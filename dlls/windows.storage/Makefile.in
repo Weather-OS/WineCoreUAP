@@ -1,0 +1,7 @@
+MODULE  = windows.storage.dll
+IMPORTS = combase
+
+SOURCES = \
+	WineCoreUAP/AppDataPaths.c \
+	classes.idl \
+	main.c
