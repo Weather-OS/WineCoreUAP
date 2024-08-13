@@ -265,7 +265,7 @@ static const struct IAppDataPathsVtbl app_data_paths_vtbl =
 
 DEFINE_IINSPECTABLE( app_data_paths_statics, IAppDataPathsStatics, struct app_data_paths_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI app_data_paths_statics_GetForUser( IAppDataPathsStatics *iface, __x_ABI_CWindows_CSystem_CIUser *user, IAppDataPaths **result )
+static HRESULT WINAPI app_data_paths_statics_GetForUser( IAppDataPathsStatics *iface, IUser *user, IAppDataPaths **result )
 {
     struct app_data_paths *impl;
 

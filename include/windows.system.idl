@@ -28,6 +28,9 @@ import "windows.foundation.idl";
 
 namespace Windows.System
 {
+    typedef enum UserType UserType;
+    typedef enum UserAuthenticationStatus UserAuthenticationStatus;
+    typedef enum UserPictureSize UserPictureSize;
     typedef enum DispatcherQueuePriority DispatcherQueuePriority;
     typedef enum ProcessorArchitecture ProcessorArchitecture;
     typedef enum VirtualKey VirtualKey;
@@ -58,6 +61,38 @@ namespace Windows.System
         interface Windows.Foundation.TypedEventHandler<Windows.System.DispatcherQueue *, Windows.System.DispatcherQueueShutdownStartingEventArgs *>;
         interface Windows.Foundation.TypedEventHandler<Windows.System.DispatcherQueueTimer *, IInspectable *>;
     }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    enum UserType
+    {
+        LocalUser     = 0,
+        RemoteUser    = 1,
+        LocalGuest    = 2,
+        RemoteGuest   = 3,
+        [contract(Windows.Foundation.UniversalApiContract, 11.0)]
+        SystemManaged = 4
+    };
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    enum UserAuthenticationStatus
+    {
+        Unauthenticated       = 0,
+        LocallyAuthenticated  = 1,
+        RemotelyAuthenticated = 2
+    };
+
+    [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+    enum UserPictureSize
+    {
+        Size64x64     = 0,
+        Size208x208   = 1,
+        Size424x424   = 2,
+        Size1080x1080 = 3
+    };
 
     [
         contract(Windows.Foundation.UniversalApiContract, 5.0)
@@ -323,6 +358,21 @@ namespace Windows.System
         uuid(dfa2dc9c-1a2d-4917-98f2-939af1d6e0c8)
     ]
     delegate HRESULT DispatcherQueueHandler();
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.System.User),
+        uuid(DF9A26C6-E746-4BCD-B5D4-120103C4209B)
+    ]
+    interface IUser : IInspectable
+    {
+        [propget] HRESULT NonRoamableId([out] [retval] HSTRING* value);
+        [propget] HRESULT AuthenticationStatus([out] [retval] Windows.System.UserAuthenticationStatus* value);
+        [propget] HRESULT Type([out] [retval] Windows.System.UserType* value);
+        HRESULT GetPropertyAsync([in] HSTRING value, [out] [retval] Windows.Foundation.IAsyncOperation<IInspectable*>** operation);
+        //FIXME: HRESULT GetPropertiesAsync([in] Windows.Foundation.Collections.IVectorView<HSTRING>* values, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IPropertySet*>** operation);
+        //FIXME: HRESULT GetPictureAsync([in] Windows.System.UserPictureSize desiredSize, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamReference*>** operation);
+    }
 
     [
         contract(Windows.Foundation.UniversalApiContract, 5.0),

@@ -29,11 +29,14 @@
 
 #include "activation.h"
 
+#define WIDL_using_Windows_System
+#include "windows.system.h"
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
+
 
 extern IActivationFactory *app_data_paths_factory;
 

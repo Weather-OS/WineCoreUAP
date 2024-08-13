@@ -43,6 +43,8 @@ namespace Windows.Storage {
     typedef enum StorageDeleteOption StorageDeleteOption;
     typedef enum StorageItemTypes StorageItemTypes;
 
+    interface IAppDataPaths;
+    interface IAppDataPathsStatics;
     interface IApplicationData;
     interface IApplicationData2;
     interface IApplicationData3;
@@ -65,6 +67,7 @@ namespace Windows.Storage {
     interface IStorageFileStatics2;
     interface IStorageItem;
 
+    runtimeclass AppDataPaths;
     runtimeclass ApplicationData;
     runtimeclass ApplicationDataContainer;
     runtimeclass KnownFolders;
@@ -236,6 +239,32 @@ namespace Windows.Storage {
         uuid(a05791e6-cc9f-4687-acab-a364fd785463)
     ]
     delegate HRESULT ApplicationDataSetVersionHandler([in] Windows.Storage.SetVersionRequest *version);
+
+    [contract(Windows.Foundation.UniversalApiContract, 5.0)]
+    [exclusiveto(Windows.Storage.AppDataPaths)]
+    [uuid(7301D60A-79A2-48C9-9EC0-3FDA092F79E1)]
+    interface IAppDataPaths : IInspectable
+    {
+        [propget] HRESULT Cookies([out] [retval] HSTRING* value);
+        [propget] HRESULT Desktop([out] [retval] HSTRING* value);
+        [propget] HRESULT Documents([out] [retval] HSTRING* value);
+        [propget] HRESULT Favorites([out] [retval] HSTRING* value);
+        [propget] HRESULT History([out] [retval] HSTRING* value);
+        [propget] HRESULT InternetCache([out] [retval] HSTRING* value);
+        [propget] HRESULT LocalAppData([out] [retval] HSTRING* value);
+        [propget] HRESULT ProgramData([out] [retval] HSTRING* value);
+        [propget] HRESULT RoamingAppData([out] [retval] HSTRING* value);
+    }
+
+    [contract(Windows.Foundation.UniversalApiContract, 5.0)]
+    [exclusiveto(Windows.Storage.AppDataPaths)]
+    [uuid(D8EB2AFE-A9D9-4B14-B999-E3921379D903)]
+    interface IAppDataPathsStatics : IInspectable
+    {
+        HRESULT GetForUser([in] Windows.System.User* user, [out] [retval] Windows.Storage.AppDataPaths** result);
+        HRESULT GetDefault([out] [retval] Windows.Storage.AppDataPaths** result);
+    }
+
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
@@ -588,6 +617,15 @@ namespace Windows.Storage {
     {
         [propget] HRESULT Stream([out, retval] Windows.Storage.Streams.IRandomAccessStream **value);
         HRESULT CommitAsync([out, retval] Windows.Foundation.IAsyncAction **operation);
+    }
+
+    [contract(Windows.Foundation.UniversalApiContract, 5.0)]
+    [marshaling_behavior(agile)]
+    [static(Windows.Storage.IAppDataPathsStatics, Windows.Foundation.UniversalApiContract, 5.0)]
+    [threading(both)]
+    runtimeclass AppDataPaths
+    {
+        [default] interface Windows.Storage.IAppDataPaths;
     }
 
     [
