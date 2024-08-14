@@ -19,6 +19,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "AppInternalPaths.h"
+
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -188,10 +190,16 @@ static HRESULT WINAPI app_data_paths_GetTrustLevel( IAppDataPaths *iface, TrustL
     return E_NOTIMPL;
 }
 
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::AppDataPaths
+ * 
+ * We're assuimg the user already used GetDefault();
+*/
+
 static HRESULT WINAPI app_data_paths_get_Cookies( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    //Need to fix FOLDERID_COOKIES
+    return app_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Desktop( IAppDataPaths *iface, HSTRING *value )
@@ -267,6 +275,7 @@ DEFINE_IINSPECTABLE( app_data_paths_statics, IAppDataPathsStatics, struct app_da
 
 static HRESULT WINAPI app_data_paths_statics_GetForUser( IAppDataPathsStatics *iface, IUser *user, IAppDataPaths **result )
 {
+    //I couldn't find a difference between GetForUser and GetDefault.
     struct app_data_paths *impl;
 
     TRACE( "iface %p, value %p\n", iface, result );
@@ -284,8 +293,19 @@ static HRESULT WINAPI app_data_paths_statics_GetForUser( IAppDataPathsStatics *i
 
 static HRESULT WINAPI app_data_paths_statics_GetDefault( IAppDataPathsStatics *iface, IAppDataPaths **result )
 {
-    FIXME( "iface %p stub!\n", iface );
-    return E_NOTIMPL;
+    struct app_data_paths *impl;
+
+    TRACE( "iface %p, value %p\n", iface, result );
+
+    if (!result) return E_INVALIDARG;
+    if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
+
+    impl->IAppDataPaths_iface.lpVtbl = &app_data_paths_vtbl;
+    impl->ref = 1;
+
+    *result = &impl->IAppDataPaths_iface;
+    TRACE( "created IAppDataPaths %p.\n", *result );
+    return S_OK;
 }
 
 

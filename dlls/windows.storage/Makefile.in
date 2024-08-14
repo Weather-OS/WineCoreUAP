@@ -1,7 +1,8 @@
 MODULE  = windows.storage.dll
-IMPORTS = combase
+IMPORTS = shell32 user32 combase ole32 advapi32 shlwapi
 
 SOURCES = \
+	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	classes.idl \
 	main.c
