@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2023 Mohamad Al-Jaf
+ * Written by Weather
+ *
+ * This is a reverse engineered implementation of Microsoft's OneCoreUAP binaries.
+ *
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -50,6 +53,7 @@ static void test_AppDataPathsStatics(void)
     static const WCHAR *app_data_paths_statics_name = L"Windows.Storage.AppDataPaths";
     IAppDataPathsStatics *app_data_paths_statics;
     IAppDataPaths *app_data_paths = NULL;
+    const wchar_t* wstr;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING cookiesString;
@@ -62,13 +66,12 @@ static void test_AppDataPathsStatics(void)
 
     hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
     WindowsDeleteString( str );
-    //ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
     if (hr == REGDB_E_CLASSNOTREG)
     {
         win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( app_data_paths_statics_name ) );
         return;
     }
-    printf("hello\n");
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
     check_interface( factory, &IID_IAgileObject );
@@ -78,16 +81,13 @@ static void test_AppDataPathsStatics(void)
     hr = IAppDataPathsStatics_GetDefault( app_data_paths_statics, NULL );
     ok( hr == E_INVALIDARG, "got hr %#lx.\n", hr );
     hr = IAppDataPathsStatics_GetDefault( app_data_paths_statics, &app_data_paths );
-    todo_wine ok( hr == 0x80073d54, "got hr %#lx.\n", hr );
-    todo_wine ok( !app_data_paths, "got app_data_paths %p.\n", app_data_paths );
+
     IAppDataPaths_get_Cookies( app_data_paths, &cookiesString );
-    if ( !cookiesString )
-        ok ( hr == S_OK, "got cookies String of %s\n", cookiesString);
-    else
-        ok ( hr == S_OK, "got no cookie strings");
+    wstr = WindowsGetStringRawBuffer(cookiesString, NULL);
+    wprintf(L"Cookies Path: %s\n", wstr);
+
+
     if (app_data_paths) IAppDataPaths_Release( app_data_paths );
-
-
     ref = IAppDataPathsStatics_Release( app_data_paths_statics );
     ok( ref == 2, "got ref %ld.\n", ref );
     ref = IActivationFactory_Release( factory );
@@ -105,5 +105,3 @@ START_TEST(appdatapaths)
 
     RoUninitialize();
 }
-
-

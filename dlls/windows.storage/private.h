@@ -1,6 +1,8 @@
-/* WinRT Windows.Storage.ApplicationData Implementation
+/* WinRT Windows.Storage Implementation
  *
- * Copyright (C) 2023 Mohamad Al-Jaf
+ * Written by Weather
+ *
+ * This is a reverse engineered implementation of Microsoft's OneCoreUAP binaries.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

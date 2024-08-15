@@ -24,7 +24,7 @@
 
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 HRESULT WINAPI DllGetClassObject( REFCLSID clsid, REFIID riid, void **out )
 {

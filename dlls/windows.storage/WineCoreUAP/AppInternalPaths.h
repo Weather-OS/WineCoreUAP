@@ -2,6 +2,7 @@
 #include <knownfolders.h>
 #include <shlobj.h>
 #include <shlwapi.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <combaseapi.h>
 

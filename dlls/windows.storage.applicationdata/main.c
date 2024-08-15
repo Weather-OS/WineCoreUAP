@@ -32,6 +32,7 @@ HRESULT WINAPI DllGetClassObject( REFCLSID clsid, REFIID riid, void **out )
 
 HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **factory )
 {
+    printf("Windows.Storage.ApplicationData was called\n");
     const WCHAR *buffer = WindowsGetStringRawBuffer( classid, NULL );
 
     TRACE( "class %s, factory %p.\n", debugstr_hstring( classid ), factory );

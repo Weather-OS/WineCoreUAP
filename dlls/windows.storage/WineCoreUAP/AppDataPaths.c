@@ -24,7 +24,7 @@
 #include "../private.h"
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 // App Data Paths
 
@@ -42,6 +42,7 @@ static inline struct app_data_paths_statics *impl_from_IActivationFactory( IActi
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
+
     struct app_data_paths_statics *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
@@ -194,60 +195,55 @@ static HRESULT WINAPI app_data_paths_GetTrustLevel( IAppDataPaths *iface, TrustL
  * COM Oriented, WinRT Implementation: winrt::Windows::Storage::AppDataPaths
  * 
  * We're assuimg the user already used GetDefault();
+ * 
+ * TODO: Need to fix FOLDERID's for a fully conformant implementation.
+ * 
+ * ISSUES: This assumes AppxManifest.xml is present.
 */
 
 static HRESULT WINAPI app_data_paths_get_Cookies( IAppDataPaths *iface, HSTRING *value )
 {
-    //Need to fix FOLDERID_COOKIES
     return app_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Desktop( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "desktop", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Documents( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "documents", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Favorites( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "favorites", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_History( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "history", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_InternetCache( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "internet_cache", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_LocalAppData( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "localappdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_ProgramData( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "programdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_RoamingAppData( IAppDataPaths *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return app_data_paths_GetKnownFolder(iface, "roamingappdata", value);
 }
 
 static const struct IAppDataPathsVtbl app_data_paths_vtbl =
