@@ -68,7 +68,7 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char *F
     if (!file) {
         MessageBoxW(NULL, L"Failed to read AppxManifest.xml", L"WineCoreUAP", MB_ICONERROR);
         printf("Manifest path was %s\n", manifestPath);
-        return 1;
+        return E_INVALIDARG;
     }
 
     while (fgets(buffer, BUFFER_SIZE, file)) {
@@ -81,7 +81,7 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char *F
 
     if (!GetUserNameA(username, &username_len)) {
         MessageBoxW(NULL, L"Failed to get username", L"WineCoreUAP", MB_ICONERROR);
-        return 1;
+        return E_UNEXPECTED;
     }
 
     PathAppendA(path, username);
@@ -110,7 +110,7 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char *F
 
     if (WindowsCreateString(charToLPCWSTR(path), strlen(path), value) != S_OK) {
         MessageBoxW(NULL, L"Failed to create Windows string", L"WineCoreUAP", MB_ICONERROR);
-        return 1;
+        return E_UNEXPECTED;
     }
     return S_OK;
 }
