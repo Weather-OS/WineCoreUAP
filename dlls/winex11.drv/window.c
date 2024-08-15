@@ -1410,8 +1410,8 @@ static void sync_window_position( struct x11drv_win_data *data,
         mask |= CWWidth | CWHeight;
     }
 
-    /* only the size is allowed to change for the desktop window */
-    if (data->whole_window != root_window)
+    /* only the size is allowed to change for the desktop window or systray docked windows */
+    if (data->whole_window != root_window && !data->embedded)
     {
         POINT pt = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
         changes.x = pt.x;
@@ -2458,6 +2458,7 @@ void X11DRV_GetDC( HDC hdc, HWND hwnd, HWND top, const RECT *win_rect,
         else escape.drawable = X11DRV_get_whole_window( top );
     }
 
+    if (!escape.drawable) return; /* don't create a GC for foreign windows */
     NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
 }
 
@@ -2588,21 +2589,18 @@ done:
 /***********************************************************************
  *		WindowPosChanging   (X11DRV.@)
  */
-BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const RECT *window_rect,
-                               const RECT *client_rect, RECT *visible_rect )
+BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
     BOOL ret = FALSE;
 
-    TRACE( "hwnd %p, swp_flags %04x, shaped %u, window_rect %s, client_rect %s, visible_rect %s\n",
-           hwnd, swp_flags, shaped, wine_dbgstr_rect(window_rect), wine_dbgstr_rect(client_rect),
-           wine_dbgstr_rect(visible_rect) );
+    TRACE( "hwnd %p, swp_flags %#x, shaped %u, rects %s\n", hwnd, swp_flags, shaped, debugstr_window_rects( rects ) );
 
-    if (!data && !(data = X11DRV_create_win_data( hwnd, window_rect, client_rect ))) return FALSE; /* use default surface */
+    if (!data && !(data = X11DRV_create_win_data( hwnd, &rects->window, &rects->client ))) return FALSE; /* use default surface */
     data->shaped = shaped;
 
     /* check if we need to switch the window to managed */
-    if (!data->managed && data->whole_window && is_window_managed( hwnd, swp_flags, window_rect ))
+    if (!data->managed && data->whole_window && is_window_managed( hwnd, swp_flags, &rects->window ))
     {
         TRACE( "making win %p/%lx managed\n", hwnd, data->whole_window );
         release_win_data( data );
@@ -2611,8 +2609,8 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const REC
         data->managed = TRUE;
     }
 
-    X11DRV_window_to_X_rect( data, visible_rect, window_rect, client_rect );
-    TRACE( "visible_rect %s -> %s\n", wine_dbgstr_rect(window_rect), wine_dbgstr_rect(visible_rect) );
+    X11DRV_window_to_X_rect( data, &rects->visible, &rects->window, &rects->client );
+    TRACE( "-> %s\n", debugstr_window_rects(rects) );
 
     ret = !!data->whole_window; /* use default surface if we don't have a window */
     release_win_data( data );
@@ -2620,13 +2618,40 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const REC
     return ret;
 }
 
+/***********************************************************************
+ *      MoveWindowBits   (X11DRV.@)
+ */
+void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, const RECT *valid_rects )
+{
+    RECT old_visible_rect, old_client_rect;
+    struct x11drv_win_data *data;
+    Window window;
+
+    if (!(data = get_win_data( hwnd ))) return;
+    old_visible_rect = data->whole_rect;
+    old_client_rect = data->client_rect;
+    window = data->whole_window;
+    release_win_data( data );
+
+    /* if all that happened is that the whole window moved, copy everything */
+    if (EqualRect( &valid_rects[0], &new_rects->visible ) && EqualRect( &valid_rects[1], &old_visible_rect ))
+    {
+        /* if we have an X window the bits will be moved by the X server */
+        if (!window && (valid_rects[0].left - valid_rects[1].left || valid_rects[0].top - valid_rects[1].top))
+            move_window_bits( hwnd, 0, &old_visible_rect, &new_rects->visible,
+                              &old_client_rect, &new_rects->client, &new_rects->window );
+    }
+    else
+    {
+        move_window_bits( hwnd, window, &valid_rects[1], &valid_rects[0],
+                          &old_client_rect, &new_rects->client, &new_rects->window );
+    }
+}
 
 /***********************************************************************
  *		WindowPosChanged   (X11DRV.@)
  */
-void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
-                              const RECT *rectWindow, const RECT *rectClient,
-                              const RECT *visible_rect, const RECT *valid_rects,
+void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
                               struct window_surface *surface )
 {
     struct x11drv_thread_data *thread_data;
@@ -2642,9 +2667,9 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     old_window_rect = data->window_rect;
     old_whole_rect  = data->whole_rect;
     old_client_rect = data->client_rect;
-    data->window_rect = *rectWindow;
-    data->whole_rect  = *visible_rect;
-    data->client_rect = *rectClient;
+    data->window_rect = new_rects->window;
+    data->whole_rect  = new_rects->visible;
+    data->client_rect = new_rects->client;
     if (data->vis.visualid == default_visual.visualid)
     {
         if (surface) window_surface_add_ref( surface );
@@ -2652,42 +2677,8 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
         data->surface = surface;
     }
 
-    TRACE( "win %p window %s client %s style %08x flags %08x\n",
-           hwnd, wine_dbgstr_rect(rectWindow), wine_dbgstr_rect(rectClient), new_style, swp_flags );
-
-    if (!IsRectEmpty( &valid_rects[0] ))
-    {
-        Window window = data->whole_window;
-        int x_offset = old_whole_rect.left - data->whole_rect.left;
-        int y_offset = old_whole_rect.top - data->whole_rect.top;
-
-        /* if all that happened is that the whole window moved, copy everything */
-        if (!(swp_flags & SWP_FRAMECHANGED) &&
-            old_whole_rect.right   - data->whole_rect.right   == x_offset &&
-            old_whole_rect.bottom  - data->whole_rect.bottom  == y_offset &&
-            old_client_rect.left   - data->client_rect.left   == x_offset &&
-            old_client_rect.right  - data->client_rect.right  == x_offset &&
-            old_client_rect.top    - data->client_rect.top    == y_offset &&
-            old_client_rect.bottom - data->client_rect.bottom == y_offset &&
-            EqualRect( &valid_rects[0], &data->client_rect ))
-        {
-            /* if we have an X window the bits will be moved by the X server */
-            if (!window && (x_offset != 0 || y_offset != 0))
-            {
-                release_win_data( data );
-                move_window_bits( hwnd, window, &old_whole_rect, visible_rect,
-                                  &old_client_rect, rectClient, rectWindow );
-                if (!(data = get_win_data( hwnd ))) return;
-            }
-        }
-        else
-        {
-            release_win_data( data );
-            move_window_bits( hwnd, window, &valid_rects[1], &valid_rects[0],
-                              &old_client_rect, rectClient, rectWindow );
-            if (!(data = get_win_data( hwnd ))) return;
-        }
-    }
+    TRACE( "win %p/%lx new_rects %s style %08x flags %08x\n", hwnd, data->whole_window,
+           debugstr_window_rects(new_rects), new_style, swp_flags );
 
     XFlush( gdi_display );  /* make sure painting is done before we move the window */
 
@@ -2721,7 +2712,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     {
         if (((swp_flags & SWP_HIDEWINDOW) && !(new_style & WS_VISIBLE)) ||
             (!event_type && !(new_style & WS_MINIMIZE) &&
-             !is_window_rect_mapped( rectWindow ) && is_window_rect_mapped( &old_window_rect )))
+             !is_window_rect_mapped( &new_rects->window ) && is_window_rect_mapped( &old_window_rect )))
         {
             release_win_data( data );
             unmap_window( hwnd );
@@ -2737,7 +2728,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
         sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
 
     if ((new_style & WS_VISIBLE) &&
-        ((new_style & WS_MINIMIZE) || is_window_rect_mapped( rectWindow )))
+        ((new_style & WS_MINIMIZE) || is_window_rect_mapped( &new_rects->window )))
     {
         if (!data->mapped)
         {
@@ -2746,7 +2737,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
 
             /* layered windows are mapped only once their attributes are set */
             if (NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_LAYERED)
-                needs_map = data->layered || IsRectEmpty( rectWindow );
+                needs_map = data->layered || IsRectEmpty( &new_rects->window );
             release_win_data( data );
             if (needs_icon) fetch_icon_data( hwnd, 0, 0 );
             if (needs_map) map_window( hwnd, new_style );
@@ -2759,7 +2750,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
             TRACE( "changing win %p iconic state to %u\n", data->hwnd, data->iconic );
             if (data->iconic)
                 XIconifyWindow( data->display, data->whole_window, data->vis.screen );
-            else if (is_window_rect_mapped( rectWindow ))
+            else if (is_window_rect_mapped( &new_rects->window ))
                 XMapWindow( data->display, data->whole_window );
             update_net_wm_states( data );
         }

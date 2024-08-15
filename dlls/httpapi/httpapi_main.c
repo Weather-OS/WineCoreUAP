@@ -430,8 +430,8 @@ ULONG WINAPI HttpSendHttpResponse(HANDLE queue, HTTP_REQUEST_ID id, ULONG flags,
             queue, wine_dbgstr_longlong(id), flags, response, cache_policy,
             ret_size, reserved1, reserved2, ovl, log_data);
 
-    if (flags)
-        FIXME("Unhandled flags %#lx.\n", flags);
+    if (flags & ~HTTP_SEND_RESPONSE_FLAG_MORE_DATA)
+        FIXME("Unhandled flags %#lx.\n", flags & ~HTTP_SEND_RESPONSE_FLAG_MORE_DATA);
     if (response->s.Flags)
         FIXME("Unhandled response flags %#lx.\n", response->s.Flags);
     if (cache_policy)
@@ -456,7 +456,7 @@ ULONG WINAPI HttpSendHttpResponse(HANDLE queue, HTTP_REQUEST_ID id, ULONG flags,
             len += 37;
         else if (response->s.Headers.KnownHeaders[i].RawValueLength)
             len += strlen(header_names[i]) + 2 + response->s.Headers.KnownHeaders[i].RawValueLength + 2;
-        else if (i == HttpHeaderContentLength)
+        else if (i == HttpHeaderContentLength && !(flags & HTTP_SEND_RESPONSE_FLAG_MORE_DATA))
         {
             char dummy[12];
             len += strlen(header_names[i]) + 2 + sprintf(dummy, "%d", body_len) + 2;
@@ -472,6 +472,7 @@ ULONG WINAPI HttpSendHttpResponse(HANDLE queue, HTTP_REQUEST_ID id, ULONG flags,
     if (!(buffer = malloc(offsetof(struct http_response, buffer[len]))))
         return ERROR_OUTOFMEMORY;
     buffer->id = id;
+    buffer->response_flags = flags;
     buffer->len = len;
     sprintf(buffer->buffer, "HTTP/1.1 %u %.*s\r\n", response->s.StatusCode,
             response->s.ReasonLength, response->s.pReason);
@@ -484,7 +485,7 @@ ULONG WINAPI HttpSendHttpResponse(HANDLE queue, HTTP_REQUEST_ID id, ULONG flags,
         else if (header->RawValueLength)
             sprintf(buffer->buffer + strlen(buffer->buffer), "%s: %.*s\r\n",
                     header_names[i], header->RawValueLength, header->pRawValue);
-        else if (i == HttpHeaderContentLength)
+        else if (i == HttpHeaderContentLength && !(flags & HTTP_SEND_RESPONSE_FLAG_MORE_DATA))
             sprintf(buffer->buffer + strlen(buffer->buffer), "Content-Length: %d\r\n", body_len);
     }
     for (i = 0; i < response->s.Headers.UnknownHeaderCount; ++i)
@@ -506,6 +507,91 @@ ULONG WINAPI HttpSendHttpResponse(HANDLE queue, HTTP_REQUEST_ID id, ULONG flags,
 
     if (!ovl)
         ovl = &dummy_ovl;
+
+    if (!DeviceIoControl(queue, IOCTL_HTTP_SEND_RESPONSE, buffer,
+            offsetof(struct http_response, buffer[len]), NULL, 0, NULL, ovl))
+        ret = GetLastError();
+
+    free(buffer);
+    return ret;
+}
+
+/***********************************************************************
+ *        HttpSendResponseEntityBody     (HTTPAPI.@)
+ *
+ * Sends entity-body data for a response.
+ *
+ * PARAMS
+ *   queue              [I] The request queue handle
+ *   id                 [I] The ID of the request to which this response corresponds
+ *   flags              [I] Flags to control the response
+ *   entity_chunk_count [I] The number of entities pointed to by entity_chunks
+ *   entity_chunks      [I] The entities to be sent
+ *   ret_size           [O] The number of bytes sent
+ *   reserved1          [I] Reserved, must be NULL
+ *   reserved2          [I] Reserved, must be zero
+ *   ovl                [I] Must be set to an OVERLAP pointer when making async calls
+ *   log_data           [I] Optional log data structure for logging the call
+ *
+ * RETURNS
+ *   NO_ERROR on success, or an error code on failure.
+ */
+ULONG WINAPI HttpSendResponseEntityBody(HANDLE queue, HTTP_REQUEST_ID id,
+       ULONG flags, USHORT entity_chunk_count, PHTTP_DATA_CHUNK entity_chunks,
+       ULONG *ret_size, void *reserved1, ULONG reserved2, OVERLAPPED *ovl,
+       HTTP_LOG_DATA *log_data)
+{
+    struct http_response *buffer;
+    OVERLAPPED dummy_ovl = {};
+    ULONG ret = NO_ERROR;
+    int len = 0;
+    char *p;
+    USHORT i;
+
+    TRACE("queue %p, id %s, flags %#lx, entity_chunk_count %u, entity_chunks %p, "
+            "ret_size %p, reserved1 %p, reserved2 %#lx, ovl %p, log_data %p\n",
+            queue, wine_dbgstr_longlong(id), flags, entity_chunk_count, entity_chunks,
+            ret_size, reserved1, reserved2, ovl, log_data);
+
+    if (!id)
+        return ERROR_CONNECTION_INVALID;
+
+    if (flags & ~HTTP_SEND_RESPONSE_FLAG_MORE_DATA)
+        FIXME("Unhandled flags %#lx.\n", flags & ~HTTP_SEND_RESPONSE_FLAG_MORE_DATA);
+    if (log_data)
+        WARN("Ignoring log_data.\n");
+
+    /* Compute the length of the body. */
+    for (i = 0; i < entity_chunk_count; ++i)
+    {
+        if (entity_chunks[i].DataChunkType != HttpDataChunkFromMemory)
+        {
+            FIXME("Unhandled data chunk type %u.\n", entity_chunks[i].DataChunkType);
+            return ERROR_CALL_NOT_IMPLEMENTED;
+        }
+        len += entity_chunks[i].FromMemory.BufferLength;
+    }
+
+    if (!(buffer = malloc(offsetof(struct http_response, buffer[len]))))
+        return ERROR_OUTOFMEMORY;
+    buffer->id = id;
+    buffer->response_flags = flags;
+    buffer->len = len;
+
+    p = buffer->buffer;
+    for (i = 0; i < entity_chunk_count; ++i)
+    {
+        const HTTP_DATA_CHUNK *chunk = &entity_chunks[i];
+        memcpy(p, chunk->FromMemory.pBuffer, chunk->FromMemory.BufferLength);
+        p += chunk->FromMemory.BufferLength;
+    }
+
+    if (!ovl)
+    {
+        ovl = &dummy_ovl;
+        if (ret_size)
+            *ret_size = len;
+    }
 
     if (!DeviceIoControl(queue, IOCTL_HTTP_SEND_RESPONSE, buffer,
             offsetof(struct http_response, buffer[len]), NULL, 0, NULL, ovl))

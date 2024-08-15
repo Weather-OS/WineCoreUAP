@@ -39,10 +39,24 @@
 #include "ddk/d3dkmthk.h"
 #include "kbd.h"
 #include "wine/list.h"
+#include "wine/debug.h"
 
 struct gdi_dc_funcs;
 struct opengl_funcs;
 struct vulkan_funcs;
+
+struct window_rects
+{
+    RECT window;    /* window area, including non-client frame */
+    RECT client;    /* client area, excluding non-client frame */
+    RECT visible;   /* area currently visible on the host screen, backed with a surface */
+};
+
+static inline const char *debugstr_window_rects( const struct window_rects *rects )
+{
+    return wine_dbg_sprintf( "{ window %s, client %s, visible %s }", wine_dbgstr_rect( &rects->window ),
+                             wine_dbgstr_rect( &rects->client ), wine_dbgstr_rect( &rects->visible ) );
+}
 
 typedef struct gdi_physdev
 {
@@ -179,7 +193,7 @@ struct gdi_dc_funcs
 };
 
 /* increment this when you change the DC function table */
-#define WINE_GDI_DRIVER_VERSION 89
+#define WINE_GDI_DRIVER_VERSION 93
 
 #define GDI_PRIORITY_NULL_DRV        0  /* null driver */
 #define GDI_PRIORITY_FONT_DRV      100  /* any font driver */
@@ -344,10 +358,10 @@ struct user_driver_funcs
     LRESULT (*pSysCommand)(HWND,WPARAM,LPARAM);
     void    (*pUpdateLayeredWindow)(HWND,UINT);
     LRESULT (*pWindowMessage)(HWND,UINT,WPARAM,LPARAM);
-    BOOL    (*pWindowPosChanging)(HWND,UINT,BOOL,const RECT *,const RECT *,RECT *);
+    BOOL    (*pWindowPosChanging)(HWND,UINT,BOOL,struct window_rects *);
     BOOL    (*pCreateWindowSurface)(HWND,BOOL,const RECT *,struct window_surface**);
-    void    (*pWindowPosChanged)(HWND,HWND,UINT,const RECT *,const RECT *,const RECT *,
-                                 const RECT *,struct window_surface*);
+    void    (*pMoveWindowBits)(HWND,const struct window_rects *,const RECT *);
+    void    (*pWindowPosChanged)(HWND,HWND,UINT,const struct window_rects*,struct window_surface*);
     /* system parameters */
     BOOL    (*pSystemParametersInfo)(UINT,UINT,void*,UINT);
     /* vulkan support */

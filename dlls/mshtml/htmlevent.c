@@ -1802,17 +1802,17 @@ static const dispex_static_data_vtbl_t HTMLEventObj_dispex_vtbl = {
     .unlink           = HTMLEventObj_unlink
 };
 
-static const tid_t HTMLEventObj_iface_tids[] = {
+static const tid_t MSEventObj_iface_tids[] = {
     IHTMLEventObj5_tid,
     IHTMLEventObj_tid,
     0
 };
 
-static dispex_static_data_t HTMLEventObj_dispex = {
-    "MSEventObj",
-    &HTMLEventObj_dispex_vtbl,
-    DispCEventObj_tid,
-    HTMLEventObj_iface_tids
+dispex_static_data_t MSEventObj_dispex = {
+    .id         = PROT_MSEventObj,
+    .vtbl       = &HTMLEventObj_dispex_vtbl,
+    .disp_tid   = DispCEventObj_tid,
+    .iface_tids = MSEventObj_iface_tids,
 };
 
 static HTMLEventObj *alloc_event_obj(DOMEvent *event, HTMLInnerWindow *script_global)
@@ -1832,9 +1832,9 @@ static HTMLEventObj *alloc_event_obj(DOMEvent *event, HTMLInnerWindow *script_gl
     event_obj->event = event;
     if(event) {
         IDOMEvent_AddRef(&event->IDOMEvent_iface);
-        init_dispatch_with_owner(&event_obj->dispex, &HTMLEventObj_dispex, &event->dispex);
+        init_dispatch_with_owner(&event_obj->dispex, &MSEventObj_dispex, &event->dispex);
     }else {
-        init_dispatch(&event_obj->dispex, &HTMLEventObj_dispex, script_global,
+        init_dispatch(&event_obj->dispex, &MSEventObj_dispex, script_global,
                       dispex_compat_mode(&script_global->event_target.dispex));
     }
     return event_obj;
@@ -3576,16 +3576,16 @@ static const dispex_static_data_vtbl_t DOMEvent_dispex_vtbl = {
     .unlink           = DOMEvent_unlink
 };
 
-static const tid_t DOMEvent_iface_tids[] = {
+static const tid_t Event_iface_tids[] = {
     IDOMEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMEvent_dispex = {
-    "Event",
-    &DOMEvent_dispex_vtbl,
-    DispDOMEvent_tid,
-    DOMEvent_iface_tids
+dispex_static_data_t Event_dispex = {
+    .id         = PROT_Event,
+    .vtbl       = &DOMEvent_dispex_vtbl,
+    .disp_tid   = DispDOMEvent_tid,
+    .iface_tids = Event_iface_tids,
 };
 
 static const dispex_static_data_vtbl_t DOMUIEvent_dispex_vtbl = {
@@ -3595,17 +3595,18 @@ static const dispex_static_data_vtbl_t DOMUIEvent_dispex_vtbl = {
     .unlink           = DOMUIEvent_unlink
 };
 
-static const tid_t DOMUIEvent_iface_tids[] = {
+static const tid_t UIEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMUIEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMUIEvent_dispex = {
-    "UIEvent",
-    &DOMUIEvent_dispex_vtbl,
-    DispDOMUIEvent_tid,
-    DOMUIEvent_iface_tids
+dispex_static_data_t UIEvent_dispex = {
+    .id           = PROT_UIEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMUIEvent_dispex_vtbl,
+    .disp_tid     = DispDOMUIEvent_tid,
+    .iface_tids   = UIEvent_iface_tids,
 };
 
 static const dispex_static_data_vtbl_t DOMMouseEvent_dispex_vtbl = {
@@ -3615,18 +3616,19 @@ static const dispex_static_data_vtbl_t DOMMouseEvent_dispex_vtbl = {
     .unlink           = DOMMouseEvent_unlink
 };
 
-static const tid_t DOMMouseEvent_iface_tids[] = {
+static const tid_t MouseEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMUIEvent_tid,
     IDOMMouseEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMMouseEvent_dispex = {
-    "MouseEvent",
-    &DOMMouseEvent_dispex_vtbl,
-    DispDOMMouseEvent_tid,
-    DOMMouseEvent_iface_tids
+dispex_static_data_t MouseEvent_dispex = {
+    .id           = PROT_MouseEvent,
+    .prototype_id = PROT_UIEvent,
+    .vtbl         = &DOMMouseEvent_dispex_vtbl,
+    .disp_tid     = DispDOMMouseEvent_tid,
+    .iface_tids   = MouseEvent_iface_tids,
 };
 
 static const dispex_static_data_vtbl_t DOMKeyboardEvent_dispex_vtbl = {
@@ -3636,18 +3638,19 @@ static const dispex_static_data_vtbl_t DOMKeyboardEvent_dispex_vtbl = {
     .unlink           = DOMKeyboardEvent_unlink
 };
 
-static const tid_t DOMKeyboardEvent_iface_tids[] = {
+static const tid_t KeyboardEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMUIEvent_tid,
     IDOMKeyboardEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMKeyboardEvent_dispex = {
-    "KeyboardEvent",
-    &DOMKeyboardEvent_dispex_vtbl,
-    DispDOMKeyboardEvent_tid,
-    DOMKeyboardEvent_iface_tids
+dispex_static_data_t KeyboardEvent_dispex = {
+    .id           = PROT_KeyboardEvent,
+    .prototype_id = PROT_UIEvent,
+    .vtbl         = &DOMKeyboardEvent_dispex_vtbl,
+    .disp_tid     = DispDOMKeyboardEvent_tid,
+    .iface_tids   = KeyboardEvent_iface_tids,
 };
 
 static void DOMPageTransitionEvent_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
@@ -3663,12 +3666,13 @@ static const dispex_static_data_vtbl_t DOMPageTransitionEvent_dispex_vtbl = {
     .unlink           = DOMEvent_unlink
 };
 
-static dispex_static_data_t DOMPageTransitionEvent_dispex = {
-    "PageTransitionEvent",
-    &DOMPageTransitionEvent_dispex_vtbl,
-    DispDOMEvent_tid,
-    DOMEvent_iface_tids,
-    DOMPageTransitionEvent_init_dispex_info
+dispex_static_data_t PageTransitionEvent_dispex = {
+    .id           = PROT_PageTransitionEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMPageTransitionEvent_dispex_vtbl,
+    .disp_tid     = DispDOMEvent_tid,
+    .iface_tids   = Event_iface_tids,
+    .init_info    = DOMPageTransitionEvent_init_dispex_info,
 };
 
 static const dispex_static_data_vtbl_t DOMCustomEvent_dispex_vtbl = {
@@ -3678,17 +3682,18 @@ static const dispex_static_data_vtbl_t DOMCustomEvent_dispex_vtbl = {
     .unlink           = DOMCustomEvent_unlink
 };
 
-static const tid_t DOMCustomEvent_iface_tids[] = {
+static const tid_t CustomEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMCustomEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMCustomEvent_dispex = {
-    "CustomEvent",
-    &DOMCustomEvent_dispex_vtbl,
-    DispDOMCustomEvent_tid,
-    DOMCustomEvent_iface_tids
+dispex_static_data_t CustomEvent_dispex = {
+    .id           = PROT_CustomEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMCustomEvent_dispex_vtbl,
+    .disp_tid     = DispDOMCustomEvent_tid,
+    .iface_tids   = CustomEvent_iface_tids,
 };
 
 static const dispex_static_data_vtbl_t DOMMessageEvent_dispex_vtbl = {
@@ -3698,17 +3703,13 @@ static const dispex_static_data_vtbl_t DOMMessageEvent_dispex_vtbl = {
     .unlink           = DOMMessageEvent_unlink
 };
 
-static const tid_t DOMMessageEvent_iface_tids[] = {
-    IDOMEvent_tid,
-    0
-};
-
-static dispex_static_data_t DOMMessageEvent_dispex = {
-    "MessageEvent",
-    &DOMMessageEvent_dispex_vtbl,
-    DispDOMMessageEvent_tid,
-    DOMMessageEvent_iface_tids,
-    DOMMessageEvent_init_dispex_info
+dispex_static_data_t MessageEvent_dispex = {
+    .id           = PROT_MessageEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMMessageEvent_dispex_vtbl,
+    .disp_tid     = DispDOMMessageEvent_tid,
+    .iface_tids   = Event_iface_tids,
+    .init_info    = DOMMessageEvent_init_dispex_info,
 };
 
 static const dispex_static_data_vtbl_t DOMProgressEvent_dispex_vtbl = {
@@ -3718,17 +3719,18 @@ static const dispex_static_data_vtbl_t DOMProgressEvent_dispex_vtbl = {
     .unlink           = DOMProgressEvent_unlink
 };
 
-static const tid_t DOMProgressEvent_iface_tids[] = {
+static const tid_t ProgressEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMProgressEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMProgressEvent_dispex = {
-    "ProgressEvent",
-    &DOMProgressEvent_dispex_vtbl,
-    DispDOMProgressEvent_tid,
-    DOMProgressEvent_iface_tids
+dispex_static_data_t ProgressEvent_dispex = {
+    .id           = PROT_ProgressEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMProgressEvent_dispex_vtbl,
+    .disp_tid     = DispDOMProgressEvent_tid,
+    .iface_tids   = ProgressEvent_iface_tids,
 };
 
 static const dispex_static_data_vtbl_t DOMStorageEvent_dispex_vtbl = {
@@ -3738,17 +3740,18 @@ static const dispex_static_data_vtbl_t DOMStorageEvent_dispex_vtbl = {
     .unlink           = DOMEvent_unlink
 };
 
-static const tid_t DOMStorageEvent_iface_tids[] = {
+static const tid_t StorageEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMStorageEvent_tid,
     0
 };
 
-static dispex_static_data_t DOMStorageEvent_dispex = {
-    "StorageEvent",
-    &DOMStorageEvent_dispex_vtbl,
-    DispDOMStorageEvent_tid,
-    DOMStorageEvent_iface_tids
+dispex_static_data_t StorageEvent_dispex = {
+    .id           = PROT_StorageEvent,
+    .prototype_id = PROT_Event,
+    .vtbl         = &DOMStorageEvent_dispex_vtbl,
+    .disp_tid     = DispDOMStorageEvent_tid,
+    .iface_tids   = StorageEvent_iface_tids,
 };
 
 static void *event_ctor(unsigned size, dispex_static_data_t *dispex_data, nsIDOMEvent *nsevent, eventid_t event_id,
@@ -3786,13 +3789,13 @@ static void fill_parent_ui_event(nsIDOMEvent *nsevent, DOMUIEvent *ui_event)
 static DOMEvent *generic_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                     compat_mode_t compat_mode)
 {
-    return event_ctor(sizeof(DOMEvent), &DOMEvent_dispex, nsevent, event_id, script_global, compat_mode);
+    return event_ctor(sizeof(DOMEvent), &Event_dispex, nsevent, event_id, script_global, compat_mode);
 }
 
 static DOMEvent *ui_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                compat_mode_t compat_mode)
 {
-    DOMUIEvent *ui_event = event_ctor(sizeof(DOMUIEvent), &DOMUIEvent_dispex, nsevent, event_id, script_global, compat_mode);
+    DOMUIEvent *ui_event = event_ctor(sizeof(DOMUIEvent), &UIEvent_dispex, nsevent, event_id, script_global, compat_mode);
     if(!ui_event) return NULL;
     ui_event->IDOMUIEvent_iface.lpVtbl = &DOMUIEventVtbl;
     ui_event->nsevent = iface;
@@ -3802,7 +3805,7 @@ static DOMEvent *ui_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t even
 static DOMEvent *mouse_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                   compat_mode_t compat_mode)
 {
-    DOMMouseEvent *mouse_event = event_ctor(sizeof(DOMMouseEvent), &DOMMouseEvent_dispex, nsevent, event_id, script_global, compat_mode);
+    DOMMouseEvent *mouse_event = event_ctor(sizeof(DOMMouseEvent), &MouseEvent_dispex, nsevent, event_id, script_global, compat_mode);
     if(!mouse_event) return NULL;
     mouse_event->IDOMMouseEvent_iface.lpVtbl = &DOMMouseEventVtbl;
     mouse_event->nsevent = iface;
@@ -3813,7 +3816,7 @@ static DOMEvent *mouse_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t e
 static DOMEvent *keyboard_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                      compat_mode_t compat_mode)
 {
-    DOMKeyboardEvent *keyboard_event = event_ctor(sizeof(DOMKeyboardEvent), &DOMKeyboardEvent_dispex, nsevent, event_id, script_global,
+    DOMKeyboardEvent *keyboard_event = event_ctor(sizeof(DOMKeyboardEvent), &KeyboardEvent_dispex, nsevent, event_id, script_global,
                                                   compat_mode);
     if(!keyboard_event) return NULL;
     keyboard_event->IDOMKeyboardEvent_iface.lpVtbl = &DOMKeyboardEventVtbl;
@@ -3825,7 +3828,7 @@ static DOMEvent *keyboard_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_
 static DOMEvent *page_transition_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                             compat_mode_t compat_mode)
 {
-    DOMPageTransitionEvent *page_transition_event = event_ctor(sizeof(DOMCustomEvent), &DOMPageTransitionEvent_dispex, nsevent, event_id,
+    DOMPageTransitionEvent *page_transition_event = event_ctor(sizeof(DOMCustomEvent), &PageTransitionEvent_dispex, nsevent, event_id,
                                                                script_global, compat_mode);
     if(!page_transition_event) return NULL;
     page_transition_event->IWinePageTransitionEvent_iface.lpVtbl = &DOMPageTransitionEventVtbl;
@@ -3835,7 +3838,7 @@ static DOMEvent *page_transition_event_ctor(void *iface, nsIDOMEvent *nsevent, e
 static DOMEvent *custom_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                    compat_mode_t compat_mode)
 {
-    DOMCustomEvent *custom_event = event_ctor(sizeof(DOMCustomEvent), &DOMCustomEvent_dispex, nsevent, event_id, script_global,
+    DOMCustomEvent *custom_event = event_ctor(sizeof(DOMCustomEvent), &CustomEvent_dispex, nsevent, event_id, script_global,
                                               compat_mode);
     if(!custom_event) return NULL;
     custom_event->IDOMCustomEvent_iface.lpVtbl = &DOMCustomEventVtbl;
@@ -3848,7 +3851,7 @@ static DOMEvent *progress_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_
 {
     DOMProgressEvent *progress_event;
 
-    if(!(progress_event = event_ctor(sizeof(DOMProgressEvent), &DOMProgressEvent_dispex, nsevent, event_id, script_global, compat_mode)))
+    if(!(progress_event = event_ctor(sizeof(DOMProgressEvent), &ProgressEvent_dispex, nsevent, event_id, script_global, compat_mode)))
         return NULL;
     progress_event->IDOMProgressEvent_iface.lpVtbl = &DOMProgressEventVtbl;
     progress_event->nsevent = iface;
@@ -3858,7 +3861,7 @@ static DOMEvent *progress_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_
 static DOMEvent *message_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                     compat_mode_t compat_mode)
 {
-    DOMMessageEvent *message_event = event_ctor(sizeof(DOMMessageEvent), &DOMMessageEvent_dispex, nsevent, event_id, script_global,
+    DOMMessageEvent *message_event = event_ctor(sizeof(DOMMessageEvent), &MessageEvent_dispex, nsevent, event_id, script_global,
                                                 compat_mode);
     if(!message_event) return NULL;
     message_event->IDOMMessageEvent_iface.lpVtbl = &DOMMessageEventVtbl;
@@ -3868,7 +3871,7 @@ static DOMEvent *message_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t
 static DOMEvent *storage_event_ctor(void *iface, nsIDOMEvent *nsevent, eventid_t event_id, HTMLInnerWindow *script_global,
                                     compat_mode_t compat_mode)
 {
-    DOMStorageEvent *storage_event = event_ctor(sizeof(DOMStorageEvent), &DOMStorageEvent_dispex, nsevent, event_id, script_global,
+    DOMStorageEvent *storage_event = event_ctor(sizeof(DOMStorageEvent), &StorageEvent_dispex, nsevent, event_id, script_global,
                                                 compat_mode);
     if(!storage_event) return NULL;
     storage_event->IDOMStorageEvent_iface.lpVtbl = &DOMStorageEventVtbl;

@@ -413,14 +413,20 @@ typedef struct {
     X(CSSStyleSheet)                       \
     X(CharacterData)                       \
     X(ClientRect)                          \
+    X(ClientRectList)                      \
+    X(Console)                             \
+    X(CustomEvent)                         \
     X(DOMImplementation)                   \
+    X(DOMTokenList)                        \
     X(Document)                            \
     X(DocumentType)                        \
     X(Element)                             \
+    X(Event)                               \
     X(HTMLAnchorElement)                   \
     X(HTMLAreaElement)                     \
     X(HTMLBodyElement)                     \
     X(HTMLButtonElement)                   \
+    X(HTMLCollection)                      \
     X(HTMLDocument)                        \
     X(HTMLElement)                         \
     X(HTMLEmbedElement)                    \
@@ -445,23 +451,45 @@ typedef struct {
     X(HTMLTableRowElement)                 \
     X(HTMLTextAreaElement)                 \
     X(HTMLTitleElement)                    \
+    X(History)                             \
+    X(KeyboardEvent)                       \
     X(MSCSSProperties)                     \
     X(MSCSSRuleList)                       \
     X(MSCurrentStyleCSSProperties)         \
+    X(MSEventObj)                          \
+    X(MSNamespaceInfoCollection)           \
+    X(MSSelection)                         \
     X(MSStyleCSSProperties)                \
+    X(MediaQueryList)                      \
+    X(MessageEvent)                        \
+    X(MimeTypeArray)                       \
+    X(MouseEvent)                          \
     X(MutationObserver)                    \
+    X(NamedNodeMap)                        \
     X(Navigator)                           \
     X(Node)                                \
+    X(NodeList)                            \
+    X(PageTransitionEvent)                 \
+    X(Performance)                         \
+    X(PerformanceNavigation)               \
+    X(PerformanceTiming)                   \
+    X(PluginArray)                         \
+    X(ProgressEvent)                       \
+    X(Range)                               \
     X(SVGCircleElement)                    \
     X(SVGElement)                          \
     X(SVGSVGElement)                       \
     X(SVGTSpanElement)                     \
     X(SVGTextContentElement)               \
     X(SVGTextPositioningElement)           \
+    X(Screen)                              \
     X(Storage)                             \
+    X(StorageEvent)                        \
     X(StyleSheet)                          \
     X(StyleSheetList)                      \
     X(Text)                                \
+    X(TextRange)                           \
+    X(UIEvent)                             \
     X(Window)                              \
     X(XMLHttpRequest)
 
@@ -488,6 +516,7 @@ typedef struct {
     prototype_id_t constructor_id;
     UINT32 js_flags;
     compat_mode_t min_compat_mode;
+    compat_mode_t max_compat_mode;
     char prototype_name[64];
 } dispex_static_data_t;
 

@@ -876,7 +876,7 @@ static LRESULT nulldrv_WindowMessage( HWND hwnd, UINT msg, WPARAM wparam, LPARAM
     return 0;
 }
 
-static BOOL nulldrv_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const RECT *window_rect, const RECT *client_rect, RECT *visible_rect )
+static BOOL nulldrv_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects )
 {
     return TRUE;
 }
@@ -886,9 +886,11 @@ static BOOL nulldrv_CreateWindowSurface( HWND hwnd, BOOL layered, const RECT *su
     return FALSE;
 }
 
-static void nulldrv_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
-                                      const RECT *window_rect, const RECT *client_rect,
-                                      const RECT *visible_rect, const RECT *valid_rects,
+static void nulldrv_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, const RECT *valid_rects )
+{
+}
+
+static void nulldrv_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
                                       struct window_surface *surface )
 {
 }
@@ -1282,6 +1284,7 @@ static const struct user_driver_funcs lazy_load_driver =
     nulldrv_WindowMessage,
     nulldrv_WindowPosChanging,
     nulldrv_CreateWindowSurface,
+    nulldrv_MoveWindowBits,
     nulldrv_WindowPosChanged,
     /* system parameters */
     nulldrv_SystemParametersInfo,
@@ -1369,6 +1372,7 @@ void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT version
     SET_USER_FUNC(WindowMessage);
     SET_USER_FUNC(WindowPosChanging);
     SET_USER_FUNC(CreateWindowSurface);
+    SET_USER_FUNC(MoveWindowBits);
     SET_USER_FUNC(WindowPosChanged);
     SET_USER_FUNC(SystemParametersInfo);
     SET_USER_FUNC(VulkanInit);

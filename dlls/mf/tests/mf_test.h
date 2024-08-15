@@ -107,6 +107,7 @@ struct sample_desc
     LONGLONG sample_time;
     LONGLONG sample_duration;
     DWORD buffer_count;
+    DWORD total_length;
     const struct buffer_desc *buffers;
     DWORD repeat_count;
     BOOL todo_length;
@@ -114,6 +115,6 @@ struct sample_desc
     BOOL todo_time;
 };
 
-#define check_mf_sample_collection(a, b, c) check_mf_sample_collection_(__FILE__, __LINE__, a, b, c)
+#define check_mf_sample_collection(a, b, c) check_mf_sample_collection_(__FILE__, __LINE__, a, b, c, FALSE)
 extern DWORD check_mf_sample_collection_(const char *file, int line, IMFCollection *samples,
-        const struct sample_desc *expect_samples, const WCHAR *expect_data_filename);
+        const struct sample_desc *expect_samples, const WCHAR *expect_data_filename, BOOL use_2d_buffer);

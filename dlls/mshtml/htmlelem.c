@@ -1120,15 +1120,15 @@ static const dispex_static_data_vtbl_t HTMLRectCollection_dispex_vtbl = {
     .get_prop_desc    = dispex_index_prop_desc,
     .invoke           = HTMLRectCollection_invoke,
 };
-static const tid_t HTMLRectCollection_iface_tids[] = {
+static const tid_t ClientRectList_iface_tids[] = {
     IHTMLRectCollection_tid,
     0
 };
-static dispex_static_data_t HTMLRectCollection_dispex = {
-    "ClientRectList",
-    &HTMLRectCollection_dispex_vtbl,
-    IHTMLRectCollection_tid,
-    HTMLRectCollection_iface_tids
+dispex_static_data_t ClientRectList_dispex = {
+    .id         = PROT_ClientRectList,
+    .vtbl       = &HTMLRectCollection_dispex_vtbl,
+    .disp_tid   = IHTMLRectCollection_tid,
+    .iface_tids = ClientRectList_iface_tids,
 };
 
 DISPEX_IDISPATCH_IMPL(HTMLElement, IHTMLElement,
@@ -3038,7 +3038,7 @@ static HRESULT WINAPI HTMLElement2_getClientRects(IHTMLElement2 *iface, IHTMLRec
 
     rects->IHTMLRectCollection_iface.lpVtbl = &HTMLRectCollectionVtbl;
     rects->rect_list = rect_list;
-    init_dispatch(&rects->dispex, &HTMLRectCollection_dispex, This->node.doc->script_global,
+    init_dispatch(&rects->dispex, &ClientRectList_dispex, This->node.doc->script_global,
                   dispex_compat_mode(&This->node.event_target.dispex));
 
     *pRectCol = &rects->IHTMLRectCollection_iface;
@@ -7121,15 +7121,16 @@ static const dispex_static_data_vtbl_t token_list_dispex_vtbl = {
     .invoke           = token_list_invoke
 };
 
-static const tid_t token_list_iface_tids[] = {
+static const tid_t DOMTokenList_tids[] = {
     IWineDOMTokenList_tid,
     0
 };
-static dispex_static_data_t token_list_dispex = {
-    "DOMTokenList",
-    &token_list_dispex_vtbl,
-    IWineDOMTokenList_tid,
-    token_list_iface_tids
+dispex_static_data_t DOMTokenList_dispex = {
+    .id              = PROT_DOMTokenList,
+    .vtbl            = &token_list_dispex_vtbl,
+    .disp_tid        = IWineDOMTokenList_tid,
+    .iface_tids      = DOMTokenList_tids,
+    .min_compat_mode = COMPAT_MODE_IE10,
 };
 
 static HRESULT create_token_list(compat_mode_t compat_mode, HTMLElement *element, IWineDOMTokenList **ret)
@@ -7144,7 +7145,7 @@ static HRESULT create_token_list(compat_mode_t compat_mode, HTMLElement *element
     }
 
     obj->IWineDOMTokenList_iface.lpVtbl = &WineDOMTokenListVtbl;
-    init_dispatch_with_owner(&obj->dispex, &token_list_dispex, &element->node.event_target.dispex);
+    init_dispatch_with_owner(&obj->dispex, &DOMTokenList_dispex, &element->node.event_target.dispex);
     obj->element = &element->IHTMLElement_iface;
     IHTMLElement_AddRef(obj->element);
 
@@ -8083,18 +8084,18 @@ static const dispex_static_data_vtbl_t HTMLAttributeCollection_dispex_vtbl = {
     .invoke           = HTMLAttributeCollection_invoke,
 };
 
-static const tid_t HTMLAttributeCollection_iface_tids[] = {
+const tid_t NamedNodeMap_iface_tids[] = {
     IHTMLAttributeCollection_tid,
     IHTMLAttributeCollection2_tid,
     IHTMLAttributeCollection3_tid,
     0
 };
 
-static dispex_static_data_t HTMLAttributeCollection_dispex = {
-    "NamedNodeMap",
-    &HTMLAttributeCollection_dispex_vtbl,
-    DispHTMLAttributeCollection_tid,
-    HTMLAttributeCollection_iface_tids
+dispex_static_data_t NamedNodeMap_dispex = {
+    .id         = PROT_NamedNodeMap,
+    .vtbl       = &HTMLAttributeCollection_dispex_vtbl,
+    .disp_tid   = DispHTMLAttributeCollection_tid,
+    .iface_tids = NamedNodeMap_iface_tids,
 };
 
 HRESULT HTMLElement_get_attr_col(HTMLDOMNode *iface, HTMLAttributeCollection **ac)
@@ -8118,7 +8119,7 @@ HRESULT HTMLElement_get_attr_col(HTMLDOMNode *iface, HTMLAttributeCollection **a
     IHTMLDOMNode_AddRef(&This->node.IHTMLDOMNode_iface);
     This->attrs->elem = This;
     list_init(&This->attrs->attrs);
-    init_dispatch(&This->attrs->dispex, &HTMLAttributeCollection_dispex, This->node.doc->script_global,
+    init_dispatch(&This->attrs->dispex, &NamedNodeMap_dispex, This->node.doc->script_global,
                   dispex_compat_mode(&This->node.event_target.dispex));
 
     *ac = This->attrs;

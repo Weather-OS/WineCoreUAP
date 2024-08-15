@@ -1039,16 +1039,13 @@ static struct android_win_data *create_win_data( HWND hwnd, const RECT *window_r
 /***********************************************************************
  *           ANDROID_WindowPosChanging
  */
-BOOL ANDROID_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const RECT *window_rect,
-                                const RECT *client_rect, RECT *visible_rect )
+BOOL ANDROID_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects )
 {
     struct android_win_data *data = get_win_data( hwnd );
 
-    TRACE( "hwnd %p, swp_flags %04x, shaped %u, window_rect %s, client_rect %s, visible_rect %s\n",
-           hwnd, swp_flags, shaped, wine_dbgstr_rect(window_rect), wine_dbgstr_rect(client_rect),
-           wine_dbgstr_rect(visible_rect) );
+    TRACE( "hwnd %p, swp_flags %#x, shaped %u, rects %s\n", hwnd, swp_flags, shaped, debugstr_window_rects( rects ) );
 
-    if (!data && !(data = create_win_data( hwnd, window_rect, client_rect ))) return FALSE; /* use default surface */
+    if (!data && !(data = create_win_data( hwnd, &rects->window, &rects->client ))) return FALSE; /* use default surface */
     release_win_data(data);
 
     return TRUE;
@@ -1079,9 +1076,7 @@ BOOL ANDROID_CreateWindowSurface( HWND hwnd, BOOL layered, const RECT *surface_r
 /***********************************************************************
  *           ANDROID_WindowPosChanged
  */
-void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
-                               const RECT *window_rect, const RECT *client_rect,
-                               const RECT *visible_rect, const RECT *valid_rects,
+void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
                                struct window_surface *surface )
 {
     struct android_win_data *data;
@@ -1090,9 +1085,9 @@ void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
 
     if (!(data = get_win_data( hwnd ))) return;
 
-    data->window_rect = *window_rect;
-    data->whole_rect  = *visible_rect;
-    data->client_rect = *client_rect;
+    data->window_rect = new_rects->window;
+    data->whole_rect  = new_rects->visible;
+    data->client_rect = new_rects->client;
 
     if (!is_argb_surface( data->surface ))
     {
@@ -1105,11 +1100,10 @@ void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
 
     if (!(swp_flags & SWP_NOZORDER)) insert_after = NtUserGetWindowRelative( hwnd, GW_HWNDPREV );
 
-    TRACE( "win %p window %s client %s style %08x owner %p after %p flags %08x\n", hwnd,
-           wine_dbgstr_rect(window_rect), wine_dbgstr_rect(client_rect),
-           new_style, owner, insert_after, swp_flags );
+    TRACE( "win %p new_rects %s style %08x owner %p after %p flags %08x\n", hwnd,
+           debugstr_window_rects(new_rects), new_style, owner, insert_after, swp_flags );
 
-    ioctl_window_pos_changed( hwnd, window_rect, client_rect, visible_rect,
+    ioctl_window_pos_changed( hwnd, &new_rects->window, &new_rects->client, &new_rects->visible,
                               new_style, swp_flags, insert_after, owner );
 }
 

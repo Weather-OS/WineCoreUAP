@@ -3237,4 +3237,87 @@ sync_test("prototypes", function() {
     check(CSSRule.prototype, Object.prototype, "css rule prototype");
     check(document.body.getBoundingClientRect(), ClientRect.prototype, "rect");
     check(ClientRect.prototype, Object.prototype, "rect prototype");
+    check(document.body.getClientRects(), ClientRectList.prototype, "rect list");
+    check(ClientRectList.prototype, Object.prototype, "rect list prototype");
+    if(v < 11) {
+        check(document.createEventObject(), MSEventObj.prototype, "event obj");
+        check(MSEventObj.prototype, Object.prototype, "event obj prototype");
+    }
+    check(document.createEvent("Event"), Event.prototype, "event");
+    check(Event.prototype, Object.prototype, "event prototype");
+    check(document.createEvent("UIEvent"), UIEvent.prototype, "UI event");
+    check(UIEvent.prototype, Event.prototype, "UI event prototype");
+    check(document.createEvent("MouseEvent"), MouseEvent.prototype, "mouse event");
+    check(MouseEvent.prototype, UIEvent.prototype, "mouse event prototype");
+    check(document.createEvent("KeyboardEvent"), KeyboardEvent.prototype, "keyboard event");
+    check(KeyboardEvent.prototype, UIEvent.prototype, "keyboard event prototype");
+    if(v >= 11) {
+        check(document.createEvent("PageTransitionEvent"), PageTransitionEvent.prototype, "page transition event");
+        check(PageTransitionEvent.prototype, Event.prototype, "page transition event prototype");
+    }
+    check(document.createEvent("CustomEvent"), CustomEvent.prototype, "custom event");
+    check(CustomEvent.prototype, Event.prototype, "custom event prototype");
+    check(document.createEvent("MessageEvent"), MessageEvent.prototype, "message event");
+    check(MessageEvent.prototype, Event.prototype, "message event prototype");
+    if(v >= 10) {
+        check(document.createEvent("ProgressEvent"), ProgressEvent.prototype, "progress event");
+        check(ProgressEvent.prototype, Event.prototype, "progress event prototype");
+    }
+    check(document.createEvent("StorageEvent"), StorageEvent.prototype, "storage event");
+    check(StorageEvent.prototype, Event.prototype, "storage event prototype");
+    check(screen, Screen.prototype, "screen");
+    check(Screen.prototype, Object.prototype, "screen prototype");
+    check(history, History.prototype, "history");
+    check(History.prototype, Object.prototype, "history prototype");
+    if(v >= 11 /* todo_wine */) {
+        check(navigator.plugins, PluginArray.prototype, "plugins");
+        check(PluginArray.prototype, Object.prototype, "plugins prototype");
+        check(navigator.mimeTypes, MimeTypeArray.prototype, "mimeTypes");
+        check(MimeTypeArray.prototype, Object.prototype, "mimeTypes prototype");
+    }
+    check(performance.timing, PerformanceTiming.prototype, "timing");
+    check(PerformanceTiming.prototype, Object.prototype, "timing prototype");
+    check(performance.navigation, PerformanceNavigation.prototype, "navigation");
+    check(PerformanceNavigation.prototype, Object.prototype, "navigation prototype");
+    check(performance, Performance.prototype, "performance");
+    check(Performance.prototype, Object.prototype, "performance prototype");
+    if(v < 10) {
+        check(document.namespaces, MSNamespaceInfoCollection.prototype, "namespaces");
+        check(MSNamespaceInfoCollection.prototype, Object.prototype, "namespaces prototype");
+    }else {
+        ok(!("MSNamespaceInfoCollection" in window), "MSNamespaceInfoCollection found in window");
+    }
+    if(v >= 10) {
+        check(console, Console.prototype, "console");
+        check(Console.prototype, Object.prototype, "console prototype");
+    }else {
+        ok(!("Console" in window), "Console found in window");
+    }
+    if(v >= 10) {
+        check(window.matchMedia("(hover:hover)"), MediaQueryList.prototype, "media query");
+        check(MediaQueryList.prototype, Object.prototype, "media query prototype");
+    }else {
+        ok(!("MediaQueryList" in window), "MediaQueryList found in window");
+    }
+    if(v >= 10) {
+        check(document.body.classList, DOMTokenList.prototype, "token list");
+        check(DOMTokenList.prototype, Object.prototype, "token list prototype");
+    }else {
+        ok(!("DOMTokenList" in window), "DOMTokenList found in window");
+    }
+    check(document.body.attributes, NamedNodeMap.prototype, "node map");
+    check(NamedNodeMap.prototype, Object.prototype, "node map prototype");
+    check(document.getElementsByTagName("body"), HTMLCollection.prototype, "elem collection");
+    check(HTMLCollection.prototype, Object.prototype, "elem collection prototype");
+    check(document.body.childNodes, NodeList.prototype, "node list");
+    check(NodeList.prototype, Object.prototype, "node list prototype");
+    check(document.body.createTextRange(), TextRange.prototype, "text range");
+    check(TextRange.prototype, Object.prototype, "text range prototype");
+    check(Range.prototype, Object.prototype, "range prototype");
+    if(v < 11) {
+        check(document.selection, MSSelection.prototype, "selection");
+        check(MSSelection.prototype, Object.prototype, "selection prototype");
+    }else {
+        ok(!("MSSelection" in window), "MSSelection found in window");
+    }
 });

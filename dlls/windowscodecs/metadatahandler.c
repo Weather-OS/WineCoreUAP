@@ -37,6 +37,7 @@ typedef struct MetadataHandler {
     IWICMetadataWriter IWICMetadataWriter_iface;
     LONG ref;
     IWICPersistStream IWICPersistStream_iface;
+    IWICStreamProvider IWICStreamProvider_iface;
     const MetadataHandlerVtbl *vtable;
     MetadataItem *items;
     DWORD item_count;
@@ -53,6 +54,11 @@ static inline MetadataHandler *impl_from_IWICPersistStream(IWICPersistStream *if
     return CONTAINING_RECORD(iface, MetadataHandler, IWICPersistStream_iface);
 }
 
+static inline MetadataHandler *impl_from_IWICStreamProvider(IWICStreamProvider *iface)
+{
+    return CONTAINING_RECORD(iface, MetadataHandler, IWICStreamProvider_iface);
+}
+
 static void MetadataHandler_FreeItems(MetadataHandler *This)
 {
     DWORD i;
@@ -65,6 +71,8 @@ static void MetadataHandler_FreeItems(MetadataHandler *This)
     }
 
     free(This->items);
+    This->items = NULL;
+    This->item_count = 0;
 }
 
 static HRESULT MetadataHandlerEnum_Create(MetadataHandler *parent, DWORD index,
@@ -89,6 +97,10 @@ static HRESULT WINAPI MetadataHandler_QueryInterface(IWICMetadataWriter *iface, 
              IsEqualIID(&IID_IWICPersistStream, iid))
     {
         *ppv = &This->IWICPersistStream_iface;
+    }
+    else if (IsEqualIID(&IID_IWICStreamProvider, iid))
+    {
+        *ppv = &This->IWICStreamProvider_iface;
     }
     else
     {
@@ -345,19 +357,22 @@ static HRESULT WINAPI MetadataHandler_GetSizeMax(IWICPersistStream *iface,
 }
 
 static HRESULT WINAPI MetadataHandler_LoadEx(IWICPersistStream *iface,
-    IStream *pIStream, const GUID *pguidPreferredVendor, DWORD dwPersistOptions)
+    IStream *stream, const GUID *pguidPreferredVendor, DWORD dwPersistOptions)
 {
     MetadataHandler *This = impl_from_IWICPersistStream(iface);
-    HRESULT hr;
+    HRESULT hr = S_OK;
     MetadataItem *new_items=NULL;
     DWORD item_count=0;
 
-    TRACE("(%p,%p,%s,%lx)\n", iface, pIStream, debugstr_guid(pguidPreferredVendor), dwPersistOptions);
+    TRACE("(%p,%p,%s,%lx)\n", iface, stream, debugstr_guid(pguidPreferredVendor), dwPersistOptions);
 
     EnterCriticalSection(&This->lock);
 
-    hr = This->vtable->fnLoad(pIStream, pguidPreferredVendor, dwPersistOptions,
-        &new_items, &item_count);
+    if (stream)
+    {
+        hr = This->vtable->fnLoad(stream, pguidPreferredVendor, dwPersistOptions,
+                &new_items, &item_count);
+    }
 
     if (SUCCEEDED(hr))
     {
@@ -391,6 +406,63 @@ static const IWICPersistStreamVtbl MetadataHandler_PersistStream_Vtbl = {
     MetadataHandler_SaveEx
 };
 
+static HRESULT WINAPI metadatahandler_stream_provider_QueryInterface(IWICStreamProvider *iface, REFIID iid, void **ppv)
+{
+    MetadataHandler *handler = impl_from_IWICStreamProvider(iface);
+    return IWICMetadataWriter_QueryInterface(&handler->IWICMetadataWriter_iface, iid, ppv);
+}
+
+static ULONG WINAPI metadatahandler_stream_provider_AddRef(IWICStreamProvider *iface)
+{
+    MetadataHandler *handler = impl_from_IWICStreamProvider(iface);
+    return IWICMetadataWriter_AddRef(&handler->IWICMetadataWriter_iface);
+}
+
+static ULONG WINAPI metadatahandler_stream_provider_Release(IWICStreamProvider *iface)
+{
+    MetadataHandler *handler = impl_from_IWICStreamProvider(iface);
+    return IWICMetadataWriter_Release(&handler->IWICMetadataWriter_iface);
+}
+
+static HRESULT WINAPI metadatahandler_stream_provider_GetStream(IWICStreamProvider *iface, IStream **stream)
+{
+    FIXME("%p, %p stub\n", iface, stream);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI metadatahandler_stream_provider_GetPersistOptions(IWICStreamProvider *iface, DWORD *options)
+{
+    FIXME("%p, %p stub\n", iface, options);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI metadatahandler_stream_provider_GetPreferredVendorGUID(IWICStreamProvider *iface, GUID *guid)
+{
+    FIXME("%p, %p stub\n", iface, guid);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI metadatahandler_stream_provider_RefreshStream(IWICStreamProvider *iface)
+{
+    FIXME("%p stub\n", iface);
+
+    return E_NOTIMPL;
+}
+
+static const IWICStreamProviderVtbl MetadataHandler_StreamProvider_Vtbl =
+{
+    metadatahandler_stream_provider_QueryInterface,
+    metadatahandler_stream_provider_AddRef,
+    metadatahandler_stream_provider_Release,
+    metadatahandler_stream_provider_GetStream,
+    metadatahandler_stream_provider_GetPersistOptions,
+    metadatahandler_stream_provider_GetPreferredVendorGUID,
+    metadatahandler_stream_provider_RefreshStream,
+};
+
 HRESULT MetadataReader_Create(const MetadataHandlerVtbl *vtable, REFIID iid, void** ppv)
 {
     MetadataHandler *This;
@@ -405,6 +477,7 @@ HRESULT MetadataReader_Create(const MetadataHandlerVtbl *vtable, REFIID iid, voi
 
     This->IWICMetadataWriter_iface.lpVtbl = &MetadataHandler_Vtbl;
     This->IWICPersistStream_iface.lpVtbl = &MetadataHandler_PersistStream_Vtbl;
+    This->IWICStreamProvider_iface.lpVtbl = &MetadataHandler_StreamProvider_Vtbl;
     This->ref = 1;
     This->vtable = vtable;
     This->items = NULL;

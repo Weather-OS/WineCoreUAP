@@ -97,12 +97,9 @@ extern void ANDROID_SetCapture( HWND hwnd, UINT flags );
 extern void ANDROID_SetWindowStyle( HWND hwnd, INT offset, STYLESTRUCT *style );
 extern UINT ANDROID_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp );
 extern LRESULT ANDROID_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp );
-extern BOOL ANDROID_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const RECT *window_rect,
-                                       const RECT *client_rect, RECT *visible_rect );
+extern BOOL ANDROID_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects );
 extern BOOL ANDROID_CreateWindowSurface( HWND hwnd, BOOL layered, const RECT *surface_rect, struct window_surface **surface );
-extern void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
-                                      const RECT *window_rect, const RECT *client_rect,
-                                      const RECT *visible_rect, const RECT *valid_rects,
+extern void ANDROID_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
                                       struct window_surface *surface );
 
 /* unixlib interface */

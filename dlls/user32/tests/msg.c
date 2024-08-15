@@ -1873,7 +1873,7 @@ static const struct message WmModalDialogSeq[] = {
     { WM_IME_SETCONTEXT, sent|parent|wparam|defwinproc|optional, 1 },
     { EVENT_OBJECT_FOCUS, winevent_hook|wparam|lparam, OBJID_CLIENT, 0 },
     { WM_SETFOCUS, sent|parent|defwinproc },
-    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
+    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam, 0, 0 },
     { HCBT_DESTROYWND, hook },
     { 0x0090, sent|optional },
     { EVENT_OBJECT_DESTROY, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
@@ -1902,7 +1902,7 @@ static const struct message WmModalDialogSeq_2[] = {
     { EVENT_OBJECT_HIDE, winevent_hook|wparam|lparam|optional, 0, 0 },
     { WM_CHANGEUISTATE, sent|optional },
     { WM_UPDATEUISTATE, sent|optional },
-    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
+    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam, 0, 0 },
     { HCBT_DESTROYWND, hook },
     { 0x0090, sent|optional },
     { EVENT_OBJECT_DESTROY, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
@@ -6591,7 +6591,7 @@ static const struct message WmSetTextInvisibleSeq[] =
 static const struct message WmSetStyleButtonSeq[] =
 {
     { BM_SETSTYLE, sent },
-    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam|msg_todo, OBJID_CLIENT, 0 },
+    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam, OBJID_CLIENT, 0 },
     { WM_APP, sent|wparam|lparam, 0, 0 },
     { WM_PAINT, sent },
     { WM_ERASEBKGND, sent|defwinproc|optional }, /* Win9x doesn't send it */
@@ -6601,7 +6601,7 @@ static const struct message WmSetStyleButtonSeq[] =
 static const struct message WmSetStyleStaticSeq[] =
 {
     { BM_SETSTYLE, sent },
-    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam|msg_todo, OBJID_CLIENT, 0 },
+    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam, OBJID_CLIENT, 0 },
     { WM_APP, sent|wparam|lparam, 0, 0 },
     { WM_PAINT, sent },
     { WM_ERASEBKGND, sent|defwinproc|optional }, /* Win9x doesn't send it */
@@ -6611,7 +6611,7 @@ static const struct message WmSetStyleStaticSeq[] =
 static const struct message WmSetStyleUserSeq[] =
 {
     { BM_SETSTYLE, sent },
-    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam|msg_todo, OBJID_CLIENT, 0 },
+    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam, OBJID_CLIENT, 0 },
     { WM_APP, sent|wparam|lparam, 0, 0 },
     { WM_PAINT, sent },
     { WM_NCPAINT, sent|defwinproc|wine_only }, /* FIXME: Wine sends it */
@@ -6623,7 +6623,7 @@ static const struct message WmSetStyleUserSeq[] =
 static const struct message WmSetStyleOwnerdrawSeq[] =
 {
     { BM_SETSTYLE, sent },
-    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam|msg_todo, OBJID_CLIENT, 0 },
+    { EVENT_OBJECT_STATECHANGE, winevent_hook|wparam|lparam, OBJID_CLIENT, 0 },
     { WM_APP, sent|wparam|lparam, 0, 0 },
     { WM_PAINT, sent },
     { WM_ERASEBKGND, sent|defwinproc|optional }, /* Win9x doesn't send it */
@@ -14493,7 +14493,7 @@ static const struct message WmQuitDialogSeq[] = {
     { WM_SETFONT, sent },
     { WM_INITDIALOG, sent },
     { WM_CHANGEUISTATE, sent|optional },
-    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
+    { EVENT_SYSTEM_DIALOGEND, winevent_hook|wparam|lparam, 0, 0 },
     { HCBT_DESTROYWND, hook },
     { 0x0090, sent|optional }, /* Vista */
     { EVENT_OBJECT_DESTROY, winevent_hook|wparam|lparam, 0, 0 },

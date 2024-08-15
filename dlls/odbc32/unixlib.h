@@ -27,6 +27,8 @@
 #include <stdarg.h>
 #include "windef.h"
 #include "winbase.h"
+
+#include "wine/list.h"
 #include "wine/unixlib.h"
 
 static inline BOOL SUCCESS( SQLRETURN ret ) { return ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO; }
@@ -34,11 +36,8 @@ static inline BOOL SUCCESS( SQLRETURN ret ) { return ret == SQL_SUCCESS || ret =
 enum sql_funcs
 {
     process_attach,
-    unix_SQLAllocConnect,
-    unix_SQLAllocEnv,
     unix_SQLAllocHandle,
     unix_SQLAllocHandleStd,
-    unix_SQLAllocStmt,
     unix_SQLBindCol,
     unix_SQLBindParameter,
     unix_SQLBrowseConnect,
@@ -74,8 +73,6 @@ enum sql_funcs
     unix_SQLFetchScroll,
     unix_SQLForeignKeys,
     unix_SQLForeignKeysW,
-    unix_SQLFreeConnect,
-    unix_SQLFreeEnv,
     unix_SQLFreeHandle,
     unix_SQLFreeStmt,
     unix_SQLGetConnectAttr,
@@ -183,38 +180,54 @@ struct param_binding
     struct param *param;
 };
 
-struct handle
+struct object
 {
-    /* handles */
+    UINT32 type;
     UINT64 unix_handle;
     void  *win32_handle;
     const struct win32_funcs *win32_funcs;
-    struct handle *parent;
+    struct object *parent;
+    struct list entry;
+    struct list children;
+    CRITICAL_SECTION cs;
+    BOOL closed;
+};
+
+struct environment
+{
+    struct object hdr;
     /* attributes */
-    UINT32 env_attr_version;
-    UINT32 con_attr_con_timeout;
-    UINT32 con_attr_login_timeout;
+    UINT32 attr_version;
     /* drivers and data sources */
     UINT32 drivers_idx;
     void  *drivers_key;
     UINT32 sources_idx;
     void  *sources_key;
     BOOL   sources_system;
+};
+
+struct connection
+{
+    struct object hdr;
+    /* attributes */
+    UINT32 attr_con_timeout;
+    UINT32 attr_login_timeout;
+};
+
+struct statement
+{
+    struct object hdr;
+    /* descriptors */
+    struct descriptor *desc[4];
     /* parameter bindings */
     struct param_binding bind_col;
     struct param_binding bind_parameter;
     UINT32 row_count;   /* number of rows returned by SQLFetch() */
 };
 
-struct SQLAllocConnect_params
+struct descriptor
 {
-    UINT64  EnvironmentHandle;
-    UINT64 *ConnectionHandle;
-};
-
-struct SQLAllocEnv_params
-{
-    UINT64 *EnvironmentHandle;
+    struct object hdr;
 };
 
 struct SQLAllocHandle_params
@@ -229,12 +242,6 @@ struct SQLAllocHandleStd_params
     INT16   HandleType;
     UINT64  InputHandle;
     UINT64 *OutputHandle;
-};
-
-struct SQLAllocStmt_params
-{
-    UINT64  ConnectionHandle;
-    UINT64 *StatementHandle;
 };
 
 struct SQLBindCol_params
@@ -589,16 +596,6 @@ struct SQLForeignKeysW_params
     INT16  NameLength5;
     WCHAR *FkTableName;
     INT16  NameLength6;
-};
-
-struct SQLFreeConnect_params
-{
-    UINT64 ConnectionHandle;
-};
-
-struct SQLFreeEnv_params
-{
-    UINT64 EnvironmentHandle;
 };
 
 struct SQLFreeHandle_params
