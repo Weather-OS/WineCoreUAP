@@ -24,6 +24,10 @@ import "inspectable.idl";
 import "eventtoken.idl";
 import "windows.foundation.idl";
 
+namespace Windows.Storage {
+    interface IStorageFile;
+}
+
 namespace Windows.Storage.Streams {
     interface IBuffer;
     interface IBufferFactory;
@@ -49,8 +53,12 @@ namespace Windows.Storage.Streams {
         interface Windows.Foundation.Collections.IVector<Windows.Storage.Streams.IRandomAccessStream *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.Streams.IBuffer *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.Streams.IRandomAccessStream *>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.Streams.IRandomAccessStreamReference *>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.Streams.IRandomAccessStreamWithContentType *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IBuffer *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStream *>;
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamReference *>;
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamWithContentType *>;
     }
 
     [
@@ -106,6 +114,27 @@ namespace Windows.Storage.Streams {
         HRESULT CloneStream([out, retval] Windows.Storage.Streams.IRandomAccessStream **stream);
         [propget] HRESULT CanRead([out, retval] boolean *value);
         [propget] HRESULT CanWrite([out, retval] boolean *value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(33EE3134-1DD6-4E3A-8067-D1C162E8642B)
+    ]
+    interface IRandomAccessStreamReference : IInspectable
+    {
+        HRESULT OpenReadAsync([out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamWithContentType*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.Streams.RandomAccessStreamReference),
+        uuid(857309DC-3FBF-4E7D-986F-EF3B1A07A964)
+    ]
+    interface IRandomAccessStreamReferenceStatics : IInspectable
+    {
+        HRESULT CreateFromFile([in] Windows.Storage.IStorageFile* file, [out] [retval] Windows.Storage.Streams.RandomAccessStreamReference** streamReference);
+        HRESULT CreateFromUri([in] Windows.Foundation.Uri* uri, [out] [retval] Windows.Storage.Streams.RandomAccessStreamReference** streamReference);
+        HRESULT CreateFromStream([in] Windows.Storage.Streams.IRandomAccessStream* stream, [out] [retval] Windows.Storage.Streams.RandomAccessStreamReference** streamReference);
     }
 
     [

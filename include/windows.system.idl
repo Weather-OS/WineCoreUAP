@@ -25,6 +25,7 @@ import "asyncinfo.idl";
 import "eventtoken.idl";
 import "windowscontracts.idl";
 import "windows.foundation.idl";
+import "windows.storage.streams.idl";
 
 namespace Windows.System
 {
@@ -370,8 +371,8 @@ namespace Windows.System
         [propget] HRESULT AuthenticationStatus([out] [retval] Windows.System.UserAuthenticationStatus* value);
         [propget] HRESULT Type([out] [retval] Windows.System.UserType* value);
         HRESULT GetPropertyAsync([in] HSTRING value, [out] [retval] Windows.Foundation.IAsyncOperation<IInspectable*>** operation);
-        //FIXME: HRESULT GetPropertiesAsync([in] Windows.Foundation.Collections.IVectorView<HSTRING>* values, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IPropertySet*>** operation);
-        //FIXME: HRESULT GetPictureAsync([in] Windows.System.UserPictureSize desiredSize, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamReference*>** operation);
+        HRESULT GetPropertiesAsync([in] Windows.Foundation.Collections.IVectorView<HSTRING>* values, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IPropertySet*>** operation);
+        HRESULT GetPictureAsync([in] Windows.System.UserPictureSize desiredSize, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamReference*>** operation);
     }
 
     [
