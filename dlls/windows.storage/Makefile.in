@@ -2,7 +2,9 @@ MODULE  = windows.storage.dll
 IMPORTS = shell32 user32 combase ole32 advapi32 shlwapi
 
 SOURCES = \
+	provider.idl \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
+	WineCoreUAP/StorageFolder.c \
 	classes.idl \
 	main.c
