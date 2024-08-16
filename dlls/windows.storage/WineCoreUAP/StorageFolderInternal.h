@@ -1,5 +1,4 @@
-/*
- * Runtime Classes for windows.storage.dll
+/* WinRT Windows.Storage.StorageFolder Implementation
  *
  * Written by Weather
  *
@@ -20,13 +19,30 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#pragma makedep register
+#include "../private.h"
+#include "wine/debug.h"
 
-#ifdef __WIDL__
-#pragma winrt ns_prefix
+#ifndef STORAGE_FOLDER_INTERNAL_H
+#define STORAGE_FOLDER_INTERNAL_H
+
+struct storage_folder
+{
+    IStorageFolder IStorageFolder_iface;
+    IStorageItem IStorageItem_iface;
+    LONG ref;
+    HSTRING Path;
+};
+
+
+struct storage_folder_statics
+{
+    IActivationFactory IActivationFactory_iface;
+    IStorageFolderStatics IStorageFolderStatics_iface;
+    LONG ref;
+};
+
+struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface );
+struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
+HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+
 #endif
-
-import "windows.foundation.idl";
-
-#define DO_NO_IMPORTS
-#include "windows.storage.idl"

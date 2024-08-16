@@ -94,13 +94,49 @@ static void test_AppDataPathsStatics(void)
     ok( ref == 1, "got ref %ld.\n", ref );
 }
 
-START_TEST(appdatapaths)
+static void test_StorageFolder(void)
+{
+    static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
+    static const WCHAR *path = L"C:\\";
+    IStorageFolderStatics *storage_folder_statics;
+    IStorageFolder *storageFolder;
+    IAsyncOperation_StorageFolder *storage_folder = NULL;
+    IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler = NULL;
+    IActivationFactory *factory;
+    HSTRING str;
+    HSTRING pathString;
+    HRESULT hr;
+    WindowsCreateString( path, wcslen( path ), &pathString );
+
+    hr = WindowsCreateString( storage_folder_statics_name, wcslen( storage_folder_statics_name ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
+    WindowsDeleteString( str );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( storage_folder_statics_name ) );
+        return;
+    }
+    check_interface( factory, &IID_IUnknown );
+    check_interface( factory, &IID_IInspectable );
+    check_interface( factory, &IID_IAgileObject );
+    hr = IActivationFactory_QueryInterface( factory, &IID_IStorageFolderStatics, (void **)&storage_folder_statics );
+    hr = IStorageFolderStatics_GetFolderFromPathAsync( storage_folder_statics, pathString, &storage_folder );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+    //hr = IAsyncOperation_StorageFolder_get_Completed( storage_folder, &storage_folder_handler );
+    //ok( hr == S_OK, "got hr %#lx.\n", hr );
+}
+
+START_TEST(storage)
 {
     HRESULT hr;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
+    test_StorageFolder();
     test_AppDataPathsStatics();
 
     RoUninitialize();

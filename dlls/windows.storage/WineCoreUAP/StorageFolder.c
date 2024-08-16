@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.AppDataPaths  Implementation
+/* WinRT Windows.Storage.StorageFolder Implementation
  *
  * Written by Weather
  *
@@ -18,6 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
+#include "StorageFolderInternal.h"
 
 #include "../private.h"
 #include "wine/debug.h"
@@ -26,14 +27,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 // Storage Folder
 
-struct storage_folder_statics
-{
-    IActivationFactory IActivationFactory_iface;
-    IStorageFolderStatics IStorageFolderStatics_iface;
-    LONG ref;
-};
-
-static inline struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface )
+struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
     return CONTAINING_RECORD( iface, struct storage_folder_statics, IActivationFactory_iface );
 }
@@ -120,13 +114,7 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-struct storage_folder
-{
-    IStorageFolder IStorageFolder_iface;
-    LONG ref;
-};
-
-static inline struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface )
+struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface )
 {
     return CONTAINING_RECORD( iface, struct storage_folder, IStorageFolder_iface );
 }
@@ -143,6 +131,13 @@ static HRESULT WINAPI storage_folder_QueryInterface( IStorageFolder *iface, REFI
         IsEqualGUID( iid, &IID_IStorageFolder ))
     {
         *out = &impl->IStorageFolder_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageItem ))
+    {
+        *out = &impl->IStorageItem_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -266,7 +261,7 @@ static HRESULT WINAPI storage_folder_GetItemsAsyncOverloadDefaultStartAndCount( 
     return E_NOTIMPL;
 }
 
-static const struct IStorageFolderVtbl storage_folder_vtbl =
+struct IStorageFolderVtbl storage_folder_vtbl =
 {
     storage_folder_QueryInterface,
     storage_folder_AddRef,
@@ -292,8 +287,9 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
-    FIXME( "iface %p, path %p stub!\n", iface, path );
-    return E_NOTIMPL;
+    async_operation_storage_folder_result_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
+    return S_OK;
 }
 
 static const struct IStorageFolderStaticsVtbl storage_folder_statics_vtbl =

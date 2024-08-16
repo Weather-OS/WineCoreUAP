@@ -32,10 +32,10 @@ import "eventtoken.idl";
 import "windowscontracts.idl";
 import "windows.foundation.idl";
 
-namespace Windows.Storage.Custom {
+namespace Windows.Storage {
     /* type-pruning version of AsyncOperationCompletedHandler<T> */
     delegate HRESULT WineAsyncOperationCompletedHandler([in] IInspectable *async, [in] AsyncStatus status);
-    
+
     [
         uuid(83f377ee-c799-11ec-9d64-0242ac120002)
     ]
