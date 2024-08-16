@@ -237,10 +237,12 @@ static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTR
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_IStorageItem**operation )
+static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
 {
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_storage_item_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchItem, operation );
+    TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetFilesAsyncOverloadDefaultOptionsStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_StorageFile **operation )
@@ -287,9 +289,10 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
-    async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
+    HRESULT hr;
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
-    return S_OK;
+    return hr;
 }
 
 static const struct IStorageFolderStaticsVtbl storage_folder_statics_vtbl =

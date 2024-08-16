@@ -120,11 +120,9 @@ static HRESULT WINAPI storage_item_async_GetResults( IAsyncOperation_IStorageIte
     PROPVARIANT result = {.vt = VT_UNKNOWN};
     HRESULT hr;
 
-    printf( "iface %p, results %p.\n", iface, results );
-
     hr = IWineAsyncInfoImpl_get_Result( impl->IWineAsyncInfoImpl_inner, &result );
 
-    results = (IStorageItem **)&result.ppunkVal;
+    *results = (IStorageItem *)result.ppunkVal;
     PropVariantClear( &result );
     return hr;
 }
@@ -145,7 +143,7 @@ static const struct IAsyncOperation_IStorageItemVtbl storage_item_async_vtbl =
     storage_item_async_GetResults,
 };
 
-HRESULT async_operation_storage_folder_result_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+HRESULT async_operation_storage_item_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IStorageItem **out )
 {
     struct storage_item_async *impl;

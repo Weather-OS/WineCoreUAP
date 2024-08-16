@@ -51,6 +51,8 @@ HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_c
 
 extern HRESULT async_operation_storage_folder_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_StorageFolder **out );
+extern HRESULT async_operation_storage_item_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+                                              IAsyncOperation_IStorageItem **out );
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     static inline impl_type *impl_from( iface_type *iface )                                        \

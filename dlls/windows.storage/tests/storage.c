@@ -109,11 +109,80 @@ static IAsyncOperationCompletedHandler_StorageFolderVtbl storage_folder_async_ha
     storage_folder_async_handler_QueryInterface,
     storage_folder_async_handler_AddRef,
     storage_folder_async_handler_Release,
-    /*** IAsyncOperationCompletedHandler<boolean> methods ***/
+    /*** IAsyncOperationCompletedHandler<StorageFolder> methods ***/
     storage_folder_async_handler_Invoke,
 };
 
 static struct storage_folder_async_handler default_storage_folder_async_handler = {{&storage_folder_async_handler_vtbl}};
+
+struct storage_item_async_handler
+{
+    IAsyncOperationCompletedHandler_IStorageItem IAsyncOperationCompletedHandler_IStorageItem_iface;
+    IAsyncOperation_IStorageItem *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct storage_item_async_handler *impl_from_IAsyncOperationCompletedHandler_IStorageItem( IAsyncOperationCompletedHandler_IStorageItem *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_item_async_handler, IAsyncOperationCompletedHandler_IStorageItem_iface );
+}
+
+static HRESULT WINAPI storage_item_async_handler_QueryInterface( IAsyncOperationCompletedHandler_IStorageItem *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_IStorageItem ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_item_async_handler_AddRef( IAsyncOperationCompletedHandler_IStorageItem *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI storage_item_async_handler_Release( IAsyncOperationCompletedHandler_IStorageItem *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI storage_item_async_handler_Invoke( IAsyncOperationCompletedHandler_IStorageItem *iface,
+                                                 IAsyncOperation_IStorageItem *async, AsyncStatus status )
+{
+    struct storage_item_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_IStorageItem( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_IStorageItemVtbl storage_item_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    storage_item_async_handler_QueryInterface,
+    storage_item_async_handler_AddRef,
+    storage_item_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<IStorageItem> methods ***/
+    storage_item_async_handler_Invoke,
+};
+
+static struct storage_item_async_handler default_storage_item_async_handler = {{&storage_item_async_handler_vtbl}};
+
 
 #define check_interface( obj, iid ) check_interface_( __LINE__, obj, iid )
 static void check_interface_( unsigned int line, void *obj, const IID *iid )
@@ -177,20 +246,31 @@ static void test_StorageFolder(void)
 {
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
     static const WCHAR *path = L"C:\\";
+    static const WCHAR *name = L"Users";
+    static const WCHAR *fullPath = L"C:\\Users";
     struct storage_folder_async_handler storage_folder_async_handler;
+    struct storage_item_async_handler storage_item_async_handler;
     IStorageItem *storageItem;
+    IStorageItem *storageItemResults;
     IStorageFolder *storageFolderResults = NULL;
     IStorageFolderStatics *storage_folder_statics;
     IAsyncOperation_StorageFolder *storage_folder = NULL;
+    IAsyncOperation_IStorageItem *storageItemOperation = NULL;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
+    IAsyncOperationCompletedHandler_IStorageItem *storage_item_handler;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING pathString;
+    HSTRING secondPathString;
+    HSTRING fullPathString;
+    HSTRING nameString;
     HSTRING Path;
     HRESULT hr;
     DWORD ret;
 
     WindowsCreateString( path, wcslen( path ), &pathString );
+    WindowsCreateString( name, wcslen( name ), &nameString );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &fullPathString );
 
     hr = WindowsCreateString( storage_folder_statics_name, wcslen( storage_folder_statics_name ), &str );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -209,6 +289,10 @@ static void test_StorageFolder(void)
     check_interface( factory, &IID_IAgileObject );
     hr = IActivationFactory_QueryInterface( factory, &IID_IStorageFolderStatics, (void **)&storage_folder_statics );
     
+    /**
+     * IStorageFolderStatics_GetFolderFromPathAsync
+    */
+
     hr = IStorageFolderStatics_GetFolderFromPathAsync( storage_folder_statics, pathString, &storage_folder );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
     
@@ -227,17 +311,56 @@ static void test_StorageFolder(void)
     
     hr = IAsyncOperation_StorageFolder_put_Completed( storage_folder, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
     ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
     ret = WaitForSingleObject( storage_folder_async_handler.event, 1000 );
     ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+    
     ret = CloseHandle( storage_folder_async_handler.event );
     ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
     ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
     ok( storage_folder_async_handler.async == storage_folder, "got async %p\n", storage_folder_async_handler.async );
     ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+    
     hr = IAsyncOperation_StorageFolder_GetResults( storage_folder, &storageFolderResults );
+   
     IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
+    
+    /**
+     * IStorageFolder_GetItemAsync
+    */
+
+    hr = IStorageFolder_GetItemAsync( storageFolderResults, nameString, &storageItemOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageItemOperation, &IID_IUnknown );
+    check_interface( storageItemOperation, &IID_IInspectable );
+    check_interface( storageItemOperation, &IID_IAgileObject );
+    check_interface( storageItemOperation, &IID_IAsyncInfo );
+    check_interface( storageItemOperation, &IID_IAsyncOperation_IStorageItem );
+
+    hr = IAsyncOperation_IStorageItem_get_Completed( storageItemOperation, &storage_item_handler);
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_item_handler == NULL, "got handler %p\n", storage_item_handler );
+
+    storage_item_async_handler = default_storage_item_async_handler;
+    storage_item_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IStorageItem_put_Completed( storageItemOperation, &storage_item_async_handler.IAsyncOperationCompletedHandler_IStorageItem_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_item_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_item_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_item_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_item_async_handler.async == storageItemOperation, "got async %p\n", storage_item_async_handler.async );
+    ok( storage_item_async_handler.status == Completed || broken( storage_item_async_handler.status == Error ), "got status %u\n", storage_item_async_handler.status );
+
+    hr = IAsyncOperation_IStorageItem_GetResults( storageItemOperation, &storageItemResults );
+    IStorageItem_get_Path( storageItemResults, &secondPathString );
 }
 
 START_TEST(storage)
@@ -248,7 +371,7 @@ START_TEST(storage)
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
     test_StorageFolder();
-    //test_AppDataPathsStatics();
+    test_AppDataPathsStatics();
 
     RoUninitialize();
 }

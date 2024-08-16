@@ -19,11 +19,23 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <windows.h>
+#include <knownfolders.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <combaseapi.h> 
+#include <stdint.h>
+
 #include "../private.h"
 #include "wine/debug.h"
 
 #ifndef STORAGE_FOLDER_INTERNAL_H
 #define STORAGE_FOLDER_INTERNAL_H
+
+#define WINDOWS_TICK 10000000
+#define SEC_TO_UNIX_EPOCH 11644473600LL
 
 struct storage_folder
 {
@@ -43,5 +55,6 @@ struct storage_folder_statics
 struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface );
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
 HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

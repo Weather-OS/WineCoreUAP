@@ -124,7 +124,6 @@ static HRESULT WINAPI storage_folder_async_GetResults( IAsyncOperation_StorageFo
 
     *results = (IStorageFolder *)result.ppunkVal;
     PropVariantClear( &result );
-    printf( "iface %p, results %p, result.ppunkVal %p.\n", iface, results, result.ppunkVal );
     return hr;
 }
 
