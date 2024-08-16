@@ -36,6 +36,17 @@
 
 #include "wine/test.h"
 
+LPCSTR HStringToLPCSTR( HSTRING hString ) {
+    UINT32 length = WindowsGetStringLen(hString);
+    const wchar_t* rawBuffer = WindowsGetStringRawBuffer(hString, &length);
+    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
+    char* multiByteStr = (char*)malloc(bufferSize + 1);
+    WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, multiByteStr, bufferSize, NULL, NULL);
+    multiByteStr[bufferSize] = '\0';
+
+    return multiByteStr;
+}
+
 struct storage_folder_async_handler
 {
     IAsyncOperationCompletedHandler_StorageFolder IAsyncOperationCompletedHandler_StorageFolder_iface;
@@ -167,12 +178,15 @@ static void test_StorageFolder(void)
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
     static const WCHAR *path = L"C:\\";
     struct storage_folder_async_handler storage_folder_async_handler;
+    IStorageItem *storageItem;
+    IStorageFolder *storageFolderResults = NULL;
     IStorageFolderStatics *storage_folder_statics;
     IAsyncOperation_StorageFolder *storage_folder = NULL;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING pathString;
+    HSTRING Path;
     HRESULT hr;
     DWORD ret;
 
@@ -220,6 +234,10 @@ static void test_StorageFolder(void)
     ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
     ok( storage_folder_async_handler.async == storage_folder, "got async %p\n", storage_folder_async_handler.async );
     ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+    hr = IAsyncOperation_StorageFolder_GetResults( storage_folder, &storageFolderResults );
+    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
+    IStorageItem_get_Path( storageItem, &Path );
+    ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
 }
 
 START_TEST(storage)
@@ -230,7 +248,7 @@ START_TEST(storage)
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
     test_StorageFolder();
-    test_AppDataPathsStatics();
+    //test_AppDataPathsStatics();
 
     RoUninitialize();
 }

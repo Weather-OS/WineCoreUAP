@@ -6,8 +6,10 @@ SOURCES = \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \
 	WineCoreUAP/StorageFolderInternal.c \
+	WineCoreUAP/StorageItem.c \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
+	WineCoreUAP/AsyncOperation/StorageItemAsync.c \
 	provider.idl \
 	classes.idl \
 	main.c

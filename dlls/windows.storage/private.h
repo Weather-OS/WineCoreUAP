@@ -49,7 +49,7 @@ typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown 
 HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
 
-extern HRESULT async_operation_storage_folder_result_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+extern HRESULT async_operation_storage_folder_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_StorageFolder **out );
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \

@@ -287,7 +287,7 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
-    async_operation_storage_folder_result_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
+    async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
     return S_OK;
 }

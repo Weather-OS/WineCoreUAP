@@ -22,26 +22,19 @@
 #include "../private.h"
 #include "wine/debug.h"
 
-#ifndef STORAGE_FOLDER_INTERNAL_H
-#define STORAGE_FOLDER_INTERNAL_H
+#ifndef STORAGE_ITEM_INTERNAL_H
+#define STORAGE_ITEM_INTERNAL_H
 
-struct storage_folder
+struct storage_item
 {
-    IStorageFolder IStorageFolder_iface;
     IStorageItem IStorageItem_iface;
+    FileAttributes Attributes;
+    DateTime DateCreated;
+    HSTRING Name;
+    HSTRING Path;
     LONG ref;
 };
 
-
-struct storage_folder_statics
-{
-    IActivationFactory IActivationFactory_iface;
-    IStorageFolderStatics IStorageFolderStatics_iface;
-    LONG ref;
-};
-
-struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface );
-struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
-HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
 
 #endif

@@ -20,10 +20,12 @@
  */
 
 #include "StorageFolderInternal.h"
+#include "StorageItemInternal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IStorageItemVtbl storage_item_vtbl;
 
 LPCSTR HStringToLPCSTR( HSTRING hString ) {
     UINT32 length = WindowsGetStringLen(hString);
@@ -40,11 +42,13 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
     HRESULT hr;
     DWORD attrib;
     struct storage_folder *folder;
+    
     TRACE( "iface %p, value %p\n", invoker, result );
     if (!result) return E_INVALIDARG;
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
     
     attrib = GetFileAttributesA(HStringToLPCSTR((HSTRING)param));
@@ -52,11 +56,14 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
         hr = E_INVALIDARG;
     } else {
         hr = S_OK;
+        impl_from_IStorageItem(&folder->IStorageItem_iface)->Path = (HSTRING)param;
     }
+
     result->vt = VT_UNKNOWN;
     if (SUCCEEDED(hr))
     {
         result->ppunkVal = (IUnknown **)&folder->IStorageFolder_iface;
+        printf("folder->IStorageFolder_iface %p\n", (IUnknown **)&folder->IStorageFolder_iface);
     }
         
     //TODO: Implement IStorageItem and Assign.
