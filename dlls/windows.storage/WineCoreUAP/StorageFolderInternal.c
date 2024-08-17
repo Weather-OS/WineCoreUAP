@@ -26,6 +26,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
 
 int64_t FileTimeToUnixTime(const FILETIME *ft) {
     ULARGE_INTEGER ull;
@@ -36,6 +37,30 @@ int64_t FileTimeToUnixTime(const FILETIME *ft) {
 
     // Convert from Windows epoch (1601-01-01) to Unix epoch (1970-01-01)
     return (ull.QuadPart / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH;
+}
+
+char * GetFileNameFromPath(LPCSTR path) {
+    char* last_slash = strrchr(path, '/');
+    char* last_backslash = strrchr(path, '\\');
+    char* last_separator = (last_slash > last_backslash) ? last_slash : last_backslash;
+
+    if (last_separator != NULL) {
+        return last_separator + 1;
+    }
+    
+    return path;
+}
+
+
+void GenerateUniqueFileName(char* buffer, size_t bufferSize) {
+    UUID uuid;
+    char* str;
+
+    UuidCreate(&uuid);
+    UuidToStringA(&uuid, (RPC_CSTR*)&str);
+    snprintf(buffer, bufferSize, "%s", str);
+
+    RpcStringFreeA((RPC_CSTR*)&str);
 }
 
 LPCWSTR CharToLPCWSTR(char * charString) {
@@ -66,6 +91,8 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
 {    
     HRESULT hr;
     DWORD attrib;
+    HANDLE hFile;
+    FILETIME ftCreate;
     struct storage_folder *folder;
     
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -76,12 +103,55 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
     
-    attrib = GetFileAttributesA(HStringToLPCSTR((HSTRING)param));
-    if (attrib == INVALID_FILE_ATTRIBUTES) {
+    attrib = GetFileAttributesA( HStringToLPCSTR( (HSTRING)param ) );
+    if (attrib == INVALID_FILE_ATTRIBUTES) 
+    {
         hr = E_INVALIDARG;
-    } else {
-        hr = S_OK;
+    } else 
+    {
+        hFile = CreateFileA( HStringToLPCSTR((HSTRING)param), GENERIC_READ, FILE_SHARE_READ, NULL,
+                       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+        if (hFile == INVALID_HANDLE_VALUE) 
+        {
+            MessageBoxW( NULL, L"Couldn't open a folder for READ.", L"WineCoreUAP", MB_ICONERROR );
+            return E_ABORT;
+        }
+
+        if ( !GetFileTime( hFile, &ftCreate, NULL, NULL ) ) 
+        {
+            MessageBoxW( NULL, L"Failed to get folder time.", L"WineCoreUAP", MB_ICONERROR );
+            CloseHandle(hFile);
+            return E_ABORT;
+        }
         impl_from_IStorageItem(&folder->IStorageItem_iface)->Path = (HSTRING)param;
+        impl_from_IStorageItem(&folder->IStorageItem_iface)->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
+        switch (attrib)
+        {
+            case FILE_ATTRIBUTE_NORMAL:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Normal;
+                break;
+            case FILE_ATTRIBUTE_READONLY:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_ReadOnly;
+                break;
+            case FILE_ATTRIBUTE_DIRECTORY:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Directory;
+                break;
+            case FILE_ATTRIBUTE_ARCHIVE:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Archive;
+                break;
+            case FILE_ATTRIBUTE_TEMPORARY:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Temporary;
+                break;
+            default:
+                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Normal;
+        }
+        //What the hell?
+        WindowsCreateString( 
+            CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param))),
+            wcslen(CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param)))),
+            &impl_from_IStorageItem(&folder->IStorageItem_iface)->Name
+            );
+        hr = S_OK;
     }
 
     result->vt = VT_UNKNOWN;
@@ -106,7 +176,7 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
     size_t length;
 
     folder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
-    Path = impl_from_IStorageItem(&folder->IStorageItem_iface)->Path;
+    Path = impl_from_IStorageItem( &folder->IStorageItem_iface )->Path;
 
     length = strlen(HStringToLPCSTR(Path)) + 1; 
     fullPath = (char*)malloc(length);
@@ -119,10 +189,11 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     item->ref = 1;
 
-    PathAppendA(fullPath, HStringToLPCSTR((HSTRING)param));
+    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
     
     attrib = GetFileAttributesA(fullPath);
-    if (attrib == INVALID_FILE_ATTRIBUTES) {
+    if (attrib == INVALID_FILE_ATTRIBUTES) 
+    {
         hr = E_INVALIDARG;
     } else {
         switch (attrib)
@@ -144,22 +215,24 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
                 break;
         }
 
-        hFile = CreateFileA(fullPath, GENERIC_READ, FILE_SHARE_READ, NULL,
-                       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
-        if (hFile == INVALID_HANDLE_VALUE) {
-            MessageBoxW(NULL, L"Couldn't open a file for READ.", L"WineCoreUAP", MB_ICONERROR);
+        hFile = CreateFileA( fullPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+                       OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+        if (hFile == INVALID_HANDLE_VALUE) 
+        {
+            MessageBoxW( NULL, L"Couldn't open a file for READ.", L"WineCoreUAP", MB_ICONERROR );
             return E_ABORT;
         }
 
-        if (!GetFileTime(hFile, &ftCreate, NULL, NULL)) {
-            MessageBoxW(NULL, L"Failed to get file time.", L"WineCoreUAP", MB_ICONERROR);
+        if ( !GetFileTime( hFile, &ftCreate, NULL, NULL ) ) 
+        {
+            MessageBoxW( NULL, L"Failed to get file time.", L"WineCoreUAP", MB_ICONERROR );
             CloseHandle(hFile);
             return E_ABORT;
         }
 
         item->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
         item->Name = (HSTRING)param;
-        WindowsCreateString(CharToLPCWSTR(fullPath), wcslen(CharToLPCWSTR(fullPath)), &item->Path);
+        WindowsCreateString( CharToLPCWSTR(fullPath), wcslen(CharToLPCWSTR(fullPath)), &item->Path );
 
         hr = S_OK;
     }
@@ -170,5 +243,93 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
         result->ppunkVal = (IUnknown **)&item->IStorageItem_iface;
     }
 
+    return hr;
+}
+
+HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
+{
+    HRESULT hr;
+    HSTRING Path;
+    DWORD attrib;
+    BOOL Exists = FALSE;
+    BOOL Replace = FALSE;
+    struct storage_folder *invokerFolder;
+    char * fullPath;
+    char uuidName[MAX_PATH];
+    size_t length;
+
+    invokerFolder = impl_from_IStorageFolder( (IStorageFolder *)folder );
+    Path = impl_from_IStorageItem(&invokerFolder->IStorageItem_iface)->Path;
+
+    length = strlen(HStringToLPCSTR(Path)) + 1; 
+    fullPath = (char*)malloc(length);
+    strcpy(fullPath, HStringToLPCSTR(Path));
+
+    TRACE( "iface %p, value %p\n", folder, OutPath );
+    switch ( collisionOption )
+    {
+        case CreationCollisionOption_FailIfExists:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                hr = E_INVALIDARG;
+
+            hr = S_OK;
+            break;
+
+        case CreationCollisionOption_GenerateUniqueName:
+            GenerateUniqueFileName( uuidName, sizeof(uuidName) );
+            PathAppendA( fullPath, uuidName );
+
+            hr = S_OK;
+            break;
+        
+        case CreationCollisionOption_OpenIfExists:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                Exists = TRUE;
+            
+            hr = S_OK;
+            break;
+        
+        case CreationCollisionOption_ReplaceExisting:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                Replace = TRUE;
+
+            hr = S_OK;
+            break;
+    }
+    if (SUCCEEDED(hr))
+    {
+        if (Replace)
+        {
+            if ( RemoveDirectoryA( fullPath ) )
+            {
+                MessageBoxW( NULL, L"Failed to remove a folder.", L"WineCoreUAP", MB_ICONERROR );
+                return E_ABORT;
+            }
+        }
+        if (!Exists)
+        {
+            if ( CreateDirectoryA( fullPath, NULL ) )
+            {
+                MessageBoxW( NULL, L"Failed to create a folder.", L"WineCoreUAP", MB_ICONERROR );
+                return E_ABORT;
+            }
+            hr = S_OK;
+        }
+        hr = WindowsCreateString( CharToLPCWSTR(fullPath), wcslen(CharToLPCWSTR(fullPath)), OutPath );
+    }
+    return hr;
+}
+
+HRESULT storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT hr = S_OK;
+
+    // Awaiting future implementation.
     return hr;
 }

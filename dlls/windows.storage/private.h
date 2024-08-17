@@ -42,6 +42,14 @@
 
 #include "provider.h"
 
+struct vector_iids
+{
+    const GUID *vector;
+    const GUID *view;
+    const GUID *iterable;
+    const GUID *iterator;
+};
+
 extern IActivationFactory *app_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
 

@@ -56,5 +56,6 @@ struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory 
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
 HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath );
 
 #endif
