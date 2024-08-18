@@ -123,7 +123,7 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
             CloseHandle(hFile);
             return E_ABORT;
         }
-        impl_from_IStorageItem(&folder->IStorageItem_iface)->Path = (HSTRING)param;
+        WindowsDuplicateString((HSTRING)param, &impl_from_IStorageItem(&folder->IStorageItem_iface)->Path);
         impl_from_IStorageItem(&folder->IStorageItem_iface)->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
         switch (attrib)
         {
@@ -146,11 +146,11 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
                 impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Normal;
         }
         //What the hell?
-        WindowsCreateString( 
-            CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param))),
-            wcslen(CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param)))),
-            &impl_from_IStorageItem(&folder->IStorageItem_iface)->Name
-            );
+        //WindowsCreateString( 
+        //    CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param))),
+        //    wcslen(CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param)))),
+        //    &impl_from_IStorageItem(&folder->IStorageItem_iface)->Name
+        //   );
         hr = S_OK;
     }
 
@@ -231,7 +231,7 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
         }
 
         item->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
-        item->Name = (HSTRING)param;
+        WindowsDuplicateString( (HSTRING)param, &item->Name );
         WindowsCreateString( CharToLPCWSTR(fullPath), wcslen(CharToLPCWSTR(fullPath)), &item->Path );
 
         hr = S_OK;
@@ -248,7 +248,7 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
 HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
 {
-    HRESULT hr;
+    HRESULT hr = S_OK;
     HSTRING Path;
     DWORD attrib;
     BOOL Exists = FALSE;
@@ -273,8 +273,8 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
             attrib = GetFileAttributesA(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 hr = E_INVALIDARG;
-
-            hr = S_OK;
+            else 
+                hr = S_OK;
             break;
 
         case CreationCollisionOption_GenerateUniqueName:
@@ -306,7 +306,7 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
     {
         if (Replace)
         {
-            if ( RemoveDirectoryA( fullPath ) )
+            if ( !RemoveDirectoryA( fullPath ) )
             {
                 MessageBoxW( NULL, L"Failed to remove a folder.", L"WineCoreUAP", MB_ICONERROR );
                 return E_ABORT;
@@ -314,8 +314,9 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
         }
         if (!Exists)
         {
-            if ( CreateDirectoryA( fullPath, NULL ) )
+            if ( !CreateDirectoryA( fullPath, NULL ) )
             {
+                printf("We failed to create %s\n", fullPath);
                 MessageBoxW( NULL, L"Failed to create a folder.", L"WineCoreUAP", MB_ICONERROR );
                 return E_ABORT;
             }

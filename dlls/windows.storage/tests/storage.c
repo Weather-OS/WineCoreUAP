@@ -196,7 +196,7 @@ static void check_interface_( unsigned int line, void *obj, const IID *iid )
     IUnknown_Release( unk );
 }
 
-static void test_AppDataPathsStatics(void)
+static const wchar_t* test_AppDataPathsStatics(void)
 {
     static const WCHAR *app_data_paths_statics_name = L"Windows.Storage.AppDataPaths";
     IAppDataPathsStatics *app_data_paths_statics;
@@ -207,6 +207,7 @@ static void test_AppDataPathsStatics(void)
     HSTRING cookiesString;
     HRESULT hr;
     LONG ref;
+    int a;
 
     cookiesString = NULL;
     hr = WindowsCreateString( app_data_paths_statics_name, wcslen( app_data_paths_statics_name ), &str );
@@ -218,7 +219,7 @@ static void test_AppDataPathsStatics(void)
     if (hr == REGDB_E_CLASSNOTREG)
     {
         win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( app_data_paths_statics_name ) );
-        return;
+        a = 0/(1-1); //crash the app
     }
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
@@ -230,9 +231,9 @@ static void test_AppDataPathsStatics(void)
     ok( hr == E_INVALIDARG, "got hr %#lx.\n", hr );
     hr = IAppDataPathsStatics_GetDefault( app_data_paths_statics, &app_data_paths );
 
-    IAppDataPaths_get_Cookies( app_data_paths, &cookiesString );
+    IAppDataPaths_get_LocalAppData( app_data_paths, &cookiesString );
     wstr = WindowsGetStringRawBuffer(cookiesString, NULL);
-    wprintf(L"Cookies Path: %s\n", wstr);
+    wprintf(L"LocalAppData Path: %s\n", wstr);
 
 
     if (app_data_paths) IAppDataPaths_Release( app_data_paths );
@@ -240,21 +241,24 @@ static void test_AppDataPathsStatics(void)
     ok( ref == 2, "got ref %ld.\n", ref );
     ref = IActivationFactory_Release( factory );
     ok( ref == 1, "got ref %ld.\n", ref );
+    return wstr;
 }
 
-static void test_StorageFolder(void)
+static void test_StorageFolder( const wchar_t* path )
 {
+    //This assumes test_AppDataPathsStatics passes every test.
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
-    static const WCHAR *path = L"C:\\";
-    static const WCHAR *name = L"Users";
-    static const WCHAR *fullPath = L"C:\\Users";
+    static const WCHAR *name = L"Temp";
     struct storage_folder_async_handler storage_folder_async_handler;
     struct storage_item_async_handler storage_item_async_handler;
     IStorageItem *storageItem;
     IStorageItem *storageItemResults;
+    IStorageItem *storageItemResults2;
     IStorageFolder *storageFolderResults = NULL;
+    IStorageFolder *storageFolderResults2 = NULL;
     IStorageFolderStatics *storage_folder_statics;
     IAsyncOperation_StorageFolder *storage_folder = NULL;
+    IAsyncOperation_StorageFolder *storageFolderOperation = NULL;
     IAsyncOperation_IStorageItem *storageItemOperation = NULL;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
     IAsyncOperationCompletedHandler_IStorageItem *storage_item_handler;
@@ -262,15 +266,14 @@ static void test_StorageFolder(void)
     HSTRING str;
     HSTRING pathString;
     HSTRING secondPathString;
-    HSTRING fullPathString;
     HSTRING nameString;
     HSTRING Path;
+    HSTRING SecondPath;
     HRESULT hr;
     DWORD ret;
 
     WindowsCreateString( path, wcslen( path ), &pathString );
     WindowsCreateString( name, wcslen( name ), &nameString );
-    WindowsCreateString( fullPath, wcslen( fullPath ), &fullPathString );
 
     hr = WindowsCreateString( storage_folder_statics_name, wcslen( storage_folder_statics_name ), &str );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -326,7 +329,43 @@ static void test_StorageFolder(void)
     IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
+    printf("Path received was %s\n", HStringToLPCSTR(Path));
+
+    /**
+     * IStorageFolder_CreateFolderAsync
+    */
+
+    hr = IStorageFolder_CreateFolderAsync( storageFolderResults, nameString, CreationCollisionOption_ReplaceExisting, &storageFolderOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageFolderOperation, &IID_IUnknown );
+    check_interface( storageFolderOperation, &IID_IInspectable );
+    check_interface( storageFolderOperation, &IID_IAgileObject );
+    check_interface( storageFolderOperation, &IID_IAsyncInfo );
+    check_interface( storageFolderOperation, &IID_IAsyncOperation_StorageFolder );
+    hr = IAsyncOperation_StorageFolder_get_Completed( storageFolderOperation, &storage_folder_handler);
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_folder_handler == NULL, "got handler %p\n", storage_folder_handler );
+
+    storage_folder_async_handler = default_storage_folder_async_handler;
+    storage_folder_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_StorageFolder_put_Completed( storageFolderOperation, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
+    ret = WaitForSingleObject( storage_folder_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
     
+    ret = CloseHandle( storage_folder_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_folder_async_handler.async == storageFolderOperation, "got async %p\n", storage_folder_async_handler.async );
+    ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+    hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, &storageFolderResults2 );
+    IStorageFolder_QueryInterface( storageFolderResults2, &IID_IStorageItem, (void **)&storageItemResults2);
+    IStorageItem_get_Path( storageItemResults2, &SecondPath );
+    printf("Path received was %s\n", HStringToLPCSTR(SecondPath));
+
     /**
      * IStorageFolder_GetItemAsync
     */
@@ -366,12 +405,13 @@ static void test_StorageFolder(void)
 START_TEST(storage)
 {
     HRESULT hr;
+    const wchar_t* apppath;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
-    test_StorageFolder();
-    test_AppDataPathsStatics();
+    apppath = test_AppDataPathsStatics();
+    test_StorageFolder(apppath);
 
     RoUninitialize();
 }
