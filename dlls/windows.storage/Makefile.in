@@ -2,11 +2,13 @@ MODULE  = windows.storage.dll
 IMPORTS = shell32 user32 combase ole32 advapi32 shlwapi rpcrt4
 
 SOURCES = \
+	WineCoreUAP/util.c \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \
 	WineCoreUAP/StorageFolderInternal.c \
 	WineCoreUAP/StorageItem.c \
+	WineCoreUAP/StorageItemInternal.c \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsync.c \

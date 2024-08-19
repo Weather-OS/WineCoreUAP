@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.StorageFolder Implementation
+/* WinRT Windows.Storage Internal Utilities.
  *
  * Written by Weather
  *
@@ -21,21 +21,25 @@
 
 #include "../private.h"
 
-#ifndef STORAGE_ITEM_INTERNAL_H
-#define STORAGE_ITEM_INTERNAL_H
+#include <windows.h>
+#include <knownfolders.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <combaseapi.h> 
+#include <stdint.h>
 
-struct storage_item
-{
-    IStorageItem IStorageItem_iface;
-    FileAttributes Attributes;
-    DateTime DateCreated;
-    HSTRING Path;    
-    HSTRING Name;
-    LONG ref;
-};
 
-struct storage_item *impl_from_IStorageItem ( IStorageItem *iface );
+#ifndef _UTIL_INTERNAL_H_
+#define _UTIL_INTERNAL_H_
 
-HRESULT WINAPI storage_item_Internal_CreateNew ( HSTRING itemPath, IStorageItem * result );
+#define WINDOWS_TICK 10000000
+#define SEC_TO_UNIX_EPOCH 11644473600LL
+
+int64_t FileTimeToUnixTime(const FILETIME *ft);
+void GenerateUniqueFileName(char* buffer, size_t bufferSize);
+LPCWSTR CharToLPCWSTR(char * charString);
+LPCSTR HStringToLPCSTR( HSTRING hString );
 
 #endif
