@@ -19,24 +19,14 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "StorageItemVectorView.h"
 
 #include "../../private.h"
-
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(combase);
 
-struct storage_item_vector_view
-{
-    IVectorView_IStorageItem IVectorView_IStorageItem_iface;
-    struct vector_iids iids;
-    LONG ref;
-
-    UINT32 size;
-    IInspectable *elements[1];
-};
-
-static inline struct storage_item_vector_view *impl_from_IVectorView_IStorageItem( IVectorView_IStorageItem *iface )
+struct storage_item_vector_view *impl_from_IVectorView_IStorageItem( IVectorView_IStorageItem *iface )
 {
     return CONTAINING_RECORD( iface, struct storage_item_vector_view, IVectorView_IStorageItem_iface );
 }
@@ -78,7 +68,7 @@ static ULONG WINAPI storage_item_vector_view_Release( IVectorView_IStorageItem *
 
     if (!ref)
     {
-        for (i = 0; i < impl->size; ++i) IInspectable_Release( impl->elements[i] );
+        for (i = 0; i < impl->size; ++i) IStorageItem_Release( impl->elements[i] );
         free( impl );
     }
 
@@ -112,7 +102,7 @@ static HRESULT WINAPI storage_item_vector_view_GetAt( IVectorView_IStorageItem *
     *value = NULL;
     if (index >= impl->size) return E_BOUNDS;
 
-    IInspectable_AddRef( (*value = impl->elements[index]) );
+    IStorageItem_AddRef( (*value = impl->elements[index]) );
     return S_OK;
 }
 
@@ -155,14 +145,14 @@ static HRESULT WINAPI storage_item_vector_view_GetMany( IVectorView_IStorageItem
     for (i = start_index; i < impl->size; ++i)
     {
         if (i - start_index >= items_size) break;
-        IInspectable_AddRef( (items[i - start_index] = impl->elements[i]) );
+        IStorageItem_AddRef( (items[i - start_index] = impl->elements[i]) );
     }
     *count = i - start_index;
 
     return S_OK;
 }
 
-static const struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl =
+struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl =
 {
     storage_item_vector_view_QueryInterface,
     storage_item_vector_view_AddRef,
@@ -171,7 +161,7 @@ static const struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl =
     storage_item_vector_view_GetIids,
     storage_item_vector_view_GetRuntimeClassName,
     storage_item_vector_view_GetTrustLevel,
-    /* IVectorView<IInspectable*> methods */
+    /* IVectorView<IStorageItem*> methods */
     storage_item_vector_view_GetAt,
     storage_item_vector_view_get_Size,
     storage_item_vector_view_IndexOf,

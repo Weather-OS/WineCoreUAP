@@ -267,8 +267,10 @@ static HRESULT WINAPI storage_folder_GetFoldersAsyncOverloadDefaultOptionsStartA
 
 static HRESULT WINAPI storage_folder_GetItemsAsyncOverloadDefaultStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_IStorageItem **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_storage_item_vector_view_create( (IUnknown *)iface, NULL, storage_folder_FetchItemsAndCount, operation);
+    TRACE( "created IAsyncOperation_IVectorView_IStorageItem %p.\n", *operation );
+    return hr;
 }
 
 struct IStorageFolderVtbl storage_folder_vtbl =

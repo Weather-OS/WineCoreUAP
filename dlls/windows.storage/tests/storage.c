@@ -184,6 +184,74 @@ static IAsyncOperationCompletedHandler_IStorageItemVtbl storage_item_async_handl
 
 static struct storage_item_async_handler default_storage_item_async_handler = {{&storage_item_async_handler_vtbl}};
 
+struct storage_item_vector_view_async_handler
+{
+    IAsyncOperationCompletedHandler_IVectorView_IStorageItem IAsyncOperationCompletedHandler_IVectorView_IStorageItem_iface;
+    IAsyncOperation_IVectorView_IStorageItem *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct storage_item_vector_view_async_handler *impl_from_IAsyncOperationCompletedHandler_IVectorView_IStorageItem( IAsyncOperationCompletedHandler_IVectorView_IStorageItem *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_item_vector_view_async_handler, IAsyncOperationCompletedHandler_IVectorView_IStorageItem_iface );
+}
+
+static HRESULT WINAPI storage_item_vector_view_async_handler_QueryInterface( IAsyncOperationCompletedHandler_IVectorView_IStorageItem *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_IVectorView_IStorageItem ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_item_vector_view_async_handler_AddRef( IAsyncOperationCompletedHandler_IVectorView_IStorageItem *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI storage_item_vector_view_async_handler_Release( IAsyncOperationCompletedHandler_IVectorView_IStorageItem *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI storage_item_vector_view_async_handler_Invoke( IAsyncOperationCompletedHandler_IVectorView_IStorageItem *iface,
+                                                 IAsyncOperation_IVectorView_IStorageItem *async, AsyncStatus status )
+{
+    struct storage_item_vector_view_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_IVectorView_IStorageItem( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_IVectorView_IStorageItemVtbl storage_item_vector_view_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    storage_item_vector_view_async_handler_QueryInterface,
+    storage_item_vector_view_async_handler_AddRef,
+    storage_item_vector_view_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<IVectorView<IStorageItem *>> methods ***/
+    storage_item_vector_view_async_handler_Invoke,
+};
+
+static struct storage_item_vector_view_async_handler default_storage_item_vector_view_async_handler = {{&storage_item_vector_view_async_handler_vtbl}};
+
 
 #define check_interface( obj, iid ) check_interface_( __LINE__, obj, iid )
 static void check_interface_( unsigned int line, void *obj, const IID *iid )
@@ -248,25 +316,33 @@ static void test_StorageFolder( const wchar_t* path )
     static const WCHAR *name = L"Temp";
     struct storage_folder_async_handler storage_folder_async_handler;
     struct storage_item_async_handler storage_item_async_handler;
+    struct storage_item_vector_view_async_handler storage_item_vector_view_async_handler;
     IStorageItem *storageItem;
     IStorageItem *storageItemResults;
     IStorageItem *storageItemResults2;
+    IStorageItem *storageItemResults3;
     IStorageFolder *storageFolderResults = NULL;
     IStorageFolder *storageFolderResults2 = NULL;
     IStorageFolderStatics *storage_folder_statics;
+    IVectorView_IStorageItem *storageItemVectorResults = NULL;
     IAsyncOperation_StorageFolder *storage_folder = NULL;
     IAsyncOperation_StorageFolder *storageFolderOperation = NULL;
     IAsyncOperation_IStorageItem *storageItemOperation = NULL;
+    IAsyncOperation_IVectorView_IStorageItem *storageItemVectorOperation = NULL;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
     IAsyncOperationCompletedHandler_IStorageItem *storage_item_handler;
+    IAsyncOperationCompletedHandler_IVectorView_IStorageItem *storage_item_vector_view_handler;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING pathString;
-    HSTRING secondPathString;
     HSTRING nameString;
     HSTRING Path;
     HSTRING SecondPath;
     HSTRING SecondName;
+    HSTRING ThirdPath;
+    HSTRING ThirdName;
+    HSTRING FourthPath; 
+    HSTRING FourthName;
     HRESULT hr;
     DWORD ret;
     char * pathtest = malloc(sizeof(char *));
@@ -324,7 +400,8 @@ static void test_StorageFolder( const wchar_t* path )
     ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
     
     hr = IAsyncOperation_StorageFolder_GetResults( storage_folder, &storageFolderResults );
-   
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
     IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
@@ -361,10 +438,12 @@ static void test_StorageFolder( const wchar_t* path )
     ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
     
     hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, &storageFolderResults2 );
-    IStorageFolder_QueryInterface( storageFolderResults2, &IID_IStorageItem, (void **)&storageItemResults2);
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
     
-    IStorageItem_get_Path( storageItemResults2, &SecondPath );
-    IStorageItem_get_Name( storageItemResults2, &SecondName );
+    IStorageFolder_QueryInterface( storageFolderResults2, &IID_IStorageItem, (void **)&storageItemResults);
+    
+    IStorageItem_get_Path( storageItemResults, &SecondPath );
+    IStorageItem_get_Name( storageItemResults, &SecondName );
     
     strcpy(pathtest, HStringToLPCSTR(Path));
     strcat(pathtest, "\\Temp");
@@ -404,8 +483,59 @@ static void test_StorageFolder( const wchar_t* path )
     ok( storage_item_async_handler.async == storageItemOperation, "got async %p\n", storage_item_async_handler.async );
     ok( storage_item_async_handler.status == Completed || broken( storage_item_async_handler.status == Error ), "got status %u\n", storage_item_async_handler.status );
 
-    hr = IAsyncOperation_IStorageItem_GetResults( storageItemOperation, &storageItemResults );
-    IStorageItem_get_Path( storageItemResults, &secondPathString );
+    hr = IAsyncOperation_IStorageItem_GetResults( storageItemOperation, &storageItemResults2 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageItem_get_Path( storageItemResults2, &ThirdPath );
+    IStorageItem_get_Name( storageItemResults2, &ThirdName );
+
+    ok( !strcmp(HStringToLPCSTR(ThirdPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdName), pathtest);
+    ok( !strcmp(HStringToLPCSTR(ThirdName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+
+    /**
+     * IStorageFolder_GetItemsAsyncOverloadDefaultStartAndCount
+    */
+
+    hr = IStorageFolder_GetItemsAsyncOverloadDefaultStartAndCount( storageFolderResults, &storageItemVectorOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageItemVectorOperation, &IID_IUnknown );
+    check_interface( storageItemVectorOperation, &IID_IInspectable );
+    check_interface( storageItemVectorOperation, &IID_IAgileObject );
+    check_interface( storageItemVectorOperation, &IID_IAsyncInfo );
+    check_interface( storageItemVectorOperation, &IID_IAsyncOperation_IVectorView_IStorageItem );
+
+    hr = IAsyncOperation_IVectorView_IStorageItem_get_Completed( storageItemVectorOperation, &storage_item_vector_view_handler);
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_item_vector_view_handler == NULL, "got handler %p\n", storage_item_vector_view_handler );
+
+    storage_item_vector_view_async_handler = default_storage_item_vector_view_async_handler;
+    storage_item_vector_view_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IVectorView_IStorageItem_put_Completed( storageItemVectorOperation, &storage_item_vector_view_async_handler.IAsyncOperationCompletedHandler_IVectorView_IStorageItem_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_item_vector_view_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_item_vector_view_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_item_vector_view_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_item_vector_view_async_handler.async == storageItemVectorOperation, "got async %p\n", storage_item_vector_view_async_handler.async );
+    ok( storage_item_vector_view_async_handler.status == Completed || broken( storage_item_vector_view_async_handler.status == Error ), "got status %u\n", storage_item_vector_view_async_handler.status );    hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storageItemVectorOperation, &storageItemVectorResults );
+
+    hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storageItemVectorOperation, &storageItemVectorResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IVectorView_IStorageItem_GetAt( storageItemVectorResults, 0, &storageItemResults3 );
+
+    IStorageItem_get_Path( storageItemResults3, &FourthPath );
+    IStorageItem_get_Name( storageItemResults3, &FourthName );
+    
+    ok( !strcmp(HStringToLPCSTR(FourthPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdName), pathtest);
+    ok( !strcmp(HStringToLPCSTR(FourthName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+
+
 }
 
 START_TEST(storage)

@@ -21,6 +21,7 @@
 
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
+#include "VectorView/StorageItemVectorView.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
@@ -41,7 +42,7 @@ int64_t FileTimeToUnixTime(const FILETIME *ft) {
 
 void GenerateUniqueFileName(char* buffer, size_t bufferSize) {
     UUID uuid;
-    char* str;
+    char * str;
 
     UuidCreate(&uuid);
     UuidToStringA(&uuid, (RPC_CSTR*)&str);
@@ -65,9 +66,9 @@ LPCWSTR CharToLPCWSTR(char * charString) {
 
 LPCSTR HStringToLPCSTR( HSTRING hString ) {
     UINT32 length = WindowsGetStringLen(hString);
-    const wchar_t* rawBuffer = WindowsGetStringRawBuffer(hString, &length);
+    const wchar_t * rawBuffer = WindowsGetStringRawBuffer(hString, &length);
     int bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
-    char* multiByteStr = (char*)malloc(bufferSize + 1);
+    char * multiByteStr = (char*)malloc(bufferSize + 1);
     WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, multiByteStr, bufferSize, NULL, NULL);
     multiByteStr[bufferSize] = '\0';
 
@@ -107,13 +108,11 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (hFile == INVALID_HANDLE_VALUE) 
         {
-            MessageBoxW( NULL, L"Couldn't open a folder for READ.", L"WineCoreUAP", MB_ICONERROR );
             return E_ABORT;
         }
 
         if ( !GetFileTime( hFile, &ftCreate, NULL, NULL ) ) 
         {
-            MessageBoxW( NULL, L"Failed to get folder time.", L"WineCoreUAP", MB_ICONERROR );
             CloseHandle(hFile);
             return E_ABORT;
         }
@@ -153,7 +152,7 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
     return hr;
 }
 
-HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HANDLE hFile;
     FILETIME ftCreate;
@@ -203,19 +202,19 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
             case FILE_ATTRIBUTE_TEMPORARY:
                 item->Attributes = FileAttributes_Temporary;
                 break;
+            default:
+                item->Attributes = FileAttributes_Normal;
         }
 
         hFile = CreateFileA( fullPath, GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (hFile == INVALID_HANDLE_VALUE) 
         {
-            MessageBoxW( NULL, L"Couldn't open a file for READ.", L"WineCoreUAP", MB_ICONERROR );
             return E_ABORT;
         }
 
         if ( !GetFileTime( hFile, &ftCreate, NULL, NULL ) ) 
         {
-            MessageBoxW( NULL, L"Failed to get file time.", L"WineCoreUAP", MB_ICONERROR );
             CloseHandle(hFile);
             return E_ABORT;
         }
@@ -236,7 +235,7 @@ HRESULT storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIAN
     return hr;
 }
 
-HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
+HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
 {
     HRESULT hr = S_OK;
     HSTRING Path;
@@ -298,7 +297,6 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
         {
             if ( !RemoveDirectoryA( fullPath ) )
             {
-                MessageBoxW( NULL, L"Failed to remove a folder.", L"WineCoreUAP", MB_ICONERROR );
                 return E_ABORT;
             }
         }
@@ -306,8 +304,6 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
         {
             if ( !CreateDirectoryA( fullPath, NULL ) )
             {
-                printf("We failed to create %s\n", fullPath);
-                MessageBoxW( NULL, L"Failed to create a folder.", L"WineCoreUAP", MB_ICONERROR );
                 return E_ABORT;
             }
             hr = S_OK;
@@ -317,10 +313,109 @@ HRESULT storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOp
     return hr;
 }
 
-HRESULT storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    WIN32_FIND_DATAA findFileData;
+    HANDLE hFind = INVALID_HANDLE_VALUE;
+    HANDLE hFile;
     HRESULT hr = S_OK;
+    HSTRING Path;
+    CHAR searchPath[MAX_PATH];
+    FILETIME ftCreate;
+    struct storage_folder *invokerFolder;
+    struct storage_item_vector_view *itemVector;
+    struct storage_item *item;
+    char fullItemPath[MAX_PATH];
 
-    // Awaiting future implementation.
+    invokerFolder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
+    Path = impl_from_IStorageItem(&invokerFolder->IStorageItem_iface)->Path;
+
+    if (!(itemVector = calloc( 1, sizeof(*itemVector) ))) return E_OUTOFMEMORY;
+    
+    itemVector->IVectorView_IStorageItem_iface.lpVtbl = &storage_item_vector_view_vtbl;
+    itemVector->ref = 1;
+    itemVector->size = 0;
+
+    snprintf(searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR(Path));
+    PathAppendA(fullItemPath, HStringToLPCSTR(Path));
+
+    if (param == NULL)
+    {
+        hFind = FindFirstFileA(searchPath, &findFileData);
+
+        if (hFind == INVALID_HANDLE_VALUE) 
+        {
+            return E_ABORT;
+        } 
+
+        while (FindNextFileA(hFind, &findFileData) != 0) 
+        {
+            if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0) 
+            {
+                if (!(itemVector->elements[itemVector->size] = calloc( 1, sizeof(*itemVector->elements[itemVector->size]) ))) return E_OUTOFMEMORY;
+                itemVector->elements[itemVector->size]->lpVtbl = &storage_item_vtbl;
+                item = impl_from_IStorageItem( itemVector->elements[itemVector->size] );
+                PathAppendA(fullItemPath, findFileData.cFileName);
+
+                WindowsCreateString(
+                    CharToLPCWSTR(fullItemPath),
+                    strlen(fullItemPath),
+                    &item->Path
+                );
+
+                WindowsCreateString(
+                    CharToLPCWSTR(findFileData.cFileName),
+                    strlen(findFileData.cFileName),
+                    &item->Name
+                );
+
+                switch (findFileData.dwFileAttributes)
+                {
+                    case FILE_ATTRIBUTE_NORMAL:
+                        item->Attributes = FileAttributes_Normal;
+                        break;
+                    case FILE_ATTRIBUTE_READONLY:
+                        item->Attributes = FileAttributes_ReadOnly;
+                        break;
+                    case FILE_ATTRIBUTE_DIRECTORY:
+                        item->Attributes = FileAttributes_Directory;
+                        break;
+                    case FILE_ATTRIBUTE_ARCHIVE:
+                        item->Attributes = FileAttributes_Archive;
+                        break;
+                    case FILE_ATTRIBUTE_TEMPORARY:
+                        item->Attributes = FileAttributes_Temporary;
+                        break;
+                    default:
+                        item->Attributes = FileAttributes_Normal;
+                }
+
+                hFile = CreateFileA( fullItemPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                   OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+                if (hFile == INVALID_HANDLE_VALUE) 
+                {
+                    printf("fullitempath was %s\n", fullItemPath);
+                    return E_ABORT;
+                }
+
+                if ( !GetFileTime( hFile, &ftCreate, NULL, NULL ) ) 
+                {
+                    CloseHandle(hFile);
+                    return E_ABORT;
+                }
+
+                item->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
+
+                itemVector->size++;
+            }
+        }
+    }
+
+    result->vt = VT_UNKNOWN;
+    if (SUCCEEDED(hr))
+    {
+        result->ppunkVal = (IUnknown **)&itemVector->IVectorView_IStorageItem_iface;
+    }
+
     return hr;
 }
