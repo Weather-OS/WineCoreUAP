@@ -91,6 +91,43 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
     return status;
 }
 
+HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    char fullPath[MAX_PATH];
+    HRESULT status;
+    HSTRING Path;
+    HSTRING folderPath;
+    struct storage_folder * folder;
+    struct storage_folder * folderToFetch;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    folder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
+    Path = impl_from_IStorageItem( &folder->IStorageItem_iface )->Path;
+
+    if (!result) return E_INVALIDARG;
+    if (!(folderToFetch = calloc( 1, sizeof(*folderToFetch) ))) return E_OUTOFMEMORY;
+
+    folderToFetch->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folderToFetch->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folderToFetch->ref = 1;
+
+    PathAppendA( fullPath, HStringToLPCSTR( Path ) );
+    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
+    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &folderPath );
+
+    status = storage_item_Internal_CreateNew( folderPath, &folderToFetch->IStorageItem_iface );
+    
+    if ( SUCCEEDED( status ) )
+    {
+        result->vt = VT_UNKNOWN;
+        result->ppunkVal = (IUnknown **)&folderToFetch->IStorageFolder_iface;
+    }
+
+
+    return status;
+}
+
 HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
 {
     HRESULT status = S_OK;

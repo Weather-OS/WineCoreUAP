@@ -323,6 +323,7 @@ static void test_StorageFolder( const wchar_t* path )
     IStorageItem *storageItemResults3;
     IStorageFolder *storageFolderResults = NULL;
     IStorageFolder *storageFolderResults2 = NULL;
+    IStorageFolder *storageFolderResults3 = NULL;
     IStorageFolderStatics *storage_folder_statics;
     IVectorView_IStorageItem *storageItemVectorResults = NULL;
     IAsyncOperation_StorageFolder *storage_folder = NULL;
@@ -341,8 +342,10 @@ static void test_StorageFolder( const wchar_t* path )
     HSTRING SecondName;
     HSTRING ThirdPath;
     HSTRING ThirdName;
-    HSTRING FourthPath; 
+    HSTRING FourthPath;
     HSTRING FourthName;
+    HSTRING FifthPath; 
+    HSTRING FifthName;
     HRESULT hr;
     DWORD ret;
     char * pathtest = malloc(sizeof(char *));
@@ -489,8 +492,51 @@ static void test_StorageFolder( const wchar_t* path )
     IStorageItem_get_Path( storageItemResults2, &ThirdPath );
     IStorageItem_get_Name( storageItemResults2, &ThirdName );
 
-    ok( !strcmp(HStringToLPCSTR(ThirdPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdName), pathtest);
+    ok( !strcmp(HStringToLPCSTR(ThirdPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(ThirdName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+
+    /**
+     * IStorageFolder_GetFolderAsync
+    */
+
+    hr = IStorageFolder_GetFolderAsync( storageFolderResults, nameString, &storageFolderOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageFolderOperation, &IID_IUnknown );
+    check_interface( storageFolderOperation, &IID_IInspectable );
+    check_interface( storageFolderOperation, &IID_IAgileObject );
+    check_interface( storageFolderOperation, &IID_IAsyncInfo );
+    check_interface( storageFolderOperation, &IID_IAsyncOperation_StorageFolder );
+
+    hr = IAsyncOperation_StorageFolder_get_Completed( storageFolderOperation, &storage_folder_handler);
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_folder_handler == NULL, "got handler %p\n", storage_folder_handler );
+
+    storage_folder_async_handler = default_storage_folder_async_handler;
+    storage_folder_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_StorageFolder_put_Completed( storageFolderOperation, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_folder_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_folder_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_folder_async_handler.async == storageFolderOperation, "got async %p\n", storage_folder_async_handler.async );
+    ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+
+    hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, &storageFolderResults3 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFolder_QueryInterface( storageFolderResults3, &IID_IStorageItem, (void **)&storageItemResults);
+
+    IStorageItem_get_Path( storageItemResults, &FourthPath );
+    IStorageItem_get_Name( storageItemResults, &FourthName );
+
+    ok( !strcmp(HStringToLPCSTR(FourthPath), pathtest), "Error: Original path not returned. FourthPath %s, pathtest %s\n", HStringToLPCSTR(FourthPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(FourthName), "Temp"), "Error: Original name not returned. FourthName %s, name %s\n", HStringToLPCSTR(FourthName), "Test");
 
     /**
      * IStorageFolder_GetItemsAsyncOverloadDefaultStartAndCount
@@ -529,11 +575,11 @@ static void test_StorageFolder( const wchar_t* path )
 
     IVectorView_IStorageItem_GetAt( storageItemVectorResults, 0, &storageItemResults3 );
 
-    IStorageItem_get_Path( storageItemResults3, &FourthPath );
-    IStorageItem_get_Name( storageItemResults3, &FourthName );
+    IStorageItem_get_Path( storageItemResults3, &FifthPath );
+    IStorageItem_get_Name( storageItemResults3, &FifthName );
     
-    ok( !strcmp(HStringToLPCSTR(FourthPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdName), pathtest);
-    ok( !strcmp(HStringToLPCSTR(FourthName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+    ok( !strcmp(HStringToLPCSTR(FifthPath), pathtest), "Error: Original path not returned. FifthPath %s, pathtest %s\n", HStringToLPCSTR(FifthPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(FifthName), "Temp"), "Error: Original name not returned. FifthName %s, name %s\n", HStringToLPCSTR(FifthName), "Test");
 
 
 }

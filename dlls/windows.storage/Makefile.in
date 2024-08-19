@@ -11,9 +11,11 @@ SOURCES = \
 	WineCoreUAP/StorageItemInternal.c \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
+	WineCoreUAP/AsyncOperation/StorageFolderAsyncVectorView.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsync.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsyncVectorView.c \
 	WineCoreUAP/VectorView/StorageItemVectorView.c \
+	WineCoreUAP/VectorView/StorageFolderVectorView.c \
 	provider.idl \
 	classes.idl \
 	main.c

@@ -198,7 +198,7 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
      * 
      *  This method does the same thing as Windows::Storage::CreateFileAsync.
      */  
-    
+    FIXME( "iface %p, name %p stub!\n", iface, name );
     return E_NOTIMPL;
 }
 
@@ -241,8 +241,10 @@ static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRIN
 
 static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFolder, operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
