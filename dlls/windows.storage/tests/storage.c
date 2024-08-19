@@ -21,6 +21,7 @@
 #define COBJMACROS
 #include "initguid.h"
 #include <stdarg.h>
+#include <string.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -204,12 +205,11 @@ static const wchar_t* test_AppDataPathsStatics(void)
     const wchar_t* wstr;
     IActivationFactory *factory;
     HSTRING str;
-    HSTRING cookiesString;
+    HSTRING localAppDataPath;
     HRESULT hr;
     LONG ref;
-    int a;
 
-    cookiesString = NULL;
+    localAppDataPath = NULL;
     hr = WindowsCreateString( app_data_paths_statics_name, wcslen( app_data_paths_statics_name ), &str );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
@@ -219,7 +219,6 @@ static const wchar_t* test_AppDataPathsStatics(void)
     if (hr == REGDB_E_CLASSNOTREG)
     {
         win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( app_data_paths_statics_name ) );
-        a = 0/(1-1); //crash the app
     }
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
@@ -231,10 +230,8 @@ static const wchar_t* test_AppDataPathsStatics(void)
     ok( hr == E_INVALIDARG, "got hr %#lx.\n", hr );
     hr = IAppDataPathsStatics_GetDefault( app_data_paths_statics, &app_data_paths );
 
-    IAppDataPaths_get_LocalAppData( app_data_paths, &cookiesString );
-    wstr = WindowsGetStringRawBuffer(cookiesString, NULL);
-    wprintf(L"LocalAppData Path: %s\n", wstr);
-
+    IAppDataPaths_get_LocalAppData( app_data_paths, &localAppDataPath );
+    wstr = WindowsGetStringRawBuffer(localAppDataPath, NULL);
 
     if (app_data_paths) IAppDataPaths_Release( app_data_paths );
     ref = IAppDataPathsStatics_Release( app_data_paths_statics );
@@ -269,8 +266,10 @@ static void test_StorageFolder( const wchar_t* path )
     HSTRING nameString;
     HSTRING Path;
     HSTRING SecondPath;
+    HSTRING SecondName;
     HRESULT hr;
     DWORD ret;
+    char * pathtest = malloc(sizeof(char *));
 
     WindowsCreateString( path, wcslen( path ), &pathString );
     WindowsCreateString( name, wcslen( name ), &nameString );
@@ -329,7 +328,6 @@ static void test_StorageFolder( const wchar_t* path )
     IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
-    printf("Path received was %s\n", HStringToLPCSTR(Path));
 
     /**
      * IStorageFolder_CreateFolderAsync
@@ -361,10 +359,18 @@ static void test_StorageFolder( const wchar_t* path )
     ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
     ok( storage_folder_async_handler.async == storageFolderOperation, "got async %p\n", storage_folder_async_handler.async );
     ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+    
     hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, &storageFolderResults2 );
     IStorageFolder_QueryInterface( storageFolderResults2, &IID_IStorageItem, (void **)&storageItemResults2);
+    
     IStorageItem_get_Path( storageItemResults2, &SecondPath );
-    printf("Path received was %s\n", HStringToLPCSTR(SecondPath));
+    IStorageItem_get_Name( storageItemResults2, &SecondName );
+    
+    strcpy(pathtest, HStringToLPCSTR(Path));
+    strcat(pathtest, "\\Temp");
+
+    ok( !strcmp(HStringToLPCSTR(SecondPath), pathtest), "Error: Original path not returned. SecondPath %s, pathtest %s\n", HStringToLPCSTR(SecondPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(SecondName), "Temp"), "Error: Original name not returned. SecondName %s, name %s\n", HStringToLPCSTR(SecondName), "Test");
 
     /**
      * IStorageFolder_GetItemAsync
@@ -408,6 +414,9 @@ START_TEST(storage)
     const wchar_t* apppath;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
+
+    CoInitialize(NULL);
+
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
     apppath = test_AppDataPathsStatics();

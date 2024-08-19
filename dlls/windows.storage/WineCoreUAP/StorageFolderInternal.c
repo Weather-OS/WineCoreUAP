@@ -39,19 +39,6 @@ int64_t FileTimeToUnixTime(const FILETIME *ft) {
     return (ull.QuadPart / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH;
 }
 
-char * GetFileNameFromPath(LPCSTR path) {
-    char* last_slash = strrchr(path, '/');
-    char* last_backslash = strrchr(path, '\\');
-    char* last_separator = (last_slash > last_backslash) ? last_slash : last_backslash;
-
-    if (last_separator != NULL) {
-        return last_separator + 1;
-    }
-    
-    return path;
-}
-
-
 void GenerateUniqueFileName(char* buffer, size_t bufferSize) {
     UUID uuid;
     char* str;
@@ -93,7 +80,10 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
     DWORD attrib;
     HANDLE hFile;
     FILETIME ftCreate;
+    HSTRING FolderPath;
     struct storage_folder *folder;
+    struct storage_item * folderItem;
+    char * folderName = malloc(sizeof(char *));
     
     TRACE( "iface %p, value %p\n", invoker, result );
     if (!result) return E_INVALIDARG;
@@ -102,14 +92,18 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
+
+    folderItem = impl_from_IStorageItem(&folder->IStorageItem_iface);
+
+    WindowsDuplicateString( (HSTRING)param, &FolderPath );
     
-    attrib = GetFileAttributesA( HStringToLPCSTR( (HSTRING)param ) );
+    attrib = GetFileAttributesA( HStringToLPCSTR( FolderPath ) );
     if (attrib == INVALID_FILE_ATTRIBUTES) 
     {
         hr = E_INVALIDARG;
     } else 
     {
-        hFile = CreateFileA( HStringToLPCSTR((HSTRING)param), GENERIC_READ, FILE_SHARE_READ, NULL,
+        hFile = CreateFileA( HStringToLPCSTR(FolderPath), GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (hFile == INVALID_HANDLE_VALUE) 
         {
@@ -123,34 +117,30 @@ HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, 
             CloseHandle(hFile);
             return E_ABORT;
         }
-        WindowsDuplicateString((HSTRING)param, &impl_from_IStorageItem(&folder->IStorageItem_iface)->Path);
-        impl_from_IStorageItem(&folder->IStorageItem_iface)->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
+        WindowsDuplicateString(FolderPath, &folderItem->Path);
+        folderItem->DateCreated.UniversalTime = FileTimeToUnixTime(&ftCreate);
         switch (attrib)
         {
             case FILE_ATTRIBUTE_NORMAL:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Normal;
+                folderItem->Attributes = FileAttributes_Normal;
                 break;
             case FILE_ATTRIBUTE_READONLY:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_ReadOnly;
+                folderItem->Attributes = FileAttributes_ReadOnly;
                 break;
             case FILE_ATTRIBUTE_DIRECTORY:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Directory;
+                folderItem->Attributes = FileAttributes_Directory;
                 break;
             case FILE_ATTRIBUTE_ARCHIVE:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Archive;
+                folderItem->Attributes = FileAttributes_Archive;
                 break;
             case FILE_ATTRIBUTE_TEMPORARY:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Temporary;
+                folderItem->Attributes = FileAttributes_Temporary;
                 break;
             default:
-                impl_from_IStorageItem(&folder->IStorageItem_iface)->Attributes = FileAttributes_Normal;
+                folderItem->Attributes = FileAttributes_Normal;
         }
-        //What the hell?
-        //WindowsCreateString( 
-        //    CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param))),
-        //    wcslen(CharToLPCWSTR(GetFileNameFromPath(HStringToLPCSTR((HSTRING)param)))),
-        //    &impl_from_IStorageItem(&folder->IStorageItem_iface)->Name
-        //   );
+        strcpy( folderName, strrchr( HStringToLPCSTR(FolderPath), '\\' ) );
+        WindowsCreateString( CharToLPCWSTR(folderName + 1), strlen(folderName), &folderItem->Name );
         hr = S_OK;
     }
 
