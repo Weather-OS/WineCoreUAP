@@ -24,10 +24,16 @@
 #ifndef STORAGE_FOLDER_INTERNAL_H
 #define STORAGE_FOLDER_INTERNAL_H
 
+extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
+
 struct storage_folder
 {
+    //Derivatives
     IStorageFolder IStorageFolder_iface;
     IStorageItem IStorageItem_iface;
+
     LONG ref;
 };
 

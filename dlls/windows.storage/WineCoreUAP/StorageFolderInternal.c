@@ -26,10 +26,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-extern struct IStorageFolderVtbl storage_folder_vtbl;
-extern struct IStorageItemVtbl storage_item_vtbl;
-extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
-
 HRESULT WINAPI storage_folder_AssignFolder ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
     HRESULT status;

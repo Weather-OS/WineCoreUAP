@@ -27,6 +27,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IStorageFolderVtbl storage_folder_vtbl;
 
 HRESULT WINAPI storage_item_Internal_CreateNew ( HSTRING itemPath, IStorageItem * result ) 
 {
