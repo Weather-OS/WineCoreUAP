@@ -65,6 +65,8 @@ extern HRESULT async_operation_storage_item_vector_view_create( IUnknown *invoke
                                               IAsyncOperation_IVectorView_IStorageItem **out );
 extern HRESULT async_operation_storage_folder_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IVectorView_StorageFolder **out );
+extern HRESULT async_action_create(IAsyncAction **ret);
+
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     static inline impl_type *impl_from( iface_type *iface )                                        \

@@ -115,20 +115,20 @@ static HRESULT WINAPI storage_item_GetTrustLevel( IStorageItem *iface, TrustLeve
 
 static HRESULT WINAPI storage_item_RenameAsyncOverloadDefaultOptions( IStorageItem *iface, HSTRING name, IAsyncAction **operation )
 {
-    /**
-     *  Behavior examination: The "OverloadDefaultOptions" accesses the File Item
-     *  With the following default options:
-     *  
-     *  NameCollisionOption->FailIfExists
-     */  
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = storage_item_Rename( iface, NameCollisionOption_FailIfExists, name );
+    if ( SUCCEEDED( hr ) )
+        hr = async_action_create( operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_item_RenameAsync( IStorageItem *iface, HSTRING name, NameCollisionOption option ,IAsyncAction **operation )
 {
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = storage_item_Rename( iface, option, name );
+    if ( SUCCEEDED( hr ) )
+        hr = async_action_create( operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_item_DeleteAsyncOverloadDefaultOptions( IStorageItem *iface, IAsyncAction **operation )

@@ -378,7 +378,7 @@ static const wchar_t* test_AppDataPathsStatics(void)
     return wstr;
 }
 
-static void test_StorageFolder( const wchar_t* path )
+static IStorageItem *test_StorageFolder( const wchar_t* path )
 {
     //This assumes test_AppDataPathsStatics passes every test.
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
@@ -439,7 +439,6 @@ static void test_StorageFolder( const wchar_t* path )
     if (hr == REGDB_E_CLASSNOTREG)
     {
         win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( storage_folder_statics_name ) );
-        return;
     }
 
     check_interface( factory, &IID_IUnknown );
@@ -702,12 +701,34 @@ static void test_StorageFolder( const wchar_t* path )
     
     ok( !strcmp(HStringToLPCSTR(SixthPath), pathtest), "Error: Original path not returned. SixthPath %s, pathtest %s\n", HStringToLPCSTR(SixthPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(SixthName), "Temp"), "Error: Original name not returned. FifthName %s, name %s\n", HStringToLPCSTR(SixthName), "Test");
+
+    return storageItemResults4;
+}
+
+static void test_StorageItem( IStorageItem *customItem )
+{
+    static const WCHAR *name = L"TempTest";
+    HSTRING renameName;
+    HSTRING resultName;
+    HRESULT hr;
+    IAsyncAction *tempAction;
+
+    WindowsCreateString( name, wcslen(name), &renameName );
+
+    hr = IStorageItem_RenameAsyncOverloadDefaultOptions( customItem, renameName, &tempAction );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageItem_get_Name( customItem, &resultName );
+    ok( !strcmp(HStringToLPCSTR(resultName), "TempTest"), "Error: Original name not returned. resultName %s, name %s\n", HStringToLPCSTR(resultName), "TempTest");
+
+    
 }
 
 START_TEST(storage)
 {
     HRESULT hr;
     const wchar_t* apppath;
+    IStorageItem *returnedItem;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
 
@@ -716,7 +737,8 @@ START_TEST(storage)
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
     apppath = test_AppDataPathsStatics();
-    test_StorageFolder(apppath);
+    returnedItem = test_StorageFolder(apppath);
+    test_StorageItem(returnedItem);
 
     RoUninitialize();
 }

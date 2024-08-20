@@ -29,7 +29,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 
-HRESULT WINAPI storage_item_Internal_CreateNew ( HSTRING itemPath, IStorageItem * result ) 
+HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
 {
     CHAR itemName[MAX_PATH];
     DWORD attributes;
@@ -97,8 +97,89 @@ HRESULT WINAPI storage_item_Internal_CreateNew ( HSTRING itemPath, IStorageItem 
         strcpy( itemName, strrchr( HStringToLPCSTR( itemPath ), '\\' ) );
         WindowsCreateString( CharToLPCWSTR( itemName + 1 ), strlen(itemName), &item->Name );
 
+        CloseHandle( itemFile );
+
         status = S_OK;
     }
 
+    return status;
+}
+
+HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption collisionOption, HSTRING name )
+{
+    DWORD attributes;
+    HRESULT status = S_OK;
+    HSTRING itemPath;
+    struct storage_item *item;
+    char newItemPath[MAX_PATH];
+    char uuidName[MAX_PATH];
+
+    TRACE( "iface %p, value %p\n", iface, name );
+    if (!name) return E_INVALIDARG;
+
+    item = impl_from_IStorageItem( iface );
+    WindowsDuplicateString( item->Path, &itemPath );
+
+    strcpy( newItemPath, HStringToLPCSTR( itemPath ) );
+    *strrchr( newItemPath, '\\' ) = '\0';
+
+    //Perform rename
+    attributes = GetFileAttributesA( HStringToLPCSTR( itemPath ) );
+    if ( attributes == INVALID_FILE_ATTRIBUTES ) 
+    {
+        status = E_INVALIDARG;
+    } else 
+    {
+        switch (collisionOption)
+        {
+            case NameCollisionOption_FailIfExists:
+                PathAppendA( newItemPath, HStringToLPCSTR( name ) );
+
+                attributes = GetFileAttributesA( newItemPath );
+                if ( attributes != INVALID_FILE_ATTRIBUTES ) 
+                    status = E_INVALIDARG;
+                else
+                    status = S_OK;
+                break;
+
+            case NameCollisionOption_GenerateUniqueName:
+                GenerateUniqueFileName( uuidName, sizeof(uuidName) );
+                PathAppendA( newItemPath, uuidName );
+
+                attributes = GetFileAttributesA( newItemPath );
+                if ( attributes != INVALID_FILE_ATTRIBUTES ) 
+                    return E_ABORT;
+                else
+                    status = S_OK;
+                break;
+
+            case NameCollisionOption_ReplaceExisting:
+                PathAppendA( newItemPath, HStringToLPCSTR( name ) );
+
+                attributes = GetFileAttributesA( newItemPath );
+                if ( attributes != INVALID_FILE_ATTRIBUTES ) 
+                {
+                    if ( !DeleteFileA( newItemPath ) )
+                    {
+                        return E_ABORT;
+                    }
+                }
+                else
+                    status = S_OK;
+                break;
+        }
+    }
+
+    if ( !MoveFileA( HStringToLPCSTR( item->Path ), newItemPath ) )
+    {
+        printf("Failed to move file %s to %s. Error code: %lu\n", HStringToLPCSTR( item->Path ), newItemPath, GetLastError() );
+        status = E_ABORT;
+    }
+
+    if ( SUCCEEDED( status ) )
+    {
+        WindowsCreateString( CharToLPCWSTR( newItemPath ), wcslen( CharToLPCWSTR( newItemPath ) ), &item->Path );
+        WindowsDuplicateString( name, &item->Name );
+    }
     return status;
 }
