@@ -27,6 +27,7 @@
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
+extern struct IVectorView_StorageFolderVtbl storage_folder_vector_view_vtbl;
 
 struct storage_folder
 {
@@ -53,5 +54,6 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath );
 HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

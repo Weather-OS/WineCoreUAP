@@ -40,6 +40,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew ( HSTRING itemPath, IStorageItem 
 
     TRACE( "iface %p, value %p\n", itemPath, result );
     if (!result) return E_INVALIDARG;
+    if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
     item = impl_from_IStorageItem( result );
 
