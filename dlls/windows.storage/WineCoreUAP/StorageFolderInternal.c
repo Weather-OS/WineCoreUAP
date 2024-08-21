@@ -190,7 +190,6 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     itemVector->size = 0;
 
     snprintf( searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR( Path ) );
-    PathAppendA( fullItemPath, HStringToLPCSTR( Path ) );
 
     if ( param == NULL )
     {
@@ -210,12 +209,15 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
                     return E_OUTOFMEMORY;
                 itemVector->elements[itemVector->size]->lpVtbl = &storage_item_vtbl;
                 
+                PathAppendA( fullItemPath, HStringToLPCSTR( Path ) );
                 PathAppendA( fullItemPath, findFileData.cFileName );
                 WindowsCreateString( CharToLPCWSTR( fullItemPath ), wcslen( CharToLPCWSTR( fullItemPath ) ), &itemPath);
 
                 status = storage_item_Internal_CreateNew( itemPath, itemVector->elements[itemVector->size] );
 
                 itemVector->size++;
+
+                SecureZeroMemory( fullItemPath, sizeof( fullItemPath ) );
             }
         }
     }
@@ -291,7 +293,6 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
     folderVector->size = 0;
 
     snprintf( searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR( Path ) );
-    PathAppendA( fullFolderPath, HStringToLPCSTR( Path ) );
 
     if ( param == NULL )
     {
@@ -312,11 +313,14 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
                     return E_OUTOFMEMORY;
                 folderVector->elements[folderVector->size]->lpVtbl = &storage_folder_vtbl;
                 impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
-                
+
+                PathAppendA( fullFolderPath, HStringToLPCSTR( Path ) );
                 PathAppendA( fullFolderPath, findFolderData.cFileName );
                 WindowsCreateString( CharToLPCWSTR( fullFolderPath ), wcslen( CharToLPCWSTR( fullFolderPath ) ), &folderPath);
 
                 status = storage_item_Internal_CreateNew( folderPath, &impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageItem_iface );
+
+                SecureZeroMemory( fullFolderPath, sizeof( fullFolderPath ) );
 
                 folderVector->size++;
             }

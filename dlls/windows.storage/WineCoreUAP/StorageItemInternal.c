@@ -207,9 +207,18 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
         {
             case StorageDeleteOption_Default:
             case StorageDeleteOption_PermanentDelete:
-                if ( !DeleteFileA( HStringToLPCSTR( itemPath ) ) )
+                if ( attributes == FILE_ATTRIBUTE_DIRECTORY )
                 {
-                    status = E_ABORT;
+                    if ( !RemoveDirectoryA( HStringToLPCSTR( itemPath ) ) )
+                    {
+                        status = E_ABORT;
+                    }
+                } else
+                {
+                    if ( !DeleteFileA( HStringToLPCSTR( itemPath ) ) )
+                    {
+                        status = E_ABORT;
+                    }
                 }
         }
     }
@@ -218,5 +227,36 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
     {
         free( item );
     }
+    return status;
+}
+
+HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type )
+{
+    DWORD attributes;
+    HRESULT status = S_OK;
+    HSTRING itemPath;
+    struct storage_item *item;
+    char path[MAX_PATH];
+
+    item = impl_from_IStorageItem( iface );
+    WindowsDuplicateString( item->Path, &itemPath );
+    
+    strcpy( path, HStringToLPCSTR( itemPath ) );
+
+    attributes = GetFileAttributesA( path );
+    if ( attributes == INVALID_FILE_ATTRIBUTES )
+    {
+        status = E_INVALIDARG;
+    } else
+    {
+        if ( attributes == FILE_ATTRIBUTE_DIRECTORY )
+        {
+            *type = StorageItemTypes_Folder;
+        } else
+        {
+            *type = StorageItemTypes_File;
+        }
+    }
+
     return status;
 }

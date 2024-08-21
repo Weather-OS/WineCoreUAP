@@ -183,10 +183,20 @@ static HRESULT WINAPI storage_item_get_DateCreated( IStorageItem *iface, DateTim
     return S_OK;
 }
 
-static HRESULT WINAPI storage_item_IsOfType( IStorageItem *iface, StorageItemTypes type, boolean *value )
+static HRESULT WINAPI storage_item_IsOfType( IStorageItem *iface, StorageItemTypes type, BOOLEAN *value )
 {
-    FIXME( "iface %p, stub!\n", iface );
-    return E_NOTIMPL;
+    HRESULT hr;
+    StorageItemTypes fileType;
+    hr = storage_item_GetType( iface, &fileType );
+    if ( SUCCEEDED( hr ) )
+    {
+        if ( type == fileType )
+            *value = TRUE;
+        else
+            *value = FALSE;
+    }
+    
+    return hr;
 }
 
 struct IStorageItemVtbl storage_item_vtbl =

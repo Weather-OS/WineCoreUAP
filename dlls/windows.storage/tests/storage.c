@@ -471,7 +471,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
    
     ret = WaitForSingleObject( storage_folder_async_handler.event, 1000 );
     ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
-    
+
     ret = CloseHandle( storage_folder_async_handler.event );
     ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
     ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
@@ -700,7 +700,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     IStorageItem_get_Name( storageItemResults4, &SixthName );
     
     ok( !strcmp(HStringToLPCSTR(SixthPath), pathtest), "Error: Original path not returned. SixthPath %s, pathtest %s\n", HStringToLPCSTR(SixthPath), pathtest);
-    ok( !strcmp(HStringToLPCSTR(SixthName), "Temp"), "Error: Original name not returned. FifthName %s, name %s\n", HStringToLPCSTR(SixthName), "Test");
+    ok( !strcmp(HStringToLPCSTR(SixthName), "Temp"), "Error: Original name not returned. SixthName %s, name %s\n", HStringToLPCSTR(SixthName), "Test");
 
     return storageItemResults4;
 }
@@ -708,6 +708,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
 static void test_StorageItem( IStorageItem *customItem )
 {
     static const WCHAR *name = L"TempTest";
+    BOOLEAN isFolder;
     HSTRING renameName;
     HSTRING resultName;
     HRESULT hr;
@@ -721,7 +722,11 @@ static void test_StorageItem( IStorageItem *customItem )
     IStorageItem_get_Name( customItem, &resultName );
     ok( !strcmp(HStringToLPCSTR(resultName), "TempTest"), "Error: Original name not returned. resultName %s, name %s\n", HStringToLPCSTR(resultName), "TempTest");
 
-    
+    IStorageItem_IsOfType( customItem, StorageItemTypes_Folder, &isFolder );
+    ok( isFolder, "Error: Following path did not return as a folder.\n");
+
+    hr = IStorageItem_DeleteAsyncOverloadDefaultOptions( customItem, &tempAction );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
 }
 
 START_TEST(storage)
