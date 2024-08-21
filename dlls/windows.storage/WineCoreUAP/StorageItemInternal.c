@@ -183,3 +183,40 @@ HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption co
     }
     return status;
 }
+
+HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption deleteOption )
+{
+    DWORD attributes;
+    HRESULT status = S_OK;
+    HSTRING itemPath;
+    struct storage_item *item;
+
+    TRACE( "iface %p\n", iface );
+
+    item = impl_from_IStorageItem( iface );
+    WindowsDuplicateString( item->Path, &itemPath );
+
+    //Perform delete
+    attributes = GetFileAttributesA( HStringToLPCSTR( itemPath ) );
+    if ( attributes == INVALID_FILE_ATTRIBUTES ) 
+    {
+        status = E_INVALIDARG;
+    } else 
+    {
+        switch (deleteOption)
+        {
+            case StorageDeleteOption_Default:
+            case StorageDeleteOption_PermanentDelete:
+                if ( !DeleteFileA( HStringToLPCSTR( itemPath ) ) )
+                {
+                    status = E_ABORT;
+                }
+        }
+    }
+
+    if ( SUCCEEDED( status ) )
+    {
+        free( item );
+    }
+    return status;
+}

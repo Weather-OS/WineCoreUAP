@@ -133,14 +133,20 @@ static HRESULT WINAPI storage_item_RenameAsync( IStorageItem *iface, HSTRING nam
 
 static HRESULT WINAPI storage_item_DeleteAsyncOverloadDefaultOptions( IStorageItem *iface, IAsyncAction **operation )
 {
-    FIXME( "iface %p stub!\n", iface );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = storage_item_Delete( iface, StorageDeleteOption_Default );
+    if ( SUCCEEDED( hr ) )
+        hr = async_action_create( operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_item_DeleteAsync( IStorageItem *iface, StorageDeleteOption option, IAsyncAction **operation )
 {
-    FIXME( "iface %p, stub!\n", iface );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = storage_item_Delete( iface, option );
+    if ( SUCCEEDED( hr ) )
+        hr = async_action_create( operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_item_GetBasicPropertiesAsync( IStorageItem *iface, IAsyncOperation_BasicProperties **operation )

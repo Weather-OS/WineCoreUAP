@@ -38,5 +38,6 @@ struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
 HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption collisionOption, HSTRING name );
+HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption deleteOption );
 
 #endif
