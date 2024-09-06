@@ -37,6 +37,7 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
     BYTE buffer[BUFFER_SIZE];
     DWORD bytesRead;
     LPWSTR pwsMimeOut;
+    BOOLEAN isFile;
     char * fileExtension;
     struct storage_file *file;
 
@@ -55,6 +56,10 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
     WindowsDuplicateString( (HSTRING)param, &path );
 
     status = storage_item_Internal_CreateNew( path, &file->IStorageItem_iface );
+
+    IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
+    if ( !isFile )
+        status = E_INVALIDARG;
 
     if ( SUCCEEDED( status ) )
     {

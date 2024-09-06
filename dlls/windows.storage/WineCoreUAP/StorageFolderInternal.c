@@ -30,6 +30,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 HRESULT WINAPI storage_folder_AssignFolder ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
     HRESULT status;
+    BOOLEAN isFolder;
     struct storage_folder *folder;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -42,6 +43,10 @@ HRESULT WINAPI storage_folder_AssignFolder ( IUnknown *invoker, IUnknown *param,
     folder->ref = 1;
 
     status = storage_item_Internal_CreateNew( (HSTRING)param, &folder->IStorageItem_iface );
+
+    IStorageItem_IsOfType( &folder->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
+    if ( !isFolder )
+        status = E_INVALIDARG;
 
     if ( SUCCEEDED( status ) )
     {
