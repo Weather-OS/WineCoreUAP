@@ -36,6 +36,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     HANDLE itemFile;
     HRESULT status;
     FILETIME itemFileCreatedTime;
+
     struct storage_item *item;
 
     TRACE( "iface %p, value %p\n", itemPath, result );
@@ -110,9 +111,10 @@ HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption co
     DWORD attributes;
     HRESULT status = S_OK;
     HSTRING itemPath;
+    CHAR newItemPath[MAX_PATH];
+    CHAR uuidName[MAX_PATH];
+
     struct storage_item *item;
-    char newItemPath[MAX_PATH];
-    char uuidName[MAX_PATH];
 
     TRACE( "iface %p, value %p\n", iface, name );
     if (!name) return E_INVALIDARG;
@@ -189,6 +191,7 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
     DWORD attributes;
     HRESULT status = S_OK;
     HSTRING itemPath;
+
     struct storage_item *item;
 
     TRACE( "iface %p\n", iface );
@@ -235,9 +238,10 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
     DWORD attributes;
     HRESULT status = S_OK;
     HSTRING itemPath;
-    struct storage_item *item;
-    char path[MAX_PATH];
+    CHAR path[MAX_PATH];
 
+    struct storage_item *item;
+    
     item = impl_from_IStorageItem( iface );
     WindowsDuplicateString( item->Path, &itemPath );
     

@@ -31,4 +31,4 @@
 #include "../private.h"
 #include "wine/debug.h"
 
-HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, const char *FOLDERID, HSTRING *value );
+HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, const char * FOLDERID, HSTRING *value );

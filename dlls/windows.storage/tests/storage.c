@@ -41,7 +41,7 @@ LPCSTR HStringToLPCSTR( HSTRING hString ) {
     UINT32 length = WindowsGetStringLen(hString);
     const wchar_t* rawBuffer = WindowsGetStringRawBuffer(hString, &length);
     int bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
-    char* multiByteStr = (char*)malloc(bufferSize + 1);
+    LPSTR multiByteStr = (LPSTR)malloc(bufferSize + 1);
     WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, multiByteStr, bufferSize, NULL, NULL);
     multiByteStr[bufferSize] = '\0';
 
@@ -428,7 +428,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     HSTRING SixthName;
     HRESULT hr;
     DWORD ret;
-    char * pathtest = malloc(sizeof(char *));
+    LPSTR pathtest = malloc(sizeof(LPSTR));
 
     WindowsCreateString( path, wcslen( path ), &pathString );
     WindowsCreateString( name, wcslen( name ), &nameString );

@@ -31,6 +31,7 @@ HRESULT WINAPI storage_folder_AssignFolder ( IUnknown *invoker, IUnknown *param,
 {    
     HRESULT status;
     BOOLEAN isFolder;
+
     struct storage_folder *folder;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -65,9 +66,10 @@ HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationColl
     DWORD attrib;
     BOOL Exists = FALSE;
     BOOL Replace = FALSE;
+    CHAR fullPath[MAX_PATH];
+    CHAR uuidName[MAX_PATH];
+
     struct storage_folder *invokerFolder;
-    char fullPath[MAX_PATH];
-    char uuidName[MAX_PATH];
 
     TRACE( "iface %p, value %p\n", folder, OutPath );
 
@@ -136,10 +138,11 @@ HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationColl
 
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
-    char fullPath[MAX_PATH];
+    CHAR fullPath[MAX_PATH];
     HRESULT status;
     HSTRING Path;
     HSTRING itemPath;
+
     struct storage_folder * folder;
     struct storage_item * item;
 
@@ -178,10 +181,11 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     HRESULT status = S_OK;
     HSTRING Path;
     HSTRING itemPath;
-    CHAR searchPath[MAX_PATH];
+    CHAR searchPath[MAX_PATH]; 
+    CHAR fullItemPath[MAX_PATH];
+
     struct storage_folder *invokerFolder;
     struct storage_item_vector_view *itemVector;
-    char fullItemPath[MAX_PATH];
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
@@ -239,10 +243,11 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
 
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    char fullPath[MAX_PATH];
+    CHAR fullPath[MAX_PATH];
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
+    
     struct storage_folder * folder;
     struct storage_folder * folderToFetch;
 
@@ -282,9 +287,10 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
     HSTRING Path;
     HSTRING folderPath;
     CHAR searchPath[MAX_PATH];
+    CHAR fullFolderPath[MAX_PATH];
+
     struct storage_folder_vector_view *folderVector;
     struct storage_folder *invokerFolder;
-    char fullFolderPath[MAX_PATH];
 
     TRACE( "iface %p, value %p\n", invoker, result );
 

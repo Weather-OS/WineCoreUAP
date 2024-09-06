@@ -21,7 +21,7 @@
 
 #include "util.h"
 
-int64_t FileTimeToUnixTime(const FILETIME *ft) {
+INT64 FileTimeToUnixTime( const FILETIME *ft ) {
     ULARGE_INTEGER ull;
 
     // Copy the FILETIME (which is a 64-bit value) to a ULARGE_INTEGER.
@@ -32,9 +32,9 @@ int64_t FileTimeToUnixTime(const FILETIME *ft) {
     return (ull.QuadPart / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH;
 }
 
-void GenerateUniqueFileName(char* buffer, size_t bufferSize) {
+VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize ) {
     UUID uuid;
-    char * str;
+    LPSTR str;
 
     UuidCreate(&uuid);
     UuidToStringA(&uuid, (RPC_CSTR*)&str);
@@ -43,13 +43,13 @@ void GenerateUniqueFileName(char* buffer, size_t bufferSize) {
     RpcStringFreeA((RPC_CSTR*)&str);
 }
 
-LPCWSTR CharToLPCWSTR(char * charString) {
-    int len;
-    int stringLength = strlen(charString) + 1;
+LPCWSTR CharToLPCWSTR( LPSTR charString ) {
+    INT len;
+    INT stringLength = strlen(charString) + 1;
     LPCWSTR wideString;
 
     len = MultiByteToWideChar(CP_ACP, 0, charString, stringLength, 0, 0);
-    wideString = (LPCWSTR)malloc(len * sizeof(wchar_t));
+    wideString = (LPCWSTR)malloc(len * sizeof(LPCWSTR));
 
     MultiByteToWideChar(CP_ACP, 0, charString, stringLength, (LPWSTR)wideString, len);
 
@@ -58,9 +58,9 @@ LPCWSTR CharToLPCWSTR(char * charString) {
 
 LPCSTR HStringToLPCSTR( HSTRING hString ) {
     UINT32 length = WindowsGetStringLen(hString);
-    const wchar_t * rawBuffer = WindowsGetStringRawBuffer(hString, &length);
-    int bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
-    char * multiByteStr = (char*)malloc(bufferSize + 1);
+    LPCWSTR rawBuffer = WindowsGetStringRawBuffer(hString, &length);
+    INT bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
+    LPSTR multiByteStr = (LPSTR)malloc(bufferSize + 1);
     WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, multiByteStr, bufferSize, NULL, NULL);
     multiByteStr[bufferSize] = '\0';
 

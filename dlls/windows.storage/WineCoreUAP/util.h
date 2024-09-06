@@ -37,9 +37,9 @@
 #define WINDOWS_TICK 10000000
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 
-int64_t FileTimeToUnixTime(const FILETIME *ft);
-void GenerateUniqueFileName(char* buffer, size_t bufferSize);
-LPCWSTR CharToLPCWSTR(char * charString);
+INT64 FileTimeToUnixTime( const FILETIME *ft );
+VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize );
+LPCWSTR CharToLPCWSTR( LPSTR charString );
 LPCSTR HStringToLPCSTR( HSTRING hString );
 
 #endif

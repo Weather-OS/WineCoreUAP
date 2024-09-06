@@ -19,25 +19,14 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "util.h"
 #include "AppInternalPaths.h"
 
 #define BUFFER_SIZE 1024
 
-LPCWSTR charToLPCWSTR(char* str) {
-    //WHY ARE WE DOING THIS?
-    int wchars_num = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
-        wchar_t* wstr = (wchar_t*)malloc(wchars_num * sizeof(wchar_t));
-    if (wstr == NULL) {
-        printf("Memory allocation failed\n");
-        return NULL;
-    }
-    MultiByteToWideChar(CP_UTF8, 0, str, -1, wstr, wchars_num);
-    return wstr;
-}
-
-char * extractNameAttribute(char* line) {
-    char *nameStart = strstr(line, "Name=\"");
-    char *nameEnd;
+LPSTR extractNameAttribute(LPSTR line) {
+    LPSTR nameStart = strstr(line, "Name=\"");
+    LPSTR nameEnd;
     if (nameStart) {
         nameStart += 6; // Move past 'Name="'
         nameEnd = strchr(nameStart, '"');
@@ -50,14 +39,14 @@ char * extractNameAttribute(char* line) {
     return nameEnd;
 }
 
-HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char *FOLDERID, HSTRING *value) 
-{
-    char path[MAX_PATH] = "C:\\users\\";
+HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
+{    
     FILE *file;
-    char username[256];
-    char manifestPath[MAX_PATH];
-    char buffer[BUFFER_SIZE] = {0};
-    char AppName[BUFFER_SIZE];
+    CHAR path[MAX_PATH] = "C:\\users\\";
+    CHAR username[256];
+    CHAR manifestPath[MAX_PATH];
+    CHAR buffer[BUFFER_SIZE] = {0};
+    CHAR AppName[BUFFER_SIZE];
     DWORD username_len = sizeof(username);
 
     GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
@@ -108,7 +97,7 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char *F
         PathAppendA(path, "RoamingState");
     }
 
-    if (WindowsCreateString(charToLPCWSTR(path), strlen(path), value) != S_OK) {
+    if (WindowsCreateString(CharToLPCWSTR(path), strlen(path), value) != S_OK) {
         MessageBoxW(NULL, L"Failed to create Windows string", L"WineCoreUAP", MB_ICONERROR);
         return E_UNEXPECTED;
     }
