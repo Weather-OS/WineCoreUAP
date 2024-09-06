@@ -1,5 +1,5 @@
 MODULE  = windows.storage.dll
-IMPORTS = shell32 user32 combase ole32 advapi32 shlwapi rpcrt4
+IMPORTS = shell32 user32 combase ole32 advapi32 shlwapi rpcrt4 urlmon
 
 SOURCES = \
 	WineCoreUAP/util.c \
@@ -10,12 +10,14 @@ SOURCES = \
 	WineCoreUAP/StorageItem.c \
 	WineCoreUAP/StorageItemInternal.c \
 	WineCoreUAP/StorageFile.c \
+	WineCoreUAP/StorageFileInternal.c \
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsyncVectorView.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsync.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsyncVectorView.c \
+	WineCoreUAP/AsyncOperation/StorageFileAsync.c \
 	WineCoreUAP/VectorView/StorageItemVectorView.c \
 	WineCoreUAP/VectorView/StorageFolderVectorView.c \
 	provider.idl \

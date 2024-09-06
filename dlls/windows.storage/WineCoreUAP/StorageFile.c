@@ -19,7 +19,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "util.h"
 #include "StorageFileInternal.h"
+#include "AppInternalPaths.h"
 
 #include "../private.h"
 #include "wine/debug.h"
@@ -289,18 +291,59 @@ DEFINE_IINSPECTABLE( storage_file_statics, IStorageFileStatics, struct storage_f
 
 static HRESULT WINAPI storage_file_statics_GetFileFromPathAsync( IStorageFileStatics *iface, HSTRING path, IAsyncOperation_StorageFile **result )
 {
-    FIXME( "iface %p, result %p stub!\n", iface, result );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFile, result );
+    TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
+    return hr;
 }
 
-static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStorageFileStatics *iface, __x_ABI_CWindows_CFoundation_CIUriRuntimeClass *uri, IAsyncOperation_StorageFile **result )
+static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStorageFileStatics *iface, IUriRuntimeClass *uri, IAsyncOperation_StorageFile **result )
 {
-    FIXME( "iface %p, result %p stub!\n", iface, result );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING uriScheme;
+    HSTRING uriPath;
+    HSTRING appDataPath;
+    HSTRING path;
+    LPCSTR uriSchemeStr;
+    LPCSTR uriPathStr;
+    LPCSTR appDataPathStr;
+    char pathStr[MAX_PATH];
+
+    app_data_paths_GetKnownFolder( NULL, "localappdata", &appDataPath );
+    IUriRuntimeClass_get_SchemeName( uri, &uriScheme );
+    IUriRuntimeClass_get_Domain( uri, &uriPath );
+
+    uriSchemeStr = HStringToLPCSTR( uriScheme );
+    uriPathStr = HStringToLPCSTR( uriPath );
+    appDataPathStr = HStringToLPCSTR( appDataPath );
+    
+    //ms-appx: appx install path
+    //ms-appdata: appx app data
+
+    if ( !strcmp( uriSchemeStr, "ms-appx" ) )
+    {
+        GetModuleFileNameA(NULL, pathStr, MAX_PATH);
+        PathAppendA( pathStr, uriPathStr );
+    } else if ( !strcmp( uriSchemeStr, "ms-appdata" ) )
+    {
+        strcpy( pathStr, appDataPathStr );
+        PathAppendA( pathStr, uriPathStr );
+    } else {
+        return E_INVALIDARG;
+    }
+
+    WindowsCreateString( CharToLPCWSTR( pathStr ), wcslen( CharToLPCWSTR( pathStr ) ), &path );
+
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFile, result );
+    TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
+    return hr;
 }
 
+// UNIX has no concept of "File Thumbnails". thumbnail is to be ignored.
+// Storage.Stream needs to be implemented.
 static HRESULT WINAPI storage_file_statics_CreateStreamedFileAsync( IStorageFileStatics *iface, HSTRING displayNameWithExtension, IStreamedFileDataRequestedHandler *dataRequested, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
 {
+
     FIXME( "iface %p, result %p stub!\n", iface, result );
     return E_NOTIMPL;
 }
@@ -311,13 +354,13 @@ static HRESULT WINAPI storage_file_statics_ReplaceWithStreamedFileAsync( IStorag
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI storage_file_statics_CreateStreamedFileFromUriAsync( IStorageFileStatics *iface, HSTRING displayNameWithExtension, __x_ABI_CWindows_CFoundation_CIUriRuntimeClass *uri, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
+static HRESULT WINAPI storage_file_statics_CreateStreamedFileFromUriAsync( IStorageFileStatics *iface, HSTRING displayNameWithExtension, IUriRuntimeClass *uri, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
 {
     FIXME( "iface %p, result %p stub!\n", iface, result );
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI storage_file_statics_ReplaceWithStreamedFileFromUriAsync( IStorageFileStatics *iface, IStorageFile *fileToReplace, __x_ABI_CWindows_CFoundation_CIUriRuntimeClass *uri, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
+static HRESULT WINAPI storage_file_statics_ReplaceWithStreamedFileFromUriAsync( IStorageFileStatics *iface, IStorageFile *fileToReplace, IUriRuntimeClass *uri, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
 {
     FIXME( "iface %p, result %p stub!\n", iface, result );
     return E_NOTIMPL;

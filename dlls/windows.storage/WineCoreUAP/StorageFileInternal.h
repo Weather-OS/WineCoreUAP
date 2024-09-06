@@ -26,7 +26,6 @@
 
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
-extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
 
 struct storage_file
 {
@@ -34,6 +33,8 @@ struct storage_file
     IStorageFile IStorageFile_iface;
     IStorageItem IStorageItem_iface;
 
+    HSTRING FileType;
+    HSTRING ContentType;
     LONG ref;
 };
 
@@ -47,5 +48,7 @@ struct storage_file_statics
 };
 
 struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
+
+HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

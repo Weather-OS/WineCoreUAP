@@ -62,6 +62,8 @@ typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown 
 HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
 
+extern HRESULT async_operation_storage_file_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+                                              IAsyncOperation_StorageFile **out );
 extern HRESULT async_operation_storage_folder_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_StorageFolder **out );
 extern HRESULT async_operation_storage_item_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
