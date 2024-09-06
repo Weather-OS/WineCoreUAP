@@ -21,7 +21,6 @@
 
 #include "util.h"
 #include "StorageFileInternal.h"
-#include "StorageItemInternal.h"
 
 #define BUFFER_SIZE 512
 
@@ -83,6 +82,69 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
     {
         result->vt = VT_UNKNOWN;
         result->ppunkVal = (IUnknown **)&file->IStorageFile_iface;
+    }
+
+    return status;
+}
+
+HRESULT WINAPI storage_file_Copy ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option )
+{
+    HRESULT status = S_OK;
+    HSTRING folderPath;
+    HSTRING filePath;
+    HSTRING destPath;
+    struct storage_folder *destFolder;
+    struct storage_item *destFolderItem;
+    struct storage_item *invokerFileItem;
+    struct storage_file *invokerFile;
+    char filePathStr[MAX_PATH];
+    char folderPathStr[MAX_PATH];
+    char uuidName[MAX_PATH];
+
+    destFolder = impl_from_IStorageFolder( folder );
+    destFolderItem = impl_from_IStorageItem( &destFolder->IStorageItem_iface );
+    WindowsDuplicateString( destFolderItem->Path, &folderPath );
+    strcpy( folderPathStr, HStringToLPCSTR( folderPath ) );
+    
+    invokerFile = impl_from_IStorageFile( invoker );
+    invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
+    WindowsDuplicateString( invokerFileItem->Path, &filePath );
+    strcpy( filePathStr, HStringToLPCSTR( filePath ) );
+
+
+    switch ( option )
+    {
+        case NameCollisionOption_FailIfExists:
+            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+
+            if ( !CopyFileA( filePathStr, folderPathStr, TRUE ) )
+                return E_ABORT;
+            break;
+
+        case NameCollisionOption_GenerateUniqueName:
+            GenerateUniqueFileName( uuidName, sizeof( uuidName ) );
+            PathAppendA( folderPathStr, uuidName );
+
+            //Assume FailIfExists by default.
+            if ( !CopyFileA( filePathStr, folderPathStr, TRUE ) )
+                return E_ABORT;
+            break;
+
+        case NameCollisionOption_ReplaceExisting:
+            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+
+            if ( !CopyFileA( filePathStr, folderPathStr, FALSE ) )
+                return E_ABORT;
+            break;
+
+        default:
+            status = E_INVALIDARG;
+    }
+
+    if ( SUCCEEDED( status ) )
+    {
+        WindowsCreateString( CharToLPCWSTR( folderPathStr ), wcslen( CharToLPCWSTR( folderPathStr ) ), &destPath );
+        status = storage_item_Internal_CreateNew( destPath, &invokerFile->IStorageItem_iface );
     }
 
     return status;

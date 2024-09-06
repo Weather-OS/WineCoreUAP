@@ -24,6 +24,10 @@
 #ifndef STORAGE_FILE_INTERNAL_H
 #define STORAGE_FILE_INTERNAL_H
 
+#include "StorageFileInternal.h"
+#include "StorageFolderInternal.h"
+#include "StorageItemInternal.h"
+
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 
@@ -50,5 +54,6 @@ struct storage_file_statics
 struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
 
 HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_Copy ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option );
 
 #endif

@@ -193,14 +193,16 @@ static HRESULT WINAPI storage_file_GetTrustLevel( IStorageFile *iface, TrustLeve
 
 static HRESULT WINAPI storage_file_get_FileType( IStorageFile *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    *value = impl->FileType;
+    return S_OK;
 }
 
 static HRESULT WINAPI storage_file_get_ContentType( IStorageFile *iface, HSTRING *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    *value = impl->ContentType;
+    return S_OK;
 }
 
 static HRESULT WINAPI storage_file_OpenAsync( IStorageFile *iface, FileAccessMode mode, IAsyncOperation_IRandomAccessStream **operation )
@@ -217,25 +219,62 @@ static HRESULT WINAPI storage_file_OpenTransactedWriteAsync( IStorageFile *iface
 
 static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFile *iface, IStorageFolder *folder, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING name;
+    NameCollisionOption option = NameCollisionOption_FailIfExists;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
+
+    WindowsDuplicateString( implItem->Name, &name );
+
+    hr = storage_file_Copy( iface, folder, name, option );
+    if( SUCCEEDED( hr ) )
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)implItem->Path, storage_file_AssignFile, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    
+    return hr;
 }
 
 static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *iface, IStorageFolder *folder, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    NameCollisionOption option = NameCollisionOption_FailIfExists;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
+
+    hr = storage_file_Copy( iface, folder, name, option );
+    if( SUCCEEDED( hr ) )
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)implItem->Path, storage_file_AssignFile, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    
+    return hr;
 }
 
 static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFolder *folder, HSTRING name, NameCollisionOption option, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
+
+    hr = storage_file_Copy( iface, folder, name, option );
+    if( SUCCEEDED( hr ) )
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)implItem->Path, storage_file_AssignFile, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    
+    return hr;
 }
 
 static HRESULT WINAPI storage_file_CopyAndReplaceAsync( IStorageFile *iface, IStorageFile *file, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    HRESULT hr;
+    HSTRING name;
+    NameCollisionOption option = NameCollisionOption_ReplaceExisting;
+    struct storage_file *impl = impl_from_IStorageFile( iface );
+    struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
+
+    WindowsDuplicateString( implItem->Name, &name );
+
+    hr = storage_file_Copy( iface, folder, name, option );
     return E_NOTIMPL;
 }
 
