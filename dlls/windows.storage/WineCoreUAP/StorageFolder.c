@@ -27,7 +27,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 // Storage Folder
 
-struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface )
+static struct storage_folder_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
     return CONTAINING_RECORD( iface, struct storage_folder_statics, IActivationFactory_iface );
 }

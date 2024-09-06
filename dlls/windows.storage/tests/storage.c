@@ -369,6 +369,9 @@ static const wchar_t* test_AppDataPathsStatics(void)
 
     IAppDataPaths_get_LocalAppData( app_data_paths, &localAppDataPath );
     wstr = WindowsGetStringRawBuffer(localAppDataPath, NULL);
+    printf("Path responded is: ");
+    wprintf(wstr);
+    printf("\n");
 
     if (app_data_paths) IAppDataPaths_Release( app_data_paths );
     ref = IAppDataPathsStatics_Release( app_data_paths_statics );

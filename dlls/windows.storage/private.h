@@ -31,10 +31,13 @@
 
 #include "activation.h"
 
+//The specific order in which header files are included here is extremely important.
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #define WIDL_using_Windows_Foundation_Numerics
 #include "windows.foundation.h"
+#define WIDL_using_Windows_Storage_Streams
+#include "windows.storage.streams.h"
 #define WIDL_using_Windows_System
 #include "windows.system.h"
 #define WIDL_using_Windows_Storage
@@ -52,8 +55,10 @@ struct vector_iids
 
 extern IActivationFactory *app_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
+extern IActivationFactory *storage_file_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+
 HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
 

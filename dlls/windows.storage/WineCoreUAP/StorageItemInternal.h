@@ -26,7 +26,9 @@
 
 struct storage_item
 {
+    //Derivatives
     IStorageItem IStorageItem_iface;
+
     FileAttributes Attributes;
     DateTime DateCreated;
     HSTRING Path;    

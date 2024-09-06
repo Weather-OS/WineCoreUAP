@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.StorageFolder Implementation
+/* WinRT Windows.Storage.StorageFile Implementation
  *
  * Written by Weather
  *
@@ -21,38 +21,31 @@
 
 #include "../private.h"
 
-#ifndef STORAGE_FOLDER_INTERNAL_H
-#define STORAGE_FOLDER_INTERNAL_H
+#ifndef STORAGE_FILE_INTERNAL_H
+#define STORAGE_FILE_INTERNAL_H
 
-extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
-extern struct IVectorView_StorageFolderVtbl storage_folder_vector_view_vtbl;
 
-struct storage_folder
+struct storage_file
 {
     //Derivatives
-    IStorageFolder IStorageFolder_iface;
+    IStorageFile IStorageFile_iface;
     IStorageItem IStorageItem_iface;
 
     LONG ref;
 };
 
 
-struct storage_folder_statics
+struct storage_file_statics
 {
     IActivationFactory IActivationFactory_iface;
-    IStorageFolderStatics IStorageFolderStatics_iface;
+    IStorageFileStatics IStorageFileStatics_iface;
+
     LONG ref;
 };
 
-struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
-
-HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath );
-HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
 
 #endif
