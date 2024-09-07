@@ -31,7 +31,7 @@ struct storage_item
 
     FileAttributes Attributes;
     HSTRING Path;
-    HSTRING Name;    
+    HSTRING Name __attribute__((aligned(256)));    
     DateTime DateCreated;
     LONG ref;
 };

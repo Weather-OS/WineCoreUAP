@@ -409,6 +409,79 @@ static IAsyncOperationCompletedHandler_IVectorView_StorageFolderVtbl storage_fol
 
 static struct storage_folder_vector_view_async_handler default_storage_folder_vector_view_async_handler = {{&storage_folder_vector_view_async_handler_vtbl}};
 
+/**
+ * IAsyncOperationCompletedHandler_IVectorView_StorageFile
+ */
+
+struct storage_file_vector_view_async_handler
+{
+    IAsyncOperationCompletedHandler_IVectorView_StorageFile IAsyncOperationCompletedHandler_IVectorView_StorageFile_iface;
+    IAsyncOperation_IVectorView_StorageFile *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct storage_file_vector_view_async_handler *impl_from_IAsyncOperationCompletedHandler_IVectorView_StorageFile( IAsyncOperationCompletedHandler_IVectorView_StorageFile *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_file_vector_view_async_handler, IAsyncOperationCompletedHandler_IVectorView_StorageFile_iface );
+}
+
+static HRESULT WINAPI storage_file_vector_view_async_handler_QueryInterface( IAsyncOperationCompletedHandler_IVectorView_StorageFile *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_IVectorView_StorageFile ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_file_vector_view_async_handler_AddRef( IAsyncOperationCompletedHandler_IVectorView_StorageFile *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI storage_file_vector_view_async_handler_Release( IAsyncOperationCompletedHandler_IVectorView_StorageFile *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI storage_file_vector_view_async_handler_Invoke( IAsyncOperationCompletedHandler_IVectorView_StorageFile *iface,
+                                                 IAsyncOperation_IVectorView_StorageFile *async, AsyncStatus status )
+{
+    struct storage_file_vector_view_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_IVectorView_StorageFile( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_IVectorView_StorageFileVtbl storage_file_vector_view_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    storage_file_vector_view_async_handler_QueryInterface,
+    storage_file_vector_view_async_handler_AddRef,
+    storage_file_vector_view_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<IVectorView<StorageFile *>> methods ***/
+    storage_file_vector_view_async_handler_Invoke,
+};
+
+static struct storage_file_vector_view_async_handler default_storage_file_vector_view_async_handler = {{&storage_file_vector_view_async_handler_vtbl}};
+
+
 //************************************************************************ */
 
 #define check_interface( obj, iid ) check_interface_( __LINE__, obj, iid )
@@ -481,6 +554,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     struct storage_file_async_handler storage_file_async_handler;
     struct storage_item_vector_view_async_handler storage_item_vector_view_async_handler;
     struct storage_folder_vector_view_async_handler storage_folder_vector_view_async_handler;
+    struct storage_file_vector_view_async_handler storage_file_vector_view_async_handler;
     IStorageItem *storageItem;
     IStorageItem *storageItemResults;
     IStorageItem *storageItemResults2;
@@ -488,8 +562,10 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     IStorageItem *storageItemResults4;
     IStorageItem *storageItemResults5;
     IStorageItem *storageItemResults6;
+    IStorageItem *storageItemResults7;
     IStorageFile *storageFileResults;
     IStorageFile *storageFileResults2;
+    IStorageFile *storageFileResults3;
     IStorageFolder *storageFolderResults;
     IStorageFolder *storageFolderResults2;
     IStorageFolder *storageFolderResults3;
@@ -497,17 +573,20 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     IStorageFolderStatics *storage_folder_statics;
     IVectorView_IStorageItem *storageItemVectorResults;
     IVectorView_StorageFolder *storageFolderVectorResults;
+    IVectorView_StorageFile *storageFileVectorResults;
     IAsyncOperation_StorageFile *storageFileOperation;
     IAsyncOperation_StorageFolder *storage_folder;
     IAsyncOperation_StorageFolder *storageFolderOperation;
     IAsyncOperation_IStorageItem *storageItemOperation;
     IAsyncOperation_IVectorView_IStorageItem *storageItemVectorOperation;
     IAsyncOperation_IVectorView_StorageFolder *storageFolderVectorOperation;
+    IAsyncOperation_IVectorView_StorageFile *storageFileVectorOperation;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
     IAsyncOperationCompletedHandler_IStorageItem *storage_item_handler;
     IAsyncOperationCompletedHandler_StorageFile *storage_file_handler;
     IAsyncOperationCompletedHandler_IVectorView_IStorageItem *storage_item_vector_view_handler;
     IAsyncOperationCompletedHandler_IVectorView_StorageFolder *storage_folder_vector_view_handler;
+    IAsyncOperationCompletedHandler_IVectorView_StorageFile *storage_file_vector_view_handler;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING pathString;
@@ -528,6 +607,8 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     HSTRING SeventhName;
     HSTRING EightthPath;
     HSTRING EightthName;
+    HSTRING NinethPath;
+    HSTRING NinethName;
     HRESULT hr;
     DWORD ret;
     CHAR pathtest[MAX_PATH];
@@ -750,7 +831,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
     ok( storage_item_vector_view_async_handler.invoked, "handler not invoked\n" );
     ok( storage_item_vector_view_async_handler.async == storageItemVectorOperation, "got async %p\n", storage_item_vector_view_async_handler.async );
-    ok( storage_item_vector_view_async_handler.status == Completed || broken( storage_item_vector_view_async_handler.status == Error ), "got status %u\n", storage_item_vector_view_async_handler.status );    hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storageItemVectorOperation, &storageItemVectorResults );
+    ok( storage_item_vector_view_async_handler.status == Completed || broken( storage_item_vector_view_async_handler.status == Error ), "got status %u\n", storage_item_vector_view_async_handler.status );    
 
     hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storageItemVectorOperation, &storageItemVectorResults );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -793,7 +874,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
     ok( storage_folder_vector_view_async_handler.invoked, "handler not invoked\n" );
     ok( storage_folder_vector_view_async_handler.async == storageFolderVectorOperation, "got async %p\n", storage_folder_vector_view_async_handler.async );
-    ok( storage_folder_vector_view_async_handler.status == Completed || broken( storage_folder_vector_view_async_handler.status == Error ), "got status %u\n", storage_folder_vector_view_async_handler.status );    hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storageItemVectorOperation, &storageItemVectorResults );
+    ok( storage_folder_vector_view_async_handler.status == Completed || broken( storage_folder_vector_view_async_handler.status == Error ), "got status %u\n", storage_folder_vector_view_async_handler.status );    
 
     hr = IAsyncOperation_IVectorView_StorageFolder_GetResults( storageFolderVectorOperation, &storageFolderVectorResults );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -895,6 +976,52 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
 
     ok( !strcmp(HStringToLPCSTR(EightthPath), pathtest), "Error: Original path not returned. EightthPath %s, pathtest %s\n", HStringToLPCSTR(EightthPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(EightthName), "TempFile"), "Error: Original name not returned. EightthName %s, name %s\n", HStringToLPCSTR(EightthName), "TempFile");
+
+    /**
+     * IStorageFolder_GetFilesAsyncOverloadDefaultOptionsStartAndCount
+    */
+
+    hr = IStorageFolder_GetFilesAsyncOverloadDefaultOptionsStartAndCount( storageFolderResults4, &storageFileVectorOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageFileVectorOperation, &IID_IUnknown );
+    check_interface( storageFileVectorOperation, &IID_IInspectable );
+    check_interface( storageFileVectorOperation, &IID_IAgileObject );
+    check_interface( storageFileVectorOperation, &IID_IAsyncInfo );
+    check_interface( storageFileVectorOperation, &IID_IAsyncOperation_IVectorView_StorageFile );
+
+    hr = IAsyncOperation_IVectorView_StorageFile_get_Completed( storageFileVectorOperation, &storage_file_vector_view_handler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_file_vector_view_handler == NULL, "got handler %p\n", storage_file_vector_view_handler );
+
+    storage_file_vector_view_async_handler = default_storage_file_vector_view_async_handler;
+    storage_file_vector_view_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IVectorView_StorageFile_put_Completed( storageFileVectorOperation, &storage_file_vector_view_async_handler.IAsyncOperationCompletedHandler_IVectorView_StorageFile_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_file_vector_view_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_file_vector_view_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_file_vector_view_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_file_vector_view_async_handler.async == storageFileVectorOperation, "got async %p\n", storage_file_vector_view_async_handler.async );
+    ok( storage_file_vector_view_async_handler.status == Completed || broken( storage_file_vector_view_async_handler.status == Error ), "got status %u\n", storage_file_vector_view_async_handler.status );
+
+    hr = IAsyncOperation_IVectorView_StorageFile_GetResults( storageFileVectorOperation, &storageFileVectorResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IVectorView_StorageFile_GetAt( storageFileVectorResults, 0, &storageFileResults3 );
+
+    IStorageFile_QueryInterface( storageFileResults3, &IID_IStorageItem, (void **)&storageItemResults7 );
+
+    IStorageItem_get_Path( storageItemResults7, &NinethPath );
+    IStorageItem_get_Name( storageItemResults7, &NinethName );
+    
+    ok( !strcmp(HStringToLPCSTR(NinethPath), pathtest), "Error: Original path not returned. NinethPath %s, pathtest %s\n", HStringToLPCSTR(NinethPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(NinethName), "TempFile"), "Error: Original name not returned. NinethName %s, name %s\n", HStringToLPCSTR(NinethName), "TempFile");
+
 
     return storageItemResults4;
 }
