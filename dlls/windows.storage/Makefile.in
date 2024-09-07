@@ -4,6 +4,7 @@ EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
 
 SOURCES = \
 	WineCoreUAP/util.c \
+	WineCoreUAP/KnownFolders.c \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \

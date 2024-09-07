@@ -58,6 +58,7 @@ struct vector_iids
 extern IActivationFactory *app_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
 extern IActivationFactory *storage_file_factory;
+extern IActivationFactory *known_folders_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
