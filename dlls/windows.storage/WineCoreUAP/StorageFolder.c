@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 #include "StorageFolderInternal.h"
+#include "StorageFileInternal.h"
 
 #include "../private.h"
 #include "wine/debug.h"
@@ -198,8 +199,12 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
      * 
      *  This method does the same thing as Windows::Storage::CreateFileAsync.
      */  
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING OutPath;
+    storage_folder_CreateFile( iface, CreationCollisionOption_FailIfExists, name, &OutPath );
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFile, operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HSTRING name, CreationCollisionOption options, IAsyncOperation_StorageFile ** operation )
@@ -208,8 +213,12 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
     // uses for Storage Folders, We have to assume that this 
     // just simply creates a file and sets it's handle to 
     // Operation
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING OutPath;
+    storage_folder_CreateFile( iface, options, name, &OutPath );
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFile, operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )

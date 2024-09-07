@@ -158,14 +158,14 @@ static HRESULT WINAPI storage_item_GetBasicPropertiesAsync( IStorageItem *iface,
 static HRESULT WINAPI storage_item_get_Name( IStorageItem *iface, HSTRING *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
-    *value = impl->Name;
+    WindowsDuplicateString( impl->Name, value );
     return S_OK;
 }
 
 static HRESULT WINAPI storage_item_get_Path( IStorageItem *iface, HSTRING *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
-    *value = impl->Path;
+    WindowsDuplicateString( impl->Path, value );
     return S_OK;
 }
 

@@ -66,3 +66,50 @@ LPCSTR HStringToLPCSTR( HSTRING hString ) {
 
     return multiByteStr;
 }
+
+VOID DeleteDirectoryRecursively(LPCSTR directoryPath)
+{
+    WIN32_FIND_DATAA findFileData;
+    HANDLE hFind;
+    char searchPath[MAX_PATH];
+    char fullPath[MAX_PATH];
+
+    snprintf(searchPath, sizeof(searchPath), "%s\\*.*", directoryPath);
+
+    hFind = FindFirstFileA(searchPath, &findFileData);
+    if (hFind == INVALID_HANDLE_VALUE) 
+    {
+        printf("Error: Cannot open directory: %s\n", directoryPath);
+        return;
+    }
+
+    do 
+    {
+        if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0) 
+        {
+            snprintf(fullPath, sizeof(fullPath), "%s\\%s", directoryPath, findFileData.cFileName);
+
+            if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) 
+            {
+                DeleteDirectoryRecursively(fullPath);
+
+                RemoveDirectoryA(fullPath);
+            } 
+            else 
+            {
+                if (!DeleteFileA(fullPath)) 
+                {
+                    printf("Error: Unable to delete file: %s\n", fullPath);
+                }
+            }
+        }
+    } 
+    while (FindNextFileA(hFind, &findFileData) != 0);
+
+    FindClose(hFind);
+
+    if (!RemoveDirectoryA(directoryPath)) 
+    {
+        printf("Error: Unable to delete directory: %s\n", directoryPath);
+    }
+}

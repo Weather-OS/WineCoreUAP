@@ -68,13 +68,13 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
         {
             WindowsCreateString( CharToLPCWSTR( fileExtension ), wcslen( CharToLPCWSTR( fileExtension ) ), &file->FileType );
         }
-
         fileData = fopen( HStringToLPCSTR( path ), "rb" );
         bytesRead = (DWORD)fread( buffer, 1, BUFFER_SIZE, fileData );
         fclose( fileData );
 
         FindMimeFromData ( NULL, WindowsGetStringRawBuffer( path, NULL ), buffer, bytesRead, NULL, 0, &pwsMimeOut, 0 );
-        WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->ContentType );
+        if (pwsMimeOut != NULL)
+            WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->ContentType );
 
         CoTaskMemFree( pwsMimeOut );
     }

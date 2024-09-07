@@ -34,6 +34,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     CHAR itemName[MAX_PATH];
     DWORD attributes;
     HANDLE itemFile;
+    HSTRING tempName;
     HRESULT status;
     FILETIME itemFileCreatedTime;
 
@@ -96,7 +97,8 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
         //File Name
         strcpy( itemName, strrchr( HStringToLPCSTR( itemPath ), '\\' ) );
-        WindowsCreateString( CharToLPCWSTR( itemName + 1 ), strlen(itemName), &item->Name );
+        WindowsCreateString( CharToLPCWSTR( itemName + 1 ), strlen(itemName), &tempName );
+        WindowsDuplicateString( tempName, &item->Name );
 
         CloseHandle( itemFile );
 
@@ -212,14 +214,12 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
             case StorageDeleteOption_PermanentDelete:
                 if ( attributes == FILE_ATTRIBUTE_DIRECTORY )
                 {
-                    if ( !RemoveDirectoryA( HStringToLPCSTR( itemPath ) ) )
-                    {
-                        status = E_ABORT;
-                    }
+                    DeleteDirectoryRecursively( HStringToLPCSTR( itemPath ) );
                 } else
                 {
                     if ( !DeleteFileA( HStringToLPCSTR( itemPath ) ) )
                     {
+                        printf("Failed to remove file %s. Error code: %lu\n", HStringToLPCSTR( itemPath ), GetLastError() );
                         status = E_ABORT;
                     }
                 }

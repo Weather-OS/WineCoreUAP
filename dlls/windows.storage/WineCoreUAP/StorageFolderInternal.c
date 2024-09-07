@@ -136,6 +136,80 @@ HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationColl
     return status;
 }
 
+HRESULT WINAPI storage_folder_CreateFile( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath )
+{
+    HRESULT status = S_OK;
+    HSTRING Path;
+    DWORD attrib;
+    BOOL Exists = FALSE;
+    BOOL Replace = FALSE;
+    CHAR fullPath[MAX_PATH];
+    CHAR uuidName[MAX_PATH];
+
+    struct storage_folder *invokerFolder;
+
+    TRACE( "iface %p, value %p\n", folder, OutPath );
+
+    invokerFolder = impl_from_IStorageFolder( (IStorageFolder *)folder );
+    Path = impl_from_IStorageItem( &invokerFolder->IStorageItem_iface )->Path;
+
+    strcpy( fullPath, HStringToLPCSTR( Path ) );
+
+    switch ( collisionOption )
+    {
+        case CreationCollisionOption_FailIfExists:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                status = E_INVALIDARG;
+            else 
+                status = S_OK;
+            break;
+
+        case CreationCollisionOption_GenerateUniqueName:
+            GenerateUniqueFileName( uuidName, sizeof(uuidName) );
+            PathAppendA( fullPath, uuidName );
+
+            status = S_OK;
+            break;
+        
+        case CreationCollisionOption_OpenIfExists:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                Exists = TRUE;
+            
+            status = S_OK;
+            break;
+        
+        case CreationCollisionOption_ReplaceExisting:
+            PathAppendA( fullPath, HStringToLPCSTR( Name ));
+            attrib = GetFileAttributesA(fullPath);
+            if (attrib != INVALID_FILE_ATTRIBUTES)
+                Replace = TRUE;
+
+            status = S_OK;
+            break;
+    }
+    if ( SUCCEEDED( status ) )
+    {
+        if ( Replace )
+        {
+            if ( !DeleteFileA( fullPath ) )
+            {
+                return E_ABORT;
+            }
+        }
+        if ( !Exists )
+        {
+            CloseHandle( CreateFileA( fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL) );
+            status = S_OK;
+        }
+        status = WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), OutPath );
+    }
+    return status;
+}
+
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
     CHAR fullPath[MAX_PATH];

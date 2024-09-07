@@ -18,8 +18,10 @@ SOURCES = \
 	WineCoreUAP/AsyncOperation/StorageItemAsync.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsyncVectorView.c \
 	WineCoreUAP/AsyncOperation/StorageFileAsync.c \
+	WineCoreUAP/AsyncOperation/StorageFileAsyncVectorView.c \
 	WineCoreUAP/VectorView/StorageItemVectorView.c \
 	WineCoreUAP/VectorView/StorageFolderVectorView.c \
+	WineCoreUAP/VectorView/StorageFileVectorView.c \
 	provider.idl \
 	classes.idl \
 	main.c

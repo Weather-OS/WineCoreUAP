@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage Internal Utilities.
+/* WinRT IVectorView<Windows.Storage.IStorageItem *> Implementation
  *
  * Written by Weather
  *
@@ -19,28 +19,22 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../private.h"
+#include "../../private.h"
+#include "wine/debug.h"
 
-#include <windows.h>
-#include <knownfolders.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <combaseapi.h> 
-#include <stdint.h>
+#ifndef STORAGE_FILE_VECTOR_VIEW_H
+#define STORAGE_FILE_VECTOR_VIEW_H
 
+struct storage_file_vector_view
+{
+    IVectorView_StorageFile IVectorView_StorageFile_iface;
+    struct vector_iids iids;
+    LONG ref;
 
-#ifndef _UTIL_INTERNAL_H_
-#define _UTIL_INTERNAL_H_
+    UINT32 size;
+    IStorageFile *elements[1];
+};
 
-#define WINDOWS_TICK 10000000
-#define SEC_TO_UNIX_EPOCH 11644473600LL
-
-INT64 FileTimeToUnixTime( const FILETIME *ft );
-VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize );
-LPCWSTR CharToLPCWSTR( LPSTR charString );
-LPCSTR HStringToLPCSTR( HSTRING hString );
-VOID DeleteDirectoryRecursively(LPCSTR directoryPath);
+struct storage_file_vector_view *impl_from_IVectorView_StorageFile( IVectorView_StorageFile *iface );
 
 #endif
