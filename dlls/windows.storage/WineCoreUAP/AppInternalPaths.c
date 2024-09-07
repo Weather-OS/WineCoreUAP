@@ -24,52 +24,25 @@
 
 #define BUFFER_SIZE 1024
 
-LPSTR extractNameAttribute(LPSTR line) {
-    LPSTR nameStart = strstr(line, "Name=\"");
-    LPSTR nameEnd;
-    if (nameStart) {
-        nameStart += 6; // Move past 'Name="'
-        nameEnd = strchr(nameStart, '"');
-        if (nameEnd) {
-            *nameEnd = '\0'; // Null-terminate the string at the end quote
-            printf("WineCoreUAP: Registered Package with Name: %s\n", nameStart);
-            return nameStart;
-        }
-    }
-    return nameEnd;
-}
-
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    
-    FILE *file;
     CHAR path[MAX_PATH] = "C:\\users\\";
     CHAR username[256];
     CHAR manifestPath[MAX_PATH];
-    CHAR buffer[BUFFER_SIZE] = {0};
-    CHAR AppName[BUFFER_SIZE];
+    LPSTR AppName;
     DWORD username_len = sizeof(username);
+
+    struct appx_package package;
 
     GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
     PathRemoveFileSpecA(manifestPath);
     PathAppendA(manifestPath, "AppxManifest.xml");
 
-    file = fopen(manifestPath, "r");
-    if (!file) {
-        MessageBoxW(NULL, L"Failed to read AppxManifest.xml", L"WineCoreUAP", MB_ICONERROR);
-        printf("Manifest path was %s\n", manifestPath);
-        return E_INVALIDARG;
-    }
+    registerAppxPackage( manifestPath, &package );
 
-    while (fgets(buffer, BUFFER_SIZE, file)) {
-        if (strstr(buffer, "<Identity")) {
-            strcat(AppName, extractNameAttribute(buffer));
-            break;
-        }
-    }
-    fclose(file);
+    AppName = (CHAR *)package.Package.Identity.Name;
 
     if (!GetUserNameA(username, &username_len)) {
-        MessageBoxW(NULL, L"Failed to get username", L"WineCoreUAP", MB_ICONERROR);
         return E_UNEXPECTED;
     }
 
@@ -98,8 +71,8 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * 
     }
 
     if (WindowsCreateString(CharToLPCWSTR(path), strlen(path), value) != S_OK) {
-        MessageBoxW(NULL, L"Failed to create Windows string", L"WineCoreUAP", MB_ICONERROR);
         return E_UNEXPECTED;
     }
+    
     return S_OK;
 }

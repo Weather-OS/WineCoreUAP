@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <combaseapi.h>
 
+#include <appx.h>
+
 #include "../private.h"
 #include "wine/debug.h"
 

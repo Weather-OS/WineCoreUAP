@@ -1,0 +1,9 @@
+EXTLIB    = libappx.a
+EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
+EXTRADEFS = -DHAVE_VA_COPY
+
+SOURCES = \
+	util.c \
+    read.c \
+    package.c \
+    version.c 

@@ -151,6 +151,7 @@ static HRESULT WINAPI storage_item_DeleteAsync( IStorageItem *iface, StorageDele
 
 static HRESULT WINAPI storage_item_GetBasicPropertiesAsync( IStorageItem *iface, IAsyncOperation_BasicProperties **operation )
 {
+    IBasicProperties *a;
     FIXME( "iface %p, operation %p stub!\n", iface, operation );
     return E_NOTIMPL;
 }

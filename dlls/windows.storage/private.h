@@ -38,6 +38,8 @@
 #include "windows.foundation.h"
 #define WIDL_using_Windows_Storage_Streams
 #include "windows.storage.streams.h"
+#define WIDL_using_Windows_Storage_FileProperties
+#include "windows.storage.fileproperties.h"
 #define WIDL_using_Windows_System
 #include "windows.system.h"
 #define WIDL_using_Windows_Storage
