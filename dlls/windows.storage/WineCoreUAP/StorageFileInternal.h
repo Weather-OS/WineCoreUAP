@@ -53,7 +53,8 @@ struct storage_file_statics
 
 struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
 
-HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_Internal_AssignFile ( HSTRING filePath, IStorageFile * result );
+HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_Copy ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option, HSTRING *destPath );
 HRESULT WINAPI storage_file_CopyAndReplace ( IStorageFile *invoker, IStorageFile *target );
 HRESULT WINAPI storage_file_Move ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option );

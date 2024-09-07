@@ -22,6 +22,7 @@
 #include "util.h"
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
+#include "StorageFileInternal.h"
 #include "VectorView/StorageItemVectorView.h"
 #include "VectorView/StorageFolderVectorView.h"
 
@@ -418,6 +419,44 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
         result->vt = VT_UNKNOWN;
         result->ppunkVal = (IUnknown **)&folderVector->IVectorView_StorageFolder_iface;
     }
+
+    return status;
+}
+
+HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    CHAR fullPath[MAX_PATH];
+    HRESULT status;
+    HSTRING Path;
+    HSTRING folderPath;
+    
+    struct storage_folder * folder;
+    struct storage_file * fileToFetch;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    folder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
+    Path = impl_from_IStorageItem( &folder->IStorageItem_iface )->Path;
+
+    if (!result) return E_INVALIDARG;
+    if (!(fileToFetch = calloc( 1, sizeof(*fileToFetch) ))) return E_OUTOFMEMORY;
+
+    fileToFetch->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
+    fileToFetch->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    fileToFetch->ref = 1;
+
+    PathAppendA( fullPath, HStringToLPCSTR( Path ) );
+    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
+    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &folderPath );
+
+    status = storage_file_Internal_AssignFile( folderPath, &fileToFetch->IStorageFile_iface );
+    
+    if ( SUCCEEDED( status ) )
+    {
+        result->vt = VT_UNKNOWN;
+        result->ppunkVal = (IUnknown **)&fileToFetch->IStorageFile_iface;
+    }
+
 
     return status;
 }

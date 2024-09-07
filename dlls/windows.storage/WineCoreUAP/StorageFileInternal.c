@@ -28,7 +28,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+HRESULT WINAPI storage_file_Internal_AssignFile ( HSTRING filePath, IStorageFile * result )
 {
     HRESULT status;
     HSTRING path;
@@ -43,17 +43,17 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
 
     bytesRead = 0;
     pwsMimeOut = NULL;
-
-    TRACE( "iface %p, value %p\n", invoker, result );
     
     if (!result) return E_INVALIDARG;
     if (!(file = calloc( 1, sizeof(*file) ))) return E_OUTOFMEMORY;
+
+    file = impl_from_IStorageFile( result );
 
     file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
     file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     file->ref = 1;
 
-    WindowsDuplicateString( (HSTRING)param, &path );
+    WindowsDuplicateString( filePath, &path );
 
     status = storage_item_Internal_CreateNew( path, &file->IStorageItem_iface );
 
@@ -78,6 +78,25 @@ HRESULT WINAPI storage_file_AssignFile ( IUnknown *invoker, IUnknown *param, PRO
 
         CoTaskMemFree( pwsMimeOut );
     }
+
+    return status;
+}
+
+HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+
+    struct storage_file *file;
+
+    if (!(file = calloc( 1, sizeof(*file) ))) return E_OUTOFMEMORY;
+
+    file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
+    file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    file->ref = 1;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    status = storage_file_Internal_AssignFile( (HSTRING)param, &file->IStorageFile_iface );
 
     if ( SUCCEEDED( status ) )
     {

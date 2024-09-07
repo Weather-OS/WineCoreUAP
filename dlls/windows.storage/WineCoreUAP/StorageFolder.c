@@ -202,7 +202,7 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
     HRESULT hr;
     HSTRING OutPath;
     storage_folder_CreateFile( iface, CreationCollisionOption_FailIfExists, name, &OutPath );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFile, operation );
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFileAsync, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
@@ -216,7 +216,7 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
     HRESULT hr;
     HSTRING OutPath;
     storage_folder_CreateFile( iface, options, name, &OutPath );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFile, operation );
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFileAsync, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
@@ -244,8 +244,10 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
 
 static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, name %p stub!\n", iface, name );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFile, operation );
+    TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )

@@ -487,7 +487,9 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     IStorageItem *storageItemResults3;
     IStorageItem *storageItemResults4;
     IStorageItem *storageItemResults5;
+    IStorageItem *storageItemResults6;
     IStorageFile *storageFileResults;
+    IStorageFile *storageFileResults2;
     IStorageFolder *storageFolderResults;
     IStorageFolder *storageFolderResults2;
     IStorageFolder *storageFolderResults3;
@@ -524,6 +526,8 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     HSTRING SixthName;
     HSTRING SeventhPath;
     HSTRING SeventhName;
+    HSTRING EightthPath;
+    HSTRING EightthName;
     HRESULT hr;
     DWORD ret;
     CHAR pathtest[MAX_PATH];
@@ -805,7 +809,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     ok( !strcmp(HStringToLPCSTR(SixthName), "Temp"), "Error: Original name not returned. SixthName %s, name %s\n", HStringToLPCSTR(SixthName), "Test");
 
     /**
-     * storage_folder_CreateFileAsync
+     * IStorageFolder_CreateFileAsync
      */
 
     hr = IStorageFolder_CreateFileAsync( storageFolderResults4, fileString, CreationCollisionOption_ReplaceExisting, &storageFileOperation );
@@ -838,7 +842,7 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     hr = IAsyncOperation_StorageFile_GetResults( storageFileOperation, &storageFileResults );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    IStorageFile_QueryInterface( storageFileResults, &IID_IStorageItem, (void **)&storageItemResults5);
+    IStorageFile_QueryInterface( storageFileResults, &IID_IStorageItem, (void **)&storageItemResults5 );
     
     IStorageItem_get_Name( storageItemResults5, &SeventhName );
     IStorageItem_get_Path( storageItemResults5, &SeventhPath );
@@ -847,7 +851,50 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     strcat(pathtest, "\\TempFile");
     
     ok( !strcmp(HStringToLPCSTR(SeventhPath), pathtest), "Error: Original path not returned. SeventhPath %s, pathtest %s\n", HStringToLPCSTR(SeventhPath), pathtest);
-    ok( !strcmp(HStringToLPCSTR(SeventhName), "TempFile"), "Error: Original name not returned. SeventhName %s, name %s\n", HStringToLPCSTR(SeventhName), "TestFile");
+    ok( !strcmp(HStringToLPCSTR(SeventhName), "TempFile"), "Error: Original name not returned. SeventhName %s, name %s\n", HStringToLPCSTR(SeventhName), "TempFile");
+
+    /**
+     * IStorageFolder_GetFileAsync
+     */
+
+    hr = IStorageFolder_GetFileAsync( storageFolderResults4, fileString, &storageFileOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageFileOperation, &IID_IUnknown );
+    check_interface( storageFileOperation, &IID_IInspectable );
+    check_interface( storageFileOperation, &IID_IAgileObject );
+    check_interface( storageFileOperation, &IID_IAsyncInfo );
+    check_interface( storageFileOperation, &IID_IAsyncOperation_StorageFile );
+
+    hr = IAsyncOperation_StorageFile_get_Completed( storageFileOperation, &storage_file_handler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_file_handler == NULL, "got handler %p\n", storage_file_handler );
+
+    storage_file_async_handler = default_storage_file_async_handler;
+    storage_file_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_StorageFile_put_Completed( storageFileOperation, &storage_file_async_handler.IAsyncOperationCompletedHandler_StorageFile_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_file_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_file_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_file_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_file_async_handler.async == storageFileOperation, "got async %p\n", storage_file_async_handler.async );
+    ok( storage_item_async_handler.status == Completed || broken( storage_file_async_handler.status == Error ), "got status %u\n", storage_file_async_handler.status );
+
+    hr = IAsyncOperation_StorageFile_GetResults( storageFileOperation, &storageFileResults2 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFile_QueryInterface( storageFileResults2, &IID_IStorageItem, (void **)&storageItemResults6 );
+
+    IStorageItem_get_Path( storageItemResults6, &EightthPath );
+    IStorageItem_get_Name( storageItemResults6, &EightthName );
+
+    ok( !strcmp(HStringToLPCSTR(EightthPath), pathtest), "Error: Original path not returned. EightthPath %s, pathtest %s\n", HStringToLPCSTR(EightthPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(EightthName), "TempFile"), "Error: Original name not returned. EightthName %s, name %s\n", HStringToLPCSTR(EightthName), "TempFile");
 
     return storageItemResults4;
 }
