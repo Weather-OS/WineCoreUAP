@@ -422,11 +422,86 @@ static const struct IKnownFoldersStatics2Vtbl known_folders_statics2_vtbl =
     known_folders_statics2_get_RecordedCalls
 };
 
+DEFINE_IINSPECTABLE( known_folders_statics3, IKnownFoldersStatics3, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFoldersStatics3 *iface, IUser *user, KnownFolderId folder_id, IAsyncOperation_StorageFolder **operation )
+{
+    //User is not used.
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( folder_id, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+    }
+
+    return hr;
+}
+
+static const struct IKnownFoldersStatics3Vtbl known_folders_statics3_vtbl =
+{
+    known_folders_statics3_QueryInterface,
+    known_folders_statics3_AddRef,
+    known_folders_statics3_Release,
+    /* IInspectable methods */
+    known_folders_statics3_GetIids,
+    known_folders_statics3_GetRuntimeClassName,
+    known_folders_statics3_GetTrustLevel,
+    /* IKnownFoldersStatics3 methods */
+    known_folders_statics3_GetFolderForUserAsync
+};
+
+DEFINE_IINSPECTABLE( known_folders_statics4, IKnownFoldersStatics4, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_statics4_RequestAccessAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
+{
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFoldersStatics4 *iface, IUser *user, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
+{
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_StorageFolder **operation )
+{
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
+}
+
+static const struct IKnownFoldersStatics4Vtbl known_folders_statics4_vtbl =
+{
+    known_folders_statics4_QueryInterface,
+    known_folders_statics4_AddRef,
+    known_folders_statics4_Release,
+    /* IInspectable methods */
+    known_folders_statics4_GetIids,
+    known_folders_statics4_GetRuntimeClassName,
+    known_folders_statics4_GetTrustLevel,
+    /* IKnownFoldersStatics4 methods */
+    known_folders_statics4_RequestAccessAsync,
+    known_folders_statics4_RequestAccessForUserAsync,
+    known_folders_statics4_GetFolderAsync
+};
+
 static struct known_folders_statics known_folders_statics =
 {
     {&factory_vtbl},
     {&known_folders_statics_vtbl},
     {&known_folders_statics2_vtbl},
+    {&known_folders_statics3_vtbl},
+    {&known_folders_statics4_vtbl},
     1,
 };
 

@@ -34,6 +34,8 @@ struct known_folders_statics
     IActivationFactory IActivationFactory_iface;
     IKnownFoldersStatics IKnownFoldersStatics_iface;
     IKnownFoldersStatics2 IKnownFoldersStatics2_iface;
+    IKnownFoldersStatics3 IKnownFoldersStatics3_iface;
+    IKnownFoldersStatics4 IKnownFoldersStatics4_iface;
 
     LONG ref;
 };
