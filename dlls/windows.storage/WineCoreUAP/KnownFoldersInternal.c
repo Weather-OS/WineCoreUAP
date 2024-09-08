@@ -144,12 +144,44 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
+                {
                     PathAppendA( path, "Videos" );
                     PathAppendA( path, "Captures" );
+                }
                 break;
 
             case KnownFolderId_RecordedCalls:
                 status = E_NOTIMPL;
+                break;
+
+            case KnownFolderId_CameraRoll:
+                if ( !picturesLibraryAllowed )
+                    status = E_ACCESSDENIED;
+                else
+                {
+                    PathAppendA( path, "Pictures" );
+                    PathAppendA( path, "Camera Roll" );
+                }
+                break;
+
+            case KnownFolderId_Playlists:
+                if ( !musicLibraryAllowed )
+                    status = E_ACCESSDENIED;
+                else
+                    PathAppendA( path, "Music" );
+                    PathAppendA( path, "Playlists" );
+                    CreateDirectoryA( path, NULL );
+                break;
+
+            case KnownFolderId_SavedPictures:
+                if ( !picturesLibraryAllowed )
+                    status = E_ACCESSDENIED;
+                else
+                {
+                    PathAppendA( path, "Pictures" );
+                    PathAppendA( path, "Saved Pictures" );
+                }
+                break;
 
             default:
                 status = E_NOTIMPL;

@@ -537,6 +537,132 @@ static const struct IKnownFoldersStatics4Vtbl known_folders_statics4_vtbl =
     known_folders_statics4_GetFolderAsync
 };
 
+DEFINE_IINSPECTABLE( known_folders_camera_roll_statics, IKnownFoldersCameraRollStatics, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_camera_roll_statics_get_CameraRoll( IKnownFoldersCameraRollStatics *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_CameraRoll, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static const struct IKnownFoldersCameraRollStaticsVtbl known_folders_camera_roll_statics_vtbl =
+{
+    known_folders_camera_roll_statics_QueryInterface,
+    known_folders_camera_roll_statics_AddRef,
+    known_folders_camera_roll_statics_Release,
+    /* IInspectable methods */
+    known_folders_camera_roll_statics_GetIids,
+    known_folders_camera_roll_statics_GetRuntimeClassName,
+    known_folders_camera_roll_statics_GetTrustLevel,
+    /* IKnownFoldersCameraRollStatics methods */
+    known_folders_camera_roll_statics_get_CameraRoll
+};
+
+DEFINE_IINSPECTABLE( known_folders_playlists_statics, IKnownFoldersPlaylistsStatics, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_playlists_statics_get_Playlists( IKnownFoldersPlaylistsStatics *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Playlists, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static const struct IKnownFoldersPlaylistsStaticsVtbl known_folders_playlists_statics_vtbl =
+{
+    known_folders_playlists_statics_QueryInterface,
+    known_folders_playlists_statics_AddRef,
+    known_folders_playlists_statics_Release,
+    /* IInspectable methods */
+    known_folders_playlists_statics_GetIids,
+    known_folders_playlists_statics_GetRuntimeClassName,
+    known_folders_playlists_statics_GetTrustLevel,
+    /* IKnownFoldersPlaylistsStatics methods */
+    known_folders_playlists_statics_get_Playlists
+};
+
+DEFINE_IINSPECTABLE( known_folders_saved_pictures_statics, IKnownFoldersSavedPicturesStatics, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_saved_pictures_statics_get_SavedPictures( IKnownFoldersSavedPicturesStatics *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_SavedPictures, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static const struct IKnownFoldersSavedPicturesStaticsVtbl known_folders_saved_pictures_statics_vtbl =
+{
+    known_folders_saved_pictures_statics_QueryInterface,
+    known_folders_saved_pictures_statics_AddRef,
+    known_folders_saved_pictures_statics_Release,
+    /* IInspectable methods */
+    known_folders_saved_pictures_statics_GetIids,
+    known_folders_saved_pictures_statics_GetRuntimeClassName,
+    known_folders_saved_pictures_statics_GetTrustLevel,
+    /* IKnownFoldersSavedPicturesStatics methods */
+    known_folders_saved_pictures_statics_get_SavedPictures
+};
+
 static struct known_folders_statics known_folders_statics =
 {
     {&factory_vtbl},
@@ -544,6 +670,9 @@ static struct known_folders_statics known_folders_statics =
     {&known_folders_statics2_vtbl},
     {&known_folders_statics3_vtbl},
     {&known_folders_statics4_vtbl},
+    {&known_folders_camera_roll_statics_vtbl},
+    {&known_folders_playlists_statics_vtbl},
+    {&known_folders_saved_pictures_statics_vtbl},
     1,
 };
 

@@ -36,6 +36,9 @@ struct known_folders_statics
     IKnownFoldersStatics2 IKnownFoldersStatics2_iface;
     IKnownFoldersStatics3 IKnownFoldersStatics3_iface;
     IKnownFoldersStatics4 IKnownFoldersStatics4_iface;
+    IKnownFoldersCameraRollStatics IKnownFoldersCameraRollStatics_iface;
+    IKnownFoldersPlaylistsStatics IKnownFoldersPlaylistsStatics_iface;
+    IKnownFoldersSavedPicturesStatics IKnownFoldersSavedPicturesStatics_iface;
 
     LONG ref;
 };
