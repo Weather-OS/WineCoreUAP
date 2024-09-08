@@ -172,6 +172,7 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     CHAR title[1024];
     CHAR message[1024];
     CHAR manifestPath[MAX_PATH];
+    DWORD attributes;
 
     struct appx_package package;
 
@@ -188,9 +189,19 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &KnownFolderPath );
     if ( status == E_ACCESSDENIED )
     {
-        result->vt = VT_UNKNOWN;
-        result->punkVal = (IUnknown *)KnownFoldersAccessStatus_NotDeclaredByApp;
+        result->vt = VT_INT;
+        result->lVal = (LONG)KnownFoldersAccessStatus_NotDeclaredByApp;
         return status;
+    }
+
+    attributes = GetFileAttributesA( HStringToLPCSTR( KnownFolderPath ) );
+    if ( attributes == INVALID_FILE_ATTRIBUTES )
+    {
+        if ( GetLastError() == ERROR_ACCESS_DENIED )
+        {
+            result->vt = VT_INT;
+            result->lVal = (LONG)KnownFoldersAccessStatus_DeniedBySystem;
+        }
     }
 
     if ( SUCCEEDED( status ) )
