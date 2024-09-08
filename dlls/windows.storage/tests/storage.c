@@ -26,6 +26,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
+#include "shlwapi.h"
 
 #include "roapi.h"
 
@@ -496,7 +497,7 @@ static void check_interface_( unsigned int line, void *obj, const IID *iid )
     IUnknown_Release( unk );
 }
 
-static const wchar_t* test_AppDataPathsStatics(void)
+static void test_AppDataPathsStatics(const wchar_t** pathStr)
 {
     static const WCHAR *app_data_paths_statics_name = L"Windows.Storage.AppDataPaths";
     IAppDataPathsStatics *app_data_paths_statics;
@@ -540,10 +541,10 @@ static const wchar_t* test_AppDataPathsStatics(void)
     ok( ref == 2, "got ref %ld.\n", ref );
     ref = IActivationFactory_Release( factory );
     ok( ref == 1, "got ref %ld.\n", ref );
-    return wstr;
+    *pathStr = wstr;
 }
 
-static IStorageItem *test_StorageFolder( const wchar_t* path )
+static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
 {
     //This assumes test_AppDataPathsStatics passes every test.
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
@@ -844,6 +845,8 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     ok( !strcmp(HStringToLPCSTR(FifthPath), pathtest), "Error: Original path not returned. FifthPath %s, pathtest %s\n", HStringToLPCSTR(FifthPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(FifthName), "Temp"), "Error: Original name not returned. FifthName %s, name %s\n", HStringToLPCSTR(FifthName), "Test");
 
+    *item = storageItemResults3;
+
     /**
      * IStorageFolder_GetFoldersAsyncOverloadDefaultOptionsStartAndCount
     */
@@ -1021,9 +1024,6 @@ static IStorageItem *test_StorageFolder( const wchar_t* path )
     
     ok( !strcmp(HStringToLPCSTR(NinethPath), pathtest), "Error: Original path not returned. NinethPath %s, pathtest %s\n", HStringToLPCSTR(NinethPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(NinethName), "TempFile"), "Error: Original name not returned. NinethName %s, name %s\n", HStringToLPCSTR(NinethName), "TempFile");
-
-
-    return storageItemResults4;
 }
 
 static void test_StorageItem( IStorageItem *customItem )
@@ -1050,11 +1050,66 @@ static void test_StorageItem( IStorageItem *customItem )
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 }
 
+static void test_KnownFolders( void )
+{
+    HRESULT hr;
+    static const WCHAR *known_folders_statics_name = L"Windows.Storage.KnownFolders";
+    IStorageFolder *documentsFolder;
+    IStorageFolder *musicsFolder;
+    IStorageItem *documentsFolderItem;
+    IKnownFoldersStatics *knownFoldersStatics;
+    IActivationFactory *factory;
+    HSTRING str;
+    HSTRING path;
+    HSTRING name;
+    CHAR username[256];
+    DWORD username_len = sizeof(username);
+    CHAR pathStr[MAX_PATH] = "C:\\users\\";
+
+    if (!GetUserNameA( username, &username_len )) {
+        return;
+    }
+
+    PathAppendA( pathStr, username );
+    PathAppendA( pathStr, "Documents" );
+
+    hr = WindowsCreateString( known_folders_statics_name, wcslen( known_folders_statics_name ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
+    WindowsDeleteString( str );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( known_folders_statics_name ) );
+    }
+
+    check_interface( factory, &IID_IUnknown );
+    check_interface( factory, &IID_IInspectable );
+    check_interface( factory, &IID_IAgileObject );
+    hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics, (void **)&knownFoldersStatics );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IKnownFoldersStatics_get_DocumentsLibrary( knownFoldersStatics, &documentsFolder );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFolder_QueryInterface( documentsFolder, &IID_IStorageItem, (void **)&documentsFolderItem );
+    
+    IStorageItem_get_Path( documentsFolderItem, &path );
+    IStorageItem_get_Name( documentsFolderItem, &name );
+
+    ok( !strcmp(HStringToLPCSTR(path), pathStr), "Error: Original path not returned. path %s, pathStr %s\n", HStringToLPCSTR(path), pathStr);
+    ok( !strcmp(HStringToLPCSTR(name), "Documents"), "Error: Original name not returned. name %s, name %s\n", HStringToLPCSTR(name), "Documents");    
+    
+    hr = IKnownFoldersStatics_get_MusicLibrary( knownFoldersStatics, &musicsFolder );
+    ok( hr == E_ACCESSDENIED, "got hr %#lx.\n", hr );
+}
+
 START_TEST(storage)
 {
     HRESULT hr;
     const wchar_t* apppath;
-    IStorageItem *returnedItem;
+    IStorageItem *returnedItem = NULL;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
 
@@ -1062,9 +1117,10 @@ START_TEST(storage)
 
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
-    apppath = test_AppDataPathsStatics();
-    returnedItem = test_StorageFolder(apppath);
+    test_AppDataPathsStatics(&apppath);
+    test_StorageFolder(apppath, &returnedItem);
     test_StorageItem(returnedItem);
+    test_KnownFolders();
 
     RoUninitialize();
 }

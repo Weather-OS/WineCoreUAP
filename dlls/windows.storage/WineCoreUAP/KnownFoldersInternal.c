@@ -23,7 +23,7 @@
 
 HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface, KnownFolderId folderId , HSTRING *value ) 
 {    
-    HRESULT status;
+    HRESULT status = S_OK;
     BOOLEAN musicLibraryAllowed = FALSE;
     BOOLEAN picturesLibraryAllowed = FALSE;
     BOOLEAN videosLibraryAllowed = FALSE;
@@ -43,35 +43,37 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface
     PathAppendA(manifestPath, "AppxManifest.xml");
 
     if (!GetUserNameA(username, &username_len)) {
+        printf("Something went wrong\n.");
         return E_UNEXPECTED;
     }
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
+        printf("Something went wrong\n.");
         status = E_UNEXPECTED;
     }
 
     for ( xmlNode *capabilityNode = package.Package.Capabilities; capabilityNode; capabilityNode = capabilityNode->next )
     {
         if ( capabilityNode->type == XML_ELEMENT_NODE
-            && xmlStrcmp( capabilityNode->name, (const xmlChar*)"Capability" ) )
+            && !xmlStrcmp( capabilityNode->name, (const xmlChar*)"Capability" ) )
         {
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"musicLibrary" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"musicLibrary" ) )
                 musicLibraryAllowed = TRUE;
             
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"picturesLibrary" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"picturesLibrary" ) )
                 picturesLibraryAllowed = TRUE;
 
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"videosLibrary" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"videosLibrary" ) )
                 videosLibraryAllowed = TRUE;
 
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"documentsLibrary" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"documentsLibrary" ) )
                 documentsLibraryAllowed = TRUE;
 
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"removableStorage" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"removableStorage" ) )
                 removableDevicesAllowed = TRUE;
 
-            if ( xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"internetClient" ) )
+            if ( !xmlStrcmp( xmlGetProp( capabilityNode, (const xmlChar *)"Name" ), (const xmlChar*)"internetClient" ) )
                 mediaServerAllowed = TRUE;
         }
     }

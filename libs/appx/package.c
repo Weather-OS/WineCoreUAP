@@ -173,7 +173,7 @@ assignAppxCapabilities( xmlNode * manifest, appxCapabilityList *List )
                     if ( packageNode->type == XML_ELEMENT_NODE && 
                         !xmlStrcmp( packageNode->name, (const xmlChar*)"Capabilities" ) )
                     {
-                        *List = (appxCapabilityList)packageNode;
+                        *List = (appxCapabilityList)packageNode->children;
                     }
                 }
             }

@@ -253,7 +253,7 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
         status = E_INVALIDARG;
     } else
     {
-        if ( attributes == FILE_ATTRIBUTE_DIRECTORY )
+        if ( attributes & FILE_ATTRIBUTE_DIRECTORY )
         {
             *type = StorageItemTypes_Folder;
         } else
