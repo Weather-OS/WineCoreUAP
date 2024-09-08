@@ -22,11 +22,4 @@
 
 #pragma makedep register
 
-#ifdef __WIDL__
-#pragma winrt ns_prefix
-#endif
-
-import "windows.foundation.idl";
-
-#define DO_NO_IMPORTS
 #include "windows.storage.idl"

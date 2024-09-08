@@ -20,4 +20,31 @@
 
 #pragma makedep register
 
-#include "windows.storage.idl"
+#ifdef __WIDL__
+#pragma winrt ns_prefix
+#endif
+
+import "propidl.idl";
+import "inspectable.idl";
+import "asyncinfo.idl";
+import "eventtoken.idl";
+import "windowscontracts.idl";
+import "windows.foundation.idl";
+
+namespace Windows.Storage {
+    interface IApplicationDataStatics;
+    interface IApplicationDataStatics2;
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.IApplicationDataStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        static(Windows.Storage.IApplicationDataStatics2, Windows.Foundation.UniversalApiContract, 1.0),
+        threading(mta)
+    ]
+    runtimeclass ApplicationData
+    {
+    }
+}
+
+//#include "windows.storage.idl"

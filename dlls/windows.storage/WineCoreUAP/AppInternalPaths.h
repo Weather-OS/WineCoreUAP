@@ -19,18 +19,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-
-#include <windows.h>
-#include <knownfolders.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <combaseapi.h>
-
 #include <appx.h>
 
 #include "../private.h"
 #include "wine/debug.h"
+#include "util.h"
 
 HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, const char * FOLDERID, HSTRING *value );

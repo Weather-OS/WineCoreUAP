@@ -25,6 +25,7 @@
 #include "StorageFolderInternal.h"
 
 #include <appx.h>
+#include <shlwapi.h>
 
 #ifndef KNOWN_FOLDERS_INTERNAL_H
 #define KNOWN_FOLDERS_INTERNAL_H

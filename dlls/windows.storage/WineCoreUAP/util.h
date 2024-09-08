@@ -21,18 +21,10 @@
 
 #include "../private.h"
 
-#include <windows.h>
-#include <knownfolders.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <combaseapi.h> 
-#include <stdint.h>
-
-
 #ifndef _UTIL_INTERNAL_H_
 #define _UTIL_INTERNAL_H_
+
+#include <stdio.h>
 
 #define WINDOWS_TICK 10000000
 #define SEC_TO_UNIX_EPOCH 11644473600LL

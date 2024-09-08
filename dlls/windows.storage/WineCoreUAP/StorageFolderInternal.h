@@ -24,6 +24,8 @@
 #ifndef STORAGE_FOLDER_INTERNAL_H
 #define STORAGE_FOLDER_INTERNAL_H
 
+#include <shlwapi.h>
+
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFileVtbl storage_file_vtbl;
