@@ -22,8 +22,6 @@
 #include "util.h"
 #include "AppInternalPaths.h"
 
-#define BUFFER_SIZE 1024
-
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    
     CHAR path[MAX_PATH] = "C:\\users\\";

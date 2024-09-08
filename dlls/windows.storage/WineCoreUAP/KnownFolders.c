@@ -118,44 +118,191 @@ DEFINE_IINSPECTABLE( known_folders_statics, IKnownFoldersStatics, struct known_f
 
 static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_MusicLibrary, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_PicturesLibrary, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_VideosLibrary, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_DocumentsLibrary, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_HomeGroup, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_RemovableDevices, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_MediaServerDevices, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
 }
 
 static const struct IKnownFoldersStaticsVtbl known_folders_statics_vtbl =

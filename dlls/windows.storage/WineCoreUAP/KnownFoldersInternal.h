@@ -20,6 +20,11 @@
  */
 
 #include "../private.h"
+#include "util.h"
+
+#include "StorageFolderInternal.h"
+
+#include <appx.h>
 
 #ifndef KNOWN_FOLDERS_INTERNAL_H
 #define KNOWN_FOLDERS_INTERNAL_H
@@ -31,5 +36,7 @@ struct known_folders_statics
 
     LONG ref;
 };
+
+HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface, KnownFolderId folderId , HSTRING *value );
 
 #endif

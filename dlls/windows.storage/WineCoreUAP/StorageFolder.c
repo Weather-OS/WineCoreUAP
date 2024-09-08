@@ -227,7 +227,7 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
     HRESULT hr;
     HSTRING OutPath;
     storage_folder_CreateFolder( iface, CreationCollisionOption_FailIfExists, name, &OutPath );
-    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolder, operation );
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolderAsync, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
@@ -237,7 +237,7 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
     HRESULT hr;
     HSTRING OutPath;
     storage_folder_CreateFolder( iface, options, name, &OutPath );
-    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolder, operation );
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolderAsync, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
@@ -317,7 +317,7 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
     HRESULT hr;
-    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolder, result );
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
     return hr;
 }

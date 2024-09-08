@@ -50,7 +50,8 @@ struct storage_folder_statics
 
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
 
-HRESULT WINAPI storage_folder_AssignFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value );
+HRESULT WINAPI storage_folder_AssignFolderAsync( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );

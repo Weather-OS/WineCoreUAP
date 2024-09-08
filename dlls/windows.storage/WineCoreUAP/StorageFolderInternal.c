@@ -29,27 +29,46 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-HRESULT WINAPI storage_folder_AssignFolder ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{    
+HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value )
+{
     HRESULT status;
     BOOLEAN isFolder;
 
     struct storage_folder *folder;
 
-    TRACE( "iface %p, value %p\n", invoker, result );
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder = impl_from_IStorageFolder( value );
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    status = storage_item_Internal_CreateNew( path, &folder->IStorageItem_iface );
+
+    IStorageItem_IsOfType( &folder->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
+    if ( !isFolder )
+        status = E_INVALIDARG;
+
+    return status;
+}
+
+HRESULT WINAPI storage_folder_AssignFolderAsync ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{    
+    HRESULT status;
     
-    if (!result) return E_INVALIDARG;
+    struct storage_folder *folder;
+    
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    status = storage_item_Internal_CreateNew( (HSTRING)param, &folder->IStorageItem_iface );
+    TRACE( "iface %p, value %p\n", invoker, result );
+    if (!result) return E_INVALIDARG;
 
-    IStorageItem_IsOfType( &folder->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
-    if ( !isFolder )
-        status = E_INVALIDARG;
+    status = storage_folder_AssignFolder( (HSTRING)param, &folder->IStorageFolder_iface );
 
     if ( SUCCEEDED( status ) )
     {
