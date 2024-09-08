@@ -16,6 +16,7 @@ SOURCES = \
 	WineCoreUAP/StorageFileInternal.c \
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/KnownFoldersAccessStatusAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsyncVectorView.c \
 	WineCoreUAP/AsyncOperation/StorageItemAsync.c \

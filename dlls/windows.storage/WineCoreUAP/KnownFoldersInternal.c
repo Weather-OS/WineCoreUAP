@@ -136,6 +136,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HS
             case KnownFolderId_Objects3D:
                 PathAppendA( path, "Objects3D" );
                 CreateDirectoryA( path, NULL );
+                break;
 
             case KnownFolderId_AppCaptures:
                 if ( !videosLibraryAllowed )

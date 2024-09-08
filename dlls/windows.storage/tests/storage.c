@@ -33,6 +33,8 @@
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
+#define WIDL_using_Windows_System
+#include "windows.system.h"
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
 
@@ -1054,10 +1056,16 @@ static void test_KnownFolders( void )
 {
     HRESULT hr;
     static const WCHAR *known_folders_statics_name = L"Windows.Storage.KnownFolders";
+    IUser *user = NULL;
     IStorageFolder *documentsFolder;
     IStorageFolder *musicsFolder;
+    IAsyncOperation_StorageFolder *storageFolderOperation;
+    IAsyncOperationCompletedHandler_StorageFolder *storageFolderHandler;
     IStorageItem *documentsFolderItem;
     IKnownFoldersStatics *knownFoldersStatics;
+    IKnownFoldersStatics2 *knownFoldersStatics2;
+    IKnownFoldersStatics3 *knownFoldersStatics3;
+    //IKnownFoldersStatics4 *knownFoldersStatics4;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING path;
@@ -1065,6 +1073,9 @@ static void test_KnownFolders( void )
     CHAR username[256];
     DWORD username_len = sizeof(username);
     CHAR pathStr[MAX_PATH] = "C:\\users\\";
+    DWORD ret;
+
+    struct storage_folder_async_handler storage_folder_async_handler;
 
     if (!GetUserNameA( username, &username_len )) {
         return;
@@ -1087,8 +1098,15 @@ static void test_KnownFolders( void )
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
     check_interface( factory, &IID_IAgileObject );
+
+    //knownFoldersStatics1
+
     hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics, (void **)&knownFoldersStatics );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IKnownFoldersStatics_get_DocumentsLibrary
+     */
 
     hr = IKnownFoldersStatics_get_DocumentsLibrary( knownFoldersStatics, &documentsFolder );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -1101,8 +1119,69 @@ static void test_KnownFolders( void )
     ok( !strcmp(HStringToLPCSTR(path), pathStr), "Error: Original path not returned. path %s, pathStr %s\n", HStringToLPCSTR(path), pathStr);
     ok( !strcmp(HStringToLPCSTR(name), "Documents"), "Error: Original name not returned. name %s, name %s\n", HStringToLPCSTR(name), "Documents");    
     
+    /**
+     * IKnownFoldersStatics_get_MusicLibrary
+     */
     hr = IKnownFoldersStatics_get_MusicLibrary( knownFoldersStatics, &musicsFolder );
     ok( hr == E_ACCESSDENIED, "got hr %#lx.\n", hr );
+
+    //knownFoldersStatics2
+
+    hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics2, (void **)&knownFoldersStatics2 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IKnownFoldersStatics2_get_Objects3D
+     */
+
+    hr = IKnownFoldersStatics2_get_Objects3D( knownFoldersStatics2, &documentsFolder );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    //knownFoldersStatics3
+    hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics3, (void **)&knownFoldersStatics3 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IKnownFoldersStatics3_GetFolderForUserAsync
+     */
+    hr = IKnownFoldersStatics3_GetFolderForUserAsync( knownFoldersStatics3, user, KnownFolderId_DocumentsLibrary, &storageFolderOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageFolderOperation, &IID_IUnknown );
+    check_interface( storageFolderOperation, &IID_IInspectable );
+    check_interface( storageFolderOperation, &IID_IAgileObject );
+    check_interface( storageFolderOperation, &IID_IAsyncInfo );
+    check_interface( storageFolderOperation, &IID_IAsyncOperation_StorageFolder );
+    hr = IAsyncOperation_StorageFolder_get_Completed( storageFolderOperation, &storageFolderHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storageFolderHandler == NULL, "got handler %p\n", storageFolderHandler );
+
+    storage_folder_async_handler = default_storage_folder_async_handler;
+    storage_folder_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_StorageFolder_put_Completed( storageFolderOperation, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
+    ret = WaitForSingleObject( storage_folder_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+    
+    ret = CloseHandle( storage_folder_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_folder_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_folder_async_handler.async == storageFolderOperation, "got async %p\n", storage_folder_async_handler.async );
+    ok( storage_folder_async_handler.status == Completed || broken( storage_folder_async_handler.status == Error ), "got status %u\n", storage_folder_async_handler.status );
+    
+    hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, &documentsFolder );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFolder_QueryInterface( documentsFolder, &IID_IStorageItem, (void **)&documentsFolderItem );
+    
+    IStorageItem_get_Path( documentsFolderItem, &path );
+    IStorageItem_get_Name( documentsFolderItem, &name );
+
+    ok( !strcmp(HStringToLPCSTR(path), pathStr), "Error: Original path not returned. path %s, pathStr %s\n", HStringToLPCSTR(path), pathStr);
+    ok( !strcmp(HStringToLPCSTR(name), "Documents"), "Error: Original name not returned. name %s, name %s\n", HStringToLPCSTR(name), "Documents");    
+    
 }
 
 START_TEST(storage)

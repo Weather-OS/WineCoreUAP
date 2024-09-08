@@ -26,21 +26,21 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(wineasync);
 
-struct known_folder_access_status_async
+struct known_folders_access_status_async
 {
     IAsyncOperation_KnownFoldersAccessStatus IAsyncOperation_KnownFoldersAccessStatus_iface;
     IWineAsyncInfoImpl *IWineAsyncInfoImpl_inner;
     LONG ref;
 };
 
-static inline struct known_folder_access_status_async *impl_from_IAsyncOperation_KnownFoldersAccessStatus( IAsyncOperation_KnownFoldersAccessStatus *iface )
+static inline struct known_folders_access_status_async *impl_from_IAsyncOperation_KnownFoldersAccessStatus( IAsyncOperation_KnownFoldersAccessStatus *iface )
 {
-    return CONTAINING_RECORD( iface, struct known_folder_access_status_async, IAsyncOperation_KnownFoldersAccessStatus_iface );
+    return CONTAINING_RECORD( iface, struct known_folders_access_status_async, IAsyncOperation_KnownFoldersAccessStatus_iface );
 }
 
-static HRESULT WINAPI known_folder_access_status_async_QueryInterface( IAsyncOperation_KnownFoldersAccessStatus *iface, REFIID iid, void **out )
+static HRESULT WINAPI known_folders_access_status_async_QueryInterface( IAsyncOperation_KnownFoldersAccessStatus *iface, REFIID iid, void **out )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
@@ -56,17 +56,17 @@ static HRESULT WINAPI known_folder_access_status_async_QueryInterface( IAsyncOpe
     return IWineAsyncInfoImpl_QueryInterface( impl->IWineAsyncInfoImpl_inner, iid, out );
 }
 
-static ULONG WINAPI known_folder_access_status_async_AddRef( IAsyncOperation_KnownFoldersAccessStatus *iface )
+static ULONG WINAPI known_folders_access_status_async_AddRef( IAsyncOperation_KnownFoldersAccessStatus *iface )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
     ULONG ref = InterlockedIncrement( &impl->ref );
     TRACE( "iface %p, ref %lu.\n", iface, ref );
     return ref;
 }
 
-static ULONG WINAPI known_folder_access_status_async_Release( IAsyncOperation_KnownFoldersAccessStatus *iface )
+static ULONG WINAPI known_folders_access_status_async_Release( IAsyncOperation_KnownFoldersAccessStatus *iface )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
     ULONG ref = InterlockedDecrement( &impl->ref );
     TRACE( "iface %p, ref %lu.\n", iface, ref );
 
@@ -81,77 +81,77 @@ static ULONG WINAPI known_folder_access_status_async_Release( IAsyncOperation_Kn
     return ref;
 }
 
-static HRESULT WINAPI known_folder_access_status_async_GetIids( IAsyncOperation_KnownFoldersAccessStatus *iface, ULONG *iid_count, IID **iids )
+static HRESULT WINAPI known_folders_access_status_async_GetIids( IAsyncOperation_KnownFoldersAccessStatus *iface, ULONG *iid_count, IID **iids )
 {
     FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI known_folder_access_status_async_GetRuntimeClassName( IAsyncOperation_KnownFoldersAccessStatus *iface, HSTRING *class_name )
+static HRESULT WINAPI known_folders_access_status_async_GetRuntimeClassName( IAsyncOperation_KnownFoldersAccessStatus *iface, HSTRING *class_name )
 {
     return WindowsCreateString( L"Windows.Foundation.IAsyncOperation`1<Windows.Storage.StorageItem>",
                                 ARRAY_SIZE(L"Windows.Foundation.IAsyncOperation`1<Windows.Storage.StorageItem>"),
                                 class_name );
 }
 
-static HRESULT WINAPI known_folder_access_status_async_GetTrustLevel( IAsyncOperation_KnownFoldersAccessStatus *iface, TrustLevel *trust_level )
+static HRESULT WINAPI known_folders_access_status_async_GetTrustLevel( IAsyncOperation_KnownFoldersAccessStatus *iface, TrustLevel *trust_level )
 {
     FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI known_folder_access_status_async_put_Completed( IAsyncOperation_KnownFoldersAccessStatus *iface, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *handler )
+static HRESULT WINAPI known_folders_access_status_async_put_Completed( IAsyncOperation_KnownFoldersAccessStatus *iface, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *handler )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
     TRACE( "iface %p, handler %p.\n", iface, handler );
     return IWineAsyncInfoImpl_put_Completed( impl->IWineAsyncInfoImpl_inner, (IWineAsyncOperationCompletedHandler *)handler );
 }
 
-static HRESULT WINAPI known_folder_access_status_async_get_Completed( IAsyncOperation_KnownFoldersAccessStatus *iface, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus **handler )
+static HRESULT WINAPI known_folders_access_status_async_get_Completed( IAsyncOperation_KnownFoldersAccessStatus *iface, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus **handler )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
     TRACE( "iface %p, handler %p.\n", iface, handler );
     return IWineAsyncInfoImpl_get_Completed( impl->IWineAsyncInfoImpl_inner, (IWineAsyncOperationCompletedHandler **)handler );
 }
 
-static HRESULT WINAPI known_folder_access_status_async_GetResults( IAsyncOperation_KnownFoldersAccessStatus *iface, KnownFoldersAccessStatus **results )
+static HRESULT WINAPI known_folders_access_status_async_GetResults( IAsyncOperation_KnownFoldersAccessStatus *iface, KnownFoldersAccessStatus *results )
 {
-    struct known_folder_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
+    struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
     PROPVARIANT result = {.vt = VT_UNKNOWN};
     HRESULT hr;
 
     hr = IWineAsyncInfoImpl_get_Result( impl->IWineAsyncInfoImpl_inner, &result );
 
-    *results = (KnownFoldersAccessStatus *)result.ppunkVal;
+    *results = (KnownFoldersAccessStatus)result.punkVal;
     PropVariantClear( &result );
     return hr;
 }
 
-static const struct IAsyncOperation_KnownFoldersAccessStatusVtbl known_folder_access_status_async_vtbl =
+static const struct IAsyncOperation_KnownFoldersAccessStatusVtbl known_folders_access_status_async_vtbl =
 {
     /* IUnknown methods */
-    known_folder_access_status_async_QueryInterface,
-    known_folder_access_status_async_AddRef,
-    known_folder_access_status_async_Release,
+    known_folders_access_status_async_QueryInterface,
+    known_folders_access_status_async_AddRef,
+    known_folders_access_status_async_Release,
     /* IInspectable methods */
-    known_folder_access_status_async_GetIids,
-    known_folder_access_status_async_GetRuntimeClassName,
-    known_folder_access_status_async_GetTrustLevel,
+    known_folders_access_status_async_GetIids,
+    known_folders_access_status_async_GetRuntimeClassName,
+    known_folders_access_status_async_GetTrustLevel,
     /* IAsyncOperation<StorageItem> */
-    known_folder_access_status_async_put_Completed,
-    known_folder_access_status_async_get_Completed,
-    known_folder_access_status_async_GetResults,
+    known_folders_access_status_async_put_Completed,
+    known_folders_access_status_async_get_Completed,
+    known_folders_access_status_async_GetResults,
 };
 
-HRESULT async_operation_known_folder_access_status_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+HRESULT async_operation_known_folders_access_status_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_KnownFoldersAccessStatus **out )
 {
-    struct known_folder_access_status_async *impl;
+    struct known_folders_access_status_async *impl;
     HRESULT hr;
 
     *out = NULL;
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
-    impl->IAsyncOperation_KnownFoldersAccessStatus_iface.lpVtbl = &known_folder_access_status_async_vtbl;
+    impl->IAsyncOperation_KnownFoldersAccessStatus_iface.lpVtbl = &known_folders_access_status_async_vtbl;
     impl->ref = 1;
     if (FAILED(hr = async_info_create( invoker, param, callback, (IInspectable *)&impl->IAsyncOperation_KnownFoldersAccessStatus_iface, &impl->IWineAsyncInfoImpl_inner )) ||
         FAILED(hr = IWineAsyncInfoImpl_Start( impl->IWineAsyncInfoImpl_inner )))

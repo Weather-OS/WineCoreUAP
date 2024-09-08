@@ -56,6 +56,27 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IKnownFoldersStatics2 ))
+    {
+        *out = &impl->IKnownFoldersStatics2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IKnownFoldersStatics3 ))
+    {
+        *out = &impl->IKnownFoldersStatics3_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IKnownFoldersStatics4 ))
+    {
+        *out = &impl->IKnownFoldersStatics4_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
