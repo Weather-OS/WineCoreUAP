@@ -195,9 +195,9 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
 
     if ( SUCCEEDED( status ) )
     {
-        if ( package.Package.Identity.Name )
+        if ( package.Package.Properties.DisplayName )
         {
-            sprintf( title, "Let %s access the following file location?", package.Package.Identity.Name );
+            sprintf( title, "Let %s access the following file location?", package.Package.Properties.DisplayName );
         } else
         {
             sprintf( title, "Let this app access the following file location?" );
