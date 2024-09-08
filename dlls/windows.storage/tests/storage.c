@@ -35,6 +35,8 @@
 #include "windows.foundation.h"
 #define WIDL_using_Windows_System
 #include "windows.system.h"
+#define WIDL_using_Windows_Storage_FileProperties
+#include "windows.storage.fileproperties.h"
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
 
@@ -123,6 +125,77 @@ static IAsyncOperationCompletedHandler_KnownFoldersAccessStatusVtbl known_folder
 
 static struct known_folder_access_status_async_handler default_known_folder_access_status_async_handler = {{&known_folder_access_status_async_handler_vtbl}};
 
+/**
+ * IAsyncOperationCompletedHandler_BasicProperties
+ */
+
+struct basic_properties_async_handler
+{
+    IAsyncOperationCompletedHandler_BasicProperties IAsyncOperationCompletedHandler_BasicProperties_iface;
+    IAsyncOperation_BasicProperties *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct basic_properties_async_handler *impl_from_IAsyncOperationCompletedHandler_BasicProperties( IAsyncOperationCompletedHandler_BasicProperties *iface )
+{
+    return CONTAINING_RECORD( iface, struct basic_properties_async_handler, IAsyncOperationCompletedHandler_BasicProperties_iface );
+}
+
+static HRESULT WINAPI basic_properties_async_handler_QueryInterface( IAsyncOperationCompletedHandler_BasicProperties *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_BasicProperties ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI basic_properties_async_handler_AddRef( IAsyncOperationCompletedHandler_BasicProperties *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI basic_properties_async_handler_Release( IAsyncOperationCompletedHandler_BasicProperties *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI basic_properties_async_handler_Invoke( IAsyncOperationCompletedHandler_BasicProperties *iface,
+                                                 IAsyncOperation_BasicProperties *async, AsyncStatus status )
+{
+    struct basic_properties_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_BasicProperties( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_BasicPropertiesVtbl basic_properties_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    basic_properties_async_handler_QueryInterface,
+    basic_properties_async_handler_AddRef,
+    basic_properties_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<BasicProperties> methods ***/
+    basic_properties_async_handler_Invoke,
+};
+
+static struct basic_properties_async_handler default_basic_properties_async_handler = {{&basic_properties_async_handler_vtbl}};
 
 /**
  * IAsyncOperationCompletedHandler_StorageFolder
@@ -631,6 +704,9 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     struct storage_item_vector_view_async_handler storage_item_vector_view_async_handler;
     struct storage_folder_vector_view_async_handler storage_folder_vector_view_async_handler;
     struct storage_file_vector_view_async_handler storage_file_vector_view_async_handler;
+    struct basic_properties_async_handler basic_properties_async_handler;
+    DateTime modifiedDate;
+    DateTime createdDate;
     IStorageItem *storageItem;
     IStorageItem *storageItemResults;
     IStorageItem *storageItemResults2;
@@ -646,6 +722,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     IStorageFolder *storageFolderResults2;
     IStorageFolder *storageFolderResults3;
     IStorageFolder *storageFolderResults4;
+    IBasicProperties *basicPropertiesResults;
     IStorageFolderStatics *storage_folder_statics;
     IVectorView_IStorageItem *storageItemVectorResults;
     IVectorView_StorageFolder *storageFolderVectorResults;
@@ -654,12 +731,14 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     IAsyncOperation_StorageFolder *storage_folder;
     IAsyncOperation_StorageFolder *storageFolderOperation;
     IAsyncOperation_IStorageItem *storageItemOperation;
+    IAsyncOperation_BasicProperties *basicPropertiesOperation;
     IAsyncOperation_IVectorView_IStorageItem *storageItemVectorOperation;
     IAsyncOperation_IVectorView_StorageFolder *storageFolderVectorOperation;
     IAsyncOperation_IVectorView_StorageFile *storageFileVectorOperation;
     IAsyncOperationCompletedHandler_StorageFolder *storage_folder_handler;
     IAsyncOperationCompletedHandler_IStorageItem *storage_item_handler;
     IAsyncOperationCompletedHandler_StorageFile *storage_file_handler;
+    IAsyncOperationCompletedHandler_BasicProperties *basicPropertiesHandler;
     IAsyncOperationCompletedHandler_IVectorView_IStorageItem *storage_item_vector_view_handler;
     IAsyncOperationCompletedHandler_IVectorView_StorageFolder *storage_folder_vector_view_handler;
     IAsyncOperationCompletedHandler_IVectorView_StorageFile *storage_file_vector_view_handler;
@@ -688,6 +767,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     HRESULT hr;
     DWORD ret;
     CHAR pathtest[MAX_PATH];
+    UINT64 filesize;
 
     WindowsCreateString( path, wcslen( path ), &pathString );
     WindowsCreateString( name, wcslen( name ), &nameString );
@@ -747,6 +827,45 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
+
+    IStorageItem_GetBasicPropertiesAsync( storageItem, &basicPropertiesOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+    
+    check_interface( basicPropertiesOperation, &IID_IUnknown );
+    check_interface( basicPropertiesOperation, &IID_IInspectable );
+    check_interface( basicPropertiesOperation, &IID_IAgileObject );
+    check_interface( basicPropertiesOperation, &IID_IAsyncInfo );
+    check_interface( basicPropertiesOperation, &IID_IAsyncOperation_BasicProperties );
+
+    hr = IAsyncOperation_BasicProperties_get_Completed( basicPropertiesOperation, &basicPropertiesHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( basicPropertiesHandler == NULL, "got handler %p\n", basicPropertiesHandler );
+    
+    basic_properties_async_handler = default_basic_properties_async_handler;
+    basic_properties_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    
+    hr = IAsyncOperation_BasicProperties_put_Completed( basicPropertiesOperation, &basic_properties_async_handler.IAsyncOperationCompletedHandler_BasicProperties_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
+    ret = WaitForSingleObject( basic_properties_async_handler.event, 100000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( basic_properties_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( basic_properties_async_handler.invoked, "handler not invoked\n" );
+    ok( basic_properties_async_handler.async == basicPropertiesOperation, "got async %p\n", basic_properties_async_handler.async );
+    ok( basic_properties_async_handler.status == Completed || broken( basic_properties_async_handler.status == Error ), "got status %u\n", basic_properties_async_handler.status );
+    
+    hr = IAsyncOperation_BasicProperties_GetResults( basicPropertiesOperation, &basicPropertiesResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IBasicProperties_get_Size( basicPropertiesResults, &filesize );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+    ok( filesize == 0llu, "File size received is NOT empty!");
+
+    IStorageItem_get_DateCreated( storageItem, &createdDate );
+    IBasicProperties_get_DateModified( basicPropertiesResults, &modifiedDate );
+    ok( createdDate.UniversalTime != modifiedDate.UniversalTime, "File Creation date %lli, and Modification date %lli match!\n", createdDate.UniversalTime, modifiedDate.UniversalTime );
 
     /**
      * IStorageFolder_CreateFolderAsync

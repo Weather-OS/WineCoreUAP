@@ -40,6 +40,9 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
 
     *factory = NULL;
 
+    /**
+     * Windows.Storage
+     */
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_AppDataPaths ))
         IActivationFactory_QueryInterface( app_data_paths_factory, &IID_IActivationFactory, (void **)factory );
 
@@ -51,6 +54,12 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_KnownFolders ))
         IActivationFactory_QueryInterface( known_folders_factory, &IID_IActivationFactory, (void **)factory );
+
+    /**
+     * Windows.Storage.FileProperties
+     */
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_FileProperties_BasicProperties ))
+        IActivationFactory_QueryInterface( basic_properties_factory, &IID_IActivationFactory, (void **)factory );
 
     if (*factory) return S_OK;
     return CLASS_E_CLASSNOTAVAILABLE;

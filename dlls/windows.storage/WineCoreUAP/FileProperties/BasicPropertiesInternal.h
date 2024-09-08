@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.StorageFolder Implementation
+/* WinRT Windows.Storage.FileProperties.BasicProperties Implementation
  *
  * Written by Weather
  *
@@ -19,29 +19,23 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../private.h"
+#ifndef BASIC_PROPERTIES_INTERNAL_H
+#define BASIC_PROPERTIES_INTERNAL_H
 
-#ifndef STORAGE_ITEM_INTERNAL_H
-#define STORAGE_ITEM_INTERNAL_H
+#include "../../private.h"
+#include "wine/debug.h"
 
-struct storage_item
+struct basic_properties
 {
     //Derivatives
-    IStorageItem IStorageItem_iface;
+    IActivationFactory IActivationFactory_iface;
+    IBasicProperties IBasicProperties_iface;
 
-    FileAttributes Attributes;
-    HSTRING Path;
-    HSTRING Name __attribute__((aligned(256)));    
-    DateTime DateCreated;
+    DateTime ItemDate;
+    DateTime DateModified;
+    UINT64 size;
+
     LONG ref;
 };
-
-struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
-
-HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
-HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption collisionOption, HSTRING name );
-HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption deleteOption );
-HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type );
-HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

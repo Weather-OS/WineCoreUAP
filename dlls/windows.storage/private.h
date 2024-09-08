@@ -59,6 +59,7 @@ extern IActivationFactory *app_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
 extern IActivationFactory *storage_file_factory;
 extern IActivationFactory *known_folders_factory;
+extern IActivationFactory *basic_properties_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
@@ -80,6 +81,9 @@ extern HRESULT async_operation_storage_item_vector_view_create( IUnknown *invoke
 extern HRESULT async_operation_storage_folder_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IVectorView_StorageFolder **out );
 extern HRESULT async_action_create(IAsyncAction **ret);
+
+extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+                                              IAsyncOperation_BasicProperties **out );
 
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \

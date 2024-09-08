@@ -20,6 +20,7 @@
  */
 
 #include "StorageItemInternal.h"
+#include "FileProperties/BasicPropertiesInternal.h"
 #include "util.h"
 
 #include "wine/debug.h"
@@ -28,6 +29,9 @@ WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IBasicPropertiesVtbl basic_properties_vtbl;
+
+extern struct IActivationFactoryVtbl factory_vtbl;
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
 {
@@ -231,6 +235,44 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
         free( item );
     }
     return status;
+}
+
+HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HANDLE file;
+    FILETIME lastWrite;
+    DWORD fileSize;
+    
+    struct basic_properties *properties;
+    struct storage_item *item;
+    
+    item = impl_from_IStorageItem( (IStorageItem *)invoker );
+
+    file = CreateFileA( HStringToLPCSTR( item->Path ), GENERIC_READ, FILE_SHARE_READ, NULL,
+                    OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+
+    fileSize = GetFileSize( file, NULL );
+
+    GetFileTime(file, NULL, NULL, &lastWrite);
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+    if (!result) return E_INVALIDARG;
+    if (!(properties = calloc( 1, sizeof(*properties) ))) return E_OUTOFMEMORY;
+
+    properties->IActivationFactory_iface.lpVtbl = &factory_vtbl;
+    properties->IBasicProperties_iface.lpVtbl = &basic_properties_vtbl;
+
+    properties->DateModified.UniversalTime = FileTimeToUnixTime( &lastWrite );
+    properties->ItemDate = item->DateCreated;
+    properties->size = fileSize;
+    properties->ref = 1;
+
+    result->vt = VT_UNKNOWN;
+    result->ppunkVal = (IUnknown **)&properties->IBasicProperties_iface;
+    
+    return status;
+
 }
 
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type )

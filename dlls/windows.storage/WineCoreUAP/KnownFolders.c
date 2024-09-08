@@ -26,7 +26,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-// Storage File
+// Known Folders
 
 static struct known_folders_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
