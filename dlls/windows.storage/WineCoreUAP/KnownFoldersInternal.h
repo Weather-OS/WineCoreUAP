@@ -33,10 +33,11 @@ struct known_folders_statics
 {
     IActivationFactory IActivationFactory_iface;
     IKnownFoldersStatics IKnownFoldersStatics_iface;
+    IKnownFoldersStatics2 IKnownFoldersStatics2_iface;
 
     LONG ref;
 };
 
-HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface, KnownFolderId folderId , HSTRING *value );
+HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HSTRING *value );
 
 #endif

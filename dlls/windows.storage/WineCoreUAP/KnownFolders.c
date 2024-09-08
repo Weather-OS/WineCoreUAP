@@ -129,7 +129,7 @@ static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStati
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_MusicLibrary, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MusicLibrary, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -156,7 +156,7 @@ static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersSt
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_PicturesLibrary, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_PicturesLibrary, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -183,7 +183,7 @@ static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStat
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_VideosLibrary, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_VideosLibrary, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -210,7 +210,7 @@ static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersS
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_DocumentsLibrary, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_DocumentsLibrary, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -237,7 +237,7 @@ static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics 
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_HomeGroup, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_HomeGroup, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -264,7 +264,7 @@ static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersS
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_RemovableDevices, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RemovableDevices, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -291,7 +291,7 @@ static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFolder
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
-    hr = known_folders_statics_GetKnownFolder( iface, KnownFolderId_MediaServerDevices, &path );
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MediaServerDevices, &path );
     if ( SUCCEEDED( hr ) )
     {
         hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
@@ -324,10 +324,109 @@ static const struct IKnownFoldersStaticsVtbl known_folders_statics_vtbl =
     known_folders_statics_get_MediaServerDevices
 };
 
+DEFINE_IINSPECTABLE( known_folders_statics2, IKnownFoldersStatics2, struct known_folders_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics2 *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Objects3D, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStatics2 *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_AppCaptures, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static HRESULT WINAPI known_folders_statics2_get_RecordedCalls( IKnownFoldersStatics2 *iface, IStorageFolder **value )
+{
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RecordedCalls, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        *value = &folder->IStorageFolder_iface;
+    }
+
+    return hr;
+}
+
+static const struct IKnownFoldersStatics2Vtbl known_folders_statics2_vtbl =
+{
+    known_folders_statics2_QueryInterface,
+    known_folders_statics2_AddRef,
+    known_folders_statics2_Release,
+    /* IInspectable methods */
+    known_folders_statics2_GetIids,
+    known_folders_statics2_GetRuntimeClassName,
+    known_folders_statics2_GetTrustLevel,
+    /* IKnownFoldersStatics2 methods */
+    known_folders_statics2_get_Objects3D,
+    known_folders_statics2_get_AppCaptures,
+    known_folders_statics2_get_RecordedCalls
+};
+
 static struct known_folders_statics known_folders_statics =
 {
     {&factory_vtbl},
     {&known_folders_statics_vtbl},
+    {&known_folders_statics2_vtbl},
     1,
 };
 

@@ -21,7 +21,7 @@
 
 #include "KnownFoldersInternal.h"
 
-HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface, KnownFolderId folderId , HSTRING *value ) 
+HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HSTRING *value ) 
 {    
     HRESULT status = S_OK;
     BOOLEAN musicLibraryAllowed = FALSE;
@@ -132,6 +132,21 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( IKnownFoldersStatics *iface
                 else
                     status = E_NOTIMPL;
                 break;
+
+            case KnownFolderId_Objects3D:
+                PathAppendA( path, "Objects3D" );
+                CreateDirectoryA( path, NULL );
+
+            case KnownFolderId_AppCaptures:
+                if ( !videosLibraryAllowed )
+                    status = E_ACCESSDENIED;
+                else
+                    PathAppendA( path, "Videos" );
+                    PathAppendA( path, "Captures" );
+                break;
+
+            case KnownFolderId_RecordedCalls:
+                status = E_NOTIMPL;
 
             default:
                 status = E_NOTIMPL;
