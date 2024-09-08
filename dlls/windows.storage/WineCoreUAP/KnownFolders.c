@@ -485,20 +485,41 @@ DEFINE_IINSPECTABLE( known_folders_statics4, IKnownFoldersStatics4, struct known
 
 static HRESULT WINAPI known_folders_statics4_RequestAccessAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
+    TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFoldersStatics4 *iface, IUser *user, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //User is not used. 
+    HRESULT hr;
+    hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
+    TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+
+    struct storage_folder *folder;
+    
+    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->ref = 1;
+
+    hr = known_folders_statics_GetKnownFolder( folder_id, &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+    }
+
+    return hr;
 }
 
 static const struct IKnownFoldersStatics4Vtbl known_folders_statics4_vtbl =

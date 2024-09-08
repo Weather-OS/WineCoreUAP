@@ -19,9 +19,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+//TODO: Permission handling is to be stored in Windows.Storage.AccessCache
+
 #include "KnownFoldersInternal.h"
 
-HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HSTRING *value ) 
+HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HSTRING *value ) 
 {    
     HRESULT status = S_OK;
     BOOLEAN musicLibraryAllowed = FALSE;
@@ -157,6 +159,75 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HS
     if ( SUCCEEDED( status ) )
     {
         status = WindowsCreateString( CharToLPCWSTR( path ), wcslen( CharToLPCWSTR( path ) ), value );
+    }
+
+    return status;
+}
+
+HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HSTRING KnownFolderPath;
+    INT promptResult;
+    CHAR title[1024];
+    CHAR message[1024];
+    CHAR manifestPath[MAX_PATH];
+
+    struct appx_package package;
+
+    GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
+    PathRemoveFileSpecA(manifestPath);
+    PathAppendA(manifestPath, "AppxManifest.xml");
+
+    if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
+    {
+        printf("Something went wrong\n.");
+        status = E_UNEXPECTED;
+    }
+
+    status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &KnownFolderPath );
+    if ( status == E_ACCESSDENIED )
+    {
+        result->vt = VT_UNKNOWN;
+        result->punkVal = (IUnknown *)KnownFoldersAccessStatus_NotDeclaredByApp;
+        return status;
+    }
+
+    if ( SUCCEEDED( status ) )
+    {
+        if ( package.Package.Identity.Name )
+        {
+            sprintf( title, "Let %s access the following file location?", package.Package.Identity.Name );
+        } else
+        {
+            sprintf( title, "Let this app access the following file location?" );
+        }
+
+        sprintf( message, "%s\n%s", title, HStringToLPCSTR( KnownFolderPath ) );
+        
+        promptResult = MessageBoxA (
+            NULL,
+            message,
+            title,
+            MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2
+        );
+
+        result->vt = VT_INT;
+
+        switch ( promptResult )
+        {
+            case IDYES:
+                result->lVal = (LONG)KnownFoldersAccessStatus_Allowed;
+                break;
+                
+            case IDNO:
+                result->lVal = (LONG)KnownFoldersAccessStatus_DeniedByUser;
+                break;
+
+            default:
+                result->lVal = (LONG)KnownFoldersAccessStatus_AllowedPerAppFolder;
+                break;
+        }
     }
 
     return status;

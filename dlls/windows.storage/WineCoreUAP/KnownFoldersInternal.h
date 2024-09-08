@@ -41,5 +41,6 @@ struct known_folders_statics
 };
 
 HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HSTRING *value );
+HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

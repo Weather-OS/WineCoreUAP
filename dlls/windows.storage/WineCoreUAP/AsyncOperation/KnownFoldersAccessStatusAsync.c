@@ -117,13 +117,21 @@ static HRESULT WINAPI known_folders_access_status_async_get_Completed( IAsyncOpe
 static HRESULT WINAPI known_folders_access_status_async_GetResults( IAsyncOperation_KnownFoldersAccessStatus *iface, KnownFoldersAccessStatus *results )
 {
     struct known_folders_access_status_async *impl = impl_from_IAsyncOperation_KnownFoldersAccessStatus( iface );
-    PROPVARIANT result = {.vt = VT_UNKNOWN};
+    PROPVARIANT result = {.vt = VT_INT};
     HRESULT hr;
 
     hr = IWineAsyncInfoImpl_get_Result( impl->IWineAsyncInfoImpl_inner, &result );
 
-    *results = (KnownFoldersAccessStatus)result.punkVal;
-    PropVariantClear( &result );
+    if ( !result.lVal )
+    {
+        *results = KnownFoldersAccessStatus_UserPromptRequired;
+    }
+    else
+    {
+        *results = (KnownFoldersAccessStatus)result.lVal;
+        PropVariantClear( &result );
+    }
+
     return hr;
 }
 

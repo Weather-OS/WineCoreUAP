@@ -52,6 +52,79 @@ LPCSTR HStringToLPCSTR( HSTRING hString ) {
 }
 
 /**
+ * IAsyncOperationCompletedHandler_KnownFoldersAccessStatus
+ */
+
+struct known_folder_access_status_async_handler
+{
+    IAsyncOperationCompletedHandler_KnownFoldersAccessStatus IAsyncOperationCompletedHandler_KnownFoldersAccessStatus_iface;
+    IAsyncOperation_KnownFoldersAccessStatus *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct known_folder_access_status_async_handler *impl_from_IAsyncOperationCompletedHandler_KnownFoldersAccessStatus( IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *iface )
+{
+    return CONTAINING_RECORD( iface, struct known_folder_access_status_async_handler, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus_iface );
+}
+
+static HRESULT WINAPI known_folder_access_status_async_handler_QueryInterface( IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_KnownFoldersAccessStatus ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI known_folder_access_status_async_handler_AddRef( IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI known_folder_access_status_async_handler_Release( IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI known_folder_access_status_async_handler_Invoke( IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *iface,
+                                                 IAsyncOperation_KnownFoldersAccessStatus *async, AsyncStatus status )
+{
+    struct known_folder_access_status_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_KnownFoldersAccessStatus( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_KnownFoldersAccessStatusVtbl known_folder_access_status_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    known_folder_access_status_async_handler_QueryInterface,
+    known_folder_access_status_async_handler_AddRef,
+    known_folder_access_status_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<KnownFoldersAccessStatus> methods ***/
+    known_folder_access_status_async_handler_Invoke,
+};
+
+static struct known_folder_access_status_async_handler default_known_folder_access_status_async_handler = {{&known_folder_access_status_async_handler_vtbl}};
+
+
+/**
  * IAsyncOperationCompletedHandler_StorageFolder
  */
 
@@ -1059,13 +1132,16 @@ static void test_KnownFolders( void )
     IUser *user = NULL;
     IStorageFolder *documentsFolder;
     IStorageFolder *musicsFolder;
-    IAsyncOperation_StorageFolder *storageFolderOperation;
-    IAsyncOperationCompletedHandler_StorageFolder *storageFolderHandler;
     IStorageItem *documentsFolderItem;
     IKnownFoldersStatics *knownFoldersStatics;
     IKnownFoldersStatics2 *knownFoldersStatics2;
     IKnownFoldersStatics3 *knownFoldersStatics3;
-    //IKnownFoldersStatics4 *knownFoldersStatics4;
+    IKnownFoldersStatics4 *knownFoldersStatics4;    
+    KnownFoldersAccessStatus accessStatus;
+    IAsyncOperation_StorageFolder *storageFolderOperation;
+    IAsyncOperation_KnownFoldersAccessStatus *knownFoldersAccessStatusOperation;
+    IAsyncOperationCompletedHandler_StorageFolder *storageFolderHandler;
+    IAsyncOperationCompletedHandler_KnownFoldersAccessStatus *knownFoldersAccessStatusHandler;
     IActivationFactory *factory;
     HSTRING str;
     HSTRING path;
@@ -1076,6 +1152,7 @@ static void test_KnownFolders( void )
     DWORD ret;
 
     struct storage_folder_async_handler storage_folder_async_handler;
+    struct known_folder_access_status_async_handler known_folder_access_status_async_handler;
 
     if (!GetUserNameA( username, &username_len )) {
         return;
@@ -1180,8 +1257,49 @@ static void test_KnownFolders( void )
     IStorageItem_get_Name( documentsFolderItem, &name );
 
     ok( !strcmp(HStringToLPCSTR(path), pathStr), "Error: Original path not returned. path %s, pathStr %s\n", HStringToLPCSTR(path), pathStr);
-    ok( !strcmp(HStringToLPCSTR(name), "Documents"), "Error: Original name not returned. name %s, name %s\n", HStringToLPCSTR(name), "Documents");    
+    ok( !strcmp(HStringToLPCSTR(name), "Documents"), "Error: Original name not returned. name %s, name %s\n", HStringToLPCSTR(name), "Documents");
+
+    //knownFoldersStatics4
+    hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics4, (void **)&knownFoldersStatics4 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );   
+
+    /**
+     * IKnownFoldersStatics4_RequestAccessAsync
+     */
+
+    hr = IKnownFoldersStatics4_RequestAccessAsync( knownFoldersStatics4, KnownFolderId_DocumentsLibrary, &knownFoldersAccessStatusOperation );
+
+    check_interface( knownFoldersAccessStatusOperation, &IID_IUnknown );
+    check_interface( knownFoldersAccessStatusOperation, &IID_IInspectable );
+    check_interface( knownFoldersAccessStatusOperation, &IID_IAgileObject );
+    check_interface( knownFoldersAccessStatusOperation, &IID_IAsyncInfo );
+    check_interface( knownFoldersAccessStatusOperation, &IID_IAsyncOperation_KnownFoldersAccessStatus );
+
+    hr = IAsyncOperation_KnownFoldersAccessStatus_GetResults ( knownFoldersAccessStatusOperation, &accessStatus );
+    ok( hr == E_ILLEGAL_METHOD_CALL, "got hr %#lx.\n", hr );   
+    ok( accessStatus == KnownFoldersAccessStatus_UserPromptRequired, "got accessStatus %#x.\n", accessStatus );
+
+    hr = IAsyncOperation_KnownFoldersAccessStatus_get_Completed( knownFoldersAccessStatusOperation, &knownFoldersAccessStatusHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( knownFoldersAccessStatusHandler == NULL, "got handler %p\n", knownFoldersAccessStatusHandler );
+
+    known_folder_access_status_async_handler = default_known_folder_access_status_async_handler;
+    known_folder_access_status_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_KnownFoldersAccessStatus_put_Completed( knownFoldersAccessStatusOperation, &known_folder_access_status_async_handler.IAsyncOperationCompletedHandler_KnownFoldersAccessStatus_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
+    ret = WaitForSingleObject( known_folder_access_status_async_handler.event, INFINITE );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
     
+    ret = CloseHandle( known_folder_access_status_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( known_folder_access_status_async_handler.invoked, "handler not invoked\n" );
+    ok( known_folder_access_status_async_handler.async == knownFoldersAccessStatusOperation, "got async %p\n", known_folder_access_status_async_handler.async );
+    ok( known_folder_access_status_async_handler.status == Completed || broken( known_folder_access_status_async_handler.status == Error ), "got status %u\n", known_folder_access_status_async_handler.status );
+
+    IAsyncOperation_KnownFoldersAccessStatus_GetResults ( knownFoldersAccessStatusOperation, &accessStatus );
+    printf("User requested %#x\n", accessStatus);
 }
 
 START_TEST(storage)
