@@ -124,24 +124,15 @@ assignAppxProperties( xmlNode * manifest, struct appx_properties *Properties )
                             {
                                 if ( !xmlStrcmp( propertiesNode->name, (const xmlChar*)"DisplayName" ) )
                                 {
-                                    xmlNode *content = node->children;
-                                    if (content && content->type == XML_TEXT_NODE) {
-                                        DisplayName = content->content;
-                                    }
+                                    DisplayName = xmlNodeGetContent(propertiesNode);
                                 }
                                 if ( !xmlStrcmp( propertiesNode->name, (const xmlChar*)"PublisherDisplayName" ) )
                                 {
-                                    xmlNode *content = node->children;
-                                    if (content && content->type == XML_TEXT_NODE) {
-                                        PublisherDisplayName = content->content;
-                                    }
+                                    PublisherDisplayName = xmlNodeGetContent(propertiesNode);
                                 }
                                 if ( !xmlStrcmp( propertiesNode->name, (const xmlChar*)"Logo" ) )
                                 {
-                                    xmlNode *content = node->children;
-                                    if (content && content->type == XML_TEXT_NODE) {
-                                        Logo = content->content;
-                                    }
+                                    Logo = xmlNodeGetContent(propertiesNode);
                                 }
                             }
                         }
