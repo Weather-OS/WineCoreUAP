@@ -20,6 +20,8 @@ SOURCES = \
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	\
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/HSTRINGAsync.c \
+	WineCoreUAP/AsyncOperation/HSTRINGVectorAsync.c \
 	WineCoreUAP/AsyncOperation/KnownFoldersAccessStatusAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFolderAsyncVectorView.c \
@@ -28,6 +30,9 @@ SOURCES = \
 	WineCoreUAP/AsyncOperation/StorageFileAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFileAsyncVectorView.c \
 	\
+	WineCoreUAP/Vector/HSTRINGVector.c \
+	\
+	WineCoreUAP/VectorView/HSTRINGVectorView.c \
 	WineCoreUAP/VectorView/StorageItemVectorView.c \
 	WineCoreUAP/VectorView/StorageFolderVectorView.c \
 	WineCoreUAP/VectorView/StorageFileVectorView.c \

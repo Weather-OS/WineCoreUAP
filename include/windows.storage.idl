@@ -116,11 +116,6 @@ namespace Windows.Storage {
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageStreamTransaction *>;
         interface Windows.Foundation.TypedEventHandler<Windows.Storage.ApplicationData *, IInspectable *>;
-        interface Windows.Foundation.IAsyncOperation<HSTRING>;
-        interface Windows.Foundation.AsyncOperationCompletedHandler<HSTRING>;
-        interface Windows.Foundation.Collections.IVector<HSTRING>;
-        interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVector<HSTRING>*>;
-        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVector<HSTRING>*>;
     }
 
     [
