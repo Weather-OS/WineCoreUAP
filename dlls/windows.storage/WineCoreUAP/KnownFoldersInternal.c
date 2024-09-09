@@ -183,6 +183,10 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 }
                 break;
 
+            case KnownFolderId_DownloadsFolder:
+                PathAppendA( path, "Downloads" );
+                break;
+
             default:
                 status = E_NOTIMPL;
         }

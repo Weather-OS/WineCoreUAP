@@ -460,6 +460,7 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
     if ( SUCCEEDED( hr ) )
     {
         hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     }
 
     return hr;
@@ -514,6 +515,7 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     if ( SUCCEEDED( hr ) )
     {
         hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     }
 
     return hr;

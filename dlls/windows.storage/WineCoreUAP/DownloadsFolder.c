@@ -122,26 +122,54 @@ DEFINE_IINSPECTABLE( downloads_folder_statics, IDownloadsFolderStatics, struct d
 
 static HRESULT WINAPI downloads_folder_statics_CreateFileAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFile( desiredName, CreationCollisionOption_FailIfExists, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics_CreateFolderAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFolder( desiredName, CreationCollisionOption_FailIfExists, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFile( desiredName, option, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics_CreateFolderWithCollisionOptionAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFolder( desiredName, option, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    }
+    return hr;
 }
 
 static const struct IDownloadsFolderStaticsVtbl downloads_folder_statics_vtbl =
@@ -164,26 +192,58 @@ DEFINE_IINSPECTABLE( downloads_folder_statics2, IDownloadsFolderStatics2, struct
 
 static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserAsync( IDownloadsFolderStatics2 *iface, IUser *user, HSTRING desiredName, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //User is not used.
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFile( desiredName, CreationCollisionOption_FailIfExists, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserAsync( IDownloadsFolderStatics2 *iface, IUser *user, HSTRING desiredName, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //User is not used.
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFolder( desiredName, CreationCollisionOption_FailIfExists, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserWithCollisionOptionAsync( IDownloadsFolderStatics2 *iface, IUser *user, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFile **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //User is not used.
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFile( desiredName, option, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    }
+    return hr;
 }
 
 static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserWithCollisionOptionAsync( IDownloadsFolderStatics2 *iface, IUser *user, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFolder **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //User is not used.
+    HRESULT hr;
+    HSTRING path;
+    hr = downloads_folder_CreateFolder( desiredName, option, &path );
+    if ( SUCCEEDED (hr ) )
+    {
+        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    }
+    return hr;
 }
 
 static const struct IDownloadsFolderStatics2Vtbl downloads_folder_statics2_vtbl =

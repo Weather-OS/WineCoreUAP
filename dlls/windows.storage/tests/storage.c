@@ -1421,6 +1421,90 @@ static void test_KnownFolders( void )
     printf("User requested %#x\n", accessStatus);
 }
 
+static void test_DownloadsFolder( void )
+{
+    HRESULT hr = S_OK;
+    static const WCHAR *downloads_folders_statics_name = L"Windows.Storage.DownloadsFolder";
+    static const WCHAR *desiredFileNameStr = L"NewFile.txt";
+    IStorageFile *file;
+    IStorageItem *fileItem;
+    IDownloadsFolderStatics *downloadsFolderStatics;
+    IAsyncOperation_StorageFile *fileOperation;
+    IAsyncOperationCompletedHandler_StorageFile *fileHandler;
+    DWORD ret;
+    HSTRING str;
+    HSTRING desiredFileName;
+    HSTRING fileName;
+    IActivationFactory *factory;
+
+    struct storage_file_async_handler storage_file_async_handler;
+
+    hr = WindowsCreateString( downloads_folders_statics_name, wcslen( downloads_folders_statics_name ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( desiredFileNameStr, wcslen( desiredFileNameStr ), &desiredFileName );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
+    WindowsDeleteString( str );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( downloads_folders_statics_name ) );
+    }
+
+    check_interface( factory, &IID_IUnknown );
+    check_interface( factory, &IID_IInspectable );
+    check_interface( factory, &IID_IAgileObject );
+
+    //downloadsFolderStatics
+
+    hr = IActivationFactory_QueryInterface( factory, &IID_IDownloadsFolderStatics, (void **)&downloadsFolderStatics );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IDownloadsFolderStatics_CreateFileWithCollisionOptionAsync
+     */
+
+    IDownloadsFolderStatics_CreateFileWithCollisionOptionAsync( downloadsFolderStatics, desiredFileName, CreationCollisionOption_ReplaceExisting, &fileOperation );
+
+    check_interface( fileOperation, &IID_IUnknown );
+    check_interface( fileOperation, &IID_IInspectable );
+    check_interface( fileOperation, &IID_IAgileObject );
+    check_interface( fileOperation, &IID_IAsyncInfo );
+    check_interface( fileOperation, &IID_IAsyncOperation_StorageFile );
+
+    hr = IAsyncOperation_StorageFile_get_Completed( fileOperation, &fileHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( fileHandler == NULL, "got handler %p\n", fileHandler );
+
+    storage_file_async_handler = default_storage_file_async_handler;
+    storage_file_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_StorageFile_put_Completed( fileOperation, &storage_file_async_handler.IAsyncOperationCompletedHandler_StorageFile_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+   
+    ret = WaitForSingleObject( storage_file_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_file_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_file_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_file_async_handler.async == fileOperation, "got async %p\n", storage_file_async_handler.async );
+    ok( storage_file_async_handler.status == Completed || broken( storage_file_async_handler.status == Error ), "got status %u\n", storage_file_async_handler.status );
+
+    hr = IAsyncOperation_StorageFile_GetResults( fileOperation, &file );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IStorageFile_QueryInterface( file, &IID_IStorageItem, (void **)&fileItem );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IStorageItem_get_Name( fileItem, &fileName );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    ok( !strcmp(HStringToLPCSTR(fileName), "NewFile.txt"), "Error: Original name not returned. fileName %s, name %s\n", HStringToLPCSTR(fileName), "NewFile.txt");
+}
+
 START_TEST(storage)
 {
     HRESULT hr;
@@ -1437,6 +1521,7 @@ START_TEST(storage)
     test_StorageFolder(apppath, &returnedItem);
     test_StorageItem(returnedItem);
     test_KnownFolders();
+    test_DownloadsFolder();
 
     RoUninitialize();
 }

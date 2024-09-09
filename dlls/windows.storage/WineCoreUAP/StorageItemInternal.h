@@ -39,13 +39,12 @@
 
 struct storage_item
 {
-    //Derivatives
     IStorageItem IStorageItem_iface;
 
-    FileAttributes Attributes;
-    HSTRING Path;
-    HSTRING Name __attribute__((aligned(256)));    
     DateTime DateCreated;
+    HSTRING Path;
+    HSTRING Name __attribute__((aligned(16)));
+    FileAttributes Attributes;
     LONG ref;
 };
 

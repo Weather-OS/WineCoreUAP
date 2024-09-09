@@ -7,6 +7,7 @@ SOURCES = \
 	WineCoreUAP/KnownFolders.c \
 	WineCoreUAP/KnownFoldersInternal.c \
 	WineCoreUAP/DownloadsFolder.c \
+	WineCoreUAP/DownloadsFolderInternal.c \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \

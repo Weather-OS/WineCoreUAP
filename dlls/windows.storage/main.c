@@ -55,6 +55,9 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_KnownFolders ))
         IActivationFactory_QueryInterface( known_folders_factory, &IID_IActivationFactory, (void **)factory );
 
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_DownloadsFolder ))
+        IActivationFactory_QueryInterface( downloads_folder_factory, &IID_IActivationFactory, (void **)factory );
+
     /**
      * Windows.Storage.FileProperties
      */
