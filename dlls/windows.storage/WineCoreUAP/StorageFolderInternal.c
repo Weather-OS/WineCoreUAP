@@ -19,13 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "util.h"
 #include "StorageFolderInternal.h"
-#include "StorageItemInternal.h"
-#include "StorageFileInternal.h"
-#include "VectorView/StorageItemVectorView.h"
-#include "VectorView/StorageFolderVectorView.h"
-#include "VectorView/StorageFileVectorView.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 

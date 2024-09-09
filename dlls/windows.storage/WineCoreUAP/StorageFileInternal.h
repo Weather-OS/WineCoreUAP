@@ -19,14 +19,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../private.h"
-
 #ifndef STORAGE_FILE_INTERNAL_H
 #define STORAGE_FILE_INTERNAL_H
 
 #include "StorageFileInternal.h"
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
+
+#include "AppInternalPaths.h"
+
+#include "util.h"
+#include "../private.h"
+#include "wine/debug.h"
+
+#define BUFFER_SIZE 512
 
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;

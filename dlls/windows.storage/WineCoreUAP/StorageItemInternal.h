@@ -19,8 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../private.h"
-
 #ifndef STORAGE_ITEM_INTERNAL_H
 #define STORAGE_ITEM_INTERNAL_H
 
@@ -31,6 +29,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <combaseapi.h>
+
+#include "StorageFolderInternal.h"
+#include "FileProperties/BasicPropertiesInternal.h"
+
+#include "util.h"
+#include "../private.h"
+#include "wine/debug.h"
 
 struct storage_item
 {

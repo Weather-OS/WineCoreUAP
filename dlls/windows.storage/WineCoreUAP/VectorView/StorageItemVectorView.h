@@ -19,11 +19,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../../private.h"
-#include "wine/debug.h"
-
 #ifndef STORAGE_ITEM_VECTOR_VIEW_H
 #define STORAGE_ITEM_VECTOR_VIEW_H
+
+#include "../../private.h"
+#include "wine/debug.h"
 
 struct storage_item_vector_view
 {

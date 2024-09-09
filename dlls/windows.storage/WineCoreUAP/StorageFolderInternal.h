@@ -19,12 +19,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "../private.h"
-
 #ifndef STORAGE_FOLDER_INTERNAL_H
 #define STORAGE_FOLDER_INTERNAL_H
 
 #include <shlwapi.h>
+
+#include "StorageItemInternal.h"
+#include "StorageFileInternal.h"
+#include "VectorView/StorageItemVectorView.h"
+#include "VectorView/StorageFolderVectorView.h"
+#include "VectorView/StorageFileVectorView.h"
+
+#include "util.h"
+#include "../private.h"
+#include "wine/debug.h"
 
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;

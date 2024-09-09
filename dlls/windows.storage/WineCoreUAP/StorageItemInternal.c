@@ -20,10 +20,6 @@
  */
 
 #include "StorageItemInternal.h"
-#include "FileProperties/BasicPropertiesInternal.h"
-#include "util.h"
-
-#include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 

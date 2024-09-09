@@ -19,6 +19,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+
+
+#ifndef KNOWN_FOLDERS_INTERNAL_H
+#define KNOWN_FOLDERS_INTERNAL_H
+
 #include "../private.h"
 #include "util.h"
 
@@ -26,9 +31,6 @@
 
 #include <appx.h>
 #include <shlwapi.h>
-
-#ifndef KNOWN_FOLDERS_INTERNAL_H
-#define KNOWN_FOLDERS_INTERNAL_H
 
 struct known_folders_statics
 {

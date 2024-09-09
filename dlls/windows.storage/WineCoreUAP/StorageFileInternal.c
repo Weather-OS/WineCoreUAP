@@ -19,12 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "util.h"
 #include "StorageFileInternal.h"
-
-#define BUFFER_SIZE 512
-
-#include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 

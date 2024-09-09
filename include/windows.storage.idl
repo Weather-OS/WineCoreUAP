@@ -56,6 +56,8 @@ namespace Windows.Storage {
     interface IApplicationDataContainer;
     interface IApplicationDataStatics;
     interface IApplicationDataStatics2;
+    interface IDownloadsFolderStatics;
+    interface IDownloadsFolderStatics2;
     interface IKnownFoldersCameraRollStatics;
     interface IKnownFoldersPlaylistsStatics;
     interface IKnownFoldersSavedPicturesStatics;
@@ -76,6 +78,7 @@ namespace Windows.Storage {
     runtimeclass AppDataPaths;
     runtimeclass ApplicationData;
     runtimeclass ApplicationDataContainer;
+    runtimeclass DownloadsFolder;
     runtimeclass KnownFolders;
     runtimeclass SetVersionDeferral;
     runtimeclass SetVersionRequest;
@@ -396,6 +399,32 @@ namespace Windows.Storage {
             [in] Windows.System.User *user,
             [out, retval] Windows.Foundation.IAsyncOperation<Windows.Storage.ApplicationData *> **operation
         );
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.DownloadsFolder),
+        uuid(27862ED0-404E-47DF-A1E2-E37308BE7B37)
+    ]
+    interface IDownloadsFolderStatics : IInspectable
+    {
+        [overload("CreateFileAsync")] HRESULT CreateFileAsync([in] HSTRING desiredName, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+        [overload("CreateFolderAsync")] HRESULT CreateFolderAsync([in] HSTRING desiredName, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+        [overload("CreateFileAsync")] HRESULT CreateFileWithCollisionOptionAsync([in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+        [overload("CreateFolderAsync")] HRESULT CreateFolderWithCollisionOptionAsync([in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 2.0),
+        exclusiveto(Windows.Storage.DownloadsFolder),
+        uuid(E93045BD-8EF8-4F8E-8D15-AC0E265F390D)
+    ]
+    interface IDownloadsFolderStatics2 : IInspectable
+    {
+        [overload("CreateFileForUserAsync")] HRESULT CreateFileForUserAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+        [overload("CreateFolderForUserAsync")] HRESULT CreateFolderForUserAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+        [overload("CreateFileForUserAsync")] HRESULT CreateFileForUserWithCollisionOptionAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+        [overload("CreateFolderForUserAsync")] HRESULT CreateFolderForUserWithCollisionOptionAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
     }
 
     [
@@ -733,6 +762,15 @@ namespace Windows.Storage {
     {
         [default] interface Windows.Storage.IApplicationDataContainer;
         [contract(Windows.Foundation.UniversalApiContract, 12.0)] interface Windows.Foundation.IClosable;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        static(Windows.Storage.IDownloadsFolderStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        static(Windows.Storage.IDownloadsFolderStatics2, Windows.Foundation.UniversalApiContract, 2.0)
+    ]
+    runtimeclass DownloadsFolder
+    {
     }
 
     [

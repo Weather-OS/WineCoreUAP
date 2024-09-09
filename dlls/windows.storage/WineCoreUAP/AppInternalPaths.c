@@ -20,7 +20,6 @@
  */
 
 #include "AppInternalPaths.h"
-#include <shlwapi.h>
 
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    

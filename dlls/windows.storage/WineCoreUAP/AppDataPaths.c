@@ -21,9 +21,6 @@
 
 #include "AppInternalPaths.h"
 
-#include "../private.h"
-#include "wine/debug.h"
-
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
 // App Data Paths

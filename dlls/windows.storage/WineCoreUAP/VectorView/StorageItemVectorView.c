@@ -21,9 +21,6 @@
 
 #include "StorageItemVectorView.h"
 
-#include "../../private.h"
-#include "wine/debug.h"
-
 WINE_DEFAULT_DEBUG_CHANNEL(combase);
 
 struct storage_item_vector_view *impl_from_IVectorView_IStorageItem( IVectorView_IStorageItem *iface )

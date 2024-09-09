@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage Internal Utilities.
+/* WinRT Windows.Storage.DownloadsFolder Implementation
  *
  * Written by Weather
  *
@@ -19,21 +19,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-
-
-#ifndef _UTIL_INTERNAL_H_
-#define _UTIL_INTERNAL_H_
+#ifndef DOWNLOADS_FOLDER_INTERNAL_H
+#define DOWNLOADS_FOLDER_INTERNAL_H
 
 #include "../private.h"
-#include <stdio.h>
+#include "wine/debug.h"
 
-#define WINDOWS_TICK 10000000
-#define SEC_TO_UNIX_EPOCH 11644473600LL
+struct downloads_folder_statics
+{
+    IActivationFactory IActivationFactory_iface;
+    IDownloadsFolderStatics IDownloadsFolderStatics_iface;
+    IDownloadsFolderStatics2 IDownloadsFolderStatics2_iface;
 
-INT64 FileTimeToUnixTime( const FILETIME *ft );
-VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize );
-LPCWSTR CharToLPCWSTR( LPSTR charString );
-LPCSTR HStringToLPCSTR( HSTRING hString );
-VOID DeleteDirectoryRecursively(LPCSTR directoryPath);
+    LONG ref;
+};
+
 
 #endif
