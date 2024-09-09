@@ -108,7 +108,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     return status;
 }
 
-HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption collisionOption, HSTRING name )
+HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     DWORD attributes;
     HRESULT status = S_OK;
@@ -117,11 +117,14 @@ HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption co
     CHAR uuidName[MAX_PATH];
 
     struct storage_item *item;
+    struct storage_item_rename_options *rename_options = (struct storage_item_rename_options *)param;
+    NameCollisionOption collisionOption = rename_options->option;
+    HSTRING name = rename_options->name;
 
-    TRACE( "iface %p, value %p\n", iface, name );
+    TRACE( "iface %p, value %p\n", invoker, name );
     if (!name) return E_INVALIDARG;
 
-    item = impl_from_IStorageItem( iface );
+    item = impl_from_IStorageItem( (IStorageItem *)invoker );
     WindowsDuplicateString( item->Path, &itemPath );
 
     strcpy( newItemPath, HStringToLPCSTR( itemPath ) );
@@ -188,7 +191,7 @@ HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption co
     return status;
 }
 
-HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption deleteOption )
+HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     DWORD attributes;
     HRESULT status = S_OK;
@@ -196,9 +199,11 @@ HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption de
 
     struct storage_item *item;
 
-    TRACE( "iface %p\n", iface );
+    StorageDeleteOption deleteOption = (StorageDeleteOption)param;
 
-    item = impl_from_IStorageItem( iface );
+    TRACE( "iface %p\n", invoker );
+
+    item = impl_from_IStorageItem( (IStorageItem *)invoker );
     WindowsDuplicateString( item->Path, &itemPath );
 
     //Perform delete

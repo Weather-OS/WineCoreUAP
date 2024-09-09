@@ -50,12 +50,21 @@ struct storage_folder
     LONG ref;
 };
 
-
 struct storage_folder_statics
 {
     IActivationFactory IActivationFactory_iface;
     IStorageFolderStatics IStorageFolderStatics_iface;
     LONG ref;
+};
+
+/**
+ * Parametized structs
+ */
+
+struct storage_folder_creation_options
+{
+    CreationCollisionOption option;
+    HSTRING name;
 };
 
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
@@ -65,8 +74,8 @@ HRESULT WINAPI storage_folder_AssignFolderAsync( IUnknown *invoker, IUnknown *pa
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_folder_CreateFolder( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath );
-HRESULT WINAPI storage_folder_CreateFile( IStorageFolder* folder, CreationCollisionOption collisionOption, HSTRING Name, HSTRING *OutPath );
+HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );

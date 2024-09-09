@@ -216,17 +216,19 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
 {
     HRESULT hr;
     HSTRING name;
-    HSTRING path;
-    NameCollisionOption option = NameCollisionOption_FailIfExists;
+    struct storage_file_copy_options *copy_options;
 
     struct storage_file *impl = impl_from_IStorageFile( iface );
     struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
     WindowsDuplicateString( implItem->Name, &name );
 
-    hr = storage_file_Copy( iface, folder, name, option, &path );
-    if( SUCCEEDED( hr ) )
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
+
+    copy_options->folder = folder;
+    copy_options->name = name;
+    copy_options->option = NameCollisionOption_FailIfExists;
+
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
     
     return hr;
 }
@@ -234,13 +236,16 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
 static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *iface, IStorageFolder *folder, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
-    HSTRING path;
-    NameCollisionOption option = NameCollisionOption_FailIfExists;
 
-    hr = storage_file_Copy( iface, folder, name, option, &path );
-    if( SUCCEEDED( hr ) )
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    struct storage_file_copy_options *copy_options;
+
+    if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
+
+    copy_options->folder = folder;
+    copy_options->name = name;
+    copy_options->option = NameCollisionOption_FailIfExists;
+
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
     
     return hr;
 }
@@ -248,22 +253,24 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *ifa
 static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFolder *folder, HSTRING name, NameCollisionOption option, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
-    HSTRING path;
 
-    hr = storage_file_Copy( iface, folder, name, option, &path );
-    if( SUCCEEDED( hr ) )
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+    struct storage_file_move_options *copy_options;
+
+    if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
+
+    copy_options->folder = folder;
+    copy_options->name = name;
+    copy_options->option = option;
     
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_file_CopyAndReplaceAsync( IStorageFile *iface, IStorageFile *file, IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_file_CopyAndReplace( iface, file );
-    if( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)file, storage_file_CopyAndReplace, operation );
     return hr;
 }
 
@@ -271,15 +278,19 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultNameAndOptions( IStorageFi
 {
     HRESULT hr;
     HSTRING name;
-    NameCollisionOption option = NameCollisionOption_FailIfExists;
+    struct storage_file_move_options *move_options;
 
     struct storage_file *impl = impl_from_IStorageFile( iface );
     struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
     WindowsDuplicateString( implItem->Name, &name );
 
-    hr = storage_file_Move( iface, folder, name, option );
-    if( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
+
+    move_options->folder = folder;
+    move_options->name = name;
+    move_options->option = NameCollisionOption_FailIfExists;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
     
     return hr;
 }
@@ -287,11 +298,15 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultNameAndOptions( IStorageFi
 static HRESULT WINAPI storage_file_MoveOverloadDefaultOptions( IStorageFile *iface, IStorageFolder *folder, HSTRING name, IAsyncAction **operation )
 {
     HRESULT hr;
-    NameCollisionOption option = NameCollisionOption_FailIfExists;
+    struct storage_file_move_options *move_options;
 
-    hr = storage_file_Move( iface, folder, name, option );
-    if( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
+
+    move_options->folder = folder;
+    move_options->name = name;
+    move_options->option = NameCollisionOption_FailIfExists;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
     
     return hr;
 }
@@ -299,20 +314,23 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultOptions( IStorageFile *ifa
 static HRESULT WINAPI storage_file_MoveOverload( IStorageFile *iface, IStorageFolder *folder, HSTRING name, NameCollisionOption option, IAsyncAction **operation )
 {
     HRESULT hr;
+    struct storage_file_move_options *move_options;
 
-    hr = storage_file_Move( iface, folder, name, option );
-    if( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
+
+    move_options->folder = folder;
+    move_options->name = name;
+    move_options->option = option;
     
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_file_MoveAndReplaceAsync( IStorageFile *iface, IStorageFile *file,  IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_file_MoveAndReplace( iface, file );
-    if( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)file, storage_file_MoveAndReplace, operation );
     return hr;
 }
 

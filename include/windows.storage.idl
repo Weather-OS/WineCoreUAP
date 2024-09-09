@@ -58,6 +58,7 @@ namespace Windows.Storage {
     interface IApplicationDataStatics2;
     interface IDownloadsFolderStatics;
     interface IDownloadsFolderStatics2;
+    interface IFileIOStatics;
     interface IKnownFoldersCameraRollStatics;
     interface IKnownFoldersPlaylistsStatics;
     interface IKnownFoldersSavedPicturesStatics;
@@ -79,6 +80,7 @@ namespace Windows.Storage {
     runtimeclass ApplicationData;
     runtimeclass ApplicationDataContainer;
     runtimeclass DownloadsFolder;
+    runtimeclass FileIO;
     runtimeclass KnownFolders;
     runtimeclass SetVersionDeferral;
     runtimeclass SetVersionRequest;
@@ -114,6 +116,11 @@ namespace Windows.Storage {
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageStreamTransaction *>;
         interface Windows.Foundation.TypedEventHandler<Windows.Storage.ApplicationData *, IInspectable *>;
+        interface Windows.Foundation.IAsyncOperation<HSTRING>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<HSTRING>;
+        interface Windows.Foundation.Collections.IVector<HSTRING>;
+        interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVector<HSTRING>*>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVector<HSTRING>*>;
     }
 
     [
@@ -426,6 +433,31 @@ namespace Windows.Storage {
         [overload("CreateFileForUserAsync")] HRESULT CreateFileForUserWithCollisionOptionAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
         [overload("CreateFolderForUserAsync")] HRESULT CreateFolderForUserWithCollisionOptionAsync([in] Windows.System.User* user, [in] HSTRING desiredName, [in] Windows.Storage.CreationCollisionOption option, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
     }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.FileIO),
+        uuid(887411EB-7F54-4732-A5F0-5E43E3B8C2F5)
+    ]
+    interface IFileIOStatics : IInspectable
+    {
+        [overload("ReadTextAsync")] HRESULT ReadTextAsync([in] Windows.Storage.IStorageFile* file, [out] [retval] Windows.Foundation.IAsyncOperation<HSTRING>** textOperation);
+        [overload("ReadTextAsync")] HRESULT ReadTextWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncOperation<HSTRING>** textOperation);
+        [overload("WriteTextAsync")] HRESULT WriteTextAsync([in] Windows.Storage.IStorageFile* file, [in] HSTRING contents, [out] [retval] Windows.Foundation.IAsyncAction** textOperation);
+        [overload("WriteTextAsync")] HRESULT WriteTextWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] HSTRING contents, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncAction** textOperation);
+        [overload("AppendTextAsync")] HRESULT AppendTextAsync([in] Windows.Storage.IStorageFile* file, [in] HSTRING contents, [out] [retval] Windows.Foundation.IAsyncAction** textOperation);
+        [overload("AppendTextAsync")] HRESULT AppendTextWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] HSTRING contents, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncAction** textOperation);
+        [overload("ReadLinesAsync")] HRESULT ReadLinesAsync([in] Windows.Storage.IStorageFile* file, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVector<HSTRING>*>** linesOperation);
+        [overload("ReadLinesAsync")] HRESULT ReadLinesWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVector<HSTRING>*>** linesOperation);
+        [overload("WriteLinesAsync")] HRESULT WriteLinesAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Foundation.Collections.IIterable<HSTRING>* lines, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+        [overload("WriteLinesAsync")] HRESULT WriteLinesWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Foundation.Collections.IIterable<HSTRING>* lines, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+        [overload("AppendLinesAsync")] HRESULT AppendLinesAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Foundation.Collections.IIterable<HSTRING>* lines, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+        [overload("AppendLinesAsync")] HRESULT AppendLinesWithEncodingAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Foundation.Collections.IIterable<HSTRING>* lines, [in] Windows.Storage.Streams.UnicodeEncoding encoding, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+        HRESULT ReadBufferAsync([in] Windows.Storage.IStorageFile* file, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IBuffer*>** operation);
+        HRESULT WriteBufferAsync([in] Windows.Storage.IStorageFile* file, [in] Windows.Storage.Streams.IBuffer* buffer, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+        HRESULT WriteBytesAsync([in] Windows.Storage.IStorageFile* file, [in] UINT32 __bufferSize, [in] [size_is(__bufferSize)] BYTE* buffer, [out] [retval] Windows.Foundation.IAsyncAction** operation);
+    }
+
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
@@ -770,6 +802,16 @@ namespace Windows.Storage {
         static(Windows.Storage.IDownloadsFolderStatics2, Windows.Foundation.UniversalApiContract, 2.0)
     ]
     runtimeclass DownloadsFolder
+    {
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.IFileIOStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        threading(both)
+    ]
+    runtimeclass FileIO
     {
     }
 

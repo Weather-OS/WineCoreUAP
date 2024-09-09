@@ -21,14 +21,16 @@
 
 #include "DownloadsFolderInternal.h"
 
-HRESULT WINAPI downloads_folder_CreateFile( HSTRING fileName, CreationCollisionOption creationOption, HSTRING *outPath )
+HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, CreationCollisionOption creationOption, IStorageFolder *outFolder )
 {
     HRESULT status = S_OK;
-    HSTRING path;   
+    HSTRING path;
 
     struct storage_folder *folder;
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
+    folder = impl_from_IStorageFolder( outFolder );
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
@@ -36,43 +38,10 @@ HRESULT WINAPI downloads_folder_CreateFile( HSTRING fileName, CreationCollisionO
 
     status = known_folders_statics_GetKnownFolder( KnownFolderId_DownloadsFolder, &path );
 
-    if ( !SUCCEEDED( status ) )
+    if ( FAILED( status ) )
         return status;
 
     status = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-
-    if ( !SUCCEEDED( status ) )
-        return status;
-
-    status = storage_folder_CreateFile( &folder->IStorageFolder_iface, creationOption, fileName, outPath );
-
-    return status;
-}
-
-HRESULT WINAPI downloads_folder_CreateFolder( HSTRING folderName, CreationCollisionOption creationOption, HSTRING *outPath )
-{
-    HRESULT status = S_OK;
-    HSTRING path;   
-
-    struct storage_folder *folder;
-    
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
-    folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
-    folder->ref = 1;
-
-    status = known_folders_statics_GetKnownFolder( KnownFolderId_DownloadsFolder, &path );
-
-    if ( !SUCCEEDED( status ) )
-        return status;
-
-    status = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-
-    if ( !SUCCEEDED( status ) )
-        return status;
-
-    status = storage_folder_CreateFolder( &folder->IStorageFolder_iface, creationOption, folderName, outPath );
 
     return status;
 }

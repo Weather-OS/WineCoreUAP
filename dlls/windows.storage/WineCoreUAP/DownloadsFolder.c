@@ -123,11 +123,20 @@ DEFINE_IINSPECTABLE( downloads_folder_statics, IDownloadsFolderStatics, struct d
 static HRESULT WINAPI downloads_folder_statics_CreateFileAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFile( desiredName, CreationCollisionOption_FailIfExists, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        creation_options->name = desiredName;
+        creation_options->option = CreationCollisionOption_FailIfExists;
+
+        hr = async_operation_storage_file_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
         TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
@@ -136,12 +145,21 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileAsync( IDownloadsFolder
 static HRESULT WINAPI downloads_folder_statics_CreateFolderAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFolder( desiredName, CreationCollisionOption_FailIfExists, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+        creation_options->name = desiredName;
+        creation_options->option = CreationCollisionOption_FailIfExists;
+
+        hr = async_operation_storage_folder_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
 }
@@ -149,11 +167,20 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderAsync( IDownloadsFold
 static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFile( desiredName, option, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        creation_options->name = desiredName;
+        creation_options->option = option;
+
+        hr = async_operation_storage_file_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
         TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
@@ -162,12 +189,21 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsyn
 static HRESULT WINAPI downloads_folder_statics_CreateFolderWithCollisionOptionAsync( IDownloadsFolderStatics *iface, HSTRING desiredName, CreationCollisionOption option, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFolder( desiredName, option, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+        creation_options->name = desiredName;
+        creation_options->option = option;
+
+        hr = async_operation_storage_folder_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
 }
@@ -194,11 +230,20 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserAsync( IDownloa
 {
     //User is not used.
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFile( desiredName, CreationCollisionOption_FailIfExists, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        creation_options->name = desiredName;
+        creation_options->option = CreationCollisionOption_FailIfExists;
+
+        hr = async_operation_storage_file_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
         TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
@@ -208,12 +253,21 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserAsync( IDownl
 {
     //User is not used.
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFolder( desiredName, CreationCollisionOption_FailIfExists, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+        creation_options->name = desiredName;
+        creation_options->option = CreationCollisionOption_FailIfExists;
+
+        hr = async_operation_storage_folder_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
 }
@@ -222,11 +276,20 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserWithCollisionOp
 {
     //User is not used.
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFile( desiredName, option, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, operation );
+        creation_options->name = desiredName;
+        creation_options->option = option;
+
+        hr = async_operation_storage_file_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
         TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
@@ -236,12 +299,21 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserWithCollision
 {
     //User is not used.
     HRESULT hr;
-    HSTRING path;
-    hr = downloads_folder_CreateFolder( desiredName, option, &path );
+
+    struct storage_folder_creation_options *creation_options;
+    struct storage_folder *downloadsFolder;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+    if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
+
+    hr = downloads_folder_GetDownloadsFolder( desiredName, CreationCollisionOption_FailIfExists, &downloadsFolder->IStorageFolder_iface );
     if ( SUCCEEDED (hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+        creation_options->name = desiredName;
+        creation_options->option = option;
+
+        hr = async_operation_storage_folder_create( (IUnknown *)&downloadsFolder->IStorageFolder_iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     }
     return hr;
 }

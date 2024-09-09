@@ -54,6 +54,79 @@ LPCSTR HStringToLPCSTR( HSTRING hString ) {
 }
 
 /**
+ * IAsyncActionCompletedHandler
+ */
+
+struct async_action_handler
+{
+    IAsyncActionCompletedHandler IAsyncActionCompletedHandler_iface;
+    IAsyncAction *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct async_action_handler *impl_from_IAsyncActionCompletedHandler( IAsyncActionCompletedHandler *iface )
+{
+    return CONTAINING_RECORD( iface, struct async_action_handler, IAsyncActionCompletedHandler_iface );
+}
+
+static HRESULT WINAPI async_action_handler_QueryInterface( IAsyncActionCompletedHandler *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncActionCompletedHandler ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI async_action_handler_AddRef( IAsyncActionCompletedHandler *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI async_action_handler_Release( IAsyncActionCompletedHandler *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI async_action_handler_Invoke( IAsyncActionCompletedHandler *iface,
+                                                 IAsyncAction *async, AsyncStatus status )
+{
+    struct async_action_handler *impl = impl_from_IAsyncActionCompletedHandler( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncActionCompletedHandlerVtbl async_action_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    async_action_handler_QueryInterface,
+    async_action_handler_AddRef,
+    async_action_handler_Release,
+    /*** IAsyncActionCompletedHandler methods ***/
+    async_action_handler_Invoke,
+};
+
+static struct async_action_handler default_async_action_handler = {{&async_action_handler_vtbl}};
+
+
+/**
  * IAsyncOperationCompletedHandler_KnownFoldersAccessStatus
  */
 
@@ -1227,12 +1300,42 @@ static void test_StorageItem( IStorageItem *customItem )
     HSTRING renameName;
     HSTRING resultName;
     HRESULT hr;
-    IAsyncAction *tempAction;
+    IAsyncAction *action;
+    IAsyncActionCompletedHandler *actionHandler;
+    DWORD ret;
+
+    struct async_action_handler async_action_handler;
 
     WindowsCreateString( name, wcslen(name), &renameName );
 
-    hr = IStorageItem_RenameAsyncOverloadDefaultOptions( customItem, renameName, &tempAction );
+    hr = IStorageItem_RenameAsyncOverloadDefaultOptions( customItem, renameName, &action );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( action, &IID_IUnknown );
+    check_interface( action, &IID_IInspectable );
+    check_interface( action, &IID_IAgileObject );
+    check_interface( action, &IID_IAsyncInfo );
+    check_interface( action, &IID_IAsyncAction );
+
+    hr = IAsyncAction_get_Completed( action, &actionHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( actionHandler == NULL, "got handler %p\n", actionHandler );
+
+    async_action_handler = default_async_action_handler;
+    async_action_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncAction_put_Completed( action, &async_action_handler.IAsyncActionCompletedHandler_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( async_action_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( async_action_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( async_action_handler.invoked, "handler not invoked\n" );
+    ok( async_action_handler.async == action, "got async %p\n", async_action_handler.async );
+    ok( async_action_handler.status == Completed || broken( async_action_handler.status == Error ), "got status %u\n", async_action_handler.status );
+
 
     IStorageItem_get_Name( customItem, &resultName );
     ok( !strcmp(HStringToLPCSTR(resultName), "TempTest"), "Error: Original name not returned. resultName %s, name %s\n", HStringToLPCSTR(resultName), "TempTest");
@@ -1240,7 +1343,7 @@ static void test_StorageItem( IStorageItem *customItem )
     IStorageItem_IsOfType( customItem, StorageItemTypes_Folder, &isFolder );
     ok( isFolder, "Error: Following path did not return as a folder.\n");
 
-    hr = IStorageItem_DeleteAsyncOverloadDefaultOptions( customItem, &tempAction );
+    hr = IStorageItem_DeleteAsyncOverloadDefaultOptions( customItem, &action );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 }
 

@@ -29,6 +29,8 @@ namespace Windows.Storage {
 }
 
 namespace Windows.Storage.Streams {
+    typedef enum UnicodeEncoding UnicodeEncoding;
+
     interface IBuffer;
     interface IBufferFactory;
     interface IBufferStatics;
@@ -41,6 +43,7 @@ namespace Windows.Storage.Streams {
     interface IRandomAccessStreamReferenceStatics;
     interface IRandomAccessStreamStatics;
     interface IRandomAccessStreamWithContentType;
+
     runtimeclass Buffer;
     runtimeclass InMemoryRandomAccessStream;
     runtimeclass RandomAccessStream;
@@ -60,6 +63,16 @@ namespace Windows.Storage.Streams {
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamReference *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.IRandomAccessStreamWithContentType *>;
     }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    enum UnicodeEncoding
+    {
+        Utf8    = 0,
+        Utf16LE = 1,
+        Utf16BE = 2
+    };
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),

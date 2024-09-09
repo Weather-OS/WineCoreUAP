@@ -187,43 +187,45 @@ static HRESULT WINAPI storage_folder_GetTrustLevel( IStorageFolder *iface, Trust
 
 static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
-    /**
-     *  Behavior examination: The "OverloadDefaultOptions" accesses the File Item
-     *  With the following default options:
-     *  
-     *  CreationCollisionOption->FailIfExists
-     * 
-     *  This method does the same thing as Windows::Storage::CreateFileAsync.
-     */  
     HRESULT hr;
-    HSTRING OutPath;
-    storage_folder_CreateFile( iface, CreationCollisionOption_FailIfExists, name, &OutPath );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFileAsync, operation );
+    struct storage_folder_creation_options *creation_options;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+
+    creation_options->name = name;
+    creation_options->option = CreationCollisionOption_FailIfExists;
+
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HSTRING name, CreationCollisionOption options, IAsyncOperation_StorageFile ** operation )
 {
-    // Since we don't exactly know what secret sauce Microsoft
-    // uses for Storage Folders, We have to assume that this 
-    // just simply creates a file and sets it's handle to 
-    // Operation
     HRESULT hr;
-    HSTRING OutPath;
-    storage_folder_CreateFile( iface, options, name, &OutPath );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_file_AssignFileAsync, operation );
+    struct storage_folder_creation_options *creation_options;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+
+    creation_options->name = name;
+    creation_options->option = options;
+
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFile, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )
 {
-    //CreationCollisionOption->FailIfExists
     HRESULT hr;
-    HSTRING OutPath;
-    storage_folder_CreateFolder( iface, CreationCollisionOption_FailIfExists, name, &OutPath );
-    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolderAsync, operation );
+    struct storage_folder_creation_options *creation_options;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+
+    creation_options->name = name;
+    creation_options->option = CreationCollisionOption_FailIfExists;
+
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }
@@ -231,9 +233,14 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
 static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, HSTRING name, CreationCollisionOption options, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
-    HSTRING OutPath;
-    storage_folder_CreateFolder( iface, options, name, &OutPath );
-    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)OutPath, storage_folder_AssignFolderAsync, operation );
+    struct storage_folder_creation_options *creation_options;
+
+    if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
+
+    creation_options->name = name;
+    creation_options->option = options;
+
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFolder, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
 }

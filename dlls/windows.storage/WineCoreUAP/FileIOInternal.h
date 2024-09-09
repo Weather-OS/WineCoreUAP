@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.DownloadsFolder Implementation
+/* WinRT Windows.Storage.FileIO Implementation
  *
  * Written by Weather
  *
@@ -19,24 +19,17 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef DOWNLOADS_FOLDER_INTERNAL_H
-#define DOWNLOADS_FOLDER_INTERNAL_H
-
-#include "StorageFolderInternal.h"
-#include "KnownFoldersInternal.h"
+#ifndef FILE_IO_INTERNAL_H
+#define FILE_IO_INTERNAL_H
 
 #include "../private.h"
 #include "wine/debug.h"
 
-struct downloads_folder_statics
+struct file_io_statics
 {
     IActivationFactory IActivationFactory_iface;
-    IDownloadsFolderStatics IDownloadsFolderStatics_iface;
-    IDownloadsFolderStatics2 IDownloadsFolderStatics2_iface;
-
+    IFileIOStatics IFileIOStatics_iface;
     LONG ref;
 };
-
-HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, CreationCollisionOption creationOption, IStorageFolder *outFolder );
 
 #endif

@@ -57,13 +57,31 @@ struct storage_file_statics
     LONG ref;
 };
 
+/**
+ * Parametized structs
+ */
+
+struct storage_file_move_options
+{
+    IStorageFolder *folder;
+    NameCollisionOption option;
+    HSTRING name;
+};
+
+struct storage_file_copy_options
+{
+    IStorageFolder *folder;
+    NameCollisionOption option;
+    HSTRING name;
+};
+
 struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
 
-HRESULT WINAPI storage_file_Internal_AssignFile ( HSTRING filePath, IStorageFile * result );
+HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result );
 HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_file_Copy ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option, HSTRING *destPath );
-HRESULT WINAPI storage_file_CopyAndReplace ( IStorageFile *invoker, IStorageFile *target );
-HRESULT WINAPI storage_file_Move ( IStorageFile *invoker, IStorageFolder *folder, HSTRING name, NameCollisionOption option );
-HRESULT WINAPI storage_file_MoveAndReplace ( IStorageFile *invoker, IStorageFile *target );
+HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

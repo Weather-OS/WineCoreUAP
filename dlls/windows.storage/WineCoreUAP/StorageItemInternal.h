@@ -48,11 +48,21 @@ struct storage_item
     LONG ref;
 };
 
+/**
+ * Parametized structs
+ */
+
+struct storage_item_rename_options
+{
+    NameCollisionOption option;
+    HSTRING name;
+};
+
 struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
-HRESULT WINAPI storage_item_Rename( IStorageItem * iface, NameCollisionOption collisionOption, HSTRING name );
-HRESULT WINAPI storage_item_Delete( IStorageItem * iface, StorageDeleteOption deleteOption );
+HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type );
 HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 

@@ -111,36 +111,40 @@ static HRESULT WINAPI storage_item_GetTrustLevel( IStorageItem *iface, TrustLeve
 static HRESULT WINAPI storage_item_RenameAsyncOverloadDefaultOptions( IStorageItem *iface, HSTRING name, IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_item_Rename( iface, NameCollisionOption_FailIfExists, name );
-    if ( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    struct storage_item_rename_options *rename_options;
+
+    if (!(rename_options = calloc( 1, sizeof(*rename_options) ))) return E_OUTOFMEMORY;
+    rename_options->name = name;
+    rename_options->option = NameCollisionOption_FailIfExists;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)rename_options, storage_item_Rename, operation );
     return hr;
 }
 
 static HRESULT WINAPI storage_item_RenameAsync( IStorageItem *iface, HSTRING name, NameCollisionOption option ,IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_item_Rename( iface, option, name );
-    if ( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    struct storage_item_rename_options *rename_options;
+    
+    if (!(rename_options = calloc( 1, sizeof(*rename_options) ))) return E_OUTOFMEMORY;
+    rename_options->name = name;
+    rename_options->option = option;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)rename_options, storage_item_Rename, operation );
     return hr;
 }
 
 static HRESULT WINAPI storage_item_DeleteAsyncOverloadDefaultOptions( IStorageItem *iface, IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_item_Delete( iface, StorageDeleteOption_Default );
-    if ( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)StorageDeleteOption_Default, storage_item_Delete, operation );
     return hr;
 }
 
 static HRESULT WINAPI storage_item_DeleteAsync( IStorageItem *iface, StorageDeleteOption option, IAsyncAction **operation )
 {
     HRESULT hr;
-    hr = storage_item_Delete( iface, option );
-    if ( SUCCEEDED( hr ) )
-        hr = async_action_create( operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)option, storage_item_Delete, operation );
     return hr;
 }
 
