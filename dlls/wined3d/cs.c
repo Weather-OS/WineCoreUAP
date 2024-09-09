@@ -1035,7 +1035,10 @@ static void wined3d_cs_exec_draw(struct wined3d_cs *cs, const void *data)
         if ((geometry_shader = state->shader[WINED3D_SHADER_TYPE_GEOMETRY]) && !geometry_shader->function)
             device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_GEOMETRY));
         if (state->primitive_type == WINED3D_PT_POINTLIST || op->primitive_type == WINED3D_PT_POINTLIST)
-            device_invalidate_state(cs->c.device, STATE_POINT_ENABLE);
+        {
+            device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_VERTEX));
+            device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
+        }
         state->primitive_type = op->primitive_type;
         for (i = 0; i < device->context_count; ++i)
             device->contexts[i]->update_primitive_type = 1;
@@ -1519,59 +1522,25 @@ static void wined3d_cs_exec_set_texture(struct wined3d_cs *cs, const void *data)
     const struct wined3d_d3d_info *d3d_info = &cs->c.device->adapter->d3d_info;
     const struct wined3d_cs_set_texture *op = data;
     struct wined3d_shader_resource_view *prev;
-    BOOL old_use_color_key = FALSE, new_use_color_key = FALSE;
 
     prev = cs->state.shader_resource_view[op->shader_type][op->bind_index];
     cs->state.shader_resource_view[op->shader_type][op->bind_index] = op->view;
 
     if (op->view)
     {
-        struct wined3d_texture *texture = texture_from_resource(op->view->resource);
-
         ++op->view->resource->bind_count;
 
         if (op->shader_type == WINED3D_SHADER_TYPE_PIXEL)
         {
             if (texture_binding_might_invalidate_ps(op->view, prev, d3d_info))
                 device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
-
-            if (!prev && op->bind_index < d3d_info->ffp_fragment_caps.max_blend_stages)
-            {
-                /* The source arguments for color and alpha ops have different
-                 * meanings when a NULL texture is bound, so the COLOR_OP and
-                 * ALPHA_OP have to be dirtified. */
-                device_invalidate_state(cs->c.device, STATE_TEXTURESTAGE(op->bind_index, WINED3D_TSS_COLOR_OP));
-                device_invalidate_state(cs->c.device, STATE_TEXTURESTAGE(op->bind_index, WINED3D_TSS_ALPHA_OP));
-            }
-
-            if (!op->bind_index && texture->async.color_key_flags & WINED3D_CKEY_SRC_BLT)
-                new_use_color_key = TRUE;
         }
     }
 
     if (prev)
-    {
-        struct wined3d_texture *prev_texture = texture_from_resource(prev->resource);
-
         --prev->resource->bind_count;
 
-        if (op->shader_type == WINED3D_SHADER_TYPE_PIXEL)
-        {
-            if (!op->view && op->bind_index < d3d_info->ffp_fragment_caps.max_blend_stages)
-            {
-                device_invalidate_state(cs->c.device, STATE_TEXTURESTAGE(op->bind_index, WINED3D_TSS_COLOR_OP));
-                device_invalidate_state(cs->c.device, STATE_TEXTURESTAGE(op->bind_index, WINED3D_TSS_ALPHA_OP));
-            }
-
-            if (!op->bind_index && prev_texture->async.color_key_flags & WINED3D_CKEY_SRC_BLT)
-                old_use_color_key = TRUE;
-        }
-    }
-
     device_invalidate_state(cs->c.device, STATE_GRAPHICS_SHADER_RESOURCE_BINDING);
-
-    if (new_use_color_key != old_use_color_key)
-        device_invalidate_state(cs->c.device, STATE_RENDER(WINED3D_RS_COLORKEYENABLE));
 }
 
 void wined3d_device_context_emit_set_texture(struct wined3d_device_context *context,
@@ -1947,7 +1916,7 @@ static void wined3d_cs_exec_set_color_key(struct wined3d_cs *cs, const void *dat
                 if (texture == wined3d_state_get_ffp_texture(&cs->state, 0))
                 {
                     if (!(texture->async.color_key_flags & WINED3D_CKEY_SRC_BLT))
-                        device_invalidate_state(cs->c.device, STATE_RENDER(WINED3D_RS_COLORKEYENABLE));
+                        device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
                 }
 
                 texture->async.src_blt_color_key = op->color_key;
@@ -1975,7 +1944,7 @@ static void wined3d_cs_exec_set_color_key(struct wined3d_cs *cs, const void *dat
             case WINED3D_CKEY_SRC_BLT:
                 if (texture == wined3d_state_get_ffp_texture(&cs->state, 0)
                         && texture->async.color_key_flags & WINED3D_CKEY_SRC_BLT)
-                    device_invalidate_state(cs->c.device, STATE_RENDER(WINED3D_RS_COLORKEYENABLE));
+                    device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
 
                 texture->async.color_key_flags &= ~WINED3D_CKEY_SRC_BLT;
                 break;

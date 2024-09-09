@@ -32,6 +32,7 @@
 
 #include "wine/debug.h"
 #include "explorer_private.h"
+#include "resource.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(explorer);
 
@@ -959,6 +960,22 @@ static BOOL get_default_show_systray( const WCHAR *name )
     return result;
 }
 
+static BOOL get_no_tray_items_display(void)
+{
+    BOOL result;
+    DWORD size = sizeof(result);
+
+    if (!RegGetValueW( HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
+                       L"NoTrayItemsDisplay", RRF_RT_REG_DWORD, NULL, &result, &size ))
+        return result;
+
+    if (!RegGetValueW( HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
+                       L"NoTrayItemsDisplay", RRF_RT_REG_DWORD, NULL, &result, &size ))
+        return result;
+
+    return FALSE;
+}
+
 static void load_graphics_driver( const WCHAR *driver, GUID *guid )
 {
     static const WCHAR device_keyW[] = L"System\\CurrentControlSet\\Control\\Video\\{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}\\0000";
@@ -1007,7 +1024,7 @@ static void load_graphics_driver( const WCHAR *driver, GUID *guid )
             strcpy( error, "The graphics driver is missing. Check your build!" );
             break;
         case ERROR_DLL_INIT_FAILED:
-            strcpy( error, "Make sure that your X server is running and that $DISPLAY is set correctly." );
+            strcpy( error, "Make sure that your display server is running and that its variables are set." );
             break;
         default:
             sprintf( error, "Unknown error (%lu).", GetLastError() );
@@ -1097,30 +1114,31 @@ static void initialize_display_settings( unsigned int width, unsigned int height
 
 static void set_desktop_window_title( HWND hwnd, const WCHAR *name )
 {
-    static const WCHAR desktop_nameW[] = L"Wine desktop";
     static const WCHAR desktop_name_separatorW[] = L" - ";
+    WCHAR desktop_titleW[64];
     WCHAR *window_titleW = NULL;
     int window_title_len;
 
-    if (!name[0])
+    LoadStringW( NULL, IDS_DESKTOP_TITLE, desktop_titleW, ARRAY_SIZE(desktop_titleW) );
+
+    if (!name[0] || !wcscmp( name, L"Default" ))
     {
-        SetWindowTextW( hwnd, desktop_nameW );
+        SetWindowTextW( hwnd, desktop_titleW );
         return;
     }
 
-    window_title_len = lstrlenW(name) * sizeof(WCHAR)
-                     + sizeof(desktop_name_separatorW)
-                     + sizeof(desktop_nameW);
+    window_title_len = (wcslen(name) + wcslen(desktop_titleW)) * sizeof(WCHAR)
+                     + sizeof(desktop_name_separatorW);
     window_titleW = malloc( window_title_len );
     if (!window_titleW)
     {
-        SetWindowTextW( hwnd, desktop_nameW );
+        SetWindowTextW( hwnd, desktop_titleW );
         return;
     }
 
     lstrcpyW( window_titleW, name );
     lstrcatW( window_titleW, desktop_name_separatorW );
-    lstrcatW( window_titleW, desktop_nameW );
+    lstrcatW( window_titleW, desktop_titleW );
 
     SetWindowTextW( hwnd, window_titleW );
     free( window_titleW );
@@ -1142,7 +1160,7 @@ void manage_desktop( WCHAR *arg )
     WCHAR *cmdline = NULL, *driver = NULL;
     WCHAR *p = arg;
     const WCHAR *name = NULL;
-    BOOL enable_shell = FALSE, show_systray = TRUE;
+    BOOL enable_shell, show_systray, no_tray_items;
     void (WINAPI *pShellDDEInit)( BOOL ) = NULL;
     HMODULE shell32;
     HANDLE thread;
@@ -1176,8 +1194,9 @@ void manage_desktop( WCHAR *arg )
         if (!get_default_desktop_size( name, &width, &height )) width = height = 0;
     }
 
-    if (name) enable_shell = get_default_enable_shell( name );
+    enable_shell = name ? get_default_enable_shell( name ) : FALSE;
     show_systray = get_default_show_systray( name );
+    no_tray_items = get_no_tray_items_display();
 
     UuidCreate( &guid );
     TRACE( "display guid %s\n", debugstr_guid(&guid) );
@@ -1221,9 +1240,7 @@ void manage_desktop( WCHAR *arg )
         initialize_display_settings( width, height );
         initialize_appbar();
 
-        if (using_root) enable_shell = FALSE;
-
-        initialize_systray( using_root, enable_shell, show_systray );
+        initialize_systray( using_root, enable_shell, show_systray, no_tray_items );
         if (!using_root) initialize_launchers( hwnd );
 
         if ((shell32 = LoadLibraryW( L"shell32.dll" )) &&

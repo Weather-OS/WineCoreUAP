@@ -254,7 +254,8 @@ NTSTATUS WINAPI x11drv_dnd_position_event( void *arg, ULONG size )
 
 NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
 {
-    HWND hwnd = UlongToHandle( *(ULONG *)args );
+    struct dnd_drop_event_params *params = args;
+    HWND hwnd = UlongToHandle( params->hwnd );
     IDropTarget *dropTarget;
     DWORD effect = XDNDDropEffect;
     int accept = 0; /* Assume we're not accepting */
@@ -359,16 +360,17 @@ NTSTATUS WINAPI x11drv_dnd_leave_event( void *params, ULONG size )
 /**************************************************************************
  *           x11drv_dnd_enter_event
  */
-NTSTATUS WINAPI x11drv_dnd_enter_event( void *params, ULONG size )
+NTSTATUS WINAPI x11drv_dnd_enter_event( void *args, ULONG size )
 {
-    struct format_entry *formats = params;
+    UINT formats_size = size - offsetof(struct dnd_enter_event_params, entries);
+    struct dnd_enter_event_params *params = args;
     XDNDAccepted = FALSE;
     X11DRV_XDND_FreeDragDropOp(); /* Clear previously cached data */
 
-    if ((xdnd_formats = HeapAlloc( GetProcessHeap(), 0, size )))
+    if ((xdnd_formats = HeapAlloc( GetProcessHeap(), 0, formats_size )))
     {
-        memcpy( xdnd_formats, formats, size );
-        xdnd_formats_end = (struct format_entry *)((char *)xdnd_formats + size);
+        memcpy( xdnd_formats, params->entries, formats_size );
+        xdnd_formats_end = (struct format_entry *)((char *)xdnd_formats + formats_size);
     }
     return STATUS_SUCCESS;
 }
@@ -721,15 +723,17 @@ static IDataObjectVtbl xdndDataObjectVtbl =
 
 static IDataObject XDNDDataObject = { &xdndDataObjectVtbl };
 
-NTSTATUS WINAPI x11drv_dnd_post_drop( void *data, ULONG size )
+NTSTATUS WINAPI x11drv_dnd_post_drop( void *args, ULONG size )
 {
+    UINT drop_size = size - offsetof(struct dnd_post_drop_params, drop);
+    struct dnd_post_drop_params *params = args;
     HDROP handle;
 
-    if ((handle = GlobalAlloc( GMEM_SHARE, size )))
+    if ((handle = GlobalAlloc( GMEM_SHARE, drop_size )))
     {
         DROPFILES *ptr = GlobalLock( handle );
         HWND hwnd;
-        memcpy( ptr, data, size );
+        memcpy( ptr, &params->drop, drop_size );
         hwnd = UlongToHandle( ptr->fWide );
         ptr->fWide = TRUE;
         GlobalUnlock( handle );

@@ -49,13 +49,18 @@
 #define BYTES_FROM_MEDIATIME(time) ((time) / 10000000)
 
 HRESULT acm_wrapper_create(IUnknown *outer, IUnknown **out);
-HRESULT avi_dec_create(IUnknown *outer, IUnknown **out);
 HRESULT async_reader_create(IUnknown *outer, IUnknown **out);
+HRESULT avi_dec_create(IUnknown *outer, IUnknown **out);
+HRESULT avi_splitter_create(IUnknown *outer, IUnknown **out);
 HRESULT dsound_render_create(IUnknown *outer, IUnknown **out);
 HRESULT filter_graph_create(IUnknown *outer, IUnknown **out);
 HRESULT filter_graph_no_thread_create(IUnknown *outer, IUnknown **out);
 HRESULT filter_mapper_create(IUnknown *outer, IUnknown **out);
 HRESULT mem_allocator_create(IUnknown *outer, IUnknown **out);
+HRESULT mpeg_audio_codec_create(IUnknown *outer, IUnknown **out);
+HRESULT mpeg_layer3_decoder_create(IUnknown *outer, IUnknown **out);
+HRESULT mpeg_video_codec_create(IUnknown *outer, IUnknown **out);
+HRESULT mpeg1_splitter_create(IUnknown *outer, IUnknown **out);
 HRESULT system_clock_create(IUnknown *outer, IUnknown **out);
 HRESULT seeking_passthrough_create(IUnknown *outer, IUnknown **out);
 HRESULT video_renderer_create(IUnknown *outer, IUnknown **out);
@@ -63,6 +68,7 @@ HRESULT video_renderer_default_create(IUnknown *outer, IUnknown **out);
 HRESULT vmr7_presenter_create(IUnknown *outer, IUnknown **out);
 HRESULT vmr7_create(IUnknown *outer, IUnknown **out);
 HRESULT vmr9_create(IUnknown *outer, IUnknown **out);
+HRESULT wave_parser_create(IUnknown *outer, IUnknown **out);
 
 extern const char * qzdebugstr_guid(const GUID * id);
 extern void video_unregister_windowclass(void);

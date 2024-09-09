@@ -861,7 +861,10 @@ void __cdecl Context_Block(void)
 /* ?_Yield@_Context@details@Concurrency@@SAXXZ */
 void __cdecl Context_Yield(void)
 {
-    FIXME("()\n");
+    static unsigned int once;
+
+    if (!once++)
+        FIXME("()\n");
 }
 
 /* ?_SpinYield@Context@Concurrency@@SAXXZ */
@@ -1557,10 +1560,14 @@ DEFINE_THISCALL_WRAPPER(ThreadScheduler_ScheduleTask_loc, 16)
 void __thiscall ThreadScheduler_ScheduleTask_loc(ThreadScheduler *this,
         void (__cdecl *proc)(void*), void* data, /*location*/void *placement)
 {
+    static unsigned int once;
     schedule_task_arg *arg;
     TP_WORK *work;
 
-    FIXME("(%p %p %p %p) stub\n", this, proc, data, placement);
+    if(!once++)
+        FIXME("(%p %p %p %p) semi-stub\n", this, proc, data, placement);
+    else
+        TRACE("(%p %p %p %p) semi-stub\n", this, proc, data, placement);
 
     arg = operator_new(sizeof(*arg));
     arg->proc = proc;
@@ -1586,7 +1593,7 @@ DEFINE_THISCALL_WRAPPER(ThreadScheduler_ScheduleTask, 12)
 void __thiscall ThreadScheduler_ScheduleTask(ThreadScheduler *this,
         void (__cdecl *proc)(void*), void* data)
 {
-    FIXME("(%p %p %p) stub\n", this, proc, data);
+    TRACE("(%p %p %p)\n", this, proc, data);
     ThreadScheduler_ScheduleTask_loc(this, proc, data, NULL);
 }
 
@@ -2092,7 +2099,8 @@ _StructuredTaskCollection* __thiscall _StructuredTaskCollection_ctor(
 DEFINE_THISCALL_WRAPPER(_StructuredTaskCollection_dtor, 4)
 void __thiscall _StructuredTaskCollection_dtor(_StructuredTaskCollection *this)
 {
-    FIXME("(%p): stub!\n", this);
+    TRACE("(%p)\n", this);
+
     if (this->count && !__uncaught_exception()) {
         missing_wait e;
         missing_wait_ctor_str(&e, "Missing call to _RunAndWait");

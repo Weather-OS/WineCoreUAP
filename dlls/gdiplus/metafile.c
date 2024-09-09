@@ -5083,6 +5083,7 @@ GpStatus METAFILE_DrawPath(GpMetafile *metafile, GpPen *pen, GpPath *path)
 GpStatus METAFILE_DrawEllipse(GpMetafile *metafile, GpPen *pen, GpRectF *rect)
 {
     EmfPlusDrawEllipse *record;
+    BOOL is_int_rect;
     GpStatus stat;
     DWORD pen_id;
 
@@ -5095,12 +5096,15 @@ GpStatus METAFILE_DrawEllipse(GpMetafile *metafile, GpPen *pen, GpRectF *rect)
     stat = METAFILE_AddPenObject(metafile, pen, &pen_id);
     if (stat != Ok) return stat;
 
+    is_int_rect = is_integer_rect(rect);
+
     stat = METAFILE_AllocateRecord(metafile, EmfPlusRecordTypeDrawEllipse,
-        sizeof(EmfPlusDrawEllipse), (void **)&record);
+            FIELD_OFFSET(EmfPlusDrawEllipse, RectData) + (is_int_rect ? sizeof(EmfPlusRect) : sizeof(EmfPlusRectF)),
+            (void **)&record);
     if (stat != Ok) return stat;
     record->Header.Type = EmfPlusRecordTypeDrawEllipse;
     record->Header.Flags = pen_id;
-    if (is_integer_rect(rect))
+    if (is_int_rect)
     {
         record->Header.Flags |= 0x4000;
         record->RectData.rect.X = (SHORT)rect->X;
@@ -5158,9 +5162,9 @@ GpStatus METAFILE_FillPath(GpMetafile *metafile, GpBrush *brush, GpPath *path)
 
 GpStatus METAFILE_FillEllipse(GpMetafile *metafile, GpBrush *brush, GpRectF *rect)
 {
+    BOOL is_int_rect, inline_color;
     EmfPlusFillEllipse *record;
     DWORD brush_id = -1;
-    BOOL inline_color;
     GpStatus stat;
 
     if (metafile->metafile_type == MetafileTypeEmf)
@@ -5176,7 +5180,11 @@ GpStatus METAFILE_FillEllipse(GpMetafile *metafile, GpBrush *brush, GpRectF *rec
         if (stat != Ok) return stat;
     }
 
-    stat = METAFILE_AllocateRecord(metafile, EmfPlusRecordTypeFillEllipse, sizeof(EmfPlusFillEllipse), (void **)&record);
+    is_int_rect = is_integer_rect(rect);
+
+    stat = METAFILE_AllocateRecord(metafile, EmfPlusRecordTypeFillEllipse,
+            FIELD_OFFSET(EmfPlusFillEllipse, RectData) + (is_int_rect ? sizeof(EmfPlusRect) : sizeof(EmfPlusRectF)),
+            (void **)&record);
     if (stat != Ok) return stat;
     if (inline_color)
     {
@@ -5186,7 +5194,7 @@ GpStatus METAFILE_FillEllipse(GpMetafile *metafile, GpBrush *brush, GpRectF *rec
     else
         record->BrushId = brush_id;
 
-    if (is_integer_rect(rect))
+    if (is_int_rect)
     {
         record->Header.Flags |= 0x4000;
         record->RectData.rect.X = (SHORT)rect->X;

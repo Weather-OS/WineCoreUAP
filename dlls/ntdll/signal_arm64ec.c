@@ -59,6 +59,8 @@ static void     (WINAPI *pThreadTerm)(HANDLE,LONG);
 static void     (WINAPI *pUpdateProcessorInformation)(SYSTEM_CPU_INFORMATION*);
 
 static BOOLEAN emulated_processor_features[PROCESSOR_FEATURE_MAX];
+static BYTE KiUserExceptionDispatcher_orig[16]; /* to detect patching */
+extern void KiUserExceptionDispatcher_thunk(void) asm("EXP+#KiUserExceptionDispatcher");
 
 static inline CHPE_V2_CPU_AREA_INFO *get_arm64ec_cpu_area(void)
 {
@@ -188,6 +190,7 @@ NTSTATUS arm64ec_process_init( HMODULE module )
     RtlGetCurrentPeb()->ChpeV2ProcessInfo = info;
     info->NativeMachineType = IMAGE_FILE_MACHINE_ARM64;
     info->EmulatedMachineType = IMAGE_FILE_MACHINE_AMD64;
+    memcpy( KiUserExceptionDispatcher_orig, KiUserExceptionDispatcher_thunk, sizeof(KiUserExceptionDispatcher_orig) );
 
     enter_syscall_callback();
     if (pProcessInit) status = pProcessInit();
@@ -229,14 +232,14 @@ ALL_SYSCALLS64
 };
 
 #define DEFINE_SYSCALL_(ret,name,args) \
-    ret __attribute__((naked)) name args { __ASM_SYSCALL_FUNC( __id_##name, name ); }
+    ret __attribute__((naked, hybrid_patchable)) name args { __ASM_SYSCALL_FUNC( __id_##name, name ); }
 
 #define DEFINE_SYSCALL(name,args) DEFINE_SYSCALL_(NTSTATUS,name,args)
 
 #define DEFINE_WRAPPED_SYSCALL(name,args) \
     static NTSTATUS __attribute__((naked)) syscall_##name args { __ASM_SYSCALL_FUNC( __id_##name, syscall_##name ); }
 
-#define SYSCALL_API WINAPI
+#define SYSCALL_API __attribute__((hybrid_patchable))
 
 DEFINE_SYSCALL(NtAcceptConnectPort, (HANDLE *handle, ULONG id, LPC_MESSAGE *msg, BOOLEAN accept, LPC_SECTION_WRITE *write, LPC_SECTION_READ *read))
 DEFINE_SYSCALL(NtAccessCheck, (PSECURITY_DESCRIPTOR descr, HANDLE token, ACCESS_MASK access, GENERIC_MAPPING *mapping, PRIVILEGE_SET *privs, ULONG *retlen, ULONG *access_granted, NTSTATUS *access_status))
@@ -752,12 +755,14 @@ NTSTATUS SYSCALL_API NtUnmapViewOfSectionEx( HANDLE process, void *addr, ULONG f
 }
 
 
-void * const arm64ec_syscalls[] =
-{
-#define SYSCALL_ENTRY(id,name,args) name,
-    ALL_SYSCALLS64
+asm( ".section .rdata, \"dr\"\n\t"
+     ".balign 8\n\t"
+     ".globl arm64ec_syscalls\n"
+     "arm64ec_syscalls:\n\t"
+#define SYSCALL_ENTRY(id,name,args) ".quad \"#" #name "$hp_target\"\n\t"
+     ALL_SYSCALLS64
 #undef SYSCALL_ENTRY
-};
+     ".text" );
 
 
 /***********************************************************************
@@ -1132,26 +1137,44 @@ static void dispatch_syscall( ARM64_NT_CONTEXT *context )
 }
 
 
+static void * __attribute__((used)) prepare_exception_arm64ec( EXCEPTION_RECORD *rec, ARM64EC_NT_CONTEXT *context, ARM64_NT_CONTEXT *arm_ctx )
+{
+    if (rec->ExceptionCode == STATUS_EMULATION_SYSCALL) dispatch_syscall( arm_ctx );
+    context_arm_to_x64( context, arm_ctx );
+    if (pResetToConsistentState) pResetToConsistentState( rec, &context->AMD64_Context, arm_ctx );
+    /* call x64 dispatcher if the thunk or the function pointer was modified */
+    if (pWow64PrepareForException || memcmp( KiUserExceptionDispatcher_thunk, KiUserExceptionDispatcher_orig,
+                                             sizeof(KiUserExceptionDispatcher_orig) ))
+        return KiUserExceptionDispatcher_thunk;
+    return NULL;
+}
+
 /*******************************************************************
  *		KiUserExceptionDispatcher (NTDLL.@)
  */
-static NTSTATUS __attribute__((used)) dispatch_exception_arm64ec( EXCEPTION_RECORD *rec, ARM64_NT_CONTEXT *arm_ctx )
+void __attribute__((naked)) KiUserExceptionDispatcher( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
-    ARM64EC_NT_CONTEXT context;
-
-    if (rec->ExceptionCode == STATUS_EMULATION_SYSCALL) dispatch_syscall( arm_ctx );
-
-    context_arm_to_x64( &context, arm_ctx );
-    if (pResetToConsistentState) pResetToConsistentState( rec, &context.AMD64_Context, arm_ctx );
-    return dispatch_exception( rec, &context.AMD64_Context );
+    asm( ".seh_proc \"#KiUserExceptionDispatcher\"\n\t"
+         ".seh_context\n\t"
+         "sub sp, sp, #0x4d0\n\t"       /* sizeof(ARM64EC_NT_CONTEXT) */
+         ".seh_stackalloc 0x4d0\n\t"
+         ".seh_endprologue\n\t"
+         "add x0, sp, #0x390+0x4d0\n\t" /* rec (arm_ctx + 1) */
+         "mov x1, sp\n\t"               /* context */
+         "add x2, sp, #0x4d0\n\t"       /* arm_ctx (context + 1) */
+         "bl \"#prepare_exception_arm64ec\"\n\t"
+         "cbz x0, 1f\n\t"
+         /* bypass exit thunk to avoid messing up the stack */
+         "adrp x16, __os_arm64x_dispatch_call_no_redirect\n\t"
+         "ldr x16, [x16, #:lo12:__os_arm64x_dispatch_call_no_redirect]\n\t"
+         "mov x9, x0\n\t"
+         "blr x16\n"
+         "1:\tadd x0, sp, #0x390+0x4d0\n\t" /* rec */
+         "mov x1, sp\n\t"                   /* context */
+         "bl #dispatch_exception\n\t"
+         "brk #1\n\t"
+         ".seh_endproc" );
 }
-__ASM_GLOBAL_FUNC( "#KiUserExceptionDispatcher",
-                   ".seh_context\n\t"
-                   ".seh_endprologue\n\t"
-                   "add x0, sp, #0x390\n\t"       /* rec (context + 1) */
-                   "mov x1, sp\n\t"               /* context */
-                   "bl \"#dispatch_exception_arm64ec\"\n\t"
-                   "brk #1" )
 
 
 /*******************************************************************

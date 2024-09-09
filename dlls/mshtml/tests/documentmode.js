@@ -862,6 +862,16 @@ sync_test("eval", function() {
     context = {};
     (function(eval) { eval(code); })(function() { context.barfoo = 4321; });
     ok(context.barfoo === 4321, "context.barfoo = " + context.barfoo);
+
+    (0,eval)("var foobar = 'wine';");
+    if(v < 9) {
+        ok(!("foobar" in window), "foobar in window");
+        ok(foobar === "wine", "foobar = " + foobar);
+    }else {
+        ok("foobar" in window, "foobar not in window");
+        ok(window.foobar === "wine", "foobar = " + window.foobar);
+    }
+    delete foobar;
 });
 
 sync_test("for..in", function() {
@@ -1184,7 +1194,10 @@ async_test("script_load", function() {
 });
 
 sync_test("location", function() {
+    var v = document.documentMode;
     document.body.innerHTML = '<a name="testanchor">test</a>';
+
+    ok(location.host === "winetest.example.org" + (v < 10 ? ":80" : ""), "location.host = " + location.host);
 
     ok(location.hash === "", "initial location.hash = " + location.hash);
     location.hash = "TestAnchor";
@@ -3120,7 +3133,8 @@ sync_test("prototypes", function() {
         return;
 
     function check(obj, proto, name) {
-        ok(Object.getPrototypeOf(obj) === proto, "unexpected " + name + " prototype object");
+        var p = Object.getPrototypeOf(obj);
+        ok(p === proto, "unexpected " + name + " prototype object " + Object.prototype.toString.call(p));
     }
 
     check(document.implementation, DOMImplementation.prototype, "implementation");
@@ -3200,6 +3214,8 @@ sync_test("prototypes", function() {
     check(HTMLTableCellElement.prototype, HTMLElement.prototype, "table cell prototype");
     check(document.createElement("textarea"), HTMLTextAreaElement.prototype, "textarea element");
     check(HTMLTextAreaElement.prototype, HTMLElement.prototype, "textarea element prototype");
+    check(document.createElement("test"), HTMLUnknownElement.prototype, "unknown element");
+    check(HTMLUnknownElement.prototype, HTMLElement.prototype, "unknown element prototype");
     check(document.createElementNS(svg_ns, "svg"), SVGSVGElement.prototype, "svg:svg element");
     check(SVGSVGElement.prototype, SVGElement.prototype, "svg:svg element prototype");
     check(SVGElement.prototype, Element.prototype, "svg element prototype");
@@ -3320,4 +3336,10 @@ sync_test("prototypes", function() {
     }else {
         ok(!("MSSelection" in window), "MSSelection found in window");
     }
+    check(document.createComment(""), Comment.prototype, "comment");
+    check(Comment.prototype, CharacterData.prototype, "comment prototype");
+    check(document.createAttribute("test"), Attr.prototype, "attr");
+    check(Attr.prototype, Node.prototype, "attr prototype");
+    check(document.createDocumentFragment(), DocumentFragment.prototype, "fragment");
+    check(DocumentFragment.prototype, Node.prototype, "fragment prototype");
 });

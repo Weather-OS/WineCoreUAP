@@ -513,12 +513,12 @@ static void map_event_coords( HWND hwnd, Window window, Window event_root, int x
         {
             if (window == data->whole_window)
             {
-                pt.x += data->whole_rect.left - data->client_rect.left;
-                pt.y += data->whole_rect.top - data->client_rect.top;
+                pt.x += data->rects.visible.left - data->rects.client.left;
+                pt.y += data->rects.visible.top - data->rects.client.top;
             }
 
             if (NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_LAYOUTRTL)
-                pt.x = data->client_rect.right - data->client_rect.left - 1 - pt.x;
+                pt.x = data->rects.client.right - data->rects.client.left - 1 - pt.x;
             NtUserMapWindowPoints( hwnd, 0, &pt, 1, 0 /* per-monitor DPI */ );
         }
         release_win_data( data );
@@ -1461,7 +1461,10 @@ void move_resize_window( HWND hwnd, int dir )
     if (!(win = X11DRV_get_whole_window( hwnd ))) return;
 
     pt = NtUserGetThreadInfo()->message_pos;
-    pos = virtual_screen_to_root( (short)LOWORD( pt ), (short)HIWORD( pt ) );
+    pos.x = (short)LOWORD( pt );
+    pos.y = (short)HIWORD( pt );
+    NtUserLogicalToPerMonitorDPIPhysicalPoint( hwnd, &pos );
+    pos = virtual_screen_to_root( pos.x, pos.y );
 
     if (NtUserGetKeyState( VK_LBUTTON ) & 0x8000) button = 1;
     else if (NtUserGetKeyState( VK_MBUTTON ) & 0x8000) button = 2;

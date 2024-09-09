@@ -34,10 +34,17 @@
 # endif
 #endif
 
-/* KernelCallbackTable codes, not compatible with Windows */
+typedef NTSTATUS (WINAPI *ntuser_callback)( void *args, ULONG len );
+NTSYSAPI NTSTATUS KeUserModeCallback( ULONG id, const void *args, ULONG len, void **ret_ptr, ULONG *ret_len );
+
+/* KernelCallbackTable codes, not compatible with Windows.
+   All of these functions must live inside user32.dll. Overwatch 2's
+   KiUserCallbackDispatcher hook verifies this and prevents the callback from
+   running if that check fails. */
 enum
 {
     /* user32 callbacks */
+    NtUserCallDispatchCallback,
     NtUserCallEnumDisplayMonitor,
     NtUserCallSendAsyncCallback,
     NtUserCallWinEventHook,
@@ -57,19 +64,21 @@ enum
     NtUserPostDDEMessage,
     NtUserRenderSynthesizedFormat,
     NtUserUnpackDDEMessage,
-    /* win16 hooks */
-    NtUserCallFreeIcon,
-    NtUserThunkLock,
-    /* Vulkan support */
-    NtUserCallVulkanDebugReportCallback,
-    NtUserCallVulkanDebugUtilsCallback,
-    /* OpenGL support */
-    NtUserCallOpenGLDebugMessageCallback,
-    /* Driver-specific callbacks */
-    NtUserDriverCallbackFirst,
-    NtUserDriverCallbackLast = NtUserDriverCallbackFirst + 9,
     NtUserCallCount
 };
+
+/* NtUserCallDispatchCallback params */
+struct dispatch_callback_params
+{
+    UINT64 callback;
+};
+
+static inline NTSTATUS KeUserDispatchCallback( const struct dispatch_callback_params *params, ULONG len,
+                                               void **ret_ptr, ULONG *ret_len )
+{
+    if (!params->callback) return STATUS_ENTRYPOINT_NOT_FOUND;
+    return KeUserModeCallback( NtUserCallDispatchCallback, params, len, ret_ptr, ret_len );
+}
 
 /* TEB thread info, not compatible with Windows */
 struct ntuser_thread_info
@@ -937,9 +946,16 @@ static inline WORD NtUserEnableDC( HDC hdc )
     return NtUserCallOneParam( HandleToUlong(hdc), NtUserCallOneParam_EnableDC );
 }
 
-static inline void NtUserEnableThunkLock( BOOL enable )
+struct thunk_lock_params
 {
-    NtUserCallOneParam( enable, NtUserCallOneParam_EnableThunkLock );
+    struct dispatch_callback_params dispatch;
+    BOOL restore;
+    DWORD locks;
+};
+
+static inline void NtUserEnableThunkLock( ntuser_callback thunk_lock_callback )
+{
+    NtUserCallOneParam( (UINT_PTR)thunk_lock_callback, NtUserCallOneParam_EnableThunkLock );
 }
 
 static inline UINT NtUserEnumClipboardFormats( UINT format )
@@ -1053,6 +1069,7 @@ enum
     NtUserCallTwoParam_MonitorFromRect,
     NtUserCallTwoParam_SetCaretPos,
     NtUserCallTwoParam_SetIconParam,
+    NtUserCallTwoParam_SetIMECompositionWindowPos,
     NtUserCallTwoParam_UnhookWindowsHook,
     NtUserCallTwoParam_AdjustWindowRect,
     NtUserCallTwoParam_IsWindowRectFullScreen,
@@ -1093,9 +1110,16 @@ static inline BOOL NtUserSetCaretPos( int x, int y )
     return NtUserCallTwoParam( x, y, NtUserCallTwoParam_SetCaretPos );
 }
 
-static inline UINT_PTR NtUserSetIconParam( HICON icon, ULONG_PTR param )
+struct free_icon_params
 {
-    return NtUserCallTwoParam( HandleToUlong(icon), param, NtUserCallTwoParam_SetIconParam );
+    struct dispatch_callback_params dispatch;
+    UINT64 param;
+};
+
+static inline UINT_PTR NtUserSetIconParam( HICON icon, ULONG_PTR param, ntuser_callback callback )
+{
+    struct free_icon_params params = {.dispatch = {.callback = (UINT_PTR)callback}, .param = param};
+    return NtUserCallTwoParam( HandleToUlong(icon), (UINT_PTR)&params, NtUserCallTwoParam_SetIconParam );
 }
 
 static inline BOOL NtUserUnhookWindowsHook( INT id, HOOKPROC proc )
@@ -1289,6 +1313,7 @@ enum
     NtUserCallHwndParam_SetWindowContextHelpId,
     NtUserCallHwndParam_ShowOwnedPopups,
     NtUserCallHwndParam_SendHardwareInput,
+    NtUserCallHwndParam_ExposeWindowSurface,
     /* temporary exports */
     NtUserSetWindowStyle,
 };
@@ -1497,6 +1522,21 @@ static inline BOOL NtUserSendHardwareInput( HWND hwnd, UINT flags, const INPUT *
 {
     struct send_hardware_input_params params = {.flags = flags, .input = input, .lparam = lparam};
     return NtUserCallHwndParam( hwnd, (UINT_PTR)&params, NtUserCallHwndParam_SendHardwareInput );
+}
+
+struct expose_window_surface_params
+{
+    UINT flags;
+    BOOL whole;
+    RECT rect;
+    UINT dpi;
+};
+
+static inline BOOL NtUserExposeWindowSurface( HWND hwnd, UINT flags, const RECT *rect, UINT dpi )
+{
+    struct expose_window_surface_params params = {.flags = flags, .whole = !rect, .dpi = dpi};
+    if (rect) params.rect = *rect;
+    return NtUserCallHwndParam( hwnd, (UINT_PTR)&params, NtUserCallHwndParam_ExposeWindowSurface );
 }
 
 #endif /* _NTUSER_ */

@@ -34,13 +34,13 @@
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
-#include "wine/test.h"
 #include "windef.h"
 #include "winbase.h"
 #include "winerror.h"
 #include "winnls.h"
 #include "winternl.h"
 #include "winreg.h"
+#include "wine/test.h"
 
 static const WCHAR upper_case[] = {'\t','J','U','S','T','!',' ','A',',',' ','T','E','S','T',';',' ','S','T','R','I','N','G',' ','1','/','*','+','-','.','\r','\n',0};
 static const WCHAR lower_case[] = {'\t','j','u','s','t','!',' ','a',',',' ','t','e','s','t',';',' ','s','t','r','i','n','g',' ','1','/','*','+','-','.','\r','\n',0};
@@ -8254,7 +8254,10 @@ static const LCID locales_with_optional_calendars[] = {
 
 static BOOL CALLBACK calinfo_procA(LPSTR calinfo)
 {
-    (void)calinfo;
+    char *end;
+    int val = strtoul( calinfo, &end, 10 );
+    ok( !*end, "wrong value %s\n", debugstr_a(calinfo) );
+    ok(val >= CAL_GREGORIAN && val <= CAL_UMALQURA, "got %d\n", val);
     return TRUE;
 }
 
@@ -8262,6 +8265,9 @@ static void test_EnumCalendarInfoA(void)
 {
     BOOL ret;
     INT i;
+
+    ret = EnumCalendarInfoA( calinfo_procA, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS, CAL_ICALINTVALUE );
+    ok( ret, "EnumCalendarInfoA for user default locale failed: %lu\n", GetLastError() );
 
     ret = EnumCalendarInfoA( calinfo_procA, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS,
                              CAL_RETURN_NUMBER | CAL_ICALINTVALUE );
@@ -8279,7 +8285,10 @@ static void test_EnumCalendarInfoA(void)
 
 static BOOL CALLBACK calinfo_procW(LPWSTR calinfo)
 {
-    (void)calinfo;
+    WCHAR *end;
+    int val = wcstoul( calinfo, &end, 10 );
+    ok( !*end, "wrong value %s\n", debugstr_w(calinfo) );
+    ok(val >= CAL_GREGORIAN && val <= CAL_UMALQURA, "got %d\n", val);
     return TRUE;
 }
 
@@ -8287,6 +8296,9 @@ static void test_EnumCalendarInfoW(void)
 {
     BOOL ret;
     INT i;
+
+    ret = EnumCalendarInfoW( calinfo_procW, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS, CAL_ICALINTVALUE );
+    ok( ret, "EnumCalendarInfoW for user default locale failed: %lu\n", GetLastError() );
 
     ret = EnumCalendarInfoW( calinfo_procW, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS,
                              CAL_RETURN_NUMBER | CAL_ICALINTVALUE );
@@ -8304,8 +8316,10 @@ static void test_EnumCalendarInfoW(void)
 
 static BOOL CALLBACK calinfoex_procA(LPSTR calinfo, LCID calid)
 {
-    (void)calinfo;
-    (void)calid;
+    char *end;
+    int val = strtoul( calinfo, &end, 10 );
+    ok( !*end, "wrong value %s\n", debugstr_a(calinfo) );
+    ok(val >= CAL_GREGORIAN && val <= CAL_UMALQURA, "got %d\n", val);
     return TRUE;
 }
 
@@ -8313,6 +8327,9 @@ static void test_EnumCalendarInfoExA(void)
 {
     BOOL ret;
     INT i;
+
+    ret = EnumCalendarInfoExA( calinfoex_procA, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS, CAL_ICALINTVALUE );
+    ok( ret, "EnumCalendarInfoExA for user default locale failed: %lu\n", GetLastError() );
 
     ret = EnumCalendarInfoExA( calinfoex_procA, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS,
                                CAL_RETURN_NUMBER | CAL_ICALINTVALUE );
@@ -8330,8 +8347,10 @@ static void test_EnumCalendarInfoExA(void)
 
 static BOOL CALLBACK calinfoex_procW(LPWSTR calinfo, LCID calid)
 {
-    (void)calinfo;
-    (void)calid;
+    WCHAR *end;
+    int val = wcstoul( calinfo, &end, 10 );
+    ok( !*end, "wrong value %s\n", debugstr_w(calinfo) );
+    ok(val >= CAL_GREGORIAN && val <= CAL_UMALQURA, "got %d\n", val);
     return TRUE;
 }
 
@@ -8339,6 +8358,9 @@ static void test_EnumCalendarInfoExW(void)
 {
     BOOL ret;
     INT i;
+
+    ret = EnumCalendarInfoExW( calinfoex_procW, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS, CAL_ICALINTVALUE );
+    ok( ret, "EnumCalendarInfoExW for user default locale failed: %lu\n", GetLastError() );
 
     ret = EnumCalendarInfoExW( calinfoex_procW, LOCALE_USER_DEFAULT, ENUM_ALL_CALENDARS,
                                CAL_RETURN_NUMBER | CAL_ICALINTVALUE );

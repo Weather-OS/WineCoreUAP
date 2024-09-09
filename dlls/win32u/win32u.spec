@@ -189,7 +189,8 @@
 @ stdcall -syscall NtGdiDdDDICheckVidPnExclusiveOwnership(ptr)
 @ stdcall -syscall NtGdiDdDDICloseAdapter(ptr)
 @ stub NtGdiDdDDIConfigureSharedResource
-@ stub NtGdiDdDDICreateAllocation
+@ stdcall -syscall NtGdiDdDDICreateAllocation(ptr)
+@ stdcall -syscall NtGdiDdDDICreateAllocation2(ptr)
 @ stub NtGdiDdDDICreateBundleObject
 @ stub NtGdiDdDDICreateContext
 @ stub NtGdiDdDDICreateContextVirtual
@@ -197,32 +198,33 @@
 @ stdcall -syscall NtGdiDdDDICreateDevice(ptr)
 @ stub NtGdiDdDDICreateHwContext
 @ stub NtGdiDdDDICreateHwQueue
-@ stub NtGdiDdDDICreateKeyedMutex
-@ stub NtGdiDdDDICreateKeyedMutex2
+@ stdcall -syscall NtGdiDdDDICreateKeyedMutex(ptr)
+@ stdcall -syscall NtGdiDdDDICreateKeyedMutex2(ptr)
 @ stub NtGdiDdDDICreateOutputDupl
 @ stub NtGdiDdDDICreateOverlay
 @ stub NtGdiDdDDICreatePagingQueue
 @ stub NtGdiDdDDICreateProtectedSession
 @ stub NtGdiDdDDICreateSwapChain
-@ stub NtGdiDdDDICreateSynchronizationObject
+@ stdcall -syscall NtGdiDdDDICreateSynchronizationObject(ptr)
+@ stdcall -syscall NtGdiDdDDICreateSynchronizationObject2(ptr)
 @ stub NtGdiDdDDIDDisplayEnum
-@ stub NtGdiDdDDIDestroyAllocation
-@ stub NtGdiDdDDIDestroyAllocation2
+@ stdcall -syscall NtGdiDdDDIDestroyAllocation(ptr)
+@ stdcall -syscall NtGdiDdDDIDestroyAllocation2(ptr)
 @ stub NtGdiDdDDIDestroyContext
 @ stdcall -syscall NtGdiDdDDIDestroyDCFromMemory(ptr)
 @ stdcall -syscall NtGdiDdDDIDestroyDevice(ptr)
 @ stub NtGdiDdDDIDestroyHwContext
 @ stub NtGdiDdDDIDestroyHwQueue
-@ stub NtGdiDdDDIDestroyKeyedMutex
+@ stdcall -syscall NtGdiDdDDIDestroyKeyedMutex(ptr)
 @ stub NtGdiDdDDIDestroyOutputDupl
 @ stub NtGdiDdDDIDestroyOverlay
 @ stub NtGdiDdDDIDestroyPagingQueue
 @ stub NtGdiDdDDIDestroyProtectedSession
-@ stub NtGdiDdDDIDestroySynchronizationObject
+@ stdcall -syscall NtGdiDdDDIDestroySynchronizationObject(ptr)
 @ stub NtGdiDdDDIDispMgrCreate
 @ stub NtGdiDdDDIDispMgrSourceOperation
 @ stub NtGdiDdDDIDispMgrTargetOperation
-@ stub NtGdiDdDDIEnumAdapters
+@ stdcall -syscall NtGdiDdDDIEnumAdapters(ptr)
 @ stdcall -syscall NtGdiDdDDIEnumAdapters2(ptr)
 @ stdcall -syscall NtGdiDdDDIEscape(ptr)
 @ stub NtGdiDdDDIEvict
@@ -272,18 +274,19 @@
 @ stdcall -syscall NtGdiDdDDIOpenAdapterFromHdc(ptr)
 @ stdcall -syscall NtGdiDdDDIOpenAdapterFromLuid(ptr)
 @ stub NtGdiDdDDIOpenBundleObjectNtHandleFromName
-@ stub NtGdiDdDDIOpenKeyedMutex
-@ stub NtGdiDdDDIOpenKeyedMutex2
-@ stub NtGdiDdDDIOpenKeyedMutexFromNtHandle
+@ stdcall -syscall NtGdiDdDDIOpenKeyedMutex(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenKeyedMutex2(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenKeyedMutexFromNtHandle(ptr)
 @ stub NtGdiDdDDIOpenNtHandleFromName
 @ stub NtGdiDdDDIOpenProtectedSessionFromNtHandle
-@ stub NtGdiDdDDIOpenResource
-@ stub NtGdiDdDDIOpenResourceFromNtHandle
+@ stdcall -syscall NtGdiDdDDIOpenResource(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenResource2(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenResourceFromNtHandle(ptr)
 @ stub NtGdiDdDDIOpenSwapChain
-@ stub NtGdiDdDDIOpenSyncObjectFromNtHandle
-@ stub NtGdiDdDDIOpenSyncObjectFromNtHandle2
-@ stub NtGdiDdDDIOpenSyncObjectNtHandleFromName
-@ stub NtGdiDdDDIOpenSynchronizationObject
+@ stdcall -syscall NtGdiDdDDIOpenSyncObjectFromNtHandle(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenSyncObjectFromNtHandle2(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenSyncObjectNtHandleFromName(ptr)
+@ stdcall -syscall NtGdiDdDDIOpenSynchronizationObject(ptr)
 @ stub NtGdiDdDDIOutputDuplGetFrameInfo
 @ stub NtGdiDdDDIOutputDuplGetMetaData
 @ stub NtGdiDdDDIOutputDuplGetPointerShapeData
@@ -303,8 +306,8 @@
 @ stub NtGdiDdDDIQueryProtectedSessionInfoFromNtHandle
 @ stub NtGdiDdDDIQueryProtectedSessionStatus
 @ stub NtGdiDdDDIQueryRemoteVidPnSourceFromGdiDisplayName
-@ stub NtGdiDdDDIQueryResourceInfo
-@ stub NtGdiDdDDIQueryResourceInfoFromNtHandle
+@ stdcall -syscall NtGdiDdDDIQueryResourceInfo(ptr)
+@ stdcall -syscall NtGdiDdDDIQueryResourceInfoFromNtHandle(ptr)
 @ stdcall -syscall NtGdiDdDDIQueryStatistics(ptr)
 @ stub NtGdiDdDDIQueryVidPnExclusiveOwnership
 @ stdcall -syscall NtGdiDdDDIQueryVideoMemoryInfo(ptr)
@@ -337,7 +340,7 @@
 @ stub NtGdiDdDDISetVidPnSourceHwProtection
 @ stdcall -syscall NtGdiDdDDISetVidPnSourceOwner(ptr)
 @ stub NtGdiDdDDISetYieldPercentage
-@ stub NtGdiDdDDIShareObjects
+@ stdcall -syscall NtGdiDdDDIShareObjects(long ptr ptr long ptr)
 @ stub NtGdiDdDDISharedPrimaryLockNotification
 @ stub NtGdiDdDDISharedPrimaryUnLockNotification
 @ stub NtGdiDdDDISignalSynchronizationObject

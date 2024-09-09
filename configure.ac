@@ -42,7 +42,6 @@ AC_ARG_WITH(inotify,   AS_HELP_STRING([--without-inotify],[do not use inotify (f
 AC_ARG_WITH(krb5,      AS_HELP_STRING([--without-krb5],[do not use krb5 (Kerberos)]))
 AC_ARG_WITH(mingw,     AS_HELP_STRING([--without-mingw],[do not use the MinGW cross-compiler]))
 AC_ARG_WITH(netapi,    AS_HELP_STRING([--without-netapi],[do not use the Samba NetAPI library]))
-AC_ARG_WITH(odbc,      AS_HELP_STRING([--without-odbc],[do not use the ODBC library]))
 AC_ARG_WITH(opencl,    AS_HELP_STRING([--without-opencl],[do not use OpenCL]),
             [if test "x$withval" = "xno"; then ac_cv_header_CL_cl_h=no; ac_cv_header_OpenCL_opencl_h=no; fi])
 AC_ARG_WITH(opengl,    AS_HELP_STRING([--without-opengl],[do not use OpenGL]))
@@ -371,7 +370,6 @@ AC_CHECK_HEADERS(\
 	elf.h \
 	float.h \
 	gettext-po.h \
-	libproc.h \
 	link.h \
 	linux/cdrom.h \
 	linux/filter.h \
@@ -794,6 +792,7 @@ AS_VAR_SET_IF([enable_archs],
 
 saved_CC=$CC
 saved_CFLAGS=$CFLAGS
+saved_CPPFLAGS=$CPPFLAGS
 saved_LDFLAGS=$LDFLAGS
 
 AS_UNSET(extra_arch)
@@ -832,6 +831,7 @@ do
         esac])
 
     CFLAGS=${CROSSCFLAGS:-"-g -O2"}
+    CPPFLAGS=""
     LDFLAGS=$CROSSLDFLAGS
     AS_VAR_COPY([CC],[${wine_arch}_CC])
     AS_VAR_COPY([${wine_arch}_CFLAGS],[CFLAGS])
@@ -1012,6 +1012,7 @@ done
 
 CC=$saved_CC
 CFLAGS=$saved_CFLAGS
+CPPFLAGS=$saved_CPPFLAGS
 LDFLAGS=$saved_LDFLAGS
 
 case $HOST_ARCH in
@@ -1447,16 +1448,6 @@ WINE_NOTICE_WITH(pcsclite,[test "x$PCSCLITE_LIBS" = x],
                  [libpcsclite not found, smart cards won't be supported.],
                  [enable_winscard])
 
-dnl **** Check for libodbc ****
-if test "x$with_odbc" != "xno"
-then
-    WINE_PACKAGE_FLAGS(ODBC,[odbc],[-lodbc],,,
-        [AC_CHECK_LIB(odbc,SQLConnect,[:],[ODBC_LIBS=""],[$ODBC_LIBS])])
-fi
-WINE_NOTICE_WITH(odbc,[test "x$ODBC_LIBS" = x],
-                 [libodbc not found, ODBC won't be supported.],
-                 [enable_odbc32])
-
 dnl **** Check for inotify ****
 if test "x$with_inotify" != "xno"
 then
@@ -1846,6 +1837,9 @@ then
                   AC_SUBST(PROCSTAT_LIBS,"-lprocstat")])
 fi
 
+dnl **** Check for libodbc ****
+WINE_CHECK_SONAME(odbc,SQLConnect,,[AC_DEFINE_UNQUOTED(SONAME_LIBODBC,["libodbc.$LIBEXT"])])
+
 dnl **** Check for libnetapi ****
 if test "x$with_netapi" != "xno"
 then
@@ -2103,7 +2097,6 @@ AC_CHECK_FUNCS(\
 	posix_fadvise \
 	posix_fallocate \
 	prctl \
-	proc_pidinfo \
 	sched_yield \
 	setproctitle \
 	setprogname \
@@ -2137,28 +2130,6 @@ dnl **** Check for types ****
 
 AC_C_INLINE
 AC_CHECK_TYPES([request_sense],,,[#include <linux/cdrom.h>])
-
-AC_CHECK_TYPES([struct xinpgen],,,
-[#include <sys/types.h>
-#include <sys/socket.h>
-#ifdef HAVE_SYS_SOCKETVAR_H
-#include <sys/socketvar.h>
-#endif
-#ifdef HAVE_NET_ROUTE_H
-#include <net/route.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#ifdef HAVE_NETINET_IN_SYSTM_H
-#include <netinet/in_systm.h>
-#endif
-#ifdef HAVE_NETINET_IP_H
-#include <netinet/ip.h>
-#endif
-#ifdef HAVE_NETINET_IN_PCB_H
-#include <netinet/in_pcb.h>
-#endif])
 
 AC_CACHE_CHECK([whether we can use re-entrant gethostbyname_r Linux style],
    	wine_cv_linux_gethostbyname_r_6,
@@ -2497,6 +2468,7 @@ WINE_CONFIG_MAKEFILE(dlls/cfgmgr32)
 WINE_CONFIG_MAKEFILE(dlls/cfgmgr32/tests)
 WINE_CONFIG_MAKEFILE(dlls/clusapi)
 WINE_CONFIG_MAKEFILE(dlls/cng.sys)
+WINE_CONFIG_MAKEFILE(dlls/colorcnv)
 WINE_CONFIG_MAKEFILE(dlls/combase)
 WINE_CONFIG_MAKEFILE(dlls/combase/tests)
 WINE_CONFIG_MAKEFILE(dlls/comcat)
@@ -2801,6 +2773,7 @@ WINE_CONFIG_MAKEFILE(dlls/ksproxy.ax)
 WINE_CONFIG_MAKEFILE(dlls/ksuser)
 WINE_CONFIG_MAKEFILE(dlls/ktmw32)
 WINE_CONFIG_MAKEFILE(dlls/l3codeca.acm)
+WINE_CONFIG_MAKEFILE(dlls/l3codecx.ax)
 WINE_CONFIG_MAKEFILE(dlls/light.msstyles)
 WINE_CONFIG_MAKEFILE(dlls/loadperf)
 WINE_CONFIG_MAKEFILE(dlls/localspl)
@@ -2822,9 +2795,12 @@ WINE_CONFIG_MAKEFILE(dlls/mciwave)
 WINE_CONFIG_MAKEFILE(dlls/mf)
 WINE_CONFIG_MAKEFILE(dlls/mf/tests)
 WINE_CONFIG_MAKEFILE(dlls/mf3216)
+WINE_CONFIG_MAKEFILE(dlls/mfasfsrcsnk)
 WINE_CONFIG_MAKEFILE(dlls/mferror)
+WINE_CONFIG_MAKEFILE(dlls/mfh264enc)
 WINE_CONFIG_MAKEFILE(dlls/mfmediaengine)
 WINE_CONFIG_MAKEFILE(dlls/mfmediaengine/tests)
+WINE_CONFIG_MAKEFILE(dlls/mfmp4srcsnk)
 WINE_CONFIG_MAKEFILE(dlls/mfplat)
 WINE_CONFIG_MAKEFILE(dlls/mfplat/tests)
 WINE_CONFIG_MAKEFILE(dlls/mfplay)
@@ -2963,6 +2939,7 @@ WINE_CONFIG_MAKEFILE(dlls/msvfw32)
 WINE_CONFIG_MAKEFILE(dlls/msvfw32/tests)
 WINE_CONFIG_MAKEFILE(dlls/msvidc32)
 WINE_CONFIG_MAKEFILE(dlls/msvideo.dll16,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/msvproc)
 WINE_CONFIG_MAKEFILE(dlls/mswsock)
 WINE_CONFIG_MAKEFILE(dlls/msxml)
 WINE_CONFIG_MAKEFILE(dlls/msxml2)
@@ -3076,6 +3053,7 @@ WINE_CONFIG_MAKEFILE(dlls/rasapi32)
 WINE_CONFIG_MAKEFILE(dlls/rasapi32/tests)
 WINE_CONFIG_MAKEFILE(dlls/rasdlg)
 WINE_CONFIG_MAKEFILE(dlls/regapi)
+WINE_CONFIG_MAKEFILE(dlls/resampledmo)
 WINE_CONFIG_MAKEFILE(dlls/resutils)
 WINE_CONFIG_MAKEFILE(dlls/riched20)
 WINE_CONFIG_MAKEFILE(dlls/riched20/tests)
@@ -3349,6 +3327,7 @@ WINE_CONFIG_MAKEFILE(dlls/wldap32)
 WINE_CONFIG_MAKEFILE(dlls/wldap32/tests)
 WINE_CONFIG_MAKEFILE(dlls/wldp)
 WINE_CONFIG_MAKEFILE(dlls/wldp/tests)
+WINE_CONFIG_MAKEFILE(dlls/wmadmod)
 WINE_CONFIG_MAKEFILE(dlls/wmasf)
 WINE_CONFIG_MAKEFILE(dlls/wmi)
 WINE_CONFIG_MAKEFILE(dlls/wmiutils)
@@ -3358,6 +3337,7 @@ WINE_CONFIG_MAKEFILE(dlls/wmp/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmphoto)
 WINE_CONFIG_MAKEFILE(dlls/wmvcore)
 WINE_CONFIG_MAKEFILE(dlls/wmvcore/tests)
+WINE_CONFIG_MAKEFILE(dlls/wmvdecod)
 WINE_CONFIG_MAKEFILE(dlls/wnaspi32)
 WINE_CONFIG_MAKEFILE(dlls/wofutil)
 WINE_CONFIG_MAKEFILE(dlls/wow32,enable_win16)

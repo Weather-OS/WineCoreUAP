@@ -44,7 +44,7 @@ ALL_SYSCALLS64
 #undef SYSCALL_ENTRY
 };
 
-#define SYSCALL_API __attribute__((naked))
+#define SYSCALL_API __attribute__((naked, hybrid_patchable))
 #define SYSCALL_FUNC(name) __ASM_SYSCALL_FUNC( __id_##name, name )
 
 INT SYSCALL_API NtGdiAbortDoc( HDC hdc )
@@ -216,14 +216,54 @@ NTSTATUS SYSCALL_API NtGdiDdDDICloseAdapter( const D3DKMT_CLOSEADAPTER *desc )
     SYSCALL_FUNC( NtGdiDdDDICloseAdapter );
 }
 
+NTSTATUS SYSCALL_API NtGdiDdDDICreateAllocation( D3DKMT_CREATEALLOCATION *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateAllocation );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDICreateAllocation2( D3DKMT_CREATEALLOCATION *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateAllocation2 );
+}
+
 NTSTATUS SYSCALL_API NtGdiDdDDICreateDCFromMemory( D3DKMT_CREATEDCFROMMEMORY *desc )
 {
     SYSCALL_FUNC( NtGdiDdDDICreateDCFromMemory );
 }
 
+NTSTATUS SYSCALL_API NtGdiDdDDIDestroyAllocation( const D3DKMT_DESTROYALLOCATION *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIDestroyAllocation );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIDestroyAllocation2( const D3DKMT_DESTROYALLOCATION2 *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIDestroyAllocation2 );
+}
+
 NTSTATUS SYSCALL_API NtGdiDdDDICreateDevice( D3DKMT_CREATEDEVICE *desc )
 {
     SYSCALL_FUNC( NtGdiDdDDICreateDevice );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDICreateKeyedMutex( D3DKMT_CREATEKEYEDMUTEX *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateKeyedMutex );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDICreateKeyedMutex2( D3DKMT_CREATEKEYEDMUTEX2 *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateKeyedMutex2 );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDICreateSynchronizationObject( D3DKMT_CREATESYNCHRONIZATIONOBJECT *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateSynchronizationObject );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDICreateSynchronizationObject2( D3DKMT_CREATESYNCHRONIZATIONOBJECT2 *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDICreateSynchronizationObject2 );
 }
 
 NTSTATUS SYSCALL_API NtGdiDdDDIDestroyDCFromMemory( const D3DKMT_DESTROYDCFROMMEMORY *desc )
@@ -234,6 +274,21 @@ NTSTATUS SYSCALL_API NtGdiDdDDIDestroyDCFromMemory( const D3DKMT_DESTROYDCFROMME
 NTSTATUS SYSCALL_API NtGdiDdDDIDestroyDevice( const D3DKMT_DESTROYDEVICE *desc )
 {
     SYSCALL_FUNC( NtGdiDdDDIDestroyDevice );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIDestroyKeyedMutex( const D3DKMT_DESTROYKEYEDMUTEX *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIDestroyKeyedMutex );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIDestroySynchronizationObject( const D3DKMT_DESTROYSYNCHRONIZATIONOBJECT *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIDestroySynchronizationObject );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIEnumAdapters( D3DKMT_ENUMADAPTERS *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIEnumAdapters );
 }
 
 NTSTATUS SYSCALL_API NtGdiDdDDIEnumAdapters2( D3DKMT_ENUMADAPTERS2 *desc )
@@ -261,9 +316,69 @@ NTSTATUS SYSCALL_API NtGdiDdDDIOpenAdapterFromLuid( D3DKMT_OPENADAPTERFROMLUID *
     SYSCALL_FUNC( NtGdiDdDDIOpenAdapterFromLuid );
 }
 
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenKeyedMutex( D3DKMT_OPENKEYEDMUTEX *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenKeyedMutex );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenKeyedMutex2( D3DKMT_OPENKEYEDMUTEX2 *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenKeyedMutex2 );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenKeyedMutexFromNtHandle( D3DKMT_OPENKEYEDMUTEXFROMNTHANDLE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenKeyedMutexFromNtHandle );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenResource( D3DKMT_OPENRESOURCE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenResource );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenResource2( D3DKMT_OPENRESOURCE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenResource2 );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenResourceFromNtHandle( D3DKMT_OPENRESOURCEFROMNTHANDLE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenResourceFromNtHandle );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenSyncObjectFromNtHandle( D3DKMT_OPENSYNCOBJECTFROMNTHANDLE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenSyncObjectFromNtHandle );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenSyncObjectFromNtHandle2( D3DKMT_OPENSYNCOBJECTFROMNTHANDLE2 *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenSyncObjectFromNtHandle2 );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenSyncObjectNtHandleFromName( D3DKMT_OPENSYNCOBJECTNTHANDLEFROMNAME *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenSyncObjectNtHandleFromName );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIOpenSynchronizationObject( D3DKMT_OPENSYNCHRONIZATIONOBJECT *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIOpenSynchronizationObject );
+}
+
 NTSTATUS SYSCALL_API NtGdiDdDDIQueryAdapterInfo( D3DKMT_QUERYADAPTERINFO *desc )
 {
     SYSCALL_FUNC( NtGdiDdDDIQueryAdapterInfo );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIQueryResourceInfo( D3DKMT_QUERYRESOURCEINFO *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIQueryResourceInfo );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIQueryResourceInfoFromNtHandle( D3DKMT_QUERYRESOURCEINFOFROMNTHANDLE *desc )
+{
+    SYSCALL_FUNC( NtGdiDdDDIQueryResourceInfoFromNtHandle );
 }
 
 NTSTATUS SYSCALL_API NtGdiDdDDIQueryStatistics( D3DKMT_QUERYSTATISTICS *stats )
@@ -284,6 +399,11 @@ NTSTATUS SYSCALL_API NtGdiDdDDISetQueuedLimit( D3DKMT_SETQUEUEDLIMIT *desc )
 NTSTATUS SYSCALL_API NtGdiDdDDISetVidPnSourceOwner( const D3DKMT_SETVIDPNSOURCEOWNER *desc )
 {
     SYSCALL_FUNC( NtGdiDdDDISetVidPnSourceOwner );
+}
+
+NTSTATUS SYSCALL_API NtGdiDdDDIShareObjects( UINT count, const D3DKMT_HANDLE *handles, OBJECT_ATTRIBUTES *attr, UINT access, HANDLE *handle )
+{
+    SYSCALL_FUNC( NtGdiDdDDIShareObjects );
 }
 
 BOOL SYSCALL_API NtGdiDeleteClientObj( HGDIOBJ handle )

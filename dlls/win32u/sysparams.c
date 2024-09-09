@@ -147,7 +147,8 @@ static struct list monitors = LIST_INIT(monitors);
 static INT64 last_query_display_time;
 static pthread_mutex_t display_lock = PTHREAD_MUTEX_INITIALIZER;
 
-BOOL enable_thunk_lock = FALSE;
+BOOL decorated_mode = TRUE;
+UINT64 thunk_lock_callback = 0;
 
 #define VIRTUAL_HMONITOR ((HMONITOR)(UINT_PTR)(0x10000 + 1))
 static struct monitor virtual_monitor =
@@ -2100,6 +2101,27 @@ static HDC get_display_dc(void)
     return display_dc;
 }
 
+HBITMAP get_display_bitmap(void)
+{
+    static RECT old_virtual_rect;
+    static HBITMAP hbitmap;
+    RECT virtual_rect;
+    HBITMAP ret;
+
+    virtual_rect = get_virtual_screen_rect( 0 );
+    pthread_mutex_lock( &display_dc_lock );
+    if (!EqualRect( &old_virtual_rect, &virtual_rect ))
+    {
+        if (hbitmap) NtGdiDeleteObjectApp( hbitmap );
+        hbitmap = NtGdiCreateBitmap( virtual_rect.right - virtual_rect.left,
+                                     virtual_rect.bottom - virtual_rect.top, 1, 32, NULL );
+        old_virtual_rect = virtual_rect;
+    }
+    ret = hbitmap;
+    pthread_mutex_unlock( &display_dc_lock );
+    return ret;
+}
+
 static void release_display_dc( HDC hdc )
 {
     pthread_mutex_unlock( &display_dc_lock );
@@ -2225,6 +2247,40 @@ RECT map_dpi_rect( RECT rect, UINT dpi_from, UINT dpi_to )
         rect.bottom = muldiv( rect.bottom, dpi_to, dpi_from );
     }
     return rect;
+}
+
+/**********************************************************************
+ *              map_dpi_region
+ */
+HRGN map_dpi_region( HRGN hrgn, UINT dpi_from, UINT dpi_to )
+{
+    RGNDATA *data;
+    UINT i, size;
+
+    if (!(size = NtGdiGetRegionData( hrgn, 0, NULL ))) return 0;
+    if (!(data = malloc( size ))) return 0;
+    NtGdiGetRegionData( hrgn, size, data );
+
+    if (dpi_from && dpi_to && dpi_from != dpi_to)
+    {
+        RECT *rects = (RECT *)data->Buffer;
+        for (i = 0; i < data->rdh.nCount; i++) rects[i] = map_dpi_rect( rects[i], dpi_from, dpi_to );
+    }
+
+    hrgn = NtGdiExtCreateRegion( NULL, data->rdh.dwSize + data->rdh.nRgnSize, data );
+    free( data );
+    return hrgn;
+}
+
+/**********************************************************************
+ *              map_dpi_window_rects
+ */
+struct window_rects map_dpi_window_rects( struct window_rects rects, UINT dpi_from, UINT dpi_to )
+{
+    rects.window = map_dpi_rect( rects.window, dpi_from, dpi_to );
+    rects.client = map_dpi_rect( rects.client, dpi_from, dpi_to );
+    rects.visible = map_dpi_rect( rects.visible, dpi_from, dpi_to );
+    return rects;
 }
 
 /**********************************************************************
@@ -4869,7 +4925,6 @@ void sysparams_init(void)
 
     /* FIXME: what do the DpiScalingVer flags mean? */
     get_dword_entry( (union sysparam_all_entry *)&entry_DPISCALINGVER, 0, &dpi_scaling, 0 );
-    if (!dpi_scaling) NtUserSetProcessDpiAwarenessContext( NTUSER_DPI_PER_MONITOR_AWARE, 0 );
 
     if (volatile_base_key && dispos == REG_CREATED_NEW_KEY)  /* first process, initialize entries */
     {
@@ -4912,6 +4967,8 @@ void sysparams_init(void)
         grab_pointer = IS_OPTION_TRUE( buffer[0] );
     if (!get_config_key( hkey, appkey, "GrabFullscreen", buffer, sizeof(buffer) ))
         grab_fullscreen = IS_OPTION_TRUE( buffer[0] );
+    if (!get_config_key( hkey, appkey, "Decorated", buffer, sizeof(buffer) ))
+        decorated_mode = IS_OPTION_TRUE( buffer[0] );
 
 #undef IS_OPTION_TRUE
 }
@@ -6437,7 +6494,7 @@ ULONG_PTR WINAPI NtUserCallOneParam( ULONG_PTR arg, ULONG code )
         return set_dce_flags( UlongToHandle(arg), DCHF_ENABLEDC );
 
     case NtUserCallOneParam_EnableThunkLock:
-        enable_thunk_lock = arg;
+        thunk_lock_callback = arg;
         return 0;
 
     case NtUserCallOneParam_EnumClipboardFormats:
@@ -6539,7 +6596,10 @@ ULONG_PTR WINAPI NtUserCallTwoParam( ULONG_PTR arg1, ULONG_PTR arg2, ULONG code 
         return set_caret_pos( arg1, arg2 );
 
     case NtUserCallTwoParam_SetIconParam:
-        return set_icon_param( UlongToHandle(arg1), arg2 );
+        return set_icon_param( UlongToHandle(arg1), UlongToHandle(arg2) );
+
+    case NtUserCallTwoParam_SetIMECompositionWindowPos:
+        return set_ime_composition_window_pos( UlongToHandle(arg1), (const POINT *)arg2 );
 
     case NtUserCallTwoParam_UnhookWindowsHook:
         return unhook_windows_hook( arg1, (HOOKPROC)arg2 );
@@ -6830,6 +6890,31 @@ NTSTATUS WINAPI NtGdiDdDDIEnumAdapters2( D3DKMT_ENUMADAPTERS2 *desc )
 
 done:
     while (count) gpu_release( current_gpus[--count] );
+    return status;
+}
+
+/******************************************************************************
+ *           NtGdiDdDDIEnumAdapters    (win32u.@)
+ */
+NTSTATUS WINAPI NtGdiDdDDIEnumAdapters( D3DKMT_ENUMADAPTERS *desc )
+{
+    NTSTATUS status;
+    D3DKMT_ENUMADAPTERS2 desc2 = {0};
+
+    if (!desc) return STATUS_INVALID_PARAMETER;
+
+    if ((status = NtGdiDdDDIEnumAdapters2( &desc2 ))) return status;
+
+    if (!(desc2.pAdapters = calloc( desc2.NumAdapters, sizeof(D3DKMT_ADAPTERINFO) ))) return STATUS_NO_MEMORY;
+
+    if (!(status = NtGdiDdDDIEnumAdapters2( &desc2 )))
+    {
+        desc->NumAdapters = min( MAX_ENUM_ADAPTERS, desc2.NumAdapters );
+        memcpy( desc->Adapters, desc2.pAdapters, desc->NumAdapters * sizeof(D3DKMT_ADAPTERINFO) );
+    }
+
+    free( desc2.pAdapters );
+
     return status;
 }
 

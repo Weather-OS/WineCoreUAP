@@ -43,7 +43,6 @@ struct wayland_buffer_queue
 struct wayland_window_surface
 {
     struct window_surface header;
-    struct wayland_surface *wayland_surface;
     struct wayland_buffer_queue *wayland_buffer_queue;
 };
 
@@ -324,17 +323,10 @@ static BOOL wayland_window_surface_flush(struct window_surface *window_surface, 
 {
     RECT surface_rect = {.right = color_info->bmiHeader.biWidth, .bottom = abs(color_info->bmiHeader.biHeight)};
     struct wayland_window_surface *wws = wayland_window_surface_cast(window_surface);
-    struct wayland_shm_buffer *shm_buffer = NULL;
+    struct wayland_shm_buffer *shm_buffer = NULL, *latest_buffer;
     BOOL flushed = FALSE;
     HRGN surface_damage_region = NULL;
     HRGN copy_from_window_region;
-
-    if (!wws->wayland_surface || !wws->wayland_buffer_queue)
-    {
-        ERR("missing wayland surface=%p or buffer_queue=%p, returning\n",
-            wws->wayland_surface, wws->wayland_buffer_queue);
-        goto done;
-    }
 
     surface_damage_region = NtGdiCreateRectRgn(rect->left + dirty->left, rect->top + dirty->top,
                                                rect->left + dirty->right, rect->top + dirty->bottom);
@@ -353,12 +345,12 @@ static BOOL wayland_window_surface_flush(struct window_surface *window_surface, 
         goto done;
     }
 
-    if (wws->wayland_surface->latest_window_buffer)
+    if ((latest_buffer = get_window_surface_contents(window_surface->hwnd)))
     {
-        TRACE("latest_window_buffer=%p\n", wws->wayland_surface->latest_window_buffer);
+        TRACE("latest_window_buffer=%p\n", latest_buffer);
         /* If we have a latest buffer, use it as the source of all pixel
          * data that are not contained in the bounds of the flush... */
-        if (wws->wayland_surface->latest_window_buffer != shm_buffer)
+        if (latest_buffer != shm_buffer)
         {
             HRGN copy_from_latest_region = NtGdiCreateRectRgn(0, 0, 0, 0);
             if (!copy_from_latest_region)
@@ -368,13 +360,14 @@ static BOOL wayland_window_surface_flush(struct window_surface *window_surface, 
             }
             NtGdiCombineRgn(copy_from_latest_region, shm_buffer->damage_region,
                             surface_damage_region, RGN_DIFF);
-            wayland_shm_buffer_copy(wws->wayland_surface->latest_window_buffer,
+            wayland_shm_buffer_copy(latest_buffer,
                                     shm_buffer, copy_from_latest_region);
             NtGdiDeleteObjectApp(copy_from_latest_region);
         }
         /* ... and use the window_surface as the source of pixel data contained
          * in the flush bounds. */
         copy_from_window_region = surface_damage_region;
+        wayland_shm_buffer_unref(latest_buffer);
     }
     else
     {
@@ -385,29 +378,10 @@ static BOOL wayland_window_surface_flush(struct window_surface *window_surface, 
     }
 
     wayland_shm_buffer_copy_data(shm_buffer, color_bits, &surface_rect, copy_from_window_region);
-
-    pthread_mutex_lock(&wws->wayland_surface->mutex);
-    if (wayland_surface_reconfigure(wws->wayland_surface))
-    {
-        wayland_surface_attach_shm(wws->wayland_surface, shm_buffer,
-                                   surface_damage_region);
-        wl_surface_commit(wws->wayland_surface->wl_surface);
-        flushed = TRUE;
-    }
-    else
-    {
-        TRACE("Wayland surface not configured yet, not flushing\n");
-    }
-    pthread_mutex_unlock(&wws->wayland_surface->mutex);
-    wl_display_flush(process_wayland.wl_display);
-
     NtGdiSetRectRgn(shm_buffer->damage_region, 0, 0, 0, 0);
-    /* Update the latest window buffer for the wayland surface. Note that we
-     * only care whether the buffer contains the latest window contents,
-     * it's irrelevant if it was actually committed or not. */
-    if (wws->wayland_surface->latest_window_buffer)
-        wayland_shm_buffer_unref(wws->wayland_surface->latest_window_buffer);
-    wayland_shm_buffer_ref((wws->wayland_surface->latest_window_buffer = shm_buffer));
+
+    flushed = set_window_surface_contents(window_surface->hwnd, shm_buffer, surface_damage_region);
+    wl_display_flush(process_wayland.wl_display);
 
 done:
     if (surface_damage_region) NtGdiDeleteObjectApp(surface_damage_region);
@@ -423,9 +397,7 @@ static void wayland_window_surface_destroy(struct window_surface *window_surface
 
     TRACE("surface=%p\n", wws);
 
-    if (wws->wayland_buffer_queue)
-        wayland_buffer_queue_destroy(wws->wayland_buffer_queue);
-    free(wws);
+    wayland_buffer_queue_destroy(wws->wayland_buffer_queue);
 }
 
 static const struct window_surface_funcs wayland_window_surface_funcs =
@@ -445,6 +417,7 @@ static struct window_surface *wayland_window_surface_create(HWND hwnd, const REC
     struct wayland_window_surface *wws;
     int width = rect->right - rect->left;
     int height = rect->bottom - rect->top;
+    struct window_surface *window_surface;
 
     TRACE("hwnd %p rect %s\n", hwnd, wine_dbgstr_rect(rect));
 
@@ -457,55 +430,14 @@ static struct window_surface *wayland_window_surface_create(HWND hwnd, const REC
     info->bmiHeader.biSizeImage   = width * height * 4;
     info->bmiHeader.biCompression = BI_RGB;
 
-    wws = calloc(1, sizeof(*wws));
-    if (!wws) return NULL;
-    if (!window_surface_init(&wws->header, &wayland_window_surface_funcs, hwnd, rect, info, 0)) goto failed;
-
-    TRACE("created %p hwnd %p %s\n", wws, hwnd, wine_dbgstr_rect(rect));
-
-    return &wws->header;
-
-failed:
-    window_surface_release(&wws->header);
-    return NULL;
-}
-
-/***********************************************************************
- *           wayland_window_surface_update_wayland_surface
- */
-void wayland_window_surface_update_wayland_surface(struct window_surface *window_surface, const RECT *visible_rect,
-                                                   struct wayland_surface *wayland_surface)
-{
-    struct wayland_window_surface *wws;
-
-    /* ignore calls with the dummy surface */
-    if (window_surface->funcs != &wayland_window_surface_funcs) return;
-
-    wws = wayland_window_surface_cast(window_surface);
-    window_surface_lock(window_surface);
-
-    TRACE("surface=%p hwnd=%p visible_rect=%s wayland_surface=%p\n", wws, window_surface->hwnd,
-          wine_dbgstr_rect(visible_rect), wayland_surface);
-
-    wws->wayland_surface = wayland_surface;
-
-    if (wws->wayland_buffer_queue)
+    if ((window_surface = window_surface_create(sizeof(*wws), &wayland_window_surface_funcs, hwnd, rect, info, 0)))
     {
-        wayland_buffer_queue_destroy(wws->wayland_buffer_queue);
-        wws->wayland_buffer_queue = NULL;
+        struct wayland_window_surface *wws = wayland_window_surface_cast(window_surface);
+        wws->wayland_buffer_queue = wayland_buffer_queue_create(width, height);
     }
 
-    /* We only need a buffer queue if we have a surface to commit to. */
-    if (wws->wayland_surface)
-    {
-        wws->wayland_buffer_queue =
-            wayland_buffer_queue_create(visible_rect->right - visible_rect->left,
-                                        visible_rect->bottom - visible_rect->top);
-    }
-
-    window_surface_unlock(window_surface);
+    return window_surface;
 }
-
 
 /***********************************************************************
  *           WAYLAND_CreateWindowSurface

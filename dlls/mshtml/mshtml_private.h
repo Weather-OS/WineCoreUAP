@@ -407,6 +407,7 @@ typedef struct {
 } dispex_static_data_vtbl_t;
 
 #define ALL_PROTOTYPES                     \
+    X(Attr)                                \
     X(CSSRule)                             \
     X(CSSStyleDeclaration)                 \
     X(CSSStyleRule)                        \
@@ -414,11 +415,13 @@ typedef struct {
     X(CharacterData)                       \
     X(ClientRect)                          \
     X(ClientRectList)                      \
+    X(Comment)                             \
     X(Console)                             \
     X(CustomEvent)                         \
     X(DOMImplementation)                   \
     X(DOMTokenList)                        \
     X(Document)                            \
+    X(DocumentFragment)                    \
     X(DocumentType)                        \
     X(Element)                             \
     X(Event)                               \
@@ -451,6 +454,7 @@ typedef struct {
     X(HTMLTableRowElement)                 \
     X(HTMLTextAreaElement)                 \
     X(HTMLTitleElement)                    \
+    X(HTMLUnknownElement)                  \
     X(History)                             \
     X(KeyboardEvent)                       \
     X(MSCSSProperties)                     \
@@ -1124,6 +1128,7 @@ struct HTMLDocumentNode {
 
     nsIDOMDocument *dom_document;
     nsIDOMHTMLDocument *html_document;
+    unsigned int emulate_mode : 1;
     unsigned int content_ready : 1;
     unsigned int unload_sent : 1;
 

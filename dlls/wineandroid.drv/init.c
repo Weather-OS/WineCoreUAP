@@ -50,6 +50,7 @@ static RECT monitor_rc_work;
 static int device_init_done;
 
 PNTAPCFUNC register_window_callback;
+UINT64 start_device_callback;
 
 typedef struct
 {
@@ -345,7 +346,6 @@ static const struct user_driver_funcs android_drv_funcs =
     .pProcessEvents = ANDROID_ProcessEvents,
     .pSetCapture = ANDROID_SetCapture,
     .pSetParent = ANDROID_SetParent,
-    .pSetWindowStyle = ANDROID_SetWindowStyle,
     .pShowWindow = ANDROID_ShowWindow,
     .pWindowMessage = ANDROID_WindowMessage,
     .pWindowPosChanging = ANDROID_WindowPosChanging,
@@ -574,6 +574,7 @@ static HRESULT android_init( void *arg )
     pthread_mutexattr_destroy( &attr );
 
     register_window_callback = params->register_window_callback;
+    start_device_callback = params->start_device_callback;
 
     if ((java_vm = *p_java_vm))  /* running under Java */
     {

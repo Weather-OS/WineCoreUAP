@@ -19,8 +19,22 @@
 #pragma makedep register
 
 [
+    helpstring("AVI Byte Stream Handler"),
+    threading(both),
+    uuid(7afa253e-f823-42f6-a5d9-714bde467412)
+]
+coclass AVIByteStreamPlugin { }
+
+[
     helpstring("MF WAVE Sink Factory"),
     threading(both),
     uuid(36f99745-23c9-4c9c-8dd5-cc31ce964390)
 ]
 coclass MFWAVESinkClassFactory { }
+
+[
+    helpstring("WAV Byte Stream Handler"),
+    threading(both),
+    uuid(42c9b9f5-16fc-47ef-af22-da05f7c842e3)
+]
+coclass WAVByteStreamPlugin {}

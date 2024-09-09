@@ -64,6 +64,8 @@ struct wined3d_saved_states
     uint32_t texture_matrices : 1;
     uint32_t modelview_matrices : 1;
     uint32_t point_scale : 1;
+    uint32_t ffp_vs_settings : 1;
+    uint32_t ffp_ps_settings : 1;
 };
 
 struct stage_state
@@ -1593,6 +1595,14 @@ void CDECL wined3d_stateblock_set_render_state(struct wined3d_stateblock *stateb
             stateblock->changed.point_scale = 1;
             break;
 
+        case WINED3D_RS_NORMALIZENORMALS:
+            stateblock->changed.ffp_vs_settings = 1;
+            break;
+
+        case WINED3D_RS_COLORKEYENABLE:
+            stateblock->changed.ffp_ps_settings = 1;
+            break;
+
         default:
             break;
     }
@@ -1645,6 +1655,19 @@ void CDECL wined3d_stateblock_set_texture_stage_state(struct wined3d_stateblock 
         case WINED3D_TSS_TEXCOORD_INDEX:
         case WINED3D_TSS_TEXTURE_TRANSFORM_FLAGS:
             stateblock->changed.texture_matrices = 1;
+            stateblock->changed.ffp_ps_settings = 1;
+            break;
+
+        case WINED3D_TSS_ALPHA_ARG0:
+        case WINED3D_TSS_ALPHA_ARG1:
+        case WINED3D_TSS_ALPHA_ARG2:
+        case WINED3D_TSS_ALPHA_OP:
+        case WINED3D_TSS_COLOR_ARG0:
+        case WINED3D_TSS_COLOR_ARG1:
+        case WINED3D_TSS_COLOR_ARG2:
+        case WINED3D_TSS_COLOR_OP:
+        case WINED3D_TSS_RESULT_ARG:
+            stateblock->changed.ffp_ps_settings = 1;
             break;
 
         default:
@@ -1652,9 +1675,47 @@ void CDECL wined3d_stateblock_set_texture_stage_state(struct wined3d_stateblock 
     }
 }
 
+static bool texture_binding_might_invalidate_fs_settings(const struct wined3d_stateblock *stateblock,
+        const struct wined3d_texture *texture, const struct wined3d_texture *prev, unsigned int stage)
+{
+    const struct wined3d_d3d_info *d3d_info = &stateblock->device->adapter->d3d_info;
+    const struct wined3d_format *old_format, *new_format;
+    unsigned int old_usage, new_usage;
+
+    /* The source arguments for color and alpha ops have different meanings when
+     * a NULL texture is bound. */
+    if (!texture)
+        return !!prev;
+    if (!prev)
+        return true;
+
+    old_usage = prev->resource.usage;
+    new_usage = texture->resource.usage;
+    if (texture->resource.type != prev->resource.type
+            || ((old_usage & WINED3DUSAGE_LEGACY_CUBEMAP) != (new_usage & WINED3DUSAGE_LEGACY_CUBEMAP)))
+        return true;
+
+    if (!stage && stateblock->stateblock_state.rs[WINED3D_RS_COLORKEYENABLE]
+            && (texture->color_key_flags & WINED3D_CKEY_SRC_BLT))
+        return true;
+
+    old_format = prev->resource.format;
+    new_format = texture->resource.format;
+
+    if (is_same_fixup(old_format->color_fixup, new_format->color_fixup))
+        return false;
+
+    if (can_use_texture_swizzle(d3d_info, new_format) && can_use_texture_swizzle(d3d_info, old_format))
+        return false;
+
+    return true;
+}
+
 void CDECL wined3d_stateblock_set_texture(struct wined3d_stateblock *stateblock,
         UINT stage, struct wined3d_texture *texture)
 {
+    struct wined3d_texture *prev = stateblock->stateblock_state.textures[stage];
+
     TRACE("stateblock %p, stage %u, texture %p.\n", stateblock, stage, texture);
 
     if (stage >= ARRAY_SIZE(stateblock->stateblock_state.textures))
@@ -1665,10 +1726,13 @@ void CDECL wined3d_stateblock_set_texture(struct wined3d_stateblock *stateblock,
 
     if (texture)
         wined3d_texture_incref(texture);
-    if (stateblock->stateblock_state.textures[stage])
-        wined3d_texture_decref(stateblock->stateblock_state.textures[stage]);
+    if (prev)
+        wined3d_texture_decref(prev);
     stateblock->stateblock_state.textures[stage] = texture;
     stateblock->changed.textures |= 1u << stage;
+
+    if (texture_binding_might_invalidate_fs_settings(stateblock, texture, prev, stage))
+        stateblock->changed.ffp_ps_settings = 1;
 }
 
 void CDECL wined3d_stateblock_set_transform(struct wined3d_stateblock *stateblock,
@@ -3624,6 +3688,18 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
 
         wined3d_device_context_push_constants(context, WINED3D_PUSH_CONSTANTS_PS_FFP,
                 WINED3D_SHADER_CONST_FFP_PS, 0, offsetof(struct wined3d_ffp_ps_constants, color_key), &constants);
+    }
+
+    if (changed->ffp_vs_settings && !state->vs)
+    {
+        /* Force invalidation of the vertex shader. */
+        wined3d_device_context_emit_set_shader(context, WINED3D_SHADER_TYPE_VERTEX, NULL);
+    }
+
+    if (changed->ffp_ps_settings && !state->ps)
+    {
+        /* Force invalidation of the pixel shader. */
+        wined3d_device_context_emit_set_shader(context, WINED3D_SHADER_TYPE_PIXEL, NULL);
     }
 
     assert(list_empty(&stateblock->changed.changed_lights));

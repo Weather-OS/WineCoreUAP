@@ -737,8 +737,8 @@ typedef struct
 #define MSIHANDLETYPE_PACKAGE 5
 #define MSIHANDLETYPE_PREVIEW 6
 
-#define MSI_MAJORVERSION 4
-#define MSI_MINORVERSION 5
+#define MSI_MAJORVERSION 5
+#define MSI_MINORVERSION 0
 #define MSI_BUILDNUMBER 6001
 
 #define GUID_SIZE 39
@@ -786,7 +786,7 @@ extern UINT msi_commit_streams( MSIDATABASE *db );
 
 
 /* string table functions */
-extern BOOL msi_add_string( string_table *st, const WCHAR *data, int len, BOOL persistent );
+extern int msi_add_string( string_table *st, const WCHAR *data, int len, BOOL persistent );
 extern UINT msi_string2id( const string_table *st, const WCHAR *data, int len, UINT *id );
 extern VOID msi_destroy_stringtable( string_table *st );
 extern const WCHAR *msi_string_lookup( const string_table *st, UINT id, int *len );
@@ -982,6 +982,9 @@ extern WCHAR *msi_get_suminfo_product( IStorage *stg ) __WINE_DEALLOC(free) __WI
 extern UINT msi_add_suminfo( MSIDATABASE *db, LPWSTR **records, int num_records, int num_columns );
 extern UINT msi_export_suminfo( MSIDATABASE *db, HANDLE handle );
 extern UINT msi_load_suminfo_properties( MSIPACKAGE *package );
+extern UINT msi_suminfo_persist( MSISUMMARYINFO * );
+extern UINT msi_suminfo_get_prop( MSISUMMARYINFO *, UINT, UINT *, INT *, FILETIME *, awstring *, DWORD * );
+extern UINT msi_suminfo_set_prop( MSISUMMARYINFO *, UINT, UINT, INT, FILETIME *, awcstring * );
 
 /* undocumented functions */
 UINT WINAPI MsiCreateAndVerifyInstallerDirectory( DWORD );
@@ -1090,6 +1093,7 @@ static inline void msi_revert_fs_redirection( MSIPACKAGE *package )
 }
 extern BOOL msi_get_temp_file_name( MSIPACKAGE *, const WCHAR *, const WCHAR *, WCHAR * );
 extern HANDLE msi_create_file( MSIPACKAGE *, const WCHAR *, DWORD, DWORD, DWORD, DWORD );
+extern BOOL msi_copy_file( MSIPACKAGE *, const WCHAR *, const WCHAR *, BOOL );
 extern BOOL msi_delete_file( MSIPACKAGE *, const WCHAR * );
 extern BOOL msi_remove_directory( MSIPACKAGE *, const WCHAR * );
 extern DWORD msi_get_file_attributes( MSIPACKAGE *, const WCHAR * );

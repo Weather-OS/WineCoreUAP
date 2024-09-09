@@ -126,6 +126,11 @@ static bool is_slash( char c )
     return c == '/' || c == '\\';
 }
 
+static BOOL is_drive_specA( const char *str )
+{
+    return isalpha( str[0] ) && str[1] == ':';
+}
+
 static BOOL is_drive_spec( const WCHAR *str )
 {
     return isalpha( str[0] ) && str[1] == ':';
@@ -728,7 +733,6 @@ BOOL WINAPI PathCchIsRoot(const WCHAR *path)
         /* Has first segment with an ending backslash and has remaining characters*/
         else
         {
-            next++;
             /* Second segment must have no backslash and no remaining characters */
             return !get_next_segment(next, &next) && !*next;
         }
@@ -809,39 +813,26 @@ HRESULT WINAPI PathCchRemoveExtension(WCHAR *path, SIZE_T size)
 
 HRESULT WINAPI PathCchRemoveFileSpec(WCHAR *path, SIZE_T size)
 {
-    const WCHAR *root_end = NULL;
-    SIZE_T length;
-    WCHAR *last;
+    WCHAR *last, *root_end;
 
     TRACE("%s %Iu\n", wine_dbgstr_w(path), size);
 
     if (!path || !size || size > PATHCCH_MAX_CCH) return E_INVALIDARG;
 
-    if (PathCchIsRoot(path)) return S_FALSE;
-
-    PathCchSkipRoot(path, &root_end);
+    if (FAILED(PathCchSkipRoot(path, (const WCHAR **)&root_end)))
+        root_end = path;
 
     /* The backslash at the end of UNC and \\* are not considered part of root in this case */
-    if (root_end && root_end > path && root_end[-1] == '\\'
-        && (is_prefixed_unc(path) || (path[0] == '\\' && path[1] == '\\' && path[2] != '?')))
+    if (root_end > path && root_end[-1] == '\\' && ((is_prefixed_unc(path) && path[8])
+        || (path[0] == '\\' && path[1] == '\\' && path[2] && path[2] != '?')))
         root_end--;
 
-    length = lstrlenW(path);
-    last = path + length - 1;
-    while (last >= path && (!root_end || last >= root_end))
-    {
-        if (last - path >= size) return E_INVALIDARG;
-
-        if (*last == '\\')
-        {
-            *last-- = 0;
-            break;
-        }
-
-        *last-- = 0;
-    }
-
-    return last != path + length - 1 ? S_OK : S_FALSE;
+    if (!(last = StrRChrW(root_end, NULL, '\\'))) last = root_end;
+    if (last > root_end && last[-1] == '\\' && last[1] != '?') --last;
+    if (last - path >= size) return E_INVALIDARG;
+    if (!*last) return S_FALSE;
+    *last = 0;
+    return S_OK;
 }
 
 HRESULT WINAPI PathCchRenameExtension(WCHAR *path, SIZE_T size, const WCHAR *extension)
@@ -915,29 +906,16 @@ HRESULT WINAPI PathCchStripToRoot(WCHAR *path, SIZE_T size)
 {
     const WCHAR *root_end;
     WCHAR *segment_end;
-    BOOL is_unc;
 
     TRACE("%s %Iu\n", wine_dbgstr_w(path), size);
 
     if (!path || !*path || !size || size > PATHCCH_MAX_CCH) return E_INVALIDARG;
 
-    /* \\\\?\\UNC\\* and \\\\* have to have at least two extra segments to be striped,
-     * e.g. \\\\?\\UNC\\a\\b\\c -> \\\\?\\UNC\\a\\b
-     *      \\\\a\\b\\c         -> \\\\a\\b         */
-    if ((is_unc = is_prefixed_unc(path)) || (path[0] == '\\' && path[1] == '\\' && path[2] != '?'))
+    if (PathCchSkipRoot(path, &root_end) == S_OK)
     {
-        root_end = is_unc ? path + 8 : path + 3;
-        if (!get_next_segment(root_end, &root_end)) return S_FALSE;
-        if (!get_next_segment(root_end, &root_end)) return S_FALSE;
-
-        if (root_end - path >= size) return E_INVALIDARG;
-
-        segment_end = path + (root_end - path) - 1;
-        *segment_end = 0;
-        return S_OK;
-    }
-    else if (PathCchSkipRoot(path, &root_end) == S_OK)
-    {
+        if (root_end && root_end > path && root_end[-1] == '\\'
+            && ((is_prefixed_unc(path) && path[8]) || (path[0] == '\\' && path[1] == '\\' && path[2] && path[2] != '?')))
+            root_end--;
         if (root_end - path >= size) return E_INVALIDARG;
 
         segment_end = path + (root_end - path);
@@ -947,7 +925,10 @@ HRESULT WINAPI PathCchStripToRoot(WCHAR *path, SIZE_T size)
         return S_OK;
     }
     else
+    {
+        *path = 0;
         return E_INVALIDARG;
+    }
 }
 
 BOOL WINAPI PathIsUNCEx(const WCHAR *path, const WCHAR **server)
@@ -1049,183 +1030,116 @@ BOOL WINAPI PathIsUNCServerShareW(const WCHAR *path)
 
 BOOL WINAPI PathIsRootA(const char *path)
 {
+    WCHAR pathW[MAX_PATH];
+
     TRACE("%s\n", wine_dbgstr_a(path));
 
-    if (!path || !*path)
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH))
         return FALSE;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
 
-    if (*path == '\\')
-    {
-        if (!path[1])
-            return TRUE; /* \ */
-        else if (path[1] == '\\')
-        {
-            BOOL seen_slash = FALSE;
-            path += 2;
-
-            /* Check for UNC root path */
-            while (*path)
-            {
-                if (*path == '\\')
-                {
-                    if (seen_slash)
-                        return FALSE;
-                    seen_slash = TRUE;
-                }
-
-                path = CharNextA(path);
-            }
-
-            return TRUE;
-        }
-    }
-    else if (path[1] == ':' && path[2] == '\\' && path[3] == '\0')
-        return TRUE; /* X:\ */
-
-    return FALSE;
+    return PathIsRootW(pathW);
 }
 
 BOOL WINAPI PathIsRootW(const WCHAR *path)
 {
     TRACE("%s\n", wine_dbgstr_w(path));
 
-    if (!path || !*path)
-        return FALSE;
-
-    if (*path == '\\')
-    {
-        if (!path[1])
-            return TRUE; /* \ */
-        else if (path[1] == '\\')
-        {
-            BOOL seen_slash = FALSE;
-
-            path += 2;
-            /* Check for UNC root path */
-            while (*path)
-            {
-                if (*path == '\\')
-                {
-                    if (seen_slash)
-                        return FALSE;
-                    seen_slash = TRUE;
-                }
-                path++;
-            }
-
-            return TRUE;
-        }
-    }
-    else if (path[1] == ':' && path[2] == '\\' && path[3] == '\0')
-        return TRUE; /* X:\ */
-
-    return FALSE;
+    return PathCchIsRoot(path);
 }
 
 BOOL WINAPI PathRemoveFileSpecA(char *path)
 {
-    char *filespec = path;
-    BOOL modified = FALSE;
+    char *root_end = NULL, *ptr;
 
-    TRACE("%s\n", wine_dbgstr_a(path));
+    TRACE("%s\n", debugstr_a(path));
 
-    if (!path)
+    if (!path || !*path)
         return FALSE;
 
-    /* Skip directory or UNC path */
-    if (*path == '\\')
-        filespec = ++path;
-    if (*path == '\\')
-        filespec = ++path;
-
-    while (*path)
+    if (is_drive_specA(path))
     {
-        if (*path == '\\')
-            filespec = path; /* Skip dir */
-        else if (*path == ':')
+        root_end = path + 2;
+        if (*root_end == '\\') ++root_end;
+    }
+    else
+    {
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
         {
-            filespec = ++path; /* Skip drive */
-            if (*path == '\\')
-                filespec++;
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_specA(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
         }
-        if (!(path = CharNextA(path)))
-            break;
     }
-
-    if (*filespec)
+    ptr = StrRChrA(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
     {
-        *filespec = '\0';
-        modified = TRUE;
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
     }
-
-    return modified;
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
 }
 
 BOOL WINAPI PathRemoveFileSpecW(WCHAR *path)
 {
-    WCHAR *filespec = path;
-    BOOL modified = FALSE;
+    WCHAR *root_end = NULL, *ptr;
 
-    TRACE("%s\n", wine_dbgstr_w(path));
+    TRACE("%s\n", debugstr_w(path));
 
-    if (!path)
+    if (!path || !*path)
         return FALSE;
 
-    /* Skip directory or UNC path */
-    if (*path == '\\')
-        filespec = ++path;
-    if (*path == '\\')
-        filespec = ++path;
-
-    while (*path)
+    if (is_prefixed_volume(path))    root_end = path + 48;
+    else if (is_prefixed_disk(path)) root_end = path + 6;
+    else if (is_drive_spec(path))    root_end = path + 2;
+    if (!root_end)
     {
-        if (*path == '\\')
-            filespec = path; /* Skip dir */
-        else if (*path == ':')
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
         {
-            filespec = ++path; /* Skip drive */
-            if (*path == '\\')
-                filespec++;
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_spec(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
         }
-
-        path++;
     }
-
-    if (*filespec)
+    else if (*root_end == '\\') ++root_end;
+    ptr = StrRChrW(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
     {
-        *filespec = '\0';
-        modified = TRUE;
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
     }
-
-    return modified;
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
 }
 
 BOOL WINAPI PathStripToRootA(char *path)
 {
+    WCHAR pathW[MAX_PATH];
+
     TRACE("%s\n", wine_dbgstr_a(path));
 
-    if (!path)
-        return FALSE;
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH)) return FALSE;
 
-    while (!PathIsRootA(path))
-        if (!PathRemoveFileSpecA(path))
-            return FALSE;
-
-    return TRUE;
+    *path = 0;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
+    if (!PathStripToRootW(pathW)) return FALSE;
+    return !!WideCharToMultiByte(CP_ACP, 0, pathW, -1, path, MAX_PATH, 0, 0);
 }
 
 BOOL WINAPI PathStripToRootW(WCHAR *path)
 {
     TRACE("%s\n", wine_dbgstr_w(path));
 
-    if (!path)
-        return FALSE;
-
-    while (!PathIsRootW(path))
-        if (!PathRemoveFileSpecW(path))
-            return FALSE;
-
-    return TRUE;
+    return SUCCEEDED(PathCchStripToRoot(path, PATHCCH_MAX_CCH));
 }
 
 LPSTR WINAPI PathAddBackslashA(char *path)

@@ -58,6 +58,32 @@ static inline const char *debugstr_window_rects( const struct window_rects *rect
                              wine_dbgstr_rect( &rects->client ), wine_dbgstr_rect( &rects->visible ) );
 }
 
+/* convert a visible rect to the corresponding window rect, using the window_rects offsets */
+static inline RECT window_rect_from_visible( struct window_rects *rects, RECT visible_rect )
+{
+    RECT rect = visible_rect;
+
+    rect.left += rects->window.left - rects->visible.left;
+    rect.top += rects->window.top - rects->visible.top;
+    rect.right += rects->window.right - rects->visible.right;
+    rect.bottom += rects->window.bottom - rects->visible.bottom;
+
+    return rect;
+}
+
+/* convert a window rect to the corresponding visible rect, using the window_rects offsets */
+static inline RECT visible_rect_from_window( struct window_rects *rects, RECT window_rect )
+{
+    RECT rect = window_rect;
+
+    rect.left += rects->visible.left - rects->window.left;
+    rect.top += rects->visible.top - rects->window.top;
+    rect.right += rects->visible.right - rects->window.right;
+    rect.bottom += rects->visible.bottom - rects->window.bottom;
+
+    return rect;
+}
+
 typedef struct gdi_physdev
 {
     const struct gdi_dc_funcs *funcs;
@@ -193,7 +219,7 @@ struct gdi_dc_funcs
 };
 
 /* increment this when you change the DC function table */
-#define WINE_GDI_DRIVER_VERSION 93
+#define WINE_GDI_DRIVER_VERSION 96
 
 #define GDI_PRIORITY_NULL_DRV        0  /* null driver */
 #define GDI_PRIORITY_FONT_DRV      100  /* any font driver */
@@ -253,8 +279,8 @@ struct window_surface
     /* driver-specific fields here */
 };
 
-W32KAPI BOOL window_surface_init( struct window_surface *surface, const struct window_surface_funcs *funcs,
-                                  HWND hwnd, const RECT *rect, BITMAPINFO *info, HBITMAP bitmap );
+W32KAPI struct window_surface *window_surface_create( UINT size, const struct window_surface_funcs *funcs, HWND hwnd,
+                                                      const RECT *rect, BITMAPINFO *info, HBITMAP bitmap );
 W32KAPI void window_surface_add_ref( struct window_surface *surface );
 W32KAPI void window_surface_release( struct window_surface *surface );
 W32KAPI void window_surface_lock( struct window_surface *surface );
@@ -314,6 +340,7 @@ struct user_driver_funcs
     /* IME functions */
     UINT    (*pImeProcessKey)(HIMC,UINT,UINT,const BYTE*);
     void    (*pNotifyIMEStatus)(HWND,UINT);
+    BOOL    (*pSetIMECompositionWindowPos)(HWND, const POINT *);
     /* cursor/icon functions */
     void    (*pDestroyCursorIcon)(HCURSOR);
     void    (*pSetCursor)(HWND,HCURSOR);
@@ -358,7 +385,8 @@ struct user_driver_funcs
     LRESULT (*pSysCommand)(HWND,WPARAM,LPARAM);
     void    (*pUpdateLayeredWindow)(HWND,UINT);
     LRESULT (*pWindowMessage)(HWND,UINT,WPARAM,LPARAM);
-    BOOL    (*pWindowPosChanging)(HWND,UINT,BOOL,struct window_rects *);
+    BOOL    (*pWindowPosChanging)(HWND,UINT,BOOL,const struct window_rects *);
+    BOOL    (*pGetWindowStyleMasks)(HWND,UINT,UINT,UINT*,UINT*);
     BOOL    (*pCreateWindowSurface)(HWND,BOOL,const RECT *,struct window_surface**);
     void    (*pMoveWindowBits)(HWND,const struct window_rects *,const RECT *);
     void    (*pWindowPosChanged)(HWND,HWND,UINT,const struct window_rects*,struct window_surface*);

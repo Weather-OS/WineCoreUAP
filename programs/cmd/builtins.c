@@ -408,6 +408,7 @@ RETURN_CODE WCMD_choice(WCHAR *args)
             LARGE_INTEGER li, zeroli = {0};
             OVERLAPPED overlapped = {0};
             DWORD count;
+            char choice;
 
             overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
             if (SetFilePointerEx(GetStdHandle(STD_INPUT_HANDLE), zeroli, &li, FILE_CURRENT))
@@ -415,11 +416,12 @@ RETURN_CODE WCMD_choice(WCHAR *args)
                 overlapped.Offset = li.LowPart;
                 overlapped.OffsetHigh = li.HighPart;
             }
-            if (ReadFile(GetStdHandle(STD_INPUT_HANDLE), answer, 1, NULL, &overlapped))
+            if (ReadFile(GetStdHandle(STD_INPUT_HANDLE), &choice, 1, NULL, &overlapped))
             {
                 switch (WaitForSingleObject(overlapped.hEvent, opt_timeout == -1 ? INFINITE : opt_timeout * 1000))
                 {
                 case WAIT_OBJECT_0:
+                    answer[0] = choice;
                     break;
                 case WAIT_TIMEOUT:
                     answer[0] = opt_default;
@@ -428,7 +430,7 @@ RETURN_CODE WCMD_choice(WCHAR *args)
                     return_code = ERROR_INVALID_FUNCTION;
                 }
             }
-            else if (ReadFile(GetStdHandle(STD_INPUT_HANDLE), answer, 1, &count, NULL))
+            else if (ReadFile(GetStdHandle(STD_INPUT_HANDLE), &choice, 1, &count, NULL))
             {
                 if (count == 0)
                 {
@@ -437,6 +439,8 @@ RETURN_CODE WCMD_choice(WCHAR *args)
                     else
                         return_code = ERROR_INVALID_FUNCTION;
                 }
+                else
+                    answer[0] = choice;
             }
             else
                 return_code = ERROR_INVALID_FUNCTION;
@@ -3953,17 +3957,15 @@ RETURN_CODE WCMD_assoc(const WCHAR *args, BOOL assoc)
         lstrcpyW(subkey, keyValue);
         if (!assoc) lstrcatW(subkey, L"\\Shell\\Open\\Command");
 
-        if (RegOpenKeyExW(key, subkey, 0, accessOptions, &readKey) == ERROR_SUCCESS) {
-
-          valueLen = sizeof(keyValue);
-          rc = RegQueryValueExW(readKey, NULL, NULL, NULL, (LPBYTE)keyValue, &valueLen);
+        valueLen = sizeof(keyValue);
+        if (RegOpenKeyExW(key, subkey, 0, accessOptions, &readKey) == ERROR_SUCCESS &&
+            RegQueryValueExW(readKey, NULL, NULL, NULL, (LPBYTE)keyValue, &valueLen) == ERROR_SUCCESS) {
           WCMD_output_asis(args);
           WCMD_output_asis(L"=");
-          /* If no default value found, leave line empty after '=' */
-          if (rc == ERROR_SUCCESS) WCMD_output_asis(keyValue);
+          WCMD_output_asis(keyValue);
           WCMD_output_asis(L"\r\n");
           RegCloseKey(readKey);
-          errorlevel = rc == ERROR_SUCCESS ? NO_ERROR : ERROR_INVALID_FUNCTION;
+          errorlevel = NO_ERROR;
         } else {
           WCHAR  msgbuffer[MAXSTRING];
 
@@ -3990,14 +3992,22 @@ RETURN_CODE WCMD_assoc(const WCHAR *args, BOOL assoc)
         lstrcpyW(subkey, args);
         if (!assoc) lstrcatW(subkey, L"\\Shell\\Open\\Command");
 
-        /* If nothing after '=' then clear value - only valid for ASSOC */
         if (*newValue == 0x00) {
 
-          if (assoc) rc = RegDeleteKeyW(key, args);
-          if (assoc && rc == ERROR_SUCCESS) {
+          if (assoc)
+            rc = RegDeleteKeyW(key, args);
+          else {
+            rc = RegCreateKeyExW(key, subkey, 0, NULL, REG_OPTION_NON_VOLATILE,
+                                accessOptions, NULL, &readKey, NULL);
+            if (rc == ERROR_SUCCESS) {
+              rc = RegDeleteValueW(readKey, NULL);
+              RegCloseKey(readKey);
+            }
+          }
+          if (rc == ERROR_SUCCESS) {
             WINE_TRACE("HKCR Key '%s' deleted\n", wine_dbgstr_w(args));
 
-          } else if (assoc && rc != ERROR_FILE_NOT_FOUND) {
+          } else if (rc != ERROR_FILE_NOT_FOUND) {
             WCMD_print_error();
             errorlevel = ERROR_FILE_NOT_FOUND;
 

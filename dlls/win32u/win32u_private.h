@@ -41,12 +41,13 @@ extern void release_clipboard_owner( HWND hwnd );
 extern BOOL process_wine_setcursor( HWND hwnd, HWND window, HCURSOR handle );
 extern HICON alloc_cursoricon_handle( BOOL is_icon );
 extern ULONG_PTR get_icon_param( HICON handle );
-extern ULONG_PTR set_icon_param( HICON handle, ULONG_PTR param );
+extern ULONG_PTR set_icon_param( HICON handle, const struct free_icon_params *params );
 
 /* dce.c */
 extern struct window_surface dummy_surface;
-extern void create_offscreen_window_surface( HWND hwnd, const RECT *surface_rect,
-                                             struct window_surface **surface );
+extern void create_window_surface( HWND hwnd, BOOL create_layered, const RECT *surface_rect, UINT monitor_dpi,
+                                   struct window_surface **window_surface );
+extern struct window_surface *get_driver_window_surface( struct window_surface *surface, UINT monitor_dpi );
 extern void erase_now( HWND hwnd, UINT rdw_flags );
 extern void flush_window_surfaces( BOOL idle );
 extern void move_window_bits( HWND hwnd, const RECT *visible_rect, const RECT *old_visible_rect,
@@ -102,6 +103,7 @@ extern BOOL set_capture_window( HWND hwnd, UINT gui_flags, HWND *prev_ret );
 extern BOOL set_caret_blink_time( unsigned int time );
 extern BOOL set_caret_pos( int x, int y );
 extern BOOL set_foreground_window( HWND hwnd, BOOL mouse );
+extern BOOL set_ime_composition_window_pos( HWND hwnd, const POINT *point );
 extern void toggle_caret( HWND hwnd );
 extern void update_mouse_tracking_info( HWND hwnd );
 extern BOOL get_clip_cursor( RECT *rect, UINT dpi );
@@ -157,10 +159,12 @@ extern void set_standard_scroll_painted( HWND hwnd, int bar, BOOL painted );
 extern void track_scroll_bar( HWND hwnd, int scrollbar, POINT pt );
 
 /* sysparams.c */
-extern BOOL enable_thunk_lock;
+extern BOOL decorated_mode;
+extern UINT64 thunk_lock_callback;
 extern HBRUSH get_55aa_brush(void);
 extern DWORD get_dialog_base_units(void);
 extern LONG get_char_dimensions( HDC hdc, TEXTMETRICW *metric, int *height );
+extern HBITMAP get_display_bitmap(void);
 extern INT get_display_depth( UNICODE_STRING *name );
 extern RECT get_display_rect( const WCHAR *display );
 extern UINT get_monitor_dpi( HMONITOR monitor );
@@ -180,6 +184,8 @@ extern RECT get_virtual_screen_rect( UINT dpi );
 extern BOOL is_exiting_thread( DWORD tid );
 extern POINT map_dpi_point( POINT pt, UINT dpi_from, UINT dpi_to );
 extern RECT map_dpi_rect( RECT rect, UINT dpi_from, UINT dpi_to );
+extern HRGN map_dpi_region( HRGN region, UINT dpi_from, UINT dpi_to );
+extern struct window_rects map_dpi_window_rects( struct window_rects rects, UINT dpi_from, UINT dpi_to );
 extern BOOL message_beep( UINT i );
 extern POINT point_phys_to_win_dpi( HWND hwnd, POINT pt );
 extern POINT point_thread_to_win_dpi( HWND hwnd, POINT pt );

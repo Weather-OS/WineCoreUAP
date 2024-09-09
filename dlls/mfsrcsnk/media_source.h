@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Jactry Zeng for CodeWeavers
+ * Copyright 2024 Rémi Bernon for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,11 +16,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#pragma makedep register
+#include "mfsrcsnk_private.h"
 
-[
-    helpstring("Media Engine Class Factory"),
-    threading(both),
-    uuid(b44392da-499b-446b-a4cb-005fead0e6d5)
-]
-coclass MFMediaEngineClassFactory { interface IMFMediaEngineClassFactory; }
+#include "wine/debug.h"
+
+extern IClassFactory asf_byte_stream_plugin_factory;
+extern IClassFactory avi_byte_stream_plugin_factory;
+extern IClassFactory mpeg4_byte_stream_plugin_factory;
+extern IClassFactory wav_byte_stream_plugin_factory;

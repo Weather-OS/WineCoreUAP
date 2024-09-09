@@ -46,6 +46,7 @@
 #include "initguid.h"
 
 #include "codecapi.h"
+#include "icodecapi.h"
 
 #include "d3d11_4.h"
 
@@ -265,12 +266,41 @@ static void check_interface_(unsigned int line, void *iface_ptr, REFIID iid, BOO
     ok_ (file, line)((val).member == (exp).member, "Got " #member " " fmt ", expected " fmt ".\n", (val).member, (exp).member)
 #define check_member(val, exp, fmt, member) check_member_(__FILE__, __LINE__, val, exp, fmt, member)
 
+const char *debugstr_propvariant(const PROPVARIANT *propvar, BOOL ratio)
+{
+    char buffer[1024] = {0}, *ptr = buffer;
+    UINT i;
+
+    switch (propvar->vt)
+    {
+        default:
+            return wine_dbg_sprintf("??");
+        case VT_CLSID:
+            return wine_dbg_sprintf("%s", debugstr_guid(propvar->puuid));
+        case VT_UI4:
+            return wine_dbg_sprintf("%lu", propvar->ulVal);
+        case VT_UI8:
+            if (ratio)
+                return wine_dbg_sprintf("%lu:%lu", propvar->uhVal.HighPart, propvar->uhVal.LowPart);
+            else
+                return wine_dbg_sprintf("%I64u", propvar->uhVal.QuadPart);
+        case VT_VECTOR | VT_UI1:
+            ptr += sprintf(ptr, "size %lu, data {", propvar->caub.cElems);
+            for (i = 0; i < 128 && i < propvar->caub.cElems; ++i)
+                ptr += sprintf(ptr, "0x%02x,", propvar->caub.pElems[i]);
+            if (propvar->caub.cElems > 128)
+                ptr += sprintf(ptr, "...}");
+            else
+                ptr += sprintf(ptr - (i ? 1 : 0), "}");
+            return wine_dbg_sprintf("%s", buffer);
+    }
+}
+
 void check_attributes_(const char *file, int line, IMFAttributes *attributes,
         const struct attribute_desc *desc, ULONG limit)
 {
-    char buffer[1024], *buf = buffer;
     PROPVARIANT value;
-    int i, j, ret;
+    int i, ret;
     HRESULT hr;
 
     for (i = 0; i < limit && desc[i].key; ++i)
@@ -280,32 +310,10 @@ void check_attributes_(const char *file, int line, IMFAttributes *attributes,
         ok_(file, line)(hr == S_OK, "%s missing, hr %#lx\n", debugstr_a(desc[i].name), hr);
         if (hr != S_OK) continue;
 
-        switch (value.vt)
-        {
-        default: sprintf(buffer, "??"); break;
-        case VT_CLSID: sprintf(buffer, "%s", debugstr_guid(value.puuid)); break;
-        case VT_UI4: sprintf(buffer, "%lu", value.ulVal); break;
-        case VT_UI8:
-            if (desc[i].ratio)
-                sprintf(buffer, "%lu:%lu", value.uhVal.HighPart, value.uhVal.LowPart);
-            else
-                sprintf(buffer, "%I64u", value.uhVal.QuadPart);
-            break;
-        case VT_VECTOR | VT_UI1:
-            buf += sprintf(buf, "size %lu, data {", value.caub.cElems);
-            for (j = 0; j < 128 && j < value.caub.cElems; ++j)
-                buf += sprintf(buf, "0x%02x,", value.caub.pElems[j]);
-            if (value.caub.cElems > 128)
-                buf += sprintf(buf, "...}");
-            else
-                buf += sprintf(buf - (j ? 1 : 0), "}");
-            break;
-        }
-
         ret = PropVariantCompareEx(&value, &desc[i].value, 0, 0);
         todo_wine_if(desc[i].todo_value)
         ok_(file, line)(ret == 0, "%s mismatch, type %u, value %s\n",
-                debugstr_a(desc[i].name), value.vt, buffer);
+                debugstr_a(desc[i].name), value.vt, debugstr_propvariant(&value, desc[i].ratio));
         PropVariantClear(&value);
     }
 }
@@ -2152,7 +2160,7 @@ static IMFSample *create_sample_(const BYTE *data, ULONG size, const struct attr
         hr = MFCreateMediaType(&media_type);
         ok(hr == S_OK, "Failed to create media type, hr %#lx.\n", hr);
         init_media_type(media_type, desc, -1);
-        hr = MFCreateMediaBufferFromMediaType(media_type, 0, 0, 0, &media_buffer);
+        hr = pMFCreateMediaBufferFromMediaType(media_type, 0, 0, 0, &media_buffer);
         ok(hr == S_OK, "MFCreateMediaBufferFromMediaType returned %#lx\n", hr);
         IMFMediaType_Release(media_type);
     }
@@ -4054,11 +4062,49 @@ static void test_h264_encoder(void)
         ATTR_UINT32(test_attr_guid, 0),
         {0},
     };
+    const struct attribute_desc expect_codec_api_attributes[] =
+    {
+        ATTR_UINT32(CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR, .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncCommonQuality,           65,     .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncCommonBufferSize,        72577,  .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncCommonMaxBitRate,        0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncCommonMeanBitRate,       193540, .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncCommonQualityVsSpeed,    33,     .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncH264CABACEnable,         0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncH264PPSID,               0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncH264SPSID,               0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncMPVGOPSize,              0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncMPVDefaultBPictureCount, 1,      .todo = TRUE),
+        ATTR_UINT64(CODECAPI_AVEncVideoEncodeQP,           26,     .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncVideoMaxQP,              51,     .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncVideoMinQP,              0,      .todo = TRUE),
+        ATTR_UINT32(CODECAPI_AVEncVideoMaxNumRefFrame,     2,      .todo = TRUE),
+        {0},
+    };
+    const struct attribute_desc output_sample_attributes_key[] =
+    {
+        ATTR_UINT32(MFSampleExtension_CleanPoint, 1),
+        {0},
+    };
+    const struct buffer_desc output_buffer_desc = {.length = -1 /* Variable. */};
+    const struct sample_desc output_sample_desc =
+    {
+        .attributes = output_sample_attributes_key,
+        .sample_time = 333333, .sample_duration = 333333,
+        .buffer_count = 1, .buffers = &output_buffer_desc,
+    };
     MFT_OUTPUT_STREAM_INFO output_info, expect_output_info[] = {{.cbSize = 0x8000}, {.cbSize = 0x3bc400}};
     MFT_REGISTER_TYPE_INFO output_type = {MFMediaType_Video, MFVideoFormat_H264};
     MFT_REGISTER_TYPE_INFO input_type = {MFMediaType_Video, MFVideoFormat_NV12};
+    IMFSample *input_sample, *output_sample;
+    IMFCollection *output_sample_collection;
+    const struct attribute_desc *desc;
+    ULONG nv12frame_data_size, size;
+    const BYTE *nv12frame_data;
     IMFMediaType *media_type;
     IMFTransform *transform;
+    ICodecAPI *codec_api;
+    DWORD output_status;
     HRESULT hr;
     ULONG ret;
     DWORD i;
@@ -4082,6 +4128,7 @@ static void test_h264_encoder(void)
     ok(hr == S_OK, "CoCreateInstance returned %#lx.\n", hr);
 
     check_interface(transform, &IID_IMFTransform, TRUE);
+    check_interface(transform, &IID_ICodecAPI, TRUE);
     check_interface(transform, &IID_IMediaObject, FALSE);
     check_interface(transform, &IID_IPropertyStore, FALSE);
     check_interface(transform, &IID_IPropertyBag, FALSE);
@@ -4184,6 +4231,89 @@ static void test_h264_encoder(void)
 
         winetest_pop_context();
     }
+
+    hr = IMFTransform_QueryInterface(transform, &IID_ICodecAPI, (void **)&codec_api);
+    ok(hr == S_OK, "QueryInterface returned %#lx.\n", hr);
+    for (desc = &expect_codec_api_attributes[0]; desc->key; ++desc)
+    {
+        PROPVARIANT propvar;
+        VARIANT var;
+
+        hr = ICodecAPI_GetValue(codec_api, desc->key, &var);
+        todo_wine_if(desc->todo)
+        ok(hr == S_OK, "%s is missing.\n", debugstr_a(desc->name));
+        if (hr != S_OK)
+            continue;
+        hr = VariantToPropVariant(&var, &propvar);
+        ok(hr == S_OK, "VariantToPropVariant returned %#lx.\n", hr);
+        ret = PropVariantCompareEx(&propvar, &desc->value, 0, 0);
+        todo_wine_if(desc->todo_value)
+        ok(ret == 0, "%s mismatch, type %u, value %s.\n",
+                debugstr_a(desc->name), propvar.vt, debugstr_propvariant(&propvar, desc->ratio));
+
+        PropVariantClear(&propvar);
+        VariantClear(&var);
+    }
+    ICodecAPI_Release(codec_api);
+
+    check_mft_set_output_type(transform, output_type_desc, S_OK);
+    check_mft_set_input_type(transform, input_type_desc, S_OK);
+
+    /* Load input frame. */
+    load_resource(L"nv12frame.bmp", &nv12frame_data, &nv12frame_data_size);
+    /* Skip BMP header and RGB data from the dump. */
+    size = *(DWORD *)(nv12frame_data + 2);
+    nv12frame_data_size -= size;
+    nv12frame_data += size;
+    ok(nv12frame_data_size == 13824, "Got NV12 frame size %lu.\n", nv12frame_data_size);
+
+    /* Process input samples. */
+    for (i = 0; i < 16; ++i)
+    {
+        input_sample = create_sample(nv12frame_data, nv12frame_data_size);
+        hr = IMFSample_SetSampleTime(input_sample, i * 333333);
+        ok(hr == S_OK, "SetSampleTime returned %#lx.\n", hr);
+        hr = IMFSample_SetSampleDuration(input_sample, 333333);
+        ok(hr == S_OK, "SetSampleDuration returned %#lx.\n", hr);
+        hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
+        ok(hr == S_OK || hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx.\n", hr);
+        ret = IMFSample_Release(input_sample);
+        todo_wine
+        ok(ret == 0, "Release returned %ld.\n", ret);
+        if (hr != S_OK)
+            break;
+    }
+    todo_wine
+    ok(hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx.\n", hr);
+    ok(i >= 4, "Processed %ld input samples.\n", i);
+
+    /* Check output sample. */
+    hr = MFCreateCollection(&output_sample_collection);
+    ok(hr == S_OK, "MFCreateCollection returned %#lx\n", hr);
+
+    output_sample = create_sample(NULL, expect_output_info[0].cbSize);
+    hr = check_mft_process_output(transform, output_sample, &output_status);
+    todo_wine
+    ok(hr == S_OK, "ProcessOutput returned %#lx.\n", hr);
+    if (hr != S_OK)
+    {
+        IMFSample_Release(output_sample);
+        goto failed;
+    }
+    hr = IMFCollection_AddElement(output_sample_collection, (IUnknown *)output_sample);
+    ok(hr == S_OK, "AddElement returned %#lx.\n", hr);
+    ret = IMFSample_Release(output_sample);
+    ok(ret == 1, "Release returned %ld\n", ret);
+
+    output_sample = create_sample(NULL, expect_output_info[0].cbSize);
+    hr = check_mft_process_output(transform, output_sample, &output_status);
+    ok(hr == MF_E_TRANSFORM_NEED_MORE_INPUT, "ProcessOutput returned %#lx.\n", hr);
+    ret = IMFSample_Release(output_sample);
+    ok(ret == 0, "Release returned %ld\n", ret);
+
+    ret = check_mf_sample_collection(output_sample_collection, &output_sample_desc, L"h264encdata.bin");
+    ok(ret == 0, "Got %lu%% diff\n", ret);
+    IMFCollection_Release(output_sample_collection);
 
     IMFMediaType_Release(media_type);
     ret = IMFTransform_Release(transform);
@@ -8144,6 +8274,12 @@ static void test_video_processor(BOOL use_2d_buffer)
     ULONG ret;
     GUID guid;
     LONG ref;
+
+    if (use_2d_buffer && !pMFCreateMediaBufferFromMediaType)
+    {
+        win_skip("MFCreateMediaBufferFromMediaType() is unsupported.\n");
+        return;
+    }
 
     hr = CoInitialize(NULL);
     ok(hr == S_OK, "Failed to initialize, hr %#lx.\n", hr);

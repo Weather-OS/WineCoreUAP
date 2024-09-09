@@ -24,6 +24,17 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_NETINET_TCP_H
+#include <netinet/tcp.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
 
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
@@ -42,6 +53,8 @@
 #include "ddk/ntddser.h"
 #define USE_WS_PREFIX
 #include "winsock2.h"
+#include "ws2tcpip.h"
+#include "tcpmib.h"
 #include "file.h"
 #include "request.h"
 #include "security.h"
@@ -1375,6 +1388,91 @@ static void dump_varargs_handle_infos( const char *prefix, data_size_t size )
                  handle->owner, handle->handle, handle->access, handle->attributes, handle->type );
         size -= sizeof(*handle);
         remove_data( sizeof(*handle) );
+        if (size) fputc( ',', stderr );
+    }
+    fputc( '}', stderr );
+}
+
+static void dump_varargs_tcp_connections( const char *prefix, data_size_t size )
+{
+    static const char * const state_names[] = {
+        NULL,
+        "CLOSED",
+        "LISTEN",
+        "SYN_SENT",
+        "SYN_RCVD",
+        "ESTAB",
+        "FIN_WAIT1",
+        "FIN_WAIT2",
+        "CLOSE_WAIT",
+        "CLOSING",
+        "LAST_ACK",
+        "TIME_WAIT",
+        "DELETE_TCB"
+    };
+    const tcp_connection *conn;
+
+    fprintf( stderr, "%s{", prefix );
+    while (size >= sizeof(*conn))
+    {
+        conn = cur_data;
+
+        if (conn->common.family == WS_AF_INET)
+        {
+            char local_addr_str[INET_ADDRSTRLEN] = { 0 };
+            char remote_addr_str[INET_ADDRSTRLEN] = { 0 };
+            inet_ntop( AF_INET, (struct in_addr *)&conn->ipv4.local_addr, local_addr_str, INET_ADDRSTRLEN );
+            inet_ntop( AF_INET, (struct in_addr *)&conn->ipv4.remote_addr, remote_addr_str, INET_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET,owner=%04x,state=%s,local=%s:%d,remote=%s:%d}",
+                     conn->ipv4.owner, state_names[conn->ipv4.state],
+                     local_addr_str, conn->ipv4.local_port,
+                     remote_addr_str, conn->ipv4.remote_port );
+        }
+        else
+        {
+            char local_addr_str[INET6_ADDRSTRLEN];
+            char remote_addr_str[INET6_ADDRSTRLEN];
+            inet_ntop( AF_INET6, (struct in6_addr *)&conn->ipv6.local_addr, local_addr_str, INET6_ADDRSTRLEN );
+            inet_ntop( AF_INET6, (struct in6_addr *)&conn->ipv6.remote_addr, remote_addr_str, INET6_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET6,owner=%04x,state=%s,local=[%s%%%d]:%d,remote=[%s%%%d]:%d}",
+                     conn->ipv6.owner, state_names[conn->ipv6.state],
+                     local_addr_str, conn->ipv6.local_scope_id, conn->ipv6.local_port,
+                     remote_addr_str, conn->ipv6.remote_scope_id, conn->ipv6.remote_port );
+        }
+
+        size -= sizeof(*conn);
+        remove_data( sizeof(*conn) );
+        if (size) fputc( ',', stderr );
+    }
+    fputc( '}', stderr );
+}
+
+static void dump_varargs_udp_endpoints( const char *prefix, data_size_t size )
+{
+    const udp_endpoint *endpt;
+
+    fprintf( stderr, "%s{", prefix );
+    while (size >= sizeof(*endpt))
+    {
+        endpt = cur_data;
+
+        if (endpt->common.family == WS_AF_INET)
+        {
+            char addr_str[INET_ADDRSTRLEN] = { 0 };
+            inet_ntop( AF_INET, (struct in_addr *)&endpt->ipv4.addr, addr_str, INET_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET,owner=%04x,addr=%s:%d}",
+                     endpt->ipv4.owner, addr_str, endpt->ipv4.port );
+        }
+        else
+        {
+            char addr_str[INET6_ADDRSTRLEN];
+            inet_ntop( AF_INET6, (struct in6_addr *)&endpt->ipv6.addr, addr_str, INET6_ADDRSTRLEN );
+            fprintf( stderr, "{family=AF_INET6,owner=%04x,addr=[%s%%%d]:%d}",
+                     endpt->ipv6.owner, addr_str, endpt->ipv6.scope_id, endpt->ipv6.port );
+        }
+
+        size -= sizeof(*endpt);
+        remove_data( sizeof(*endpt) );
         if (size) fputc( ',', stderr );
     }
     fputc( '}', stderr );
@@ -3163,6 +3261,7 @@ static void dump_set_window_pos_request( const struct set_window_pos_request *re
 {
     fprintf( stderr, " swp_flags=%04x", req->swp_flags );
     fprintf( stderr, ", paint_flags=%04x", req->paint_flags );
+    fprintf( stderr, ", monitor_dpi=%08x", req->monitor_dpi );
     fprintf( stderr, ", handle=%08x", req->handle );
     fprintf( stderr, ", previous=%08x", req->previous );
     dump_rectangle( ", window=", &req->window );
@@ -4073,6 +4172,27 @@ static void dump_get_system_handles_reply( const struct get_system_handles_reply
     dump_varargs_handle_infos( ", data=", cur_size );
 }
 
+static void dump_get_tcp_connections_request( const struct get_tcp_connections_request *req )
+{
+    fprintf( stderr, " state_filter=%08x", req->state_filter );
+}
+
+static void dump_get_tcp_connections_reply( const struct get_tcp_connections_reply *req )
+{
+    fprintf( stderr, " count=%08x", req->count );
+    dump_varargs_tcp_connections( ", connections=", cur_size );
+}
+
+static void dump_get_udp_endpoints_request( const struct get_udp_endpoints_request *req )
+{
+}
+
+static void dump_get_udp_endpoints_reply( const struct get_udp_endpoints_reply *req )
+{
+    fprintf( stderr, " count=%08x", req->count );
+    dump_varargs_udp_endpoints( ", endpoints=", cur_size );
+}
+
 static void dump_create_mailslot_request( const struct create_mailslot_request *req )
 {
     fprintf( stderr, " access=%08x", req->access );
@@ -4872,6 +4992,8 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_set_security_object_request,
     (dump_func)dump_get_security_object_request,
     (dump_func)dump_get_system_handles_request,
+    (dump_func)dump_get_tcp_connections_request,
+    (dump_func)dump_get_udp_endpoints_request,
     (dump_func)dump_create_mailslot_request,
     (dump_func)dump_set_mailslot_info_request,
     (dump_func)dump_create_directory_request,
@@ -5161,6 +5283,8 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     (dump_func)dump_get_security_object_reply,
     (dump_func)dump_get_system_handles_reply,
+    (dump_func)dump_get_tcp_connections_reply,
+    (dump_func)dump_get_udp_endpoints_reply,
     (dump_func)dump_create_mailslot_reply,
     (dump_func)dump_set_mailslot_info_reply,
     (dump_func)dump_create_directory_reply,
@@ -5450,6 +5574,8 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "set_security_object",
     "get_security_object",
     "get_system_handles",
+    "get_tcp_connections",
+    "get_udp_endpoints",
     "create_mailslot",
     "set_mailslot_info",
     "create_directory",

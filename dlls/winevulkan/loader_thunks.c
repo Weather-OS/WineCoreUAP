@@ -1,10 +1,16 @@
-/* Automatically generated from Vulkan vk.xml; DO NOT EDIT!
+/* Automatically generated from Vulkan vk.xml and video.xml; DO NOT EDIT!
  *
  * This file is generated from Vulkan vk.xml file covered
  * by the following copyright and permission notice:
  *
  * Copyright 2015-2024 The Khronos Group Inc.
  *
+ * SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * and from Vulkan video.xml file covered
+ * by the following copyright and permission notice:
+ *
+ * Copyright 2021-2024 The Khronos Group Inc.
  * SPDX-License-Identifier: Apache-2.0 OR MIT
  *
  */
@@ -86,6 +92,16 @@ VkResult WINAPI vkAllocateMemory(VkDevice device, const VkMemoryAllocateInfo *pA
     status = UNIX_CALL(vkAllocateMemory, &params);
     assert(!status && "vkAllocateMemory");
     return params.result;
+}
+
+void WINAPI vkAntiLagUpdateAMD(VkDevice device, const VkAntiLagDataAMD *pData)
+{
+    struct vkAntiLagUpdateAMD_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pData = pData;
+    status = UNIX_CALL(vkAntiLagUpdateAMD, &params);
+    assert(!status && "vkAntiLagUpdateAMD");
 }
 
 VkResult WINAPI vkBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo *pBeginInfo)
@@ -196,6 +212,19 @@ VkResult WINAPI vkBindOpticalFlowSessionImageNV(VkDevice device, VkOpticalFlowSe
     params.layout = layout;
     status = UNIX_CALL(vkBindOpticalFlowSessionImageNV, &params);
     assert(!status && "vkBindOpticalFlowSessionImageNV");
+    return params.result;
+}
+
+VkResult WINAPI vkBindVideoSessionMemoryKHR(VkDevice device, VkVideoSessionKHR videoSession, uint32_t bindSessionMemoryInfoCount, const VkBindVideoSessionMemoryInfoKHR *pBindSessionMemoryInfos)
+{
+    struct vkBindVideoSessionMemoryKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.videoSession = videoSession;
+    params.bindSessionMemoryInfoCount = bindSessionMemoryInfoCount;
+    params.pBindSessionMemoryInfos = pBindSessionMemoryInfos;
+    status = UNIX_CALL(vkBindVideoSessionMemoryKHR, &params);
+    assert(!status && "vkBindVideoSessionMemoryKHR");
     return params.result;
 }
 
@@ -315,6 +344,14 @@ void WINAPI vkCmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32
     params.pCounterBuffers = pCounterBuffers;
     params.pCounterBufferOffsets = pCounterBufferOffsets;
     UNIX_CALL(vkCmdBeginTransformFeedbackEXT, &params);
+}
+
+void WINAPI vkCmdBeginVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoBeginCodingInfoKHR *pBeginInfo)
+{
+    struct vkCmdBeginVideoCodingKHR_params params;
+    params.commandBuffer = commandBuffer;
+    params.pBeginInfo = pBeginInfo;
+    UNIX_CALL(vkCmdBeginVideoCodingKHR, &params);
 }
 
 void WINAPI vkCmdBindDescriptorBufferEmbeddedSamplers2EXT(VkCommandBuffer commandBuffer, const VkBindDescriptorBufferEmbeddedSamplersInfoEXT *pBindDescriptorBufferEmbeddedSamplersInfo)
@@ -594,6 +631,14 @@ void WINAPI vkCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage i
     UNIX_CALL(vkCmdClearDepthStencilImage, &params);
 }
 
+void WINAPI vkCmdControlVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoCodingControlInfoKHR *pCodingControlInfo)
+{
+    struct vkCmdControlVideoCodingKHR_params params;
+    params.commandBuffer = commandBuffer;
+    params.pCodingControlInfo = pCodingControlInfo;
+    UNIX_CALL(vkCmdControlVideoCodingKHR, &params);
+}
+
 void WINAPI vkCmdCopyAccelerationStructureKHR(VkCommandBuffer commandBuffer, const VkCopyAccelerationStructureInfoKHR *pInfo)
 {
     struct vkCmdCopyAccelerationStructureKHR_params params;
@@ -838,6 +883,14 @@ void WINAPI vkCmdDebugMarkerInsertEXT(VkCommandBuffer commandBuffer, const VkDeb
     params.commandBuffer = commandBuffer;
     params.pMarkerInfo = pMarkerInfo;
     UNIX_CALL(vkCmdDebugMarkerInsertEXT, &params);
+}
+
+void WINAPI vkCmdDecodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoDecodeInfoKHR *pDecodeInfo)
+{
+    struct vkCmdDecodeVideoKHR_params params;
+    params.commandBuffer = commandBuffer;
+    params.pDecodeInfo = pDecodeInfo;
+    UNIX_CALL(vkCmdDecodeVideoKHR, &params);
 }
 
 void WINAPI vkCmdDecompressMemoryIndirectCountNV(VkCommandBuffer commandBuffer, VkDeviceAddress indirectCommandsAddress, VkDeviceAddress indirectCommandsCountAddress, uint32_t stride)
@@ -1151,6 +1204,14 @@ void WINAPI vkCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t dra
     UNIX_CALL(vkCmdDrawMultiIndexedEXT, &params);
 }
 
+void WINAPI vkCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR *pEncodeInfo)
+{
+    struct vkCmdEncodeVideoKHR_params params;
+    params.commandBuffer = commandBuffer;
+    params.pEncodeInfo = pEncodeInfo;
+    UNIX_CALL(vkCmdEncodeVideoKHR, &params);
+}
+
 void WINAPI vkCmdEndConditionalRenderingEXT(VkCommandBuffer commandBuffer)
 {
     struct vkCmdEndConditionalRenderingEXT_params params;
@@ -1230,6 +1291,14 @@ void WINAPI vkCmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t
     params.pCounterBuffers = pCounterBuffers;
     params.pCounterBufferOffsets = pCounterBufferOffsets;
     UNIX_CALL(vkCmdEndTransformFeedbackEXT, &params);
+}
+
+void WINAPI vkCmdEndVideoCodingKHR(VkCommandBuffer commandBuffer, const VkVideoEndCodingInfoKHR *pEndCodingInfo)
+{
+    struct vkCmdEndVideoCodingKHR_params params;
+    params.commandBuffer = commandBuffer;
+    params.pEndCodingInfo = pEndCodingInfo;
+    UNIX_CALL(vkCmdEndVideoCodingKHR, &params);
 }
 
 void WINAPI vkCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount, const VkCommandBuffer *pCommandBuffers)
@@ -2119,11 +2188,11 @@ void WINAPI vkCmdSetRenderingAttachmentLocationsKHR(VkCommandBuffer commandBuffe
     UNIX_CALL(vkCmdSetRenderingAttachmentLocationsKHR, &params);
 }
 
-void WINAPI vkCmdSetRenderingInputAttachmentIndicesKHR(VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR *pLocationInfo)
+void WINAPI vkCmdSetRenderingInputAttachmentIndicesKHR(VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR *pInputAttachmentIndexInfo)
 {
     struct vkCmdSetRenderingInputAttachmentIndicesKHR_params params;
     params.commandBuffer = commandBuffer;
-    params.pLocationInfo = pLocationInfo;
+    params.pInputAttachmentIndexInfo = pInputAttachmentIndexInfo;
     UNIX_CALL(vkCmdSetRenderingInputAttachmentIndicesKHR, &params);
 }
 
@@ -3000,6 +3069,19 @@ VkResult WINAPI vkCreateOpticalFlowSessionNV(VkDevice device, const VkOpticalFlo
     return params.result;
 }
 
+VkResult WINAPI vkCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkPipelineBinaryHandlesInfoKHR *pBinaries)
+{
+    struct vkCreatePipelineBinariesKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pCreateInfo = pCreateInfo;
+    params.pAllocator = pAllocator;
+    params.pBinaries = pBinaries;
+    status = UNIX_CALL(vkCreatePipelineBinariesKHR, &params);
+    assert(!status && "vkCreatePipelineBinariesKHR");
+    return params.result;
+}
+
 VkResult WINAPI vkCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkPipelineCache *pPipelineCache)
 {
     struct vkCreatePipelineCache_params params;
@@ -3237,6 +3319,32 @@ VkResult WINAPI vkCreateValidationCacheEXT(VkDevice device, const VkValidationCa
     params.pValidationCache = pValidationCache;
     status = UNIX_CALL(vkCreateValidationCacheEXT, &params);
     assert(!status && "vkCreateValidationCacheEXT");
+    return params.result;
+}
+
+VkResult WINAPI vkCreateVideoSessionKHR(VkDevice device, const VkVideoSessionCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkVideoSessionKHR *pVideoSession)
+{
+    struct vkCreateVideoSessionKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pCreateInfo = pCreateInfo;
+    params.pAllocator = pAllocator;
+    params.pVideoSession = pVideoSession;
+    status = UNIX_CALL(vkCreateVideoSessionKHR, &params);
+    assert(!status && "vkCreateVideoSessionKHR");
+    return params.result;
+}
+
+VkResult WINAPI vkCreateVideoSessionParametersKHR(VkDevice device, const VkVideoSessionParametersCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkVideoSessionParametersKHR *pVideoSessionParameters)
+{
+    struct vkCreateVideoSessionParametersKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pCreateInfo = pCreateInfo;
+    params.pAllocator = pAllocator;
+    params.pVideoSessionParameters = pVideoSessionParameters;
+    status = UNIX_CALL(vkCreateVideoSessionParametersKHR, &params);
+    assert(!status && "vkCreateVideoSessionParametersKHR");
     return params.result;
 }
 
@@ -3566,6 +3674,17 @@ void WINAPI vkDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllo
     assert(!status && "vkDestroyPipeline");
 }
 
+void WINAPI vkDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary, const VkAllocationCallbacks *pAllocator)
+{
+    struct vkDestroyPipelineBinaryKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pipelineBinary = pipelineBinary;
+    params.pAllocator = pAllocator;
+    status = UNIX_CALL(vkDestroyPipelineBinaryKHR, &params);
+    assert(!status && "vkDestroyPipelineBinaryKHR");
+}
+
 void WINAPI vkDestroyPipelineCache(VkDevice device, VkPipelineCache pipelineCache, const VkAllocationCallbacks *pAllocator)
 {
     struct vkDestroyPipelineCache_params params;
@@ -3729,6 +3848,28 @@ void WINAPI vkDestroyValidationCacheEXT(VkDevice device, VkValidationCacheEXT va
     params.pAllocator = pAllocator;
     status = UNIX_CALL(vkDestroyValidationCacheEXT, &params);
     assert(!status && "vkDestroyValidationCacheEXT");
+}
+
+void WINAPI vkDestroyVideoSessionKHR(VkDevice device, VkVideoSessionKHR videoSession, const VkAllocationCallbacks *pAllocator)
+{
+    struct vkDestroyVideoSessionKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.videoSession = videoSession;
+    params.pAllocator = pAllocator;
+    status = UNIX_CALL(vkDestroyVideoSessionKHR, &params);
+    assert(!status && "vkDestroyVideoSessionKHR");
+}
+
+void WINAPI vkDestroyVideoSessionParametersKHR(VkDevice device, VkVideoSessionParametersKHR videoSessionParameters, const VkAllocationCallbacks *pAllocator)
+{
+    struct vkDestroyVideoSessionParametersKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.videoSessionParameters = videoSessionParameters;
+    params.pAllocator = pAllocator;
+    status = UNIX_CALL(vkDestroyVideoSessionParametersKHR, &params);
+    assert(!status && "vkDestroyVideoSessionParametersKHR");
 }
 
 VkResult WINAPI vkDeviceWaitIdle(VkDevice device)
@@ -4401,6 +4542,20 @@ VkResult WINAPI vkGetDynamicRenderingTilePropertiesQCOM(VkDevice device, const V
     params.pProperties = pProperties;
     status = UNIX_CALL(vkGetDynamicRenderingTilePropertiesQCOM, &params);
     assert(!status && "vkGetDynamicRenderingTilePropertiesQCOM");
+    return params.result;
+}
+
+VkResult WINAPI vkGetEncodedVideoSessionParametersKHR(VkDevice device, const VkVideoEncodeSessionParametersGetInfoKHR *pVideoSessionParametersInfo, VkVideoEncodeSessionParametersFeedbackInfoKHR *pFeedbackInfo, size_t *pDataSize, void *pData)
+{
+    struct vkGetEncodedVideoSessionParametersKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pVideoSessionParametersInfo = pVideoSessionParametersInfo;
+    params.pFeedbackInfo = pFeedbackInfo;
+    params.pDataSize = pDataSize;
+    params.pData = pData;
+    status = UNIX_CALL(vkGetEncodedVideoSessionParametersKHR, &params);
+    assert(!status && "vkGetEncodedVideoSessionParametersKHR");
     return params.result;
 }
 
@@ -5152,6 +5307,43 @@ VkResult WINAPI vkGetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevice physicalDe
     return params.result;
 }
 
+VkResult WINAPI vkGetPhysicalDeviceVideoCapabilitiesKHR(VkPhysicalDevice physicalDevice, const VkVideoProfileInfoKHR *pVideoProfile, VkVideoCapabilitiesKHR *pCapabilities)
+{
+    struct vkGetPhysicalDeviceVideoCapabilitiesKHR_params params;
+    NTSTATUS status;
+    params.physicalDevice = physicalDevice;
+    params.pVideoProfile = pVideoProfile;
+    params.pCapabilities = pCapabilities;
+    status = UNIX_CALL(vkGetPhysicalDeviceVideoCapabilitiesKHR, &params);
+    assert(!status && "vkGetPhysicalDeviceVideoCapabilitiesKHR");
+    return params.result;
+}
+
+VkResult WINAPI vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR *pQualityLevelInfo, VkVideoEncodeQualityLevelPropertiesKHR *pQualityLevelProperties)
+{
+    struct vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR_params params;
+    NTSTATUS status;
+    params.physicalDevice = physicalDevice;
+    params.pQualityLevelInfo = pQualityLevelInfo;
+    params.pQualityLevelProperties = pQualityLevelProperties;
+    status = UNIX_CALL(vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR, &params);
+    assert(!status && "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR");
+    return params.result;
+}
+
+VkResult WINAPI vkGetPhysicalDeviceVideoFormatPropertiesKHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceVideoFormatInfoKHR *pVideoFormatInfo, uint32_t *pVideoFormatPropertyCount, VkVideoFormatPropertiesKHR *pVideoFormatProperties)
+{
+    struct vkGetPhysicalDeviceVideoFormatPropertiesKHR_params params;
+    NTSTATUS status;
+    params.physicalDevice = physicalDevice;
+    params.pVideoFormatInfo = pVideoFormatInfo;
+    params.pVideoFormatPropertyCount = pVideoFormatPropertyCount;
+    params.pVideoFormatProperties = pVideoFormatProperties;
+    status = UNIX_CALL(vkGetPhysicalDeviceVideoFormatPropertiesKHR, &params);
+    assert(!status && "vkGetPhysicalDeviceVideoFormatPropertiesKHR");
+    return params.result;
+}
+
 VkBool32 WINAPI vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex)
 {
     struct vkGetPhysicalDeviceWin32PresentationSupportKHR_params params;
@@ -5160,6 +5352,20 @@ VkBool32 WINAPI vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice 
     params.queueFamilyIndex = queueFamilyIndex;
     status = UNIX_CALL(vkGetPhysicalDeviceWin32PresentationSupportKHR, &params);
     assert(!status && "vkGetPhysicalDeviceWin32PresentationSupportKHR");
+    return params.result;
+}
+
+VkResult WINAPI vkGetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR *pInfo, VkPipelineBinaryKeyKHR *pPipelineBinaryKey, size_t *pPipelineBinaryDataSize, void *pPipelineBinaryData)
+{
+    struct vkGetPipelineBinaryDataKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pInfo = pInfo;
+    params.pPipelineBinaryKey = pPipelineBinaryKey;
+    params.pPipelineBinaryDataSize = pPipelineBinaryDataSize;
+    params.pPipelineBinaryData = pPipelineBinaryData;
+    status = UNIX_CALL(vkGetPipelineBinaryDataKHR, &params);
+    assert(!status && "vkGetPipelineBinaryDataKHR");
     return params.result;
 }
 
@@ -5235,6 +5441,18 @@ void WINAPI vkGetPipelineIndirectMemoryRequirementsNV(VkDevice device, const VkC
     params.pMemoryRequirements = pMemoryRequirements;
     status = UNIX_CALL(vkGetPipelineIndirectMemoryRequirementsNV, &params);
     assert(!status && "vkGetPipelineIndirectMemoryRequirementsNV");
+}
+
+VkResult WINAPI vkGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR *pPipelineCreateInfo, VkPipelineBinaryKeyKHR *pPipelineKey)
+{
+    struct vkGetPipelineKeyKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pPipelineCreateInfo = pPipelineCreateInfo;
+    params.pPipelineKey = pPipelineKey;
+    status = UNIX_CALL(vkGetPipelineKeyKHR, &params);
+    assert(!status && "vkGetPipelineKeyKHR");
+    return params.result;
 }
 
 VkResult WINAPI vkGetPipelinePropertiesEXT(VkDevice device, const VkPipelineInfoEXT *pPipelineInfo, VkBaseOutStructure *pPipelineProperties)
@@ -5506,6 +5724,19 @@ VkResult WINAPI vkGetValidationCacheDataEXT(VkDevice device, VkValidationCacheEX
     return params.result;
 }
 
+VkResult WINAPI vkGetVideoSessionMemoryRequirementsKHR(VkDevice device, VkVideoSessionKHR videoSession, uint32_t *pMemoryRequirementsCount, VkVideoSessionMemoryRequirementsKHR *pMemoryRequirements)
+{
+    struct vkGetVideoSessionMemoryRequirementsKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.videoSession = videoSession;
+    params.pMemoryRequirementsCount = pMemoryRequirementsCount;
+    params.pMemoryRequirements = pMemoryRequirements;
+    status = UNIX_CALL(vkGetVideoSessionMemoryRequirementsKHR, &params);
+    assert(!status && "vkGetVideoSessionMemoryRequirementsKHR");
+    return params.result;
+}
+
 VkResult WINAPI vkInitializePerformanceApiINTEL(VkDevice device, const VkInitializePerformanceApiInfoINTEL *pInitializeInfo)
 {
     struct vkInitializePerformanceApiINTEL_params params;
@@ -5714,6 +5945,18 @@ VkResult WINAPI vkQueueWaitIdle(VkQueue queue)
     params.queue = queue;
     status = UNIX_CALL(vkQueueWaitIdle, &params);
     assert(!status && "vkQueueWaitIdle");
+    return params.result;
+}
+
+VkResult WINAPI vkReleaseCapturedPipelineDataKHR(VkDevice device, const VkReleaseCapturedPipelineDataInfoKHR *pInfo, const VkAllocationCallbacks *pAllocator)
+{
+    struct vkReleaseCapturedPipelineDataKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.pInfo = pInfo;
+    params.pAllocator = pAllocator;
+    status = UNIX_CALL(vkReleaseCapturedPipelineDataKHR, &params);
+    assert(!status && "vkReleaseCapturedPipelineDataKHR");
     return params.result;
 }
 
@@ -6068,6 +6311,18 @@ void WINAPI vkUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCoun
     UNIX_CALL(vkUpdateDescriptorSets, &params);
 }
 
+VkResult WINAPI vkUpdateVideoSessionParametersKHR(VkDevice device, VkVideoSessionParametersKHR videoSessionParameters, const VkVideoSessionParametersUpdateInfoKHR *pUpdateInfo)
+{
+    struct vkUpdateVideoSessionParametersKHR_params params;
+    NTSTATUS status;
+    params.device = device;
+    params.videoSessionParameters = videoSessionParameters;
+    params.pUpdateInfo = pUpdateInfo;
+    status = UNIX_CALL(vkUpdateVideoSessionParametersKHR, &params);
+    assert(!status && "vkUpdateVideoSessionParametersKHR");
+    return params.result;
+}
+
 VkResult WINAPI vkWaitForFences(VkDevice device, uint32_t fenceCount, const VkFence *pFences, VkBool32 waitAll, uint64_t timeout)
 {
     struct vkWaitForFences_params params;
@@ -6160,6 +6415,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkAllocateCommandBuffers", vkAllocateCommandBuffers},
     {"vkAllocateDescriptorSets", vkAllocateDescriptorSets},
     {"vkAllocateMemory", vkAllocateMemory},
+    {"vkAntiLagUpdateAMD", vkAntiLagUpdateAMD},
     {"vkBeginCommandBuffer", vkBeginCommandBuffer},
     {"vkBindAccelerationStructureMemoryNV", vkBindAccelerationStructureMemoryNV},
     {"vkBindBufferMemory", vkBindBufferMemory},
@@ -6169,6 +6425,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkBindImageMemory2", vkBindImageMemory2},
     {"vkBindImageMemory2KHR", vkBindImageMemory2KHR},
     {"vkBindOpticalFlowSessionImageNV", vkBindOpticalFlowSessionImageNV},
+    {"vkBindVideoSessionMemoryKHR", vkBindVideoSessionMemoryKHR},
     {"vkBuildAccelerationStructuresKHR", vkBuildAccelerationStructuresKHR},
     {"vkBuildMicromapsEXT", vkBuildMicromapsEXT},
     {"vkCmdBeginConditionalRenderingEXT", vkCmdBeginConditionalRenderingEXT},
@@ -6181,6 +6438,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdBeginRendering", vkCmdBeginRendering},
     {"vkCmdBeginRenderingKHR", vkCmdBeginRenderingKHR},
     {"vkCmdBeginTransformFeedbackEXT", vkCmdBeginTransformFeedbackEXT},
+    {"vkCmdBeginVideoCodingKHR", vkCmdBeginVideoCodingKHR},
     {"vkCmdBindDescriptorBufferEmbeddedSamplers2EXT", vkCmdBindDescriptorBufferEmbeddedSamplers2EXT},
     {"vkCmdBindDescriptorBufferEmbeddedSamplersEXT", vkCmdBindDescriptorBufferEmbeddedSamplersEXT},
     {"vkCmdBindDescriptorBuffersEXT", vkCmdBindDescriptorBuffersEXT},
@@ -6207,6 +6465,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdClearAttachments", vkCmdClearAttachments},
     {"vkCmdClearColorImage", vkCmdClearColorImage},
     {"vkCmdClearDepthStencilImage", vkCmdClearDepthStencilImage},
+    {"vkCmdControlVideoCodingKHR", vkCmdControlVideoCodingKHR},
     {"vkCmdCopyAccelerationStructureKHR", vkCmdCopyAccelerationStructureKHR},
     {"vkCmdCopyAccelerationStructureNV", vkCmdCopyAccelerationStructureNV},
     {"vkCmdCopyAccelerationStructureToMemoryKHR", vkCmdCopyAccelerationStructureToMemoryKHR},
@@ -6234,6 +6493,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdDebugMarkerBeginEXT", vkCmdDebugMarkerBeginEXT},
     {"vkCmdDebugMarkerEndEXT", vkCmdDebugMarkerEndEXT},
     {"vkCmdDebugMarkerInsertEXT", vkCmdDebugMarkerInsertEXT},
+    {"vkCmdDecodeVideoKHR", vkCmdDecodeVideoKHR},
     {"vkCmdDecompressMemoryIndirectCountNV", vkCmdDecompressMemoryIndirectCountNV},
     {"vkCmdDecompressMemoryNV", vkCmdDecompressMemoryNV},
     {"vkCmdDispatch", vkCmdDispatch},
@@ -6261,6 +6521,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdDrawMeshTasksNV", vkCmdDrawMeshTasksNV},
     {"vkCmdDrawMultiEXT", vkCmdDrawMultiEXT},
     {"vkCmdDrawMultiIndexedEXT", vkCmdDrawMultiIndexedEXT},
+    {"vkCmdEncodeVideoKHR", vkCmdEncodeVideoKHR},
     {"vkCmdEndConditionalRenderingEXT", vkCmdEndConditionalRenderingEXT},
     {"vkCmdEndDebugUtilsLabelEXT", vkCmdEndDebugUtilsLabelEXT},
     {"vkCmdEndQuery", vkCmdEndQuery},
@@ -6271,6 +6532,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdEndRendering", vkCmdEndRendering},
     {"vkCmdEndRenderingKHR", vkCmdEndRenderingKHR},
     {"vkCmdEndTransformFeedbackEXT", vkCmdEndTransformFeedbackEXT},
+    {"vkCmdEndVideoCodingKHR", vkCmdEndVideoCodingKHR},
     {"vkCmdExecuteCommands", vkCmdExecuteCommands},
     {"vkCmdExecuteGeneratedCommandsNV", vkCmdExecuteGeneratedCommandsNV},
     {"vkCmdFillBuffer", vkCmdFillBuffer},
@@ -6449,6 +6711,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCreateIndirectCommandsLayoutNV", vkCreateIndirectCommandsLayoutNV},
     {"vkCreateMicromapEXT", vkCreateMicromapEXT},
     {"vkCreateOpticalFlowSessionNV", vkCreateOpticalFlowSessionNV},
+    {"vkCreatePipelineBinariesKHR", vkCreatePipelineBinariesKHR},
     {"vkCreatePipelineCache", vkCreatePipelineCache},
     {"vkCreatePipelineLayout", vkCreatePipelineLayout},
     {"vkCreatePrivateDataSlot", vkCreatePrivateDataSlot},
@@ -6467,6 +6730,8 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCreateShadersEXT", vkCreateShadersEXT},
     {"vkCreateSwapchainKHR", vkCreateSwapchainKHR},
     {"vkCreateValidationCacheEXT", vkCreateValidationCacheEXT},
+    {"vkCreateVideoSessionKHR", vkCreateVideoSessionKHR},
+    {"vkCreateVideoSessionParametersKHR", vkCreateVideoSessionParametersKHR},
     {"vkDebugMarkerSetObjectNameEXT", vkDebugMarkerSetObjectNameEXT},
     {"vkDebugMarkerSetObjectTagEXT", vkDebugMarkerSetObjectTagEXT},
     {"vkDeferredOperationJoinKHR", vkDeferredOperationJoinKHR},
@@ -6494,6 +6759,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkDestroyMicromapEXT", vkDestroyMicromapEXT},
     {"vkDestroyOpticalFlowSessionNV", vkDestroyOpticalFlowSessionNV},
     {"vkDestroyPipeline", vkDestroyPipeline},
+    {"vkDestroyPipelineBinaryKHR", vkDestroyPipelineBinaryKHR},
     {"vkDestroyPipelineCache", vkDestroyPipelineCache},
     {"vkDestroyPipelineLayout", vkDestroyPipelineLayout},
     {"vkDestroyPrivateDataSlot", vkDestroyPrivateDataSlot},
@@ -6508,6 +6774,8 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkDestroyShaderModule", vkDestroyShaderModule},
     {"vkDestroySwapchainKHR", vkDestroySwapchainKHR},
     {"vkDestroyValidationCacheEXT", vkDestroyValidationCacheEXT},
+    {"vkDestroyVideoSessionKHR", vkDestroyVideoSessionKHR},
+    {"vkDestroyVideoSessionParametersKHR", vkDestroyVideoSessionParametersKHR},
     {"vkDeviceWaitIdle", vkDeviceWaitIdle},
     {"vkEndCommandBuffer", vkEndCommandBuffer},
     {"vkFlushMappedMemoryRanges", vkFlushMappedMemoryRanges},
@@ -6562,6 +6830,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkGetDeviceQueue2", vkGetDeviceQueue2},
     {"vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI", vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI},
     {"vkGetDynamicRenderingTilePropertiesQCOM", vkGetDynamicRenderingTilePropertiesQCOM},
+    {"vkGetEncodedVideoSessionParametersKHR", vkGetEncodedVideoSessionParametersKHR},
     {"vkGetEventStatus", vkGetEventStatus},
     {"vkGetFenceStatus", vkGetFenceStatus},
     {"vkGetFramebufferTilePropertiesQCOM", vkGetFramebufferTilePropertiesQCOM},
@@ -6583,12 +6852,14 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkGetMemoryHostPointerPropertiesEXT", vkGetMemoryHostPointerPropertiesEXT},
     {"vkGetMicromapBuildSizesEXT", vkGetMicromapBuildSizesEXT},
     {"vkGetPerformanceParameterINTEL", vkGetPerformanceParameterINTEL},
+    {"vkGetPipelineBinaryDataKHR", vkGetPipelineBinaryDataKHR},
     {"vkGetPipelineCacheData", vkGetPipelineCacheData},
     {"vkGetPipelineExecutableInternalRepresentationsKHR", vkGetPipelineExecutableInternalRepresentationsKHR},
     {"vkGetPipelineExecutablePropertiesKHR", vkGetPipelineExecutablePropertiesKHR},
     {"vkGetPipelineExecutableStatisticsKHR", vkGetPipelineExecutableStatisticsKHR},
     {"vkGetPipelineIndirectDeviceAddressNV", vkGetPipelineIndirectDeviceAddressNV},
     {"vkGetPipelineIndirectMemoryRequirementsNV", vkGetPipelineIndirectMemoryRequirementsNV},
+    {"vkGetPipelineKeyKHR", vkGetPipelineKeyKHR},
     {"vkGetPipelinePropertiesEXT", vkGetPipelinePropertiesEXT},
     {"vkGetPrivateData", vkGetPrivateData},
     {"vkGetPrivateDataEXT", vkGetPrivateDataEXT},
@@ -6610,6 +6881,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkGetShaderModuleIdentifierEXT", vkGetShaderModuleIdentifierEXT},
     {"vkGetSwapchainImagesKHR", vkGetSwapchainImagesKHR},
     {"vkGetValidationCacheDataEXT", vkGetValidationCacheDataEXT},
+    {"vkGetVideoSessionMemoryRequirementsKHR", vkGetVideoSessionMemoryRequirementsKHR},
     {"vkInitializePerformanceApiINTEL", vkInitializePerformanceApiINTEL},
     {"vkInvalidateMappedMemoryRanges", vkInvalidateMappedMemoryRanges},
     {"vkLatencySleepNV", vkLatencySleepNV},
@@ -6628,6 +6900,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkQueueSubmit2", vkQueueSubmit2},
     {"vkQueueSubmit2KHR", vkQueueSubmit2KHR},
     {"vkQueueWaitIdle", vkQueueWaitIdle},
+    {"vkReleaseCapturedPipelineDataKHR", vkReleaseCapturedPipelineDataKHR},
     {"vkReleasePerformanceConfigurationINTEL", vkReleasePerformanceConfigurationINTEL},
     {"vkReleaseProfilingLockKHR", vkReleaseProfilingLockKHR},
     {"vkReleaseSwapchainImagesEXT", vkReleaseSwapchainImagesEXT},
@@ -6658,6 +6931,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkUpdateDescriptorSetWithTemplate", vkUpdateDescriptorSetWithTemplate},
     {"vkUpdateDescriptorSetWithTemplateKHR", vkUpdateDescriptorSetWithTemplateKHR},
     {"vkUpdateDescriptorSets", vkUpdateDescriptorSets},
+    {"vkUpdateVideoSessionParametersKHR", vkUpdateVideoSessionParametersKHR},
     {"vkWaitForFences", vkWaitForFences},
     {"vkWaitForPresentKHR", vkWaitForPresentKHR},
     {"vkWaitSemaphores", vkWaitSemaphores},
@@ -6717,6 +6991,9 @@ static const struct vulkan_func vk_phys_dev_dispatch_table[] =
     {"vkGetPhysicalDeviceSurfaceSupportKHR", vkGetPhysicalDeviceSurfaceSupportKHR},
     {"vkGetPhysicalDeviceToolProperties", vkGetPhysicalDeviceToolProperties},
     {"vkGetPhysicalDeviceToolPropertiesEXT", vkGetPhysicalDeviceToolPropertiesEXT},
+    {"vkGetPhysicalDeviceVideoCapabilitiesKHR", vkGetPhysicalDeviceVideoCapabilitiesKHR},
+    {"vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR", vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR},
+    {"vkGetPhysicalDeviceVideoFormatPropertiesKHR", vkGetPhysicalDeviceVideoFormatPropertiesKHR},
     {"vkGetPhysicalDeviceWin32PresentationSupportKHR", vkGetPhysicalDeviceWin32PresentationSupportKHR},
 };
 

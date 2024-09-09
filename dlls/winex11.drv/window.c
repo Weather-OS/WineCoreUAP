@@ -297,24 +297,15 @@ static inline BOOL is_window_resizable( struct x11drv_win_data *data, DWORD styl
 {
     if (style & WS_THICKFRAME) return TRUE;
     /* Metacity needs the window to be resizable to make it fullscreen */
-    return NtUserIsWindowRectFullScreen( &data->whole_rect, get_win_monitor_dpi( data->hwnd ) );
+    return NtUserIsWindowRectFullScreen( &data->rects.visible, get_win_monitor_dpi( data->hwnd ) );
 }
 
 /***********************************************************************
  *              get_mwm_decorations
  */
-static unsigned long get_mwm_decorations( struct x11drv_win_data *data,
-                                          DWORD style, DWORD ex_style,
-                                          const RECT *window_rect,
-                                          const RECT *client_rect )
+static unsigned long get_mwm_decorations_for_style( DWORD style, DWORD ex_style )
 {
     unsigned long ret = 0;
-
-    if (!decorated_mode) return 0;
-
-    if (EqualRect( window_rect, client_rect )) return 0;
-    if (IsRectEmpty( window_rect )) return 0;
-    if (data->shaped) return 0;
 
     if (ex_style & WS_EX_TOOLWINDOW) return 0;
     if (ex_style & WS_EX_LAYERED) return 0;
@@ -330,6 +321,16 @@ static unsigned long get_mwm_decorations( struct x11drv_win_data *data,
     else if (style & WS_THICKFRAME) ret |= MWM_DECOR_BORDER | MWM_DECOR_RESIZEH;
     else if ((style & (WS_DLGFRAME|WS_BORDER)) == WS_DLGFRAME) ret |= MWM_DECOR_BORDER;
     return ret;
+}
+
+
+/***********************************************************************
+ *              get_mwm_decorations
+ */
+static unsigned long get_mwm_decorations( struct x11drv_win_data *data, DWORD style, DWORD ex_style )
+{
+    if (EqualRect( &data->rects.window, &data->rects.visible )) return 0;
+    return get_mwm_decorations_for_style( style, ex_style );
 }
 
 
@@ -374,10 +375,10 @@ static void sync_window_style( struct x11drv_win_data *data )
     }
 }
 
-static void sync_empty_window_shape( struct x11drv_win_data *data )
+static void sync_empty_window_shape( struct x11drv_win_data *data, struct window_surface *surface )
 {
 #ifdef HAVE_LIBXSHAPE
-    if (IsRectEmpty( &data->window_rect ))  /* set an empty shape */
+    if (IsRectEmpty( &data->rects.window ))  /* set an empty shape */
     {
         static XRectangle empty_rect;
         XShapeCombineRectangles( data->display, data->whole_window, ShapeBounding, 0, 0,
@@ -387,7 +388,7 @@ static void sync_empty_window_shape( struct x11drv_win_data *data )
     {
         XShapeCombineMask( gdi_display, data->whole_window, ShapeBounding, 0, 0, None, ShapeSet );
         /* invalidate surface shape to make sure it gets updated again */
-        if (data->surface) window_surface_set_shape( data->surface, 0 );
+        if (surface) window_surface_set_shape( surface, 0 );
     }
 #endif
 }
@@ -403,7 +404,7 @@ static void sync_window_region( struct x11drv_win_data *data, HRGN win_region )
     HRGN hrgn = win_region;
 
     if (!data->whole_window) return;
-    if (data->surface) return; /* use surface shape instead */
+    if (client_side_graphics) return; /* use surface shape instead */
     data->shaped = FALSE;
 
     if (hrgn == (HRGN)1)  /* hack: win_region == 1 means retrieve region from server */
@@ -429,8 +430,8 @@ static void sync_window_region( struct x11drv_win_data *data, HRGN win_region )
         if ((pRegionData = X11DRV_GetRegionData( hrgn, 0 )))
         {
             XShapeCombineRectangles( data->display, data->whole_window, ShapeBounding,
-                                     data->window_rect.left - data->whole_rect.left,
-                                     data->window_rect.top - data->whole_rect.top,
+                                     data->rects.window.left - data->rects.visible.left,
+                                     data->rects.window.top - data->rects.visible.top,
                                      (XRectangle *)pRegionData->Buffer,
                                      pRegionData->rdh.nCount, ShapeSet, YXBanded );
             free( pRegionData );
@@ -734,7 +735,7 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
     {
         if (data->hwnd != NtUserGetDesktopWindow())  /* don't force position of desktop */
         {
-            POINT pt = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+            POINT pt = virtual_screen_to_root( data->rects.visible.left, data->rects.visible.top );
             size_hints->x = pt.x;
             size_hints->y = pt.y;
             size_hints->flags |= PPosition;
@@ -743,8 +744,8 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
 
         if (!is_window_resizable( data, style ))
         {
-            size_hints->max_width = data->whole_rect.right - data->whole_rect.left;
-            size_hints->max_height = data->whole_rect.bottom - data->whole_rect.top;
+            size_hints->max_width = data->rects.visible.right - data->rects.visible.left;
+            size_hints->max_height = data->rects.visible.bottom - data->rects.visible.top;
             if (size_hints->max_width <= 0 ||size_hints->max_height <= 0)
                 size_hints->max_width = size_hints->max_height = 1;
             size_hints->min_width = size_hints->max_width;
@@ -776,7 +777,7 @@ static void set_mwm_hints( struct x11drv_win_data *data, UINT style, UINT ex_sty
     }
     else
     {
-        mwm_hints.decorations = get_mwm_decorations( data, style, ex_style, &data->window_rect, &data->client_rect );
+        mwm_hints.decorations = get_mwm_decorations( data, style, ex_style );
         mwm_hints.functions = MWM_FUNC_MOVE;
         if (is_window_resizable( data, style )) mwm_hints.functions |= MWM_FUNC_RESIZE;
         if (!(style & WS_DISABLED))
@@ -1042,7 +1043,7 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
     if (!X11DRV_DisplayDevices_SupportEventHandlers())
         return;
 
-    if (!xinerama_get_fullscreen_monitors( &data->whole_rect, monitors ))
+    if (!xinerama_get_fullscreen_monitors( &data->rects.visible, monitors ))
         return;
 
     /* If _NET_WM_FULLSCREEN_MONITORS is not set and the fullscreen monitors are spanning only one
@@ -1098,7 +1099,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
     style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
     if (style & WS_MINIMIZE)
         new_state |= data->net_wm_state & ((1 << NET_WM_STATE_FULLSCREEN)|(1 << NET_WM_STATE_MAXIMIZED));
-    if (NtUserIsWindowRectFullScreen( &data->whole_rect, get_win_monitor_dpi( data->hwnd ) ))
+    if (NtUserIsWindowRectFullScreen( &data->rects.visible, get_win_monitor_dpi( data->hwnd ) ))
     {
         if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
@@ -1252,8 +1253,6 @@ static void map_window( HWND hwnd, DWORD new_style )
             sync_window_style( data );
             XMapWindow( data->display, data->whole_window );
             XFlush( data->display );
-            if (data->surface && data->vis.visualid != default_visual.visualid)
-                window_surface_flush( data->surface );
         }
         else set_xembed_flags( data, XEMBED_MAPPED );
 
@@ -1311,85 +1310,11 @@ void make_window_embedded( struct x11drv_win_data *data )
 
 
 /***********************************************************************
- *     get_decoration_rect
- */
-static void get_decoration_rect( struct x11drv_win_data *data, RECT *rect,
-                                 const RECT *window_rect, const RECT *client_rect )
-{
-    DWORD style, ex_style, style_mask = 0, ex_style_mask = 0;
-    unsigned long decor;
-    UINT dpi;
-
-    SetRectEmpty( rect );
-    if (!data->managed) return;
-
-    dpi = get_win_monitor_dpi( data->hwnd );
-    style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
-    ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
-    decor = get_mwm_decorations( data, style, ex_style, window_rect, client_rect );
-
-    if (decor & MWM_DECOR_TITLE) style_mask |= WS_CAPTION;
-    if (decor & MWM_DECOR_BORDER)
-    {
-        style_mask |= WS_DLGFRAME | WS_THICKFRAME;
-        ex_style_mask |= WS_EX_DLGMODALFRAME;
-    }
-
-    NtUserAdjustWindowRect( rect, style & style_mask, FALSE, ex_style & ex_style_mask, dpi );
-}
-
-
-/***********************************************************************
- *		X11DRV_window_to_X_rect
- *
- * Convert a rect from client to X window coordinates
- */
-static void X11DRV_window_to_X_rect( struct x11drv_win_data *data, RECT *rect,
-                                     const RECT *window_rect, const RECT *client_rect )
-{
-    RECT rc;
-
-    if (IsRectEmpty( rect )) return;
-
-    get_decoration_rect( data, &rc, window_rect, client_rect );
-    rect->left   -= rc.left;
-    rect->right  -= rc.right;
-    rect->top    -= rc.top;
-    rect->bottom -= rc.bottom;
-    if (rect->top >= rect->bottom) rect->bottom = rect->top + 1;
-    if (rect->left >= rect->right) rect->right = rect->left + 1;
-}
-
-
-/***********************************************************************
- *		X11DRV_X_to_window_rect
- *
- * Opposite of X11DRV_window_to_X_rect
- */
-void X11DRV_X_to_window_rect( struct x11drv_win_data *data, RECT *rect, int x, int y, int cx, int cy )
-{
-    RECT rc;
-
-    get_decoration_rect( data, &rc, &data->window_rect, &data->client_rect );
-
-    x += min( data->window_rect.left - data->whole_rect.left, rc.left );
-    y += min( data->window_rect.top - data->whole_rect.top, rc.top );
-    cx += max( (data->window_rect.right - data->window_rect.left) -
-               (data->whole_rect.right - data->whole_rect.left), rc.right - rc.left );
-    cy += max( (data->window_rect.bottom - data->window_rect.top) -
-               (data->whole_rect.bottom - data->whole_rect.top), rc.bottom - rc.top );
-    SetRect( rect, x, y, x + cx, y + cy );
-}
-
-
-/***********************************************************************
  *		sync_window_position
  *
  * Synchronize the X window position with the Windows one
  */
-static void sync_window_position( struct x11drv_win_data *data,
-                                  UINT swp_flags, const RECT *old_window_rect,
-                                  const RECT *old_whole_rect, const RECT *old_client_rect )
+static void sync_window_position( struct x11drv_win_data *data, UINT swp_flags )
 {
     DWORD style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
     DWORD ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
@@ -1401,8 +1326,8 @@ static void sync_window_position( struct x11drv_win_data *data,
     /* resizing a managed maximized window is not allowed */
     if (!(style & WS_MAXIMIZE) || !data->managed)
     {
-        changes.width = data->whole_rect.right - data->whole_rect.left;
-        changes.height = data->whole_rect.bottom - data->whole_rect.top;
+        changes.width = data->rects.visible.right - data->rects.visible.left;
+        changes.height = data->rects.visible.bottom - data->rects.visible.top;
         /* if window rect is empty force size to 1x1 */
         if (changes.width <= 0 || changes.height <= 0) changes.width = changes.height = 1;
         if (changes.width > 65535) changes.width = 65535;
@@ -1413,7 +1338,7 @@ static void sync_window_position( struct x11drv_win_data *data,
     /* only the size is allowed to change for the desktop window or systray docked windows */
     if (data->whole_window != root_window && !data->embedded)
     {
-        POINT pt = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+        POINT pt = virtual_screen_to_root( data->rects.visible.left, data->rects.visible.top );
         changes.x = pt.x;
         changes.y = pt.y;
         mask |= CWX | CWY;
@@ -1439,25 +1364,11 @@ static void sync_window_position( struct x11drv_win_data *data,
     update_net_wm_states( data );
     data->configure_serial = NextRequest( data->display );
     XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
-#ifdef HAVE_LIBXSHAPE
-    if (IsRectEmpty( old_window_rect ) != IsRectEmpty( &data->window_rect ))
-        sync_empty_window_shape( data );
-    if (data->shaped)
-    {
-        int old_x_offset = old_window_rect->left - old_whole_rect->left;
-        int old_y_offset = old_window_rect->top - old_whole_rect->top;
-        int new_x_offset = data->window_rect.left - data->whole_rect.left;
-        int new_y_offset = data->window_rect.top - data->whole_rect.top;
-        if (old_x_offset != new_x_offset || old_y_offset != new_y_offset)
-            XShapeOffsetShape( data->display, data->whole_window, ShapeBounding,
-                               new_x_offset - old_x_offset, new_y_offset - old_y_offset );
-    }
-#endif
 
     TRACE( "win %p/%lx pos %d,%d,%dx%d after %lx changes=%x serial=%lu\n",
-           data->hwnd, data->whole_window, (int)data->whole_rect.left, (int)data->whole_rect.top,
-           (int)(data->whole_rect.right - data->whole_rect.left),
-           (int)(data->whole_rect.bottom - data->whole_rect.top),
+           data->hwnd, data->whole_window, (int)data->rects.visible.left, (int)data->rects.visible.top,
+           (int)(data->rects.visible.right - data->rects.visible.left),
+           (int)(data->rects.visible.bottom - data->rects.visible.top),
            changes.sibling, mask, data->configure_serial );
 }
 
@@ -1467,23 +1378,22 @@ static void sync_window_position( struct x11drv_win_data *data,
  *
  * Synchronize the X client window position with the Windows one
  */
-static void sync_client_position( struct x11drv_win_data *data,
-                                  const RECT *old_client_rect, const RECT *old_whole_rect )
+static void sync_client_position( struct x11drv_win_data *data, const struct window_rects *old_rects )
 {
     int mask = 0;
     XWindowChanges changes;
 
     if (!data->client_window) return;
 
-    changes.x      = data->client_rect.left - data->whole_rect.left;
-    changes.y      = data->client_rect.top - data->whole_rect.top;
-    changes.width  = min( max( 1, data->client_rect.right - data->client_rect.left ), 65535 );
-    changes.height = min( max( 1, data->client_rect.bottom - data->client_rect.top ), 65535 );
+    changes.x      = data->rects.client.left - data->rects.visible.left;
+    changes.y      = data->rects.client.top - data->rects.visible.top;
+    changes.width  = min( max( 1, data->rects.client.right - data->rects.client.left ), 65535 );
+    changes.height = min( max( 1, data->rects.client.bottom - data->rects.client.top ), 65535 );
 
-    if (changes.x != old_client_rect->left - old_whole_rect->left) mask |= CWX;
-    if (changes.y != old_client_rect->top  - old_whole_rect->top)  mask |= CWY;
-    if (changes.width  != old_client_rect->right - old_client_rect->left) mask |= CWWidth;
-    if (changes.height != old_client_rect->bottom - old_client_rect->top) mask |= CWHeight;
+    if (changes.x != old_rects->client.left - old_rects->visible.left) mask |= CWX;
+    if (changes.y != old_rects->client.top  - old_rects->visible.top)  mask |= CWY;
+    if (changes.width  != old_rects->client.right - old_rects->client.left) mask |= CWWidth;
+    if (changes.height != old_rects->client.bottom - old_rects->client.top) mask |= CWHeight;
 
     if (mask)
     {
@@ -1652,8 +1562,8 @@ static void attach_client_window( struct x11drv_win_data *data, Window client_wi
     if (data->whole_window)
     {
         client_window_events_enable( data, client_window );
-        XReparentWindow( gdi_display, client_window, data->whole_window, data->client_rect.left - data->whole_rect.left,
-                         data->client_rect.top - data->whole_rect.top );
+        XReparentWindow( gdi_display, client_window, data->whole_window, data->rects.client.left - data->rects.visible.left,
+                         data->rects.client.top - data->rects.visible.top );
     }
 
     data->client_window = client_window;
@@ -1700,8 +1610,8 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
         if (parent == NtUserGetDesktopWindow() || NtUserGetAncestor( parent, GA_PARENT )) return 0;
         if (!(data = alloc_win_data( thread_init_display(), hwnd ))) return 0;
-        NtUserGetClientRect( hwnd, &data->client_rect, get_win_monitor_dpi( hwnd ) );
-        data->window_rect = data->whole_rect = data->client_rect;
+        NtUserGetClientRect( hwnd, &data->rects.client, get_win_monitor_dpi( hwnd ) );
+        data->rects.window = data->rects.visible = data->rects.client;
     }
 
     detach_client_window( data, data->client_window );
@@ -1712,10 +1622,10 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
     attr.backing_store = NotUseful;
     attr.border_pixel = 0;
 
-    x = data->client_rect.left - data->whole_rect.left;
-    y = data->client_rect.top - data->whole_rect.top;
-    cx = min( max( 1, data->client_rect.right - data->client_rect.left ), 65535 );
-    cy = min( max( 1, data->client_rect.bottom - data->client_rect.top ), 65535 );
+    x = data->rects.client.left - data->rects.visible.left;
+    y = data->rects.client.top - data->rects.visible.top;
+    cx = min( max( 1, data->rects.client.right - data->rects.client.left ), 65535 );
+    cy = min( max( 1, data->rects.client.bottom - data->rects.client.top ), 65535 );
 
     XSync( gdi_display, False ); /* make sure whole_window is known from gdi_display */
     ret = data->client_window = XCreateWindow( gdi_display,
@@ -1754,7 +1664,7 @@ static void create_whole_window( struct x11drv_win_data *data )
     HRGN win_rgn;
     POINT pos;
 
-    if (!data->managed && is_window_managed( data->hwnd, SWP_NOACTIVATE, &data->window_rect ))
+    if (!data->managed && is_window_managed( data->hwnd, SWP_NOACTIVATE, &data->rects.window ))
     {
         TRACE( "making win %p/%lx managed\n", data->hwnd, data->whole_window );
         data->managed = TRUE;
@@ -1773,12 +1683,12 @@ static void create_whole_window( struct x11drv_win_data *data )
 
     mask = get_window_attributes( data, &attr );
 
-    if (!(cx = data->whole_rect.right - data->whole_rect.left)) cx = 1;
+    if (!(cx = data->rects.visible.right - data->rects.visible.left)) cx = 1;
     else if (cx > 65535) cx = 65535;
-    if (!(cy = data->whole_rect.bottom - data->whole_rect.top)) cy = 1;
+    if (!(cy = data->rects.visible.bottom - data->rects.visible.top)) cy = 1;
     else if (cy > 65535) cy = 65535;
 
-    pos = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+    pos = virtual_screen_to_root( data->rects.visible.left, data->rects.visible.top );
     data->whole_window = XCreateWindow( data->display, root_window, pos.x, pos.y,
                                         cx, cy, 0, data->vis.depth, InputOutput,
                                         data->vis.visual, mask, &attr );
@@ -1796,7 +1706,7 @@ static void create_whole_window( struct x11drv_win_data *data )
     sync_window_text( data->display, data->whole_window, text );
 
     /* set the window region */
-    if (IsRectEmpty( &data->window_rect )) sync_empty_window_shape( data );
+    if (IsRectEmpty( &data->rects.window )) sync_empty_window_shape( data, NULL );
     else if (win_rgn) sync_window_region( data, win_rgn );
 
     /* set the window opacity */
@@ -1858,8 +1768,6 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     }
     /* Outlook stops processing messages after destroying a dialog, so we need an explicit flush */
     XFlush( data->display );
-    if (data->surface) window_surface_release( data->surface );
-    data->surface = NULL;
     NtUserRemoveProp( data->hwnd, whole_window_prop );
 }
 
@@ -1875,8 +1783,6 @@ void set_window_visual( struct x11drv_win_data *data, const XVisualInfo *vis, BO
     Window client_window = data->client_window;
 
     if (!data->use_alpha == !use_alpha && same_visual) return;
-    if (data->surface) window_surface_release( data->surface );
-    data->surface = NULL;
     data->use_alpha = use_alpha;
 
     if (same_visual) return;
@@ -2139,8 +2045,7 @@ void release_win_data( struct x11drv_win_data *data )
  *
  * Create an X11 data window structure for an existing window.
  */
-static struct x11drv_win_data *X11DRV_create_win_data( HWND hwnd, const RECT *window_rect,
-                                                       const RECT *client_rect )
+static struct x11drv_win_data *X11DRV_create_win_data( HWND hwnd, const struct window_rects *rects )
 {
     Display *display;
     struct x11drv_win_data *data;
@@ -2162,15 +2067,14 @@ static struct x11drv_win_data *X11DRV_create_win_data( HWND hwnd, const RECT *wi
     init_clip_window();  /* make sure the clip window is initialized in this thread */
 
     if (!(data = alloc_win_data( display, hwnd ))) return NULL;
+    data->rects = *rects;
 
-    data->whole_rect = data->window_rect = *window_rect;
-    data->client_rect = *client_rect;
     if (parent == NtUserGetDesktopWindow())
     {
         create_whole_window( data );
         TRACE( "win %p/%lx window %s whole %s client %s\n",
-               hwnd, data->whole_window, wine_dbgstr_rect( &data->window_rect ),
-               wine_dbgstr_rect( &data->whole_rect ), wine_dbgstr_rect( &data->client_rect ));
+               hwnd, data->whole_window, wine_dbgstr_rect( &data->rects.window ),
+               wine_dbgstr_rect( &data->rects.visible ), wine_dbgstr_rect( &data->rects.client ));
     }
     return data;
 }
@@ -2201,7 +2105,7 @@ HWND create_foreign_window( Display *display, Window xwin )
 
         memset( &class, 0, sizeof(class) );
         class.cbSize        = sizeof(class);
-        class.lpfnWndProc   = client_foreign_window_proc;
+        class.lpfnWndProc   = (WNDPROC)(UINT_PTR)client_foreign_window_proc;
         class.lpszClassName = foreign_window_prop;
         if (!NtUserRegisterClassExWOW( &class, &class_name, &version, NULL, 0, 0, NULL ) &&
             RtlGetLastWin32Error() != ERROR_CLASS_ALREADY_EXISTS)
@@ -2254,7 +2158,7 @@ HWND create_foreign_window( Display *display, Window xwin )
     XSaveContext( display, xwin, winContext, (char *)data->hwnd );
 
     TRACE( "win %lx parent %p style %08x %s -> hwnd %p\n",
-           xwin, parent, style, wine_dbgstr_rect(&data->window_rect), hwnd );
+           xwin, parent, style, wine_dbgstr_rect(&data->rects.window), hwnd );
 
     release_win_data( data );
 
@@ -2589,14 +2493,14 @@ done:
 /***********************************************************************
  *		WindowPosChanging   (X11DRV.@)
  */
-BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects )
+BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const struct window_rects *rects )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
     BOOL ret = FALSE;
 
     TRACE( "hwnd %p, swp_flags %#x, shaped %u, rects %s\n", hwnd, swp_flags, shaped, debugstr_window_rects( rects ) );
 
-    if (!data && !(data = X11DRV_create_win_data( hwnd, &rects->window, &rects->client ))) return FALSE; /* use default surface */
+    if (!data && !(data = X11DRV_create_win_data( hwnd, rects ))) return FALSE; /* use default surface */
     data->shaped = shaped;
 
     /* check if we need to switch the window to managed */
@@ -2608,9 +2512,6 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct wi
         if (!(data = get_win_data( hwnd ))) return FALSE; /* use default surface */
         data->managed = TRUE;
     }
-
-    X11DRV_window_to_X_rect( data, &rects->visible, &rects->window, &rects->client );
-    TRACE( "-> %s\n", debugstr_window_rects(rects) );
 
     ret = !!data->whole_window; /* use default surface if we don't have a window */
     release_win_data( data );
@@ -2628,8 +2529,8 @@ void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, con
     Window window;
 
     if (!(data = get_win_data( hwnd ))) return;
-    old_visible_rect = data->whole_rect;
-    old_client_rect = data->client_rect;
+    old_visible_rect = data->rects.visible;
+    old_client_rect = data->rects.client;
     window = data->whole_window;
     release_win_data( data );
 
@@ -2649,6 +2550,32 @@ void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, con
 }
 
 /***********************************************************************
+ *      GetWindowStyleMasks   (X11DRV.@)
+ */
+BOOL X11DRV_GetWindowStyleMasks( HWND hwnd, UINT style, UINT ex_style, UINT *style_mask, UINT *ex_style_mask )
+{
+    unsigned long decor = get_mwm_decorations_for_style( style, ex_style );
+    struct x11drv_win_data *data;
+
+    if ((data = get_win_data( hwnd )))
+    {
+        if (!data->managed) decor = 0;
+        release_win_data( data );
+    }
+
+    *style_mask = ex_style = 0;
+    if (decor & MWM_DECOR_TITLE) *style_mask |= WS_CAPTION;
+    if (decor & MWM_DECOR_BORDER)
+    {
+        *style_mask |= WS_DLGFRAME | WS_THICKFRAME;
+        *ex_style_mask |= WS_EX_DLGMODALFRAME;
+    }
+
+    return TRUE;
+}
+
+
+/***********************************************************************
  *		WindowPosChanged   (X11DRV.@)
  */
 void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
@@ -2657,40 +2584,30 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
     struct x11drv_thread_data *thread_data;
     struct x11drv_win_data *data;
     UINT new_style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
-    RECT old_window_rect, old_whole_rect, old_client_rect;
+    struct window_rects old_rects;
     int event_type;
 
     if (!(data = get_win_data( hwnd ))) return;
 
     thread_data = x11drv_thread_data();
 
-    old_window_rect = data->window_rect;
-    old_whole_rect  = data->whole_rect;
-    old_client_rect = data->client_rect;
-    data->window_rect = new_rects->window;
-    data->whole_rect  = new_rects->visible;
-    data->client_rect = new_rects->client;
-    if (data->vis.visualid == default_visual.visualid)
-    {
-        if (surface) window_surface_add_ref( surface );
-        if (data->surface) window_surface_release( data->surface );
-        data->surface = surface;
-    }
+    old_rects = data->rects;
+    data->rects = *new_rects;
 
     TRACE( "win %p/%lx new_rects %s style %08x flags %08x\n", hwnd, data->whole_window,
            debugstr_window_rects(new_rects), new_style, swp_flags );
 
     XFlush( gdi_display );  /* make sure painting is done before we move the window */
 
-    sync_client_position( data, &old_client_rect, &old_whole_rect );
+    sync_client_position( data, &old_rects );
 
     if (!data->whole_window)
     {
         BOOL needs_resize = (!data->client_window &&
-                             (data->client_rect.right - data->client_rect.left !=
-                              old_client_rect.right - old_client_rect.left ||
-                              data->client_rect.bottom - data->client_rect.top !=
-                              old_client_rect.bottom - old_client_rect.top));
+                             (data->rects.client.right - data->rects.client.left !=
+                              old_rects.client.right - old_rects.client.left ||
+                              data->rects.client.bottom - data->rects.client.top !=
+                              old_rects.client.bottom - old_rects.client.top));
         release_win_data( data );
         if (needs_resize) sync_gl_drawable( hwnd, FALSE );
         return;
@@ -2712,11 +2629,11 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
     {
         if (((swp_flags & SWP_HIDEWINDOW) && !(new_style & WS_VISIBLE)) ||
             (!event_type && !(new_style & WS_MINIMIZE) &&
-             !is_window_rect_mapped( &new_rects->window ) && is_window_rect_mapped( &old_window_rect )))
+             !is_window_rect_mapped( &new_rects->window ) && is_window_rect_mapped( &old_rects.window )))
         {
             release_win_data( data );
             unmap_window( hwnd );
-            if (NtUserIsWindowRectFullScreen( &old_window_rect, get_win_monitor_dpi( hwnd ) ))
+            if (NtUserIsWindowRectFullScreen( &old_rects.window, get_win_monitor_dpi( hwnd ) ))
                 NtUserClipCursor( NULL );
             if (!(data = get_win_data( hwnd ))) return;
         }
@@ -2725,7 +2642,23 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
     /* don't change position if we are about to minimize or maximize a managed window */
     if (!event_type &&
         !(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
-        sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
+    {
+        sync_window_position( data, swp_flags );
+#ifdef HAVE_LIBXSHAPE
+        if (IsRectEmpty( &old_rects.window ) != IsRectEmpty( &new_rects->window ))
+            sync_empty_window_shape( data, surface );
+        if (data->shaped)
+        {
+            int old_x_offset = old_rects.window.left - old_rects.visible.left;
+            int old_y_offset = old_rects.window.top - old_rects.visible.top;
+            int new_x_offset = new_rects->window.left - new_rects->visible.left;
+            int new_y_offset = new_rects->window.top - new_rects->visible.top;
+            if (old_x_offset != new_x_offset || old_y_offset != new_y_offset)
+                XShapeOffsetShape( data->display, data->whole_window, ShapeBounding,
+                                   new_x_offset - old_x_offset, new_y_offset - old_y_offset );
+        }
+#endif
+    }
 
     if ((new_style & WS_VISIBLE) &&
         ((new_style & WS_MINIMIZE) || is_window_rect_mapped( &new_rects->window )))
@@ -2762,9 +2695,6 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
     }
 
     XFlush( data->display );  /* make sure changes are done before we start painting again */
-    if (data->surface && data->vis.visualid != default_visual.visualid)
-        window_surface_flush( data->surface );
-
     release_win_data( data );
 }
 
@@ -2821,7 +2751,8 @@ UINT X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
                   &root, &x, &y, &width, &height, &border, &depth );
     XTranslateCoordinates( thread_data->display, data->whole_window, root, 0, 0, &x, &y, &top );
     pos = root_to_virtual_screen( x, y );
-    X11DRV_X_to_window_rect( data, rect, pos.x, pos.y, width, height );
+    SetRect( rect, pos.x, pos.y, pos.x + width, pos.y + height );
+    *rect = window_rect_from_visible( &data->rects, *rect );
     swp &= ~(SWP_NOMOVE | SWP_NOCLIENTMOVE | SWP_NOSIZE | SWP_NOCLIENTSIZE);
 
 done:
@@ -2898,7 +2829,7 @@ void X11DRV_SetLayeredWindowAttributes( HWND hwnd, COLORREF key, BYTE alpha, DWO
             DWORD style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
 
             if ((style & WS_VISIBLE) &&
-                ((style & WS_MINIMIZE) || is_window_rect_mapped( &data->window_rect )))
+                ((style & WS_MINIMIZE) || is_window_rect_mapped( &data->rects.window )))
             {
                 release_win_data( data );
                 map_window( hwnd, style );
@@ -2937,7 +2868,7 @@ void X11DRV_UpdateLayeredWindow( HWND hwnd, UINT flags )
     {
         DWORD style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
 
-        if ((style & WS_VISIBLE) && ((style & WS_MINIMIZE) || is_window_rect_mapped( &data->window_rect )))
+        if ((style & WS_VISIBLE) && ((style & WS_MINIMIZE) || is_window_rect_mapped( &data->rects.window )))
             map_window( hwnd, style );
     }
 }
@@ -3004,8 +2935,8 @@ LRESULT X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
             if (data->whole_window)
             {
                 /* sync window position with the new virtual screen rect */
-                POINT old_pos = {.x = data->whole_rect.left - wp, .y = data->whole_rect.top - lp};
-                POINT pos = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+                POINT old_pos = {.x = data->rects.visible.left - wp, .y = data->rects.visible.top - lp};
+                POINT pos = virtual_screen_to_root( data->rects.visible.left, data->rects.visible.top );
                 XWindowChanges changes = {.x = pos.x, .y = pos.y};
                 UINT mask = 0;
 

@@ -205,6 +205,7 @@ extern INT X11DRV_ToUnicodeEx( UINT virtKey, UINT scanCode, const BYTE *lpKeySta
                                LPWSTR bufW, int bufW_size, UINT flags, HKL hkl );
 extern SHORT X11DRV_VkKeyScanEx( WCHAR wChar, HKL hkl );
 extern void X11DRV_NotifyIMEStatus( HWND hwnd, UINT status );
+extern BOOL X11DRV_SetIMECompositionWindowPos( HWND hwnd, const POINT *point );
 extern void X11DRV_DestroyCursorIcon( HCURSOR handle );
 extern void X11DRV_SetCursor( HWND hwnd, HCURSOR handle );
 extern BOOL X11DRV_SetCursorPos( INT x, INT y );
@@ -242,7 +243,8 @@ extern LRESULT X11DRV_ClipboardWindowProc( HWND hwnd, UINT msg, WPARAM wp, LPARA
 extern void X11DRV_UpdateClipboard(void);
 extern void X11DRV_UpdateLayeredWindow( HWND hwnd, UINT flags );
 extern LRESULT X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp );
-extern BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, struct window_rects *rects );
+extern BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const struct window_rects *rects );
+extern BOOL X11DRV_GetWindowStyleMasks( HWND hwnd, UINT style, UINT ex_style, UINT *style_mask, UINT *ex_style_mask );
 extern BOOL X11DRV_CreateWindowSurface( HWND hwnd, BOOL layered, const RECT *surface_rect, struct window_surface **surface );
 extern void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, const RECT *valid_rects );
 extern void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
@@ -262,7 +264,6 @@ extern Pixmap create_pixmap_from_image( HDC hdc, const XVisualInfo *vis, const B
                                         const struct gdi_image_bits *bits, UINT coloruse );
 extern DWORD get_pixmap_image( Pixmap pixmap, int width, int height, const XVisualInfo *vis,
                                BITMAPINFO *info, struct gdi_image_bits *bits );
-extern HRGN expose_surface( struct window_surface *window_surface, const RECT *rect );
 
 extern RGNDATA *X11DRV_GetRegionData( HRGN hrgn, HDC hdc_lptodp );
 extern BOOL add_extra_clipping_region( X11DRV_PDEVICE *dev, HRGN rgn );
@@ -430,7 +431,6 @@ extern BOOL use_system_cursors;
 extern BOOL grab_fullscreen;
 extern BOOL usexcomposite;
 extern BOOL managed_mode;
-extern BOOL decorated_mode;
 extern BOOL private_color_map;
 extern int primary_monitor;
 extern int copy_default_colors;
@@ -438,7 +438,12 @@ extern int alloc_system_colors;
 extern int xrender_error_base;
 extern char *process_name;
 extern Display *clipboard_display;
-extern WNDPROC client_foreign_window_proc;
+extern UINT64 client_foreign_window_proc;
+extern UINT64 dnd_enter_event_callback;
+extern UINT64 dnd_position_event_callback;
+extern UINT64 dnd_post_drop_callback;
+extern UINT64 dnd_drop_event_callback;
+extern UINT64 dnd_leave_event_callback;
 
 /* atoms */
 
@@ -599,9 +604,7 @@ struct x11drv_win_data
     HWND        hwnd;           /* hwnd that this private data belongs to */
     Window      whole_window;   /* X window for the complete window */
     Window      client_window;  /* X window for the client area */
-    RECT        window_rect;    /* USER window rectangle relative to win32 parent window client area */
-    RECT        whole_rect;     /* X window rectangle for the whole window relative to win32 parent window client area */
-    RECT        client_rect;    /* client area relative to win32 parent window client area */
+    struct window_rects rects;  /* window rects in monitor DPI, relative to parent client area */
     XIC         xic;            /* X input context */
     UINT        managed : 1;    /* is window managed? */
     UINT        mapped : 1;     /* is window mapped? (in either normal or iconic state) */
@@ -617,7 +620,6 @@ struct x11drv_win_data
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
     unsigned long configure_serial; /* serial number of last configure request */
-    struct window_surface *surface;
     Pixmap         icon_pixmap;
     Pixmap         icon_mask;
     unsigned long *icon_bits;
@@ -648,8 +650,8 @@ extern void change_systray_owner( Display *display, Window systray_window );
 extern HWND create_foreign_window( Display *display, Window window );
 extern BOOL update_clipboard( HWND hwnd );
 extern void init_win_context(void);
-extern void *file_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
-extern void *uri_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
+extern DROPFILES *file_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
+extern DROPFILES *uri_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
@@ -680,7 +682,6 @@ typedef int (*x11drv_error_callback)( Display *display, XErrorEvent *event, void
 
 extern void X11DRV_expect_error( Display *display, x11drv_error_callback callback, void *arg );
 extern int X11DRV_check_error(void);
-extern void X11DRV_X_to_window_rect( struct x11drv_win_data *data, RECT *rect, int x, int y, int cx, int cy );
 extern POINT virtual_screen_to_root( INT x, INT y );
 extern POINT root_to_virtual_screen( INT x, INT y );
 extern RECT get_host_primary_monitor_rect(void);
@@ -841,9 +842,6 @@ extern NTSTATUS x11drv_tablet_attach_queue( void *arg );
 extern NTSTATUS x11drv_tablet_get_packet( void *arg );
 extern NTSTATUS x11drv_tablet_load_info( void *arg );
 extern NTSTATUS x11drv_tablet_info( void *arg );
-
-extern NTSTATUS x11drv_client_func( enum x11drv_client_funcs func, const void *params,
-                                    ULONG size );
 
 /* GDI helpers */
 

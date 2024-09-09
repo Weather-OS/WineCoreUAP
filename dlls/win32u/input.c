@@ -2351,6 +2351,21 @@ BOOL WINAPI NtUserGetCaretPos( POINT *pt )
     return ret;
 }
 
+BOOL set_ime_composition_window_pos( HWND hwnd, const POINT *point )
+{
+    HWND root_hwnd;
+    POINT pt;
+
+    if (!NtUserIsWindow( hwnd ))
+        return FALSE;
+
+    root_hwnd = NtUserGetAncestor( hwnd, GA_ROOT );
+    pt = *point;
+    NtUserMapWindowPoints( hwnd, root_hwnd, &pt, 1, 0 /* per-monitor DPI */ );
+
+    return user_driver->pSetIMECompositionWindowPos( root_hwnd, &pt );
+}
+
 /*******************************************************************
  *              set_caret_pos
  */
@@ -2359,6 +2374,7 @@ BOOL set_caret_pos( int x, int y )
     int old_state = 0;
     int hidden = 0;
     HWND hwnd = 0;
+    POINT pt;
     BOOL ret;
     RECT r;
 
@@ -2388,7 +2404,10 @@ BOOL set_caret_pos( int x, int y )
         r.bottom += y - r.top;
         r.left = x;
         r.top = y;
+        pt.x = x;
+        pt.y = y;
         display_caret( hwnd, &r );
+        set_ime_composition_window_pos( hwnd, &pt );
         NtUserSetSystemTimer( hwnd, SYSTEM_TIMER_CARET, caret.timeout );
     }
     return ret;
@@ -2400,6 +2419,7 @@ BOOL set_caret_pos( int x, int y )
 BOOL WINAPI NtUserShowCaret( HWND hwnd )
 {
     int hidden = 0;
+    POINT pt;
     BOOL ret;
     RECT r;
 
@@ -2422,7 +2442,10 @@ BOOL WINAPI NtUserShowCaret( HWND hwnd )
 
     if (ret && hidden == 1)  /* hidden was 1 so it's now 0 */
     {
+        pt.x = r.left;
+        pt.y = r.top;
         display_caret( hwnd, &r );
+        set_ime_composition_window_pos( hwnd, &pt );
         NtUserSetSystemTimer( hwnd, SYSTEM_TIMER_CARET, caret.timeout );
     }
     return ret;

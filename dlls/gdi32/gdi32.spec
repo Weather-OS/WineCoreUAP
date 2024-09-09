@@ -75,21 +75,45 @@
 @ stdcall CreateSolidBrush(long)
 @ stdcall D3DKMTCheckVidPnExclusiveOwnership(ptr) win32u.NtGdiDdDDICheckVidPnExclusiveOwnership
 @ stdcall D3DKMTCloseAdapter(ptr) win32u.NtGdiDdDDICloseAdapter
+@ stdcall D3DKMTCreateAllocation(ptr) win32u.NtGdiDdDDICreateAllocation
+@ stdcall D3DKMTCreateAllocation2(ptr) win32u.NtGdiDdDDICreateAllocation2
 @ stdcall D3DKMTCreateDCFromMemory(ptr) win32u.NtGdiDdDDICreateDCFromMemory
 @ stdcall D3DKMTCreateDevice(ptr) win32u.NtGdiDdDDICreateDevice
+@ stdcall D3DKMTCreateKeyedMutex(ptr) win32u.NtGdiDdDDICreateKeyedMutex
+@ stdcall D3DKMTCreateKeyedMutex2(ptr) win32u.NtGdiDdDDICreateKeyedMutex2
+@ stdcall D3DKMTCreateSynchronizationObject(ptr) win32u.NtGdiDdDDICreateSynchronizationObject
+@ stdcall D3DKMTCreateSynchronizationObject2(ptr) win32u.NtGdiDdDDICreateSynchronizationObject2
+@ stdcall D3DKMTDestroyAllocation(ptr) win32u.NtGdiDdDDIDestroyAllocation
+@ stdcall D3DKMTDestroyAllocation2(ptr) win32u.NtGdiDdDDIDestroyAllocation2
 @ stdcall D3DKMTDestroyDCFromMemory(ptr) win32u.NtGdiDdDDIDestroyDCFromMemory
 @ stdcall D3DKMTDestroyDevice(ptr) win32u.NtGdiDdDDIDestroyDevice
+@ stdcall D3DKMTDestroyKeyedMutex(ptr) win32u.NtGdiDdDDIDestroyKeyedMutex
+@ stdcall D3DKMTDestroySynchronizationObject(ptr) win32u.NtGdiDdDDIDestroySynchronizationObject
+@ stdcall D3DKMTEnumAdapters(ptr) win32u.NtGdiDdDDIEnumAdapters
 @ stdcall D3DKMTEnumAdapters2(ptr) win32u.NtGdiDdDDIEnumAdapters2
 @ stdcall D3DKMTEscape(ptr) win32u.NtGdiDdDDIEscape
 @ stdcall D3DKMTOpenAdapterFromDeviceName(ptr) win32u.NtGdiDdDDIOpenAdapterFromDeviceName
 @ stdcall D3DKMTOpenAdapterFromGdiDisplayName(ptr)
 @ stdcall D3DKMTOpenAdapterFromHdc(ptr) win32u.NtGdiDdDDIOpenAdapterFromHdc
 @ stdcall D3DKMTOpenAdapterFromLuid(ptr) win32u.NtGdiDdDDIOpenAdapterFromLuid
+@ stdcall D3DKMTOpenKeyedMutex(ptr) win32u.NtGdiDdDDIOpenKeyedMutex
+@ stdcall D3DKMTOpenKeyedMutex2(ptr) win32u.NtGdiDdDDIOpenKeyedMutex2
+@ stdcall D3DKMTOpenKeyedMutexFromNtHandle(ptr) win32u.NtGdiDdDDIOpenKeyedMutexFromNtHandle
+@ stdcall D3DKMTOpenResource(ptr) win32u.NtGdiDdDDIOpenResource
+@ stdcall D3DKMTOpenResource2(ptr) win32u.NtGdiDdDDIOpenResource2
+@ stdcall D3DKMTOpenResourceFromNtHandle(ptr) win32u.NtGdiDdDDIOpenResourceFromNtHandle
+@ stdcall D3DKMTOpenSynchronizationObject(ptr) win32u.NtGdiDdDDIOpenSynchronizationObject
+@ stdcall D3DKMTOpenSyncObjectFromNtHandle(ptr) win32u.NtGdiDdDDIOpenSyncObjectFromNtHandle
+@ stdcall D3DKMTOpenSyncObjectFromNtHandle2(ptr) win32u.NtGdiDdDDIOpenSyncObjectFromNtHandle2
+@ stdcall D3DKMTOpenSyncObjectNtHandleFromName(ptr) win32u.NtGdiDdDDIOpenSyncObjectNtHandleFromName
 @ stdcall D3DKMTQueryAdapterInfo(ptr) win32u.NtGdiDdDDIQueryAdapterInfo
+@ stdcall D3DKMTQueryResourceInfo(ptr) win32u.NtGdiDdDDIQueryResourceInfo
+@ stdcall D3DKMTQueryResourceInfoFromNtHandle(ptr) win32u.NtGdiDdDDIQueryResourceInfoFromNtHandle
 @ stdcall D3DKMTQueryStatistics(ptr) win32u.NtGdiDdDDIQueryStatistics
 @ stdcall D3DKMTQueryVideoMemoryInfo(ptr) win32u.NtGdiDdDDIQueryVideoMemoryInfo
 @ stdcall D3DKMTSetQueuedLimit(ptr) win32u.NtGdiDdDDISetQueuedLimit
 @ stdcall D3DKMTSetVidPnSourceOwner(ptr) win32u.NtGdiDdDDISetVidPnSourceOwner
+@ stdcall D3DKMTShareObjects(long ptr ptr long ptr) win32u.NtGdiDdDDIShareObjects
 @ stdcall DPtoLP(long ptr long)
 @ stdcall DeleteColorSpace(long)
 @ stdcall DeleteDC(long)

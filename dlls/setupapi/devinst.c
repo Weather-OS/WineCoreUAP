@@ -18,7 +18,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <assert.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "windef.h"
@@ -31,6 +33,9 @@
 #include "winnls.h"
 #include "winsvc.h"
 #include "setupapi.h"
+#include "softpub.h"
+#include "mscat.h"
+#include "shlwapi.h"
 #include "wine/debug.h"
 #include "wine/list.h"
 #include "cfgmgr32.h"
@@ -157,6 +162,56 @@ struct device_iface
     HKEY             refstr_key;
     struct list      entry;
 };
+
+static bool array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
+{
+    unsigned int new_capacity, max_capacity;
+    void *new_elements;
+
+    if (count <= *capacity)
+        return true;
+
+    max_capacity = ~(size_t)0 / size;
+    if (count > max_capacity)
+        return false;
+
+    new_capacity = max(4, *capacity);
+    while (new_capacity < count && new_capacity <= max_capacity / 2)
+        new_capacity *= 2;
+    if (new_capacity < count)
+        new_capacity = max_capacity;
+
+    if (!(new_elements = realloc(*elements, new_capacity * size)))
+        return false;
+
+    *elements = new_elements;
+    *capacity = new_capacity;
+
+    return true;
+}
+
+static WCHAR *sprintf_path(const WCHAR *format, ...)
+{
+    va_list args, args_copy;
+    WCHAR *buffer;
+    size_t len;
+
+    va_start(args, format);
+
+    va_copy(args_copy, args);
+    len = _vsnwprintf(NULL, 0, format, args_copy) + 1;
+    va_end(args_copy);
+
+    buffer = malloc(len * sizeof(WCHAR));
+    _vsnwprintf(buffer, len, format, args);
+    va_end(args);
+    return buffer;
+}
+
+static WCHAR *concat_path(const WCHAR *root, const WCHAR *path)
+{
+    return sprintf_path(L"%s\\%s", root, path);
+}
 
 static struct DeviceInfoSet *get_device_set(HDEVINFO devinfo)
 {
@@ -4691,10 +4746,27 @@ static BOOL version_is_compatible(const WCHAR *version)
     return !wcsnicmp(version, machine_ext, len);
 }
 
+static bool any_version_is_compatible(INFCONTEXT *ctx)
+{
+    WCHAR version[LINE_LEN];
+    DWORD j;
+
+    if (SetupGetFieldCount(ctx) < 2)
+        return true;
+
+    for (j = 2; SetupGetStringFieldW(ctx, j, version, ARRAY_SIZE(version), NULL); ++j)
+    {
+        if (version_is_compatible(version))
+            return true;
+    }
+
+    return false;
+}
+
 static void enum_compat_drivers_from_file(struct device *device, const WCHAR *path)
 {
     static const WCHAR manufacturerW[] = {'M','a','n','u','f','a','c','t','u','r','e','r',0};
-    WCHAR mfg_key[LINE_LEN], id[MAX_DEVICE_ID_LEN], version[MAX_DEVICE_ID_LEN];
+    WCHAR mfg_key[LINE_LEN], id[MAX_DEVICE_ID_LEN];
     DWORD i, j, k, driver_count = device->driver_count;
     struct driver driver, *drivers = device->drivers;
     INFCONTEXT ctx;
@@ -4714,20 +4786,8 @@ static void enum_compat_drivers_from_file(struct device *device, const WCHAR *pa
         if (!SetupGetStringFieldW(&ctx, 1, mfg_key, ARRAY_SIZE(mfg_key), NULL))
             lstrcpyW(mfg_key, driver.manufacturer);
 
-        if (SetupGetFieldCount(&ctx) >= 2)
-        {
-            BOOL compatible = FALSE;
-            for (j = 2; SetupGetStringFieldW(&ctx, j, version, ARRAY_SIZE(version), NULL); ++j)
-            {
-                if (version_is_compatible(version))
-                {
-                    compatible = TRUE;
-                    break;
-                }
-            }
-            if (!compatible)
-                continue;
-        }
+        if (!any_version_is_compatible(&ctx))
+            continue;
 
         if (!SetupDiGetActualSectionToInstallW(hinf, mfg_key, driver.mfg_key,
                 ARRAY_SIZE(driver.mfg_key), NULL, NULL))
@@ -5346,4 +5406,1077 @@ BOOL WINAPI SetupDiGetCustomDevicePropertyW(HDEVINFO devinfo, SP_DEVINFO_DATA *d
 
     SetLastError(ERROR_INVALID_DATA);
     return FALSE;
+}
+
+/***********************************************************************
+ *      SetupCopyOEMInfA  (SETUPAPI.@)
+ */
+BOOL WINAPI SetupCopyOEMInfA( PCSTR source, PCSTR location,
+                              DWORD media_type, DWORD style, PSTR dest,
+                              DWORD buffer_size, PDWORD required_size, PSTR *component )
+{
+    BOOL ret = FALSE;
+    LPWSTR destW = NULL, sourceW = NULL, locationW = NULL;
+    DWORD size;
+
+    TRACE("%s, %s, %ld, %ld, %p, %ld, %p, %p\n", debugstr_a(source), debugstr_a(location),
+          media_type, style, dest, buffer_size, required_size, component);
+
+    if (dest && !(destW = MyMalloc( buffer_size * sizeof(WCHAR) ))) return FALSE;
+    if (source && !(sourceW = strdupAtoW( source ))) goto done;
+    if (location && !(locationW = strdupAtoW( location ))) goto done;
+
+    ret = SetupCopyOEMInfW( sourceW, locationW, media_type, style, destW, buffer_size, &size, NULL );
+
+    if (required_size) *required_size = size;
+
+    if (dest)
+    {
+        if (buffer_size >= size)
+        {
+            WideCharToMultiByte( CP_ACP, 0, destW, -1, dest, buffer_size, NULL, NULL );
+            if (component) *component = strrchr( dest, '\\' ) + 1;
+        }
+        else
+            SetLastError( ERROR_INSUFFICIENT_BUFFER );
+    }
+
+done:
+    MyFree( destW );
+    free( sourceW );
+    free( locationW );
+    if (ret) SetLastError(ERROR_SUCCESS);
+    return ret;
+}
+
+static int compare_files(HANDLE file1, HANDLE file2)
+{
+    char buffer1[2048];
+    char buffer2[2048];
+    DWORD size1;
+    DWORD size2;
+
+    while (ReadFile(file1, buffer1, sizeof(buffer1), &size1, NULL)
+            && ReadFile(file2, buffer2, sizeof(buffer2), &size2, NULL))
+    {
+        int ret;
+        if (size1 != size2)
+            return size1 > size2 ? 1 : -1;
+        if (!size1)
+            return 0;
+        ret = memcmp( buffer1, buffer2, size1 );
+        if (ret)
+            return ret;
+    }
+
+    return 0;
+}
+
+struct driver_package
+{
+    const WCHAR *inf_name;
+    HINF hinf;
+    WCHAR *src_root, *dst_root;
+    bool already_installed;
+
+    struct file
+    {
+        WCHAR *desc, *tag, *subdir, *filename;
+    } *files;
+    size_t file_count, files_size;
+};
+
+static void driver_package_cleanup(struct driver_package *package)
+{
+    free(package->src_root);
+    free(package->dst_root);
+    for (size_t i = 0; i < package->file_count; ++i)
+    {
+        free(package->files[i].desc);
+        free(package->files[i].tag);
+        free(package->files[i].subdir);
+        free(package->files[i].filename);
+    }
+    free(package->files);
+    SetupCloseInfFile(package->hinf);
+}
+
+static WCHAR *get_string_field(INFCONTEXT *ctx, DWORD index)
+{
+    WCHAR *ret;
+    DWORD len;
+
+    if (!SetupGetStringFieldW(ctx, index, NULL, 0, &len) || len <= 1)
+        return NULL;
+
+    ret = malloc(len * sizeof(WCHAR));
+    SetupGetStringFieldW(ctx, index, ret, len, NULL);
+    return ret;
+}
+
+static bool get_source_info(HINF hinf, const WCHAR *filename, WCHAR **desc, WCHAR **tag, WCHAR **subdir)
+{
+    WCHAR *file_subdir = NULL, *disk_subdir = NULL;
+    UINT diskid;
+    DWORD len;
+
+    if (!SetupGetSourceFileLocationW(hinf, NULL, filename, &diskid, NULL, 0, &len))
+    {
+        ERR("Failed to get location for %s, error %lu.\n", debugstr_w(filename), GetLastError());
+        return false;
+    }
+
+    if (len > 1)
+    {
+        if (!(file_subdir = malloc(len * sizeof(WCHAR))))
+            return false;
+        SetupGetSourceFileLocationW(hinf, NULL, filename, &diskid, file_subdir, len, NULL);
+    }
+
+    if (SetupGetSourceInfoW(hinf, diskid, SRCINFO_DESCRIPTION, NULL, 0, &len) && len > 1
+            && (*desc = malloc(len * sizeof(WCHAR))))
+        SetupGetSourceInfoW(hinf, diskid, SRCINFO_DESCRIPTION, *desc, len, NULL);
+
+    if (SetupGetSourceInfoW(hinf, diskid, SRCINFO_TAGFILE, NULL, 0, &len) && len > 1
+            && (*tag = malloc(len * sizeof(WCHAR))))
+        SetupGetSourceInfoW(hinf, diskid, SRCINFO_TAGFILE, *tag, len, NULL);
+
+    if (SetupGetSourceInfoW(hinf, diskid, SRCINFO_PATH, NULL, 0, &len) && len > 1
+            && (disk_subdir = malloc(len * sizeof(WCHAR))))
+        SetupGetSourceInfoW(hinf, diskid, SRCINFO_PATH, disk_subdir, len, NULL);
+
+    if (disk_subdir)
+    {
+        if (file_subdir)
+        {
+            *subdir = concat_path(disk_subdir, file_subdir);
+            free(disk_subdir);
+            free(file_subdir);
+        }
+        else
+        {
+            *subdir = disk_subdir;
+        }
+    }
+    else
+    {
+        *subdir = file_subdir;
+    }
+
+    return true;
+}
+
+static void add_file(struct driver_package *package,
+        WCHAR *filename, WCHAR *desc, WCHAR *tag, WCHAR *subdir)
+{
+    struct file *file;
+
+    array_reserve((void **)&package->files, &package->files_size,
+            package->file_count + 1, sizeof(*package->files));
+
+    file = &package->files[package->file_count++];
+    file->filename = filename;
+    file->desc = desc;
+    file->tag = tag;
+    file->subdir = subdir;
+
+    TRACE("Adding file %s, desc %s, tag %s, subdir %s.\n",
+            debugstr_w(filename), debugstr_w(desc), debugstr_w(tag), debugstr_w(subdir));
+}
+
+static void add_file_from_copy_section(struct driver_package *package,
+        const WCHAR *dst_filename, const WCHAR *src_filename)
+{
+    WCHAR *desc = NULL, *tag = NULL, *subdir = NULL;
+
+    if (get_source_info(package->hinf, src_filename, &desc, &tag, &subdir))
+        add_file(package, wcsdup(src_filename), desc, tag, subdir);
+}
+
+static void add_copy_section(struct driver_package *package, const WCHAR *section)
+{
+    TRACE("Building file list from CopyFiles section %s.\n", debugstr_w(section));
+
+    if (section[0] == '@')
+    {
+        add_file_from_copy_section(package, section + 1, section + 1);
+    }
+    else
+    {
+        INFCONTEXT context;
+
+        if (!SetupFindFirstLineW(package->hinf, section, NULL, &context))
+            return;
+        do
+        {
+            WCHAR *dst_filename = get_string_field(&context, 1);
+            WCHAR *src_filename = get_string_field(&context, 2);
+
+            add_file_from_copy_section(package, dst_filename, src_filename ? src_filename : dst_filename);
+
+            free(dst_filename);
+            free(src_filename);
+        } while (SetupFindNextLine(&context, &context));
+    }
+}
+
+static void add_driver_files(struct driver_package *package, const WCHAR *driver_section)
+{
+    INFCONTEXT ctx;
+    BOOL found;
+
+    TRACE("Building file list for driver section %s.\n", debugstr_w(driver_section));
+
+    found = SetupFindFirstLineW(package->hinf, driver_section, L"CopyFiles", &ctx);
+    while (found)
+    {
+        DWORD count = SetupGetFieldCount(&ctx);
+
+        for (DWORD i = 1; i <= count; ++i)
+        {
+            WCHAR *section = get_string_field(&ctx, i);
+
+            add_copy_section(package, section);
+            free(section);
+        }
+
+        found = SetupFindNextMatchLineW(&ctx, L"CopyFiles", &ctx);
+    }
+}
+
+static bool driver_store_files_are_equal(const WCHAR *src_path, const WCHAR *store_path)
+{
+    HANDLE src_file, store_file;
+    bool ret;
+
+    src_file = CreateFileW(src_path, FILE_READ_DATA,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+    if (src_file == INVALID_HANDLE_VALUE)
+    {
+        ERR("Source file %s doesn't exist.\n", debugstr_w(src_path));
+        return false;
+    }
+
+    store_file = CreateFileW(store_path, FILE_READ_DATA,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+    if (store_file == INVALID_HANDLE_VALUE)
+    {
+        TRACE("File %s doesn't exist in driver store; this is the wrong package.\n", debugstr_w(store_path));
+        CloseHandle(src_file);
+        return false;
+    }
+
+    ret = !compare_files(src_file, store_file);
+
+    CloseHandle(src_file);
+    CloseHandle(store_file);
+    return ret;
+}
+
+static void find_driver_store_path(struct driver_package *package, const WCHAR *inf_path)
+{
+    static const WCHAR file_repository[] = L"C:\\windows\\system32\\driverstore\\filerepository";
+    WCHAR *search_path = sprintf_path(L"%s\\%s_*", file_repository, package->inf_name);
+    unsigned int index = 1;
+    WIN32_FIND_DATAW data;
+    HANDLE handle;
+
+    /* Windows names directories using the inf name and what appears to be a
+     * hash, separated by an underscore. For simplicity we don't implement the
+     * hash; instead we just use an integer to discriminate different packages
+     * with the same name. */
+
+    handle = FindFirstFileW(search_path, &data);
+    free(search_path);
+
+    if (handle != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            const size_t prefix_len = wcslen(package->inf_name) + 1;
+            WCHAR *store_root, *end_ptr, *store_inf;
+            unsigned int dir_index;
+
+            /* FindFirstFile() should have given us a name at least as long as
+             * the INF name followed by an underscore. */
+            assert(wcslen(data.cFileName) >= prefix_len);
+            if (!(dir_index = wcstoul(data.cFileName + prefix_len, &end_ptr, 10)))
+                ERR("Malformed directory name %s.\n", debugstr_w(data.cFileName));
+            index = max(index, dir_index + 1);
+
+            store_root = concat_path(file_repository, data.cFileName);
+            store_inf = concat_path(store_root, package->inf_name);
+
+            if (driver_store_files_are_equal(inf_path, store_inf))
+            {
+                TRACE("Found matching driver package %s.\n", debugstr_w(store_root));
+                free(store_inf);
+                FindClose(handle);
+                package->already_installed = true;
+                package->dst_root = store_root;
+                return;
+            }
+
+            free(store_root);
+        } while (FindNextFileW(handle, &data));
+
+        FindClose(handle);
+    }
+    else
+    {
+        if (GetLastError() != ERROR_PATH_NOT_FOUND && GetLastError() != ERROR_FILE_NOT_FOUND)
+        {
+            ERR("Failed to enumerate file repository, error %lu.\n", GetLastError());
+            return;
+        }
+    }
+
+    package->dst_root = sprintf_path(L"%s\\%s_%u", file_repository, package->inf_name, index);
+    TRACE("No matching driver package found; using new path %s.\n", debugstr_w(package->dst_root));
+}
+
+static DWORD parse_inf(struct driver_package *package, const WCHAR *filename)
+{
+    WCHAR mfg_key[LINE_LEN], manufacturer[LINE_LEN];
+    WCHAR *filename_abs, *file_part, *catalog;
+    INFCONTEXT ctx;
+    DWORD len;
+
+    memset(package, 0, sizeof(*package));
+
+    if (!*filename)
+        return ERROR_FILE_NOT_FOUND;
+
+    len = GetFullPathNameW(filename, 0, NULL, NULL);
+    filename_abs = malloc(len * sizeof(WCHAR));
+    GetFullPathNameW(filename, len, filename_abs, NULL);
+
+    TRACE("Parsing %s.\n", debugstr_w(filename_abs));
+
+    if ((package->hinf = SetupOpenInfFileW(filename_abs, NULL, INF_STYLE_WIN4, NULL)) == INVALID_HANDLE_VALUE)
+    {
+        ERR("Failed to open %s, error %lu.\n", debugstr_w(filename_abs), GetLastError());
+        driver_package_cleanup(package);
+        return GetLastError();
+    }
+
+    file_part = wcsrchr(filename_abs, '\\');
+    assert(file_part);
+    package->inf_name = file_part + 1;
+
+    *file_part = 0;
+    package->src_root = filename_abs;
+
+    add_file(package, wcsdup(package->inf_name), NULL, NULL, NULL);
+
+    if (SetupFindFirstLineW(package->hinf, L"Version", L"CatalogFile", &ctx)
+            && (catalog = get_string_field(&ctx, 1)))
+        add_file(package, catalog, NULL, NULL, NULL);
+
+    for (DWORD i = 0; SetupGetLineByIndexW(package->hinf, L"Manufacturer", i, &ctx); ++i)
+    {
+        SetupGetStringFieldW(&ctx, 0, manufacturer, ARRAY_SIZE(manufacturer), NULL);
+        if (!SetupGetStringFieldW(&ctx, 1, mfg_key, ARRAY_SIZE(mfg_key), NULL))
+            wcscpy(mfg_key, manufacturer);
+
+        if (!any_version_is_compatible(&ctx))
+            continue;
+
+        if (!SetupDiGetActualSectionToInstallW(package->hinf, mfg_key, mfg_key, ARRAY_SIZE(mfg_key), NULL, NULL))
+        {
+            WARN("Failed to find section for %s, skipping.\n", debugstr_w(mfg_key));
+            continue;
+        }
+
+        for (DWORD j = 0; SetupGetLineByIndexW(package->hinf, mfg_key, j, &ctx); ++j)
+        {
+            WCHAR *driver_section = get_string_field(&ctx, 1);
+            WCHAR arch_driver_section[LINE_LEN];
+
+            if (SetupDiGetActualSectionToInstallW(package->hinf, driver_section,
+                    arch_driver_section, ARRAY_SIZE(arch_driver_section), NULL, NULL))
+            {
+                WCHAR coinst_section[LINE_LEN];
+
+                add_driver_files(package, arch_driver_section);
+
+                swprintf(coinst_section, ARRAY_SIZE(coinst_section), L"%s.CoInstallers", arch_driver_section);
+                add_driver_files(package, coinst_section);
+            }
+            else
+            {
+                WARN("Failed to find driver section for %s, skipping.\n", debugstr_w(driver_section));
+            }
+
+            free(driver_section);
+        }
+    }
+
+    find_driver_store_path(package, filename);
+
+    return ERROR_SUCCESS;
+}
+
+static BOOL find_existing_inf(const WCHAR *source, WCHAR *target)
+{
+    LARGE_INTEGER source_file_size, dest_file_size;
+    HANDLE source_file, dest_file;
+    WIN32_FIND_DATAW find_data;
+    HANDLE find_handle;
+
+    source_file = CreateFileW(source, FILE_READ_DATA | FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+    if (source_file == INVALID_HANDLE_VALUE)
+        return FALSE;
+
+    if (!GetFileSizeEx(source_file, &source_file_size))
+    {
+        CloseHandle(source_file);
+        return FALSE;
+    }
+
+    GetWindowsDirectoryW(target, MAX_PATH);
+    wcscat(target, L"\\inf\\*");
+    if ((find_handle = FindFirstFileW(target, &find_data)) != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            GetWindowsDirectoryW(target, MAX_PATH);
+            wcscat(target, L"\\inf\\");
+            wcscat(target, find_data.cFileName);
+            dest_file = CreateFileW(target, FILE_READ_DATA | FILE_READ_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
+            if (dest_file == INVALID_HANDLE_VALUE)
+                continue;
+
+            SetFilePointer(source_file, 0, NULL, FILE_BEGIN);
+
+            if (GetFileSizeEx(dest_file, &dest_file_size)
+                    && dest_file_size.QuadPart == source_file_size.QuadPart
+                    && !compare_files(source_file, dest_file))
+            {
+                CloseHandle(dest_file);
+                CloseHandle(source_file);
+                FindClose(find_handle);
+                TRACE("Found matching INF %s.\n", debugstr_w(target));
+                return TRUE;
+            }
+            CloseHandle(dest_file);
+        } while (FindNextFileW(find_handle, &find_data));
+
+        FindClose(find_handle);
+    }
+
+    CloseHandle(source_file);
+    TRACE("No matching INF found.\n");
+    return FALSE;
+}
+
+/* arbitrary limit not related to what native actually uses */
+#define OEM_INDEX_LIMIT 999
+
+static DWORD copy_inf(const WCHAR *source, DWORD style, WCHAR *ret_path)
+{
+    WCHAR target[MAX_PATH], catalog_file[MAX_PATH], pnf_path[MAX_PATH], *p;
+    FILE *pnf_file;
+    unsigned int i;
+    HINF hinf;
+
+    if (find_existing_inf(source, target))
+    {
+        TRACE("Found existing INF %s.\n", debugstr_w(target));
+
+        if (ret_path)
+            wcscpy(ret_path, target);
+        if (style & SP_COPY_NOOVERWRITE)
+            return ERROR_FILE_EXISTS;
+        else
+            return ERROR_SUCCESS;
+    }
+
+    GetWindowsDirectoryW(target, ARRAY_SIZE(target));
+    wcscat(target, L"\\inf\\");
+    wcscat(target, wcsrchr(source, '\\') + 1);
+    if (GetFileAttributesW(target) != INVALID_FILE_ATTRIBUTES)
+    {
+        for (i = 0; i < OEM_INDEX_LIMIT; i++)
+        {
+            GetWindowsDirectoryW(target, ARRAY_SIZE(target));
+            wcscat(target, L"\\inf\\");
+            swprintf(target + wcslen(target), ARRAY_SIZE(target) - wcslen(target), L"oem%u.inf", i);
+
+            if (GetFileAttributesW(target) == INVALID_FILE_ATTRIBUTES)
+                break;
+        }
+        if (i == OEM_INDEX_LIMIT)
+            return ERROR_FILENAME_EXCED_RANGE;
+    }
+
+    hinf = SetupOpenInfFileW(source, NULL, INF_STYLE_WIN4, NULL);
+    if (hinf == INVALID_HANDLE_VALUE)
+        return GetLastError();
+
+    if (SetupGetLineTextW(NULL, hinf, L"Version", L"CatalogFile",
+            catalog_file, ARRAY_SIZE(catalog_file), NULL))
+    {
+        GUID msguid = DRIVER_ACTION_VERIFY;
+        WCHAR source_cat[MAX_PATH];
+        HCATADMIN handle;
+        HCATINFO cat;
+
+        SetupCloseInfFile(hinf);
+
+        wcscpy(source_cat, source);
+        p = wcsrchr(source_cat, '\\');
+        if (p)
+            p++;
+        else
+            p = source_cat;
+        wcscpy(p, catalog_file);
+
+        TRACE("Installing catalog file %s.\n", debugstr_w(source_cat));
+
+        if (!CryptCATAdminAcquireContext(&handle, &msguid, 0))
+        {
+            ERR("Failed to acquire security context, error %lu.\n", GetLastError());
+            return GetLastError();
+        }
+
+        if (!(cat = CryptCATAdminAddCatalog(handle, source_cat, catalog_file, 0)))
+        {
+            ERR("Failed to add catalog, error %lu.\n", GetLastError());
+            CryptCATAdminReleaseContext(handle, 0);
+            return GetLastError();
+        }
+
+        CryptCATAdminReleaseCatalogContext(handle, cat, 0);
+        CryptCATAdminReleaseContext(handle, 0);
+    }
+    else
+    {
+        SetupCloseInfFile(hinf);
+    }
+
+    if (!CopyFileW(source, target, TRUE))
+        return GetLastError();
+
+    wcscpy(pnf_path, target);
+    PathRemoveExtensionW(pnf_path);
+    PathAddExtensionW(pnf_path, L".pnf");
+    if ((pnf_file = _wfopen(pnf_path, L"w")))
+    {
+        fputws(PNF_HEADER, pnf_file);
+        fputws(source, pnf_file);
+        fclose(pnf_file);
+    }
+
+    if (ret_path)
+        wcscpy(ret_path, target);
+    return ERROR_SUCCESS;
+}
+
+static void queue_copy_file(const struct driver_package *package, HSPFILEQ queue, const struct file *file)
+{
+    SP_FILE_COPY_PARAMS_W params =
+    {
+        .cbSize = sizeof(params),
+        .QueueHandle = queue,
+        .SourceRootPath = package->src_root,
+        .CopyStyle = SP_COPY_NODECOMP,
+        .SourceFilename = file->filename,
+        .TargetFilename = file->filename,
+    };
+
+    params.SourceDescription = file->desc;
+    params.SourceTagfile = file->tag;
+    params.SourcePath = file->subdir;
+
+    TRACE("Queueing copy from subdir %s, filename %s.\n",
+            debugstr_w(file->subdir), debugstr_w(file->filename));
+
+    if (file->subdir)
+    {
+        WCHAR *dst_dir = concat_path(package->dst_root, file->subdir);
+
+        params.TargetDirectory = dst_dir;
+        if (!SetupQueueCopyIndirectW(&params))
+            ERR("Failed to queue copy, error %lu.\n", GetLastError());
+        free(dst_dir);
+    }
+    else
+    {
+        params.TargetDirectory = package->dst_root;
+        if (!SetupQueueCopyIndirectW(&params))
+            ERR("Failed to queue copy, error %lu.\n", GetLastError());
+    }
+}
+
+static DWORD driver_package_install_to_store(const struct driver_package *package, DWORD style, WCHAR *infdir_path)
+{
+    HSPFILEQ queue = SetupOpenFileQueue();
+    DWORD ret = ERROR_SUCCESS;
+    void *setupapi_ctx;
+    WCHAR *store_inf;
+
+    for (size_t i = 0; i < package->file_count; ++i)
+        queue_copy_file(package, queue, &package->files[i]);
+
+    setupapi_ctx = SetupInitDefaultQueueCallback(NULL);
+    if (!SetupCommitFileQueueW(NULL, queue, SetupDefaultQueueCallbackW, setupapi_ctx))
+    {
+        ERR("Failed to commit queue, error %lu.\n", GetLastError());
+        ret = GetLastError();
+    }
+
+    SetupTermDefaultQueueCallback(setupapi_ctx);
+    SetupCloseFileQueue(queue);
+
+    if (!ret)
+    {
+        store_inf = concat_path(package->dst_root, package->inf_name);
+        if ((ret = copy_inf(store_inf, style, infdir_path)))
+            ERR("Failed to copy INF %s, error %lu.\n", debugstr_w(store_inf), GetLastError());
+        free(store_inf);
+    }
+
+    return ret;
+}
+
+static DWORD driver_package_delete(const struct driver_package *package)
+{
+    WCHAR infdir_path[MAX_PATH];
+    WCHAR *inf_path;
+
+    inf_path = concat_path(package->dst_root, package->inf_name);
+
+    if (find_existing_inf(inf_path, infdir_path))
+    {
+        if (!DeleteFileW(infdir_path))
+            ERR("Failed to delete %s, error %lu.\n", debugstr_w(infdir_path), GetLastError());
+        PathRemoveExtensionW(infdir_path);
+        PathAddExtensionW(infdir_path, L".pnf");
+        if (!DeleteFileW(infdir_path))
+            ERR("Failed to delete %s, error %lu.\n", debugstr_w(infdir_path), GetLastError());
+    }
+    else
+    {
+        ERR("Driver package INF %s not found in INF directory!\n", debugstr_w(inf_path));
+    }
+
+    free(inf_path);
+
+    for (size_t i = 0; i < package->file_count; ++i)
+    {
+        const struct file *file = &package->files[i];
+        WCHAR *path;
+
+        if (file->subdir)
+            path = sprintf_path(L"%s\\%s\\%s", package->dst_root, file->subdir, file->filename);
+        else
+            path = sprintf_path(L"%s\\%s", package->dst_root, file->filename);
+
+        if (DeleteFileW(path))
+        {
+            for (;;)
+            {
+                *wcsrchr(path, '\\') = 0;
+                if (wcslen(path) == wcslen(package->dst_root))
+                    break;
+                if (!RemoveDirectoryW(path))
+                {
+                    if (GetLastError() != ERROR_DIR_NOT_EMPTY)
+                        ERR("Failed to remove %s, error %lu.\n", debugstr_w(path), GetLastError());
+                    break;
+                }
+            }
+        }
+        else
+        {
+            ERR("Failed to delete %s, error %lu.\n", debugstr_w(path), GetLastError());
+        }
+
+        free(path);
+    }
+
+    if (!RemoveDirectoryW(package->dst_root))
+        ERR("Failed to remove %s, error %lu.\n", debugstr_w(package->dst_root), GetLastError());
+
+    return ERROR_SUCCESS;
+}
+
+/***********************************************************************
+ *      SetupCopyOEMInfW  (SETUPAPI.@)
+ */
+BOOL WINAPI SetupCopyOEMInfW(const WCHAR *source, const WCHAR *location, DWORD media_type,
+        DWORD style, WCHAR *dest, DWORD buffer_size, DWORD *required_size, WCHAR **filepart)
+{
+    struct driver_package package;
+    WCHAR target[MAX_PATH];
+    DWORD size, ret;
+
+    TRACE("source %s, location %s, media_type %lu, style %#lx, dest %p, buffer_size %lu, required_size %p, filepart %p.\n",
+            debugstr_w(source), debugstr_w(location), media_type, style, dest, buffer_size, required_size, filepart);
+
+    if (!source)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    if ((ret = parse_inf(&package, source)))
+    {
+        SetLastError(ret);
+        return FALSE;
+    }
+
+    if (package.already_installed)
+    {
+        if (find_existing_inf(source, target))
+        {
+            if (style & SP_COPY_NOOVERWRITE)
+                ret = ERROR_FILE_EXISTS;
+            else
+                ret = ERROR_SUCCESS;
+        }
+        else
+        {
+            ERR("Inf %s is already installed to driver store, but not found in C:\\windows\\inf!\n",
+                    debugstr_w(source));
+            ret = ERROR_FILE_NOT_FOUND;
+        }
+    }
+    else
+    {
+        ret = driver_package_install_to_store(&package, style, target);
+    }
+
+    if (style & SP_COPY_DELETESOURCE)
+        DeleteFileW(source);
+
+    size = wcslen(target) + 1;
+    if (required_size)
+        *required_size = size;
+
+    if ((!ret || ret == ERROR_FILE_EXISTS) && dest)
+    {
+        if (buffer_size >= size)
+        {
+            wcscpy(dest, target);
+            if (filepart)
+                *filepart = wcsrchr(dest, '\\') + 1;
+        }
+        else
+        {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            return FALSE;
+        }
+    }
+
+    SetLastError(ret);
+    return !ret;
+}
+
+/***********************************************************************
+ *      SetupUninstallOEMInfA  (SETUPAPI.@)
+ */
+BOOL WINAPI SetupUninstallOEMInfA(const char *inf_file, DWORD flags, void *reserved)
+{
+    WCHAR *inf_fileW = NULL;
+    BOOL ret;
+
+    TRACE("inf_file %s, flags %#lx, reserved %p.\n", debugstr_a(inf_file), flags, reserved);
+
+    if (inf_file && !(inf_fileW = strdupAtoW(inf_file)))
+        return FALSE;
+    ret = SetupUninstallOEMInfW(inf_fileW, flags, reserved);
+    free(inf_fileW);
+    return ret;
+}
+
+/***********************************************************************
+ *      SetupUninstallOEMInfW  (SETUPAPI.@)
+ */
+BOOL WINAPI SetupUninstallOEMInfW(const WCHAR *inf_file, DWORD flags, void *reserved)
+{
+    struct driver_package package;
+    WCHAR target[MAX_PATH];
+    DWORD ret;
+
+    TRACE("inf_file %s, flags %#lx, reserved %p.\n", debugstr_w(inf_file), flags, reserved);
+
+    if (!inf_file)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    if (!GetWindowsDirectoryW( target, ARRAY_SIZE( target )))
+        return FALSE;
+
+    wcscat(target, L"\\inf\\");
+    wcscat(target, inf_file);
+
+    if ((ret = parse_inf(&package, target)))
+    {
+        SetLastError(ret);
+        return FALSE;
+    }
+
+    if (package.already_installed)
+        ret = driver_package_delete(&package);
+    else
+        ret = ERROR_FILE_NOT_FOUND;
+
+    driver_package_cleanup(&package);
+
+    SetLastError(ret);
+    return !ret;
+}
+
+HRESULT WINAPI DriverStoreFindDriverPackageW(const WCHAR *inf_path, void *unk1,
+        void *unk2, WORD architecture, void *unk4, WCHAR *ret_path, DWORD *ret_len)
+{
+    struct driver_package package;
+    SYSTEM_INFO system_info;
+    HRESULT hr;
+    DWORD ret;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p, architecture %#x, unk4 %p, ret_path %p, ret_len %p.\n",
+            debugstr_w(inf_path), unk1, unk2, architecture, unk4, ret_path, ret_len);
+
+    if (unk1)
+        FIXME("Ignoring unk1 %p.\n", unk1);
+    if (unk2)
+        FIXME("Ignoring unk2 %p.\n", unk2);
+    if (unk4)
+        FIXME("Ignoring unk4 %p.\n", unk4);
+
+    if (*ret_len < MAX_PATH)
+    {
+        FIXME("Length %lu too short, returning E_INVALIDARG.\n", *ret_len);
+        return E_INVALIDARG;
+    }
+
+    GetSystemInfo(&system_info);
+    if (architecture != system_info.wProcessorArchitecture)
+    {
+        FIXME("Wrong architecture %#x, expected %#x.\n", architecture, system_info.wProcessorArchitecture);
+        return E_INVALIDARG;
+    }
+
+    if ((ret = parse_inf(&package, inf_path)))
+        return HRESULT_FROM_WIN32(ret);
+
+    if (package.already_installed)
+    {
+        DWORD len = wcslen(package.dst_root) + 1 + wcslen(package.inf_name) + 1;
+
+        if (len > *ret_len)
+        {
+            FIXME("Buffer too small.\n");
+            /* FIXME: What do we return here? */
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        }
+        else
+        {
+            swprintf(ret_path, len, L"%s\\%s", package.dst_root, package.inf_name);
+            hr = S_OK;
+        }
+        *ret_len = len;
+    }
+    else
+    {
+        hr = HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        *ret_path = 0;
+        *ret_len = 1;
+    }
+
+    driver_package_cleanup(&package);
+    return hr;
+}
+
+HRESULT WINAPI DriverStoreFindDriverPackageA(const char *inf_path, void *unk1,
+        void *unk2, WORD architecture, void *unk4, char *ret_path, DWORD *ret_len)
+{
+    WCHAR ret_pathW[MAX_PATH];
+    WCHAR *inf_pathW;
+    DWORD lenW, len;
+    HRESULT hr;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p, architecture %#x, unk4 %p, ret_path %p, ret_len %p.\n",
+            debugstr_a(inf_path), unk1, unk2, architecture, unk4, ret_path, ret_len);
+
+    if (*ret_len < MAX_PATH)
+    {
+        FIXME("Length %lu too short, returning E_INVALIDARG.\n", *ret_len);
+        return E_INVALIDARG;
+    }
+
+    if (!(inf_pathW = strdupAtoW(inf_path)))
+        return E_OUTOFMEMORY;
+
+    lenW = ARRAY_SIZE(ret_pathW);
+    hr = DriverStoreFindDriverPackageW(inf_pathW, unk1, unk2, architecture, unk4, ret_pathW, &lenW);
+    if (!hr)
+    {
+        len = WideCharToMultiByte(CP_ACP, 0, ret_pathW, lenW, NULL, 0, NULL, NULL);
+        if (len > *ret_len)
+        {
+            FIXME("Buffer too small.\n");
+            /* FIXME: What do we return here? */
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        }
+        else
+        {
+            WideCharToMultiByte(CP_ACP, 0, ret_pathW, lenW, ret_path, len, NULL, NULL);
+        }
+        *ret_len = len;
+    }
+    else
+    {
+        *ret_path = 0;
+        *ret_len = 1;
+    }
+    free(inf_pathW);
+    return hr;
+}
+
+HRESULT WINAPI DriverStoreAddDriverPackageW(const WCHAR *inf_path, void *unk1,
+        void *unk2, WORD architecture, WCHAR *ret_path, DWORD *ret_len)
+{
+    struct driver_package package;
+    SYSTEM_INFO system_info;
+    DWORD ret, len;
+    HRESULT hr;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p, architecture %#x, ret_path %p, ret_len %p.\n",
+            debugstr_w(inf_path), unk1, unk2, architecture, ret_path, ret_len);
+
+    if (unk1)
+        FIXME("Ignoring unk1 %p.\n", unk1);
+    if (unk2)
+        FIXME("Ignoring unk2 %p.\n", unk2);
+
+    if (*ret_len < MAX_PATH)
+    {
+        FIXME("Length %lu too short, returning E_INVALIDARG.\n", *ret_len);
+        return E_INVALIDARG;
+    }
+
+    GetSystemInfo(&system_info);
+    if (architecture != system_info.wProcessorArchitecture)
+    {
+        FIXME("Wrong architecture %#x, expected %#x.\n", architecture, system_info.wProcessorArchitecture);
+        return E_INVALIDARG;
+    }
+
+    if ((ret = parse_inf(&package, inf_path)))
+        return HRESULT_FROM_WIN32(ret);
+
+    if (!package.already_installed)
+    {
+        if ((ret = driver_package_install_to_store(&package, 0, NULL)))
+        {
+            driver_package_cleanup(&package);
+            return HRESULT_FROM_WIN32(ret);
+        }
+    }
+
+    len = wcslen(package.dst_root) + 1 + wcslen(package.inf_name) + 1;
+
+    if (len > *ret_len)
+    {
+        FIXME("Buffer too small.\n");
+        /* FIXME: What do we return here? */
+        hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+    }
+    else
+    {
+        swprintf(ret_path, len, L"%s\\%s", package.dst_root, package.inf_name);
+        hr = S_OK;
+    }
+    *ret_len = len;
+
+    driver_package_cleanup(&package);
+    return hr;
+}
+
+HRESULT WINAPI DriverStoreAddDriverPackageA(const char *inf_path, void *unk1,
+        void *unk2, WORD architecture, char *ret_path, DWORD *ret_len)
+{
+    WCHAR ret_pathW[MAX_PATH];
+    WCHAR *inf_pathW;
+    DWORD lenW, len;
+    HRESULT hr;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p, architecture %#x, ret_path %p, ret_len %p.\n",
+            debugstr_a(inf_path), unk1, unk2, architecture, ret_path, ret_len);
+
+    if (*ret_len < MAX_PATH)
+    {
+        FIXME("Length %lu too short, returning E_INVALIDARG.\n", *ret_len);
+        return E_INVALIDARG;
+    }
+
+    if (!(inf_pathW = strdupAtoW(inf_path)))
+        return E_OUTOFMEMORY;
+
+    lenW = ARRAY_SIZE(ret_pathW);
+    hr = DriverStoreAddDriverPackageW(inf_pathW, unk1, unk2, architecture, ret_pathW, &lenW);
+    if (!hr)
+    {
+        len = WideCharToMultiByte(CP_ACP, 0, ret_pathW, lenW, NULL, 0, NULL, NULL);
+        if (len > *ret_len)
+        {
+            FIXME("Buffer too small.\n");
+            /* FIXME: What do we return here? */
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        }
+        else
+        {
+            WideCharToMultiByte(CP_ACP, 0, ret_pathW, lenW, ret_path, len, NULL, NULL);
+        }
+        *ret_len = len;
+    }
+    free(inf_pathW);
+    return hr;
+}
+
+HRESULT WINAPI DriverStoreDeleteDriverPackageW(const WCHAR *inf_path, void *unk1, void *unk2)
+{
+    struct driver_package package;
+    DWORD ret;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p.\n", debugstr_w(inf_path), unk1, unk2);
+
+    if (unk1)
+        FIXME("Ignoring unk1 %p.\n", unk1);
+    if (unk2)
+        FIXME("Ignoring unk2 %p.\n", unk2);
+
+    if ((ret = parse_inf(&package, inf_path)))
+        return HRESULT_FROM_WIN32(ret);
+
+    if (package.already_installed)
+        ret = driver_package_delete(&package);
+    else
+        ret = ERROR_FILE_NOT_FOUND;
+
+    driver_package_cleanup(&package);
+    return HRESULT_FROM_WIN32(ret);
+}
+
+HRESULT WINAPI DriverStoreDeleteDriverPackageA(const char *inf_path, void *unk1, void *unk2)
+{
+    WCHAR *inf_pathW;
+    HRESULT hr;
+
+    TRACE("inf_path %s, unk1 %p, unk2 %p.\n", debugstr_a(inf_path), unk1, unk2);
+
+    if (!(inf_pathW = strdupAtoW(inf_path)))
+        return E_OUTOFMEMORY;
+
+    hr = DriverStoreDeleteDriverPackageW(inf_pathW, unk1, unk2);
+    free(inf_pathW);
+    return hr;
 }

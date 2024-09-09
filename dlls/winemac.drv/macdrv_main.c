@@ -52,7 +52,6 @@ int right_option_is_alt = 0;
 int left_command_is_ctrl = 0;
 int right_command_is_ctrl = 0;
 BOOL allow_software_rendering = FALSE;
-BOOL disable_window_decorations = FALSE;
 int allow_immovable_windows = TRUE;
 int use_confinement_cursor_clipping = TRUE;
 int cursor_clipping_locks_windows = TRUE;
@@ -60,6 +59,12 @@ int use_precise_scrolling = TRUE;
 int gl_surface_mode = GL_SURFACE_IN_FRONT_OPAQUE;
 int retina_enabled = FALSE;
 int enable_app_nap = FALSE;
+
+UINT64 app_icon_callback = 0;
+UINT64 app_quit_request_callback = 0;
+UINT64 dnd_query_drag_callback = 0;
+UINT64 dnd_query_drop_callback = 0;
+UINT64 dnd_query_exited_callback = 0;
 
 CFDictionaryRef localized_strings;
 
@@ -347,10 +352,6 @@ static void setup_options(void)
     if (!get_config_key(hkey, appkey, "AllowSoftwareRendering", buffer, sizeof(buffer)))
         allow_software_rendering = IS_OPTION_TRUE(buffer[0]);
 
-    /* Value name chosen to match what's used in the X11 driver. */
-    if (!get_config_key(hkey, appkey, "Decorated", buffer, sizeof(buffer)))
-        disable_window_decorations = !IS_OPTION_TRUE(buffer[0]);
-
     if (!get_config_key(hkey, appkey, "AllowImmovableWindows", buffer, sizeof(buffer)))
         allow_immovable_windows = IS_OPTION_TRUE(buffer[0]);
 
@@ -434,6 +435,12 @@ static NTSTATUS macdrv_init(void *arg)
     struct init_params *params = arg;
     SessionAttributeBits attributes;
     OSStatus status;
+
+    app_icon_callback = params->app_icon_callback;
+    app_quit_request_callback = params->app_quit_request_callback;
+    dnd_query_drag_callback = params->dnd_query_drag_callback;
+    dnd_query_drop_callback = params->dnd_query_drop_callback;
+    dnd_query_exited_callback = params->dnd_query_exited_callback;
 
     status = SessionGetInfo(callerSecuritySession, NULL, &attributes);
     if (status != noErr || !(attributes & sessionHasGraphicAccess))
@@ -595,14 +602,6 @@ BOOL macdrv_SystemParametersInfo( UINT action, UINT int_param, void *ptr_param, 
         break;
     }
     return FALSE;
-}
-
-
-NTSTATUS macdrv_client_func(enum macdrv_client_funcs id, const void *params, ULONG size)
-{
-    void *ret_ptr;
-    ULONG ret_len;
-    return KeUserModeCallback(id, params, size, &ret_ptr, &ret_len);
 }
 
 

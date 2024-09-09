@@ -2103,15 +2103,24 @@ HKLM,%CurrentVersion%\Telephony\Country List\998,"SameAreaRule",,"G"
 11,,shell32.dll,1
 11,,quartz.dll,1
 
+11,,colorcnv.dll,1
 11,,cryptdlg.dll,1
 11,,cryptnet.dll,1
 11,,devenum.dll,1
+11,,l3codecx.ax,1
+11,,mfasfsrcsnk.dll,1
+11,,mfh264enc.dll,1
+11,,mfmp4srcsnk.dll,1
 11,,mp3dmod.dll,1
+11,,msauddecmft.dll,1
 11,,mscoree.dll,1
 11,,mshtml.dll,1
 11,,msisip.dll,1
+11,,msmpeg2vdec.dll,1
+11,,msvproc.dll,1
 11,,qcap.dll,1
 11,,qedit.dll,1
+11,,resampledmo.dll,1
 11,,urlmon.dll,1
 11,,windowscodecs.dll,1
 11,,winegstreamer.dll,1
@@ -2119,6 +2128,8 @@ HKLM,%CurrentVersion%\Telephony\Country List\998,"SameAreaRule",,"G"
 11,,winevulkan.dll,1
 55,,winprint.dll,1
 11,,wintrust.dll,1
+11,,wmadmod.dll,1
+11,,wmvdecod.dll,1
 11,,iexplore.exe,1
 
 ; 32bit-only fake dlls

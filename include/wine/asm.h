@@ -68,7 +68,15 @@
 #elif defined(__APPLE__)
 # define __ASM_FUNC_SIZE(name) ""
 #else
-# define __ASM_FUNC_SIZE(name) "\n\t.size " name ",.-" name
+# define __ASM_FUNC_SIZE(name) ".size " name ",.-" name
+#endif
+
+#ifdef __arm64ec_x64__
+# define __ASM_FUNC_SECTION(name) ".section .text,\"xr\",discard," name
+# define __ASM_FUNC_ALIGN ".balign 16"
+#else
+# define __ASM_FUNC_SECTION(name) ".text"
+# define __ASM_FUNC_ALIGN ".align 4"
 #endif
 
 #if !defined(__GNUC__) && !defined(__clang__)
@@ -81,8 +89,19 @@
 
 #define __ASM_DEFINE_FUNC(name,code)  \
     __ASM_BLOCK_BEGIN(__LINE__) \
-    asm(".text\n\t.align 4\n\t.globl " name "\n\t" __ASM_FUNC_TYPE(name) __ASM_SEH("\n\t.seh_proc " name) "\n" name ":\n\t" \
-        __ASM_CFI(".cfi_startproc\n\t") __ASM_EHABI(".fnstart\n\t") code __ASM_CFI("\n\t.cfi_endproc") __ASM_EHABI("\n\t.fnend") __ASM_SEH("\n\t.seh_endproc") __ASM_FUNC_SIZE(name)); \
+    asm( __ASM_FUNC_SECTION(name) "\n\t" \
+         __ASM_FUNC_ALIGN "\n\t" \
+         ".globl " name "\n\t" \
+         __ASM_FUNC_TYPE(name) "\n" \
+         name ":\n\t" \
+         __ASM_SEH(".seh_proc " name "\n\t") \
+         __ASM_CFI(".cfi_startproc\n\t") \
+         __ASM_EHABI(".fnstart\n\t") \
+         code "\n\t" \
+         __ASM_CFI(".cfi_endproc\n\t") \
+         __ASM_EHABI(".fnend\n\t") \
+         __ASM_SEH(".seh_endproc\n\t") \
+         __ASM_FUNC_SIZE(name)); \
     __ASM_BLOCK_END
 
 #define __ASM_GLOBAL_FUNC(name,code) __ASM_DEFINE_FUNC(__ASM_NAME(#name),code)
@@ -93,12 +112,22 @@
 # ifdef _WIN64
 #  define __ASM_DEFINE_IMPORT(name) \
     __ASM_BLOCK_BEGIN(__LINE__) \
-    asm(".data\n\t.balign 8\n\t.globl __imp_" name "\n__imp_" name ":\n\t.quad " name "\n\t.text"); \
+    asm( ".data\n\t" \
+         ".balign 8\n\t" \
+         ".globl __imp_" name "\n" \
+         "__imp_" name ":\n\t" \
+         ".quad " name "\n\t" \
+         ".text"); \
     __ASM_BLOCK_END
 # else
 #  define __ASM_DEFINE_IMPORT(name) \
     __ASM_BLOCK_BEGIN(__LINE__) \
-    asm(".data\n\t.balign 4\n\t.globl __imp_" name "\n__imp_" name ":\n\t.long " name "\n\t.text"); \
+    asm( ".data\n\t" \
+         ".balign 4\n\t" \
+         ".globl __imp_" name "\n" \
+         "__imp_" name ":\n\t" \
+         ".long " name "\n\t" \
+         ".text"); \
     __ASM_BLOCK_END
 # endif
 # define __ASM_GLOBAL_IMPORT(name) __ASM_DEFINE_IMPORT(__ASM_NAME(#name))
@@ -219,7 +248,7 @@
                        "1:\t.quad " __ASM_NAME("__wine_syscall_dispatcher") )
 #elif defined __arm64ec__
 # define __ASM_SYSCALL_FUNC(id,name) \
-    asm( ".seh_proc " #name "\n\t" \
+    asm( ".seh_proc \"#" #name "$hp_target\"\n\t" \
          ".seh_endprologue\n\t" \
          "mov x8, #%0\n\t" \
          "mov x9, x30\n\t" \
@@ -228,44 +257,40 @@
          "blr x16\n\t" \
          "ret\n\t" \
          ".seh_endproc" :: "i" (id) )
+#elif defined __arm64ec_x64__
+# define __ASM_SYSCALL_FUNC(id,name) \
+    __ASM_DEFINE_FUNC( "\"EXP+#" #name "\"", \
+                       ".seh_endprologue\n\t" \
+                       ".byte 0x4c,0x8b,0xd1\n\t" /* 00: movq %rcx,%r10 */ \
+                       ".byte 0xb8\n\t"           /* 03: movl $i,%eax */ \
+                       ".long (" #id ")\n\t"                            \
+                       ".byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n\t" /* 08: testb $1,0x7ffe0308 */ \
+                       ".byte 0x75,0x03\n\t"      /* 10: jne 15 */ \
+                       ".byte 0x0f,0x05\n\t"      /* 12: syscall */ \
+                       ".byte 0xc3\n\t"           /* 14: ret */ \
+                       ".byte 0xcd,0x2e\n\t"      /* 15: int $0x2e */ \
+                       ".byte 0xc3" )             /* 17: ret */
 #elif defined __x86_64__
 /* Chromium depends on syscall thunks having the same form as on
  * Windows. For 64-bit systems the only viable form we can emulate is
  * having an int $0x2e fallback. Since actually using an interrupt is
  * expensive, and since for some reason Chromium doesn't actually
  * validate that instruction, we can just put a jmp there instead. */
-# ifdef __WINE_PE_BUILD
-#  define __ASM_SYSCALL_FUNC(id,name) \
+# define __ASM_SYSCALL_FUNC(id,name) \
     __ASM_GLOBAL_FUNC( name, \
-                       ".seh_endprologue\n\t" \
-                       ".byte 0x4c,0x8b,0xd1\n\t" /* movq %rcx,%r10 */ \
-                       ".byte 0xb8\n\t"           /* movl $i,%eax */ \
+                       __ASM_SEH(".seh_endprologue\n\t") \
+                       ".byte 0x4c,0x8b,0xd1\n\t" /* 00: movq %rcx,%r10 */ \
+                       ".byte 0xb8\n\t"           /* 03: movl $i,%eax */ \
                        ".long (" #id ")\n\t" \
-                       ".byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n\t" /* testb $1,0x7ffe0308 */ \
-                       ".byte 0x75,0x03\n\t"      /* jne 1f */ \
-                       ".byte 0x0f,0x05\n\t"      /* syscall */ \
-                       ".byte 0xc3\n\t"           /* ret */ \
-                       ".byte 0xeb,0x01\n\t"      /* jmp 1f */ \
-                       ".byte 0xc3\n\t"           /* ret */ \
-                       ".byte 0xff,0x14,0x25\n\t" /* 1: callq *(0x7ffe1000) */ \
+                       ".byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n\t" /* 08: testb $1,0x7ffe0308 */ \
+                       ".byte 0x75,0x03\n\t"      /* 10: jne 15 */ \
+                       ".byte 0x0f,0x05\n\t"      /* 12: syscall */ \
+                       ".byte 0xc3\n\t"           /* 14: ret */ \
+                       ".byte 0xeb,0x01\n\t"      /* 15: jmp 18 */ \
+                       ".byte 0xc3\n\t"           /* 17: ret */ \
+                       ".byte 0xff,0x14,0x25\n\t" /* 18: callq *(0x7ffe1000) */ \
                        ".long 0x7ffe1000\n\t" \
-                       "ret" )
-# else
-#  define __ASM_SYSCALL_FUNC(id,name) \
-    __ASM_GLOBAL_FUNC( name, \
-                       ".byte 0x4c,0x8b,0xd1\n\t" /* movq %rcx,%r10 */ \
-                       ".byte 0xb8\n\t"           /* movl $i,%eax */ \
-                       ".long (" #id ")\n\t" \
-                       ".byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n\t" /* testb $1,0x7ffe0308 */ \
-                       ".byte 0x75,0x03\n\t"      /* jne 1f */ \
-                       ".byte 0x0f,0x05\n\t"      /* syscall */ \
-                       ".byte 0xc3\n\t"           /* ret */ \
-                       ".byte 0xeb,0x02\n\t"      /* jmp 1f */ \
-                       ".byte 0xc3\n"             /* ret */ \
-                       "nop\n\t" \
-                       "callq *" __ASM_NAME("__wine_syscall_dispatcher") "(%rip)\n\t" /* 1: callq __wine_syscall_dispatcher */ \
-                       "ret" )
-# endif
+                       ".byte 0xc3" )             /* 1f: ret */
 #elif defined __arm__
 # define __ASM_SYSCALL_FUNC(id,name,args) \
     __ASM_GLOBAL_FUNC( name, \

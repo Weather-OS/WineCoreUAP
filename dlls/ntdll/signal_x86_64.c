@@ -40,6 +40,14 @@
 #include "ntsyscalls.h"
 
 
+/*******************************************************************
+ *         syscalls
+ */
+#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id, name )
+ALL_SYSCALLS64
+#undef SYSCALL_ENTRY
+
+
 /**************************************************************************
  *		__chkstk (NTDLL.@)
  *
@@ -66,18 +74,25 @@ __ASM_GLOBAL_FUNC( invoke_arm64ec_syscall,
                    "pushq %r10\n\t"         /* and return to syscall thunk */
                    "ret" )
 
+/*******************************************************************
+ *		KiUserExceptionDispatcher (NTDLL.@)
+ */
+__ASM_GLOBAL_FUNC( "EXP+#KiUserExceptionDispatcher",
+                   "cld\n\t"
+                   "mov pWow64PrepareForException(%rip),%rax\n\t"
+                   "test %rax,%rax\n\t"
+                   "jz 1f\n\t"
+                   "subq $0x28,%rsp\n\t"
+                   "leaq 0x30+0x390+0x4d0(%rsp),%rcx\n\t" /* rec */
+                   "leaq 0x30(%rsp),%rdx\n\t"             /* context */
+                   "call *%rax\n"
+                   "addq $0x28,%rsp\n"
+                   "1:\tret" )
+
 #else  /* __arm64ec_x64__ */
 
 WINE_DEFAULT_DEBUG_CHANNEL(seh);
 WINE_DECLARE_DEBUG_CHANNEL(relay);
-
-
-/*******************************************************************
- *         syscalls
- */
-#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id, name )
-ALL_SYSCALLS64
-#undef SYSCALL_ENTRY
 
 
 /***********************************************************************
