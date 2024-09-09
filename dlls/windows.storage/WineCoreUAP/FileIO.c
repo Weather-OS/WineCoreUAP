@@ -18,7 +18,8 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
-#include "StorageFolderInternal.h"
+
+#include "FileIOInternal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
@@ -115,80 +116,95 @@ DEFINE_IINSPECTABLE( file_io_statics, IFileIOStatics, struct file_io_statics, IA
 
 static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_HSTRING **textOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_HSTRING **textOperation )
 {
-    
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, textOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, linesOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
-    
+    FIXME( "iface %p, operation %p stub!\n", iface, linesOperation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_WriteLineAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
-    
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, IStorageFile *file, IBuffer* buffer, IAsyncAction **operation )
 {
-
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
-static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IStorageFile *file, UINT32 __bufferSize, BYTE[__bufferSize] buffer, IAsyncAction **operation )
+static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IStorageFile *file, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
 {
-    
+    FIXME( "iface %p, operation %p stub!\n", iface, operation );
+    return E_NOTIMPL;
 }
 
-static const struct IStorageFolderStaticsVtbl file_io_statics_vtbl =
+static const struct IFileIOStaticsVtbl file_io_statics_vtbl =
 {
     file_io_statics_QueryInterface,
     file_io_statics_AddRef,
@@ -198,6 +214,21 @@ static const struct IStorageFolderStaticsVtbl file_io_statics_vtbl =
     file_io_statics_GetRuntimeClassName,
     file_io_statics_GetTrustLevel,
     /* IFileIOStatics methods */
+    file_io_statics_ReadTextAsync,
+    file_io_statics_ReadTextWithEncodingAsync,
+    file_io_statics_WriteTextAsync,
+    file_io_statics_WriteTextWithEncodingAsync,
+    file_io_statics_AppendTextAsync,
+    file_io_statics_AppendTextWithEncodingAsync,
+    file_io_statics_ReadLinesAsync,
+    file_io_statics_ReadLinesWithEncodingAsync,
+    file_io_statics_WriteLineAsync,
+    file_io_statics_WriteLinesWithEncodingAsync,
+    file_io_statics_AppendLinesAsync,
+    file_io_statics_AppendLinesWithEncodingAsync,
+    file_io_statics_ReadBufferAsync,
+    file_io_statics_WriteBufferAsync,
+    file_io_statics_WriteBytesAsync
 };
 
 static struct file_io_statics file_io_statics =
@@ -207,4 +238,4 @@ static struct file_io_statics file_io_statics =
     1,
 };
 
-IActivationFactory *storage_folder_factory = &file_io_statics.IActivationFactory_iface;
+IActivationFactory *file_io_factory = &file_io_statics.IActivationFactory_iface;
