@@ -32,84 +32,60 @@ INT64 FileTimeToUnixTime( const FILETIME *ft ) {
     return (ull.QuadPart / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH;
 }
 
-VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize ) {
+VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize ) {
     UUID uuid;
-    LPSTR str;
+    LPWSTR str;
 
     UuidCreate(&uuid);
-    UuidToStringA(&uuid, (RPC_CSTR*)&str);
-    snprintf(buffer, bufferSize, "%s", str);
+    UuidToStringW(&uuid, (RPC_WSTR*)&str);
+    swprintf(buffer, bufferSize, L"%s", str);
 
-    RpcStringFreeA((RPC_CSTR*)&str);
+    RpcStringFreeW((RPC_WSTR*)&str);
 }
 
-LPCWSTR CharToLPCWSTR( LPSTR charString ) {
-    INT len;
-    INT stringLength = strlen(charString) + 1;
-    LPCWSTR wideString;
-
-    len = MultiByteToWideChar(CP_ACP, 0, charString, stringLength, 0, 0);
-    wideString = (LPCWSTR)malloc(len * sizeof(LPCWSTR));
-
-    MultiByteToWideChar(CP_ACP, 0, charString, stringLength, (LPWSTR)wideString, len);
-
-    return wideString;
-}
-
-LPCSTR HStringToLPCSTR( HSTRING hString ) {
-    UINT32 length = WindowsGetStringLen(hString);
-    LPCWSTR rawBuffer = WindowsGetStringRawBuffer(hString, &length);
-    INT bufferSize = WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, NULL, 0, NULL, NULL);
-    LPSTR multiByteStr = (LPSTR)malloc(bufferSize + 1);
-    WideCharToMultiByte(CP_UTF8, 0, rawBuffer, length, multiByteStr, bufferSize, NULL, NULL);
-    multiByteStr[bufferSize] = '\0';
-
-    return multiByteStr;
-}
-
-VOID DeleteDirectoryRecursively(LPCSTR directoryPath)
+VOID DeleteDirectoryRecursively(LPCWSTR directoryPath)
 {
-    WIN32_FIND_DATAA findFileData;
+    WIN32_FIND_DATAW findFileData;
     HANDLE hFind;
-    char searchPath[MAX_PATH];
-    char fullPath[MAX_PATH];
+    WCHAR searchPath[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
 
-    snprintf(searchPath, sizeof(searchPath), "%s\\*.*", directoryPath);
+    swprintf(searchPath, sizeof(searchPath), L"%s\\*.*", directoryPath);
 
-    hFind = FindFirstFileA(searchPath, &findFileData);
+    hFind = FindFirstFileW(searchPath, &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) 
     {
-        printf("Error: Cannot open directory: %s\n", directoryPath);
+        wprintf(L"Error: Cannot open directory: %s\n", directoryPath);
         return;
     }
 
     do 
     {
-        if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0) 
+        if (wcscmp(findFileData.cFileName, L".") != 0 && wcscmp(findFileData.cFileName, L"..") != 0) 
         {
-            snprintf(fullPath, sizeof(fullPath), "%s\\%s", directoryPath, findFileData.cFileName);
+            swprintf(fullPath, sizeof(fullPath), L"%s\\%s", directoryPath, findFileData.cFileName);
 
             if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) 
             {
                 DeleteDirectoryRecursively(fullPath);
 
-                RemoveDirectoryA(fullPath);
+                RemoveDirectoryW(fullPath);
             } 
             else 
             {
-                if (!DeleteFileA(fullPath)) 
+                if (!DeleteFileW(fullPath)) 
                 {
-                    printf("Error: Unable to delete file: %s\n", fullPath);
+                    wprintf(L"Error: Unable to delete file: %s\n", fullPath);
                 }
             }
         }
     } 
-    while (FindNextFileA(hFind, &findFileData) != 0);
+    while (FindNextFileW(hFind, &findFileData) != 0);
 
     FindClose(hFind);
 
-    if (!RemoveDirectoryA(directoryPath)) 
+    if (!RemoveDirectoryW(directoryPath)) 
     {
-        printf("Error: Unable to delete directory: %s\n", directoryPath);
+        wprintf(L"Error: Unable to delete directory: %s\n", directoryPath);
     }
 }

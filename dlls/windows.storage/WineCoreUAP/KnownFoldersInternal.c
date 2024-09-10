@@ -33,18 +33,18 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     BOOLEAN homeGroupAllowed = TRUE;
     BOOLEAN removableDevicesAllowed = FALSE;
     BOOLEAN mediaServerAllowed = FALSE;
-    CHAR username[256];
-    CHAR path[MAX_PATH] = "C:\\users\\";
-    CHAR manifestPath[MAX_PATH];
+    WCHAR username[256];
+    WCHAR path[MAX_PATH] = L"C:\\users\\";
+    WCHAR manifestPath[MAX_PATH];
     DWORD username_len = sizeof(username);
 
     struct appx_package package;
 
-    GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
-    PathRemoveFileSpecA(manifestPath);
-    PathAppendA(manifestPath, "AppxManifest.xml");
+    GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
+    PathRemoveFileSpecW(manifestPath);
+    PathAppendW(manifestPath, L"AppxManifest.xml");
 
-    if (!GetUserNameA(username, &username_len)) {
+    if (!GetUserNameW(username, &username_len)) {
         printf("Something went wrong\n.");
         return E_UNEXPECTED;
     }
@@ -80,7 +80,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
         }
     }
 
-    PathAppendA(path, username);
+    PathAppendW(path, username);
 
     if ( SUCCEEDED( status ) )
     {
@@ -90,35 +90,35 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendA( path, "Music" );
+                    PathAppendW( path, L"Music" );
                 break;
 
             case KnownFolderId_PicturesLibrary:
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendA( path, "Pictures" );
+                    PathAppendW( path, L"Pictures" );
                 break;
             
             case KnownFolderId_VideosLibrary:
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendA( path, "Videos" );
+                    PathAppendW( path, L"Videos" );
                 break;
 
             case KnownFolderId_DocumentsLibrary:
                 if ( !documentsLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendA( path, "Documents" );
+                    PathAppendW( path, L"Documents" );
                 break;
 
             case KnownFolderId_RemovableDevices:
                 if ( !removableDevicesAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    strcpy( path, "\\\\.\\" );
+                    wcscpy( path, L"\\\\.\\" );
                 break;
 
             case KnownFolderId_HomeGroup:
@@ -136,8 +136,8 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 break;
 
             case KnownFolderId_Objects3D:
-                PathAppendA( path, "Objects3D" );
-                CreateDirectoryA( path, NULL );
+                PathAppendW( path, L"Objects3D" );
+                CreateDirectoryW( path, NULL );
                 break;
 
             case KnownFolderId_AppCaptures:
@@ -145,8 +145,8 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                     status = E_ACCESSDENIED;
                 else
                 {
-                    PathAppendA( path, "Videos" );
-                    PathAppendA( path, "Captures" );
+                    PathAppendW( path, L"Videos" );
+                    PathAppendW( path, L"Captures" );
                 }
                 break;
 
@@ -159,8 +159,8 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                     status = E_ACCESSDENIED;
                 else
                 {
-                    PathAppendA( path, "Pictures" );
-                    PathAppendA( path, "Camera Roll" );
+                    PathAppendW( path, L"Pictures" );
+                    PathAppendW( path, L"Camera Roll" );
                 }
                 break;
 
@@ -168,9 +168,9 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendA( path, "Music" );
-                    PathAppendA( path, "Playlists" );
-                    CreateDirectoryA( path, NULL );
+                    PathAppendW( path, L"Music" );
+                    PathAppendW( path, L"Playlists" );
+                    CreateDirectoryW( path, NULL );
                 break;
 
             case KnownFolderId_SavedPictures:
@@ -178,13 +178,13 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                     status = E_ACCESSDENIED;
                 else
                 {
-                    PathAppendA( path, "Pictures" );
-                    PathAppendA( path, "Saved Pictures" );
+                    PathAppendW( path, L"Pictures" );
+                    PathAppendW( path, L"Saved Pictures" );
                 }
                 break;
 
             case KnownFolderId_DownloadsFolder:
-                PathAppendA( path, "Downloads" );
+                PathAppendW( path, L"Downloads" );
                 break;
 
             default:
@@ -194,7 +194,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     
     if ( SUCCEEDED( status ) )
     {
-        status = WindowsCreateString( CharToLPCWSTR( path ), wcslen( CharToLPCWSTR( path ) ), value );
+        status = WindowsCreateString( path, wcslen( path ), value );
     }
 
     return status;
@@ -205,16 +205,16 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     HRESULT status = S_OK;
     HSTRING KnownFolderPath;
     INT promptResult;
-    CHAR title[1024];
-    CHAR message[1024];
-    CHAR manifestPath[MAX_PATH];
+    WCHAR title[MAX_BUFFER];
+    WCHAR message[MAX_BUFFER];
+    WCHAR manifestPath[MAX_PATH];
     DWORD attributes;
 
     struct appx_package package;
 
-    GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
-    PathRemoveFileSpecA(manifestPath);
-    PathAppendA(manifestPath, "AppxManifest.xml");
+    GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
+    PathRemoveFileSpecW(manifestPath);
+    PathAppendW(manifestPath, L"AppxManifest.xml");
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
@@ -230,7 +230,7 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
         return status;
     }
 
-    attributes = GetFileAttributesA( HStringToLPCSTR( KnownFolderPath ) );
+    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( KnownFolderPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES )
     {
         if ( GetLastError() == ERROR_ACCESS_DENIED )
@@ -244,15 +244,15 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     {
         if ( package.Package.Properties.DisplayName )
         {
-            sprintf( title, "Let %s access the following file location?", package.Package.Properties.DisplayName );
+            swprintf( title, MAX_BUFFER, L"Let %s access the following file location?", package.Package.Properties.DisplayName );
         } else
         {
-            sprintf( title, "Let this app access the following file location?" );
+            swprintf( title, MAX_BUFFER, L"Let this app access the following file location?" );
         }
 
-        sprintf( message, "%s\n%s", title, HStringToLPCSTR( KnownFolderPath ) );
+        swprintf( message, MAX_BUFFER, L"%s\n%s", title, WindowsGetStringRawBuffer( KnownFolderPath, NULL ) );
         
-        promptResult = MessageBoxA (
+        promptResult = MessageBoxW (
             NULL,
             message,
             title,

@@ -9,7 +9,14 @@
 #ifndef ___UTIL__H_
 #define ___UTIL__H_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+#include <string.h>
 #include <stdbool.h>
+#include <libxml/parser.h>
+#include <libxml/tree.h>
 
 #define STATUS_SUCCESS 0
 #define STATUS_FAIL 1
@@ -33,5 +40,5 @@ void setLastErrorMessage( const char * str );
 void setLastErrorCode( int errorCode );
 void initErrorSeed( void );
 void errorMessage( const char * str, ... );
-
+wchar_t* charToWChar(const char *charStr);
 #endif

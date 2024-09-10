@@ -375,35 +375,35 @@ static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStor
     HSTRING uriPath;
     HSTRING appDataPath;
     HSTRING path;
-    LPCSTR uriSchemeStr;
-    LPCSTR uriPathStr;
-    LPCSTR appDataPathStr;
-    CHAR pathStr[MAX_PATH];
+    LPCWSTR uriSchemeStr;
+    LPCWSTR uriPathStr;
+    LPCWSTR appDataPathStr;
+    WCHAR pathStr[MAX_PATH];
 
     app_data_paths_GetKnownFolder( NULL, "localappdata", &appDataPath );
     IUriRuntimeClass_get_SchemeName( uri, &uriScheme );
     IUriRuntimeClass_get_Domain( uri, &uriPath );
 
-    uriSchemeStr = HStringToLPCSTR( uriScheme );
-    uriPathStr = HStringToLPCSTR( uriPath );
-    appDataPathStr = HStringToLPCSTR( appDataPath );
+    uriSchemeStr = WindowsGetStringRawBuffer( uriScheme, NULL );
+    uriPathStr = WindowsGetStringRawBuffer( uriPath, NULL );
+    appDataPathStr = WindowsGetStringRawBuffer( appDataPath, NULL );
     
     //ms-appx: appx install path
     //ms-appdata: appx app data
 
-    if ( !strcmp( uriSchemeStr, "ms-appx" ) )
+    if ( !wcscmp( uriSchemeStr, L"ms-appx" ) )
     {
-        GetModuleFileNameA(NULL, pathStr, MAX_PATH);
-        PathAppendA( pathStr, uriPathStr );
-    } else if ( !strcmp( uriSchemeStr, "ms-appdata" ) )
+        GetModuleFileNameW(NULL, pathStr, MAX_PATH);
+        PathAppendW( pathStr, uriPathStr );
+    } else if ( !wcscmp( uriSchemeStr, L"ms-appdata" ) )
     {
-        strcpy( pathStr, appDataPathStr );
-        PathAppendA( pathStr, uriPathStr );
+        wcscpy( pathStr, appDataPathStr );
+        PathAppendW( pathStr, uriPathStr );
     } else {
         return E_INVALIDARG;
     }
 
-    WindowsCreateString( CharToLPCWSTR( pathStr ), wcslen( CharToLPCWSTR( pathStr ) ), &path );
+    WindowsCreateString( pathStr, wcslen( pathStr ), &path );
 
     hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );

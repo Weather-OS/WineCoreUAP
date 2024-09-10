@@ -32,7 +32,7 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     DWORD bytesRead;
     LPWSTR pwsMimeOut;
     BOOLEAN isFile;
-    LPSTR fileExtension;
+    LPWSTR fileExtension;
 
     struct storage_file *file;
 
@@ -58,12 +58,12 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
 
     if ( SUCCEEDED( status ) )
     {
-        fileExtension = strrchr( HStringToLPCSTR( path ), '.' );
-        if ( fileExtension && fileExtension != HStringToLPCSTR( path ) )
+        fileExtension = wcsrchr( WindowsGetStringRawBuffer( path, NULL ), '.' );
+        if ( fileExtension && fileExtension != WindowsGetStringRawBuffer( path, NULL ) )
         {
-            WindowsCreateString( CharToLPCWSTR( fileExtension ), wcslen( CharToLPCWSTR( fileExtension ) ), &file->FileType );
+            WindowsCreateString( fileExtension, wcslen( fileExtension ), &file->FileType );
         }
-        fileData = fopen( HStringToLPCSTR( path ), "rb" );
+        fileData = _wfopen( WindowsGetStringRawBuffer( path, NULL ), L"rb" );
         bytesRead = (DWORD)fread( buffer, 1, BUFFER_SIZE, fileData );
         fclose( fileData );
 
@@ -107,9 +107,9 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
     HRESULT status = S_OK;
     HSTRING folderPath;
     HSTRING filePath;
-    CHAR filePathStr[MAX_PATH];
-    CHAR folderPathStr[MAX_PATH];
-    CHAR uuidName[MAX_PATH];
+    WCHAR filePathStr[MAX_PATH];
+    WCHAR folderPathStr[MAX_PATH];
+    WCHAR uuidName[MAX_PATH];
 
     struct storage_file * newFile;
 
@@ -134,36 +134,36 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
     destFolder = impl_from_IStorageFolder( folder );
     destFolderItem = impl_from_IStorageItem( &destFolder->IStorageItem_iface );
     WindowsDuplicateString( destFolderItem->Path, &folderPath );
-    strcpy( folderPathStr, HStringToLPCSTR( folderPath ) );
+    wcscpy( folderPathStr, WindowsGetStringRawBuffer( folderPath, NULL ) );
     
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
     WindowsDuplicateString( invokerFileItem->Path, &filePath );
-    strcpy( filePathStr, HStringToLPCSTR( filePath ) );
+    wcscpy( filePathStr, WindowsGetStringRawBuffer( filePath, NULL ) );
 
 
     switch ( option )
     {
         case NameCollisionOption_FailIfExists:
-            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+            PathAppendW( folderPathStr, WindowsGetStringRawBuffer( name, NULL ) );
 
-            if ( !CopyFileA( filePathStr, folderPathStr, TRUE ) )
+            if ( !CopyFileW( filePathStr, folderPathStr, TRUE ) )
                 return E_ABORT;
             break;
 
         case NameCollisionOption_GenerateUniqueName:
             GenerateUniqueFileName( uuidName, sizeof( uuidName ) );
-            PathAppendA( folderPathStr, uuidName );
+            PathAppendW( folderPathStr, uuidName );
 
             //Assume FailIfExists by default.
-            if ( !CopyFileA( filePathStr, folderPathStr, TRUE ) )
+            if ( !CopyFileW( filePathStr, folderPathStr, TRUE ) )
                 return E_ABORT;
             break;
 
         case NameCollisionOption_ReplaceExisting:
-            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+            PathAppendW( folderPathStr, WindowsGetStringRawBuffer( name, NULL ) );
 
-            if ( !CopyFileA( filePathStr, folderPathStr, FALSE ) )
+            if ( !CopyFileW( filePathStr, folderPathStr, FALSE ) )
                 return E_ABORT;
             break;
 
@@ -171,7 +171,7 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
             status = E_INVALIDARG;
     }
 
-    WindowsCreateString( CharToLPCWSTR( folderPathStr ), wcslen( CharToLPCWSTR( folderPathStr ) ), &filePath );
+    WindowsCreateString( folderPathStr, wcslen( folderPathStr ), &filePath );
 
     storage_file_AssignFile( filePath, &newFile->IStorageFile_iface );
 
@@ -187,8 +187,8 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
 HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
-    LPCSTR invokerPath;
-    LPCSTR targetPath;
+    LPCWSTR invokerPath;
+    LPCWSTR targetPath;
     struct storage_file *invokerFile;
     struct storage_file *targetFile;
     struct storage_item *invokerFileItem;
@@ -196,13 +196,13 @@ HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param,
 
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
-    invokerPath = HStringToLPCSTR( invokerFileItem->Path );
+    invokerPath = WindowsGetStringRawBuffer( invokerFileItem->Path, NULL );
 
     targetFile = impl_from_IStorageFile( (IStorageFile *)param );
     targetFileItem = impl_from_IStorageItem( &targetFile->IStorageItem_iface );
-    targetPath = HStringToLPCSTR( targetFileItem->Path );
+    targetPath = WindowsGetStringRawBuffer( targetFileItem->Path, NULL );
 
-    if ( !CopyFileA( invokerPath, targetPath, FALSE ) )
+    if ( !CopyFileW( invokerPath, targetPath, FALSE ) )
         return E_ABORT;
 
     *targetFile = *invokerFile;
@@ -218,9 +218,9 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
     HSTRING folderPath;
     HSTRING filePath;
     HSTRING destPath;
-    CHAR filePathStr[MAX_PATH];
-    CHAR folderPathStr[MAX_PATH];
-    CHAR uuidName[MAX_PATH];
+    WCHAR filePathStr[MAX_PATH];
+    WCHAR folderPathStr[MAX_PATH];
+    WCHAR uuidName[MAX_PATH];
 
     struct storage_file_move_options *move_options = (struct storage_file_move_options *)param;
 
@@ -238,36 +238,36 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
     destFolder = impl_from_IStorageFolder( folder );
     destFolderItem = impl_from_IStorageItem( &destFolder->IStorageItem_iface );
     WindowsDuplicateString( destFolderItem->Path, &folderPath );
-    strcpy( folderPathStr, HStringToLPCSTR( folderPath ) );
+    wcscpy( folderPathStr, WindowsGetStringRawBuffer( folderPath, NULL ) );
     
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
     WindowsDuplicateString( invokerFileItem->Path, &filePath );
-    strcpy( filePathStr, HStringToLPCSTR( filePath ) );
+    wcscpy( filePathStr, WindowsGetStringRawBuffer( filePath, NULL ) );
 
 
     switch ( option )
     {
         case NameCollisionOption_FailIfExists:
-            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+            PathAppendW( folderPathStr, WindowsGetStringRawBuffer( name, NULL ) );
 
-            if ( !MoveFileA( filePathStr, folderPathStr ) )
+            if ( !MoveFileW( filePathStr, folderPathStr ) )
                 return E_ABORT;
             break;
 
         case NameCollisionOption_GenerateUniqueName:
             GenerateUniqueFileName( uuidName, sizeof( uuidName ) );
-            PathAppendA( folderPathStr, uuidName );
+            PathAppendW( folderPathStr, uuidName );
 
             //Assume FailIfExists by default.
-            if ( !MoveFileA( filePathStr, folderPathStr ) )
+            if ( !MoveFileW( filePathStr, folderPathStr ) )
                 return E_ABORT;
             break;
 
         case NameCollisionOption_ReplaceExisting:
-            PathAppendA( folderPathStr, HStringToLPCSTR( name ) );
+            PathAppendW( folderPathStr, WindowsGetStringRawBuffer( name, NULL ) );
 
-            if ( !MoveFileA( filePathStr, folderPathStr ) )
+            if ( !MoveFileW( filePathStr, folderPathStr ) )
                 return E_ABORT;
             break;
 
@@ -277,7 +277,7 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
 
     if ( SUCCEEDED( status ) )
     {
-        WindowsCreateString( CharToLPCWSTR( folderPathStr ), wcslen( CharToLPCWSTR( folderPathStr ) ), &destPath );
+        WindowsCreateString( folderPathStr, wcslen( folderPathStr ), &destPath );
         storage_item_Internal_CreateNew( destPath, &invokerFile->IStorageItem_iface );
     }
 
@@ -287,8 +287,8 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
 HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
-    LPCSTR invokerPath;
-    LPCSTR targetPath;
+    LPCWSTR invokerPath;
+    LPCWSTR targetPath;
     struct storage_file *invokerFile;
     struct storage_file *targetFile;
     struct storage_item *invokerFileItem;
@@ -296,13 +296,13 @@ HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param,
 
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
-    invokerPath = HStringToLPCSTR( invokerFileItem->Path );
+    invokerPath = WindowsGetStringRawBuffer( invokerFileItem->Path, NULL );
 
     targetFile = impl_from_IStorageFile( (IStorageFile *)param );
     targetFileItem = impl_from_IStorageItem( &targetFile->IStorageItem_iface );
-    targetPath = HStringToLPCSTR( targetFileItem->Path );
+    targetPath = WindowsGetStringRawBuffer( targetFileItem->Path, NULL );
 
-    if ( !MoveFileA( invokerPath, targetPath ) )
+    if ( !MoveFileW( invokerPath, targetPath ) )
         return E_ABORT;
 
     *targetFile = *invokerFile;

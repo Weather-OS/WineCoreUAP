@@ -9,15 +9,6 @@
 #ifndef _PACKAGE_H_
 #define _PACKAGE_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
-#include <string.h>
-#include <stdbool.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-
 #include "util.h"
 #include "read.h"
 #include "version.h"
@@ -27,14 +18,14 @@ typedef xmlNode* appxResourceList;
 typedef xmlNode* appxCapabilityList;
 
 struct appx_properties {
-    const xmlChar * DisplayName;
-    const xmlChar * PublisherDisplayName;
-    const xmlChar * Logo;
+    const wchar_t * DisplayName;
+    const wchar_t * PublisherDisplayName;
+    const wchar_t * Logo;
 };
 
 struct appx_identity {
-    const xmlChar * Name;
-    const xmlChar * Publisher;
+    const wchar_t * Name;
+    const wchar_t * Publisher;
     struct app_version Version;
     enum Architecture Architecture;
 };
@@ -47,12 +38,12 @@ struct appx {
 };
 
 struct appx_package {
-    const char* manifestPath;
+    const wchar_t* manifestPath;
     xmlNode* manifest;
 
     struct appx Package;
 };
 
-appxstatus registerAppxPackage( const char * manifestPath, struct appx_package *package );
+appxstatus registerAppxPackage( const wchar_t * manifestPath, struct appx_package *package );
 
 #endif

@@ -6,8 +6,6 @@
  * This is a general utility module.
  */
 
-#include <stdio.h>
-#include <string.h>
 
 #include "include/util.h"
 
@@ -60,3 +58,25 @@ errorMessage( const char * str, ... )
     setLastErrorMessage( err );
 }
 
+/**
+ * charToWChar
+ */
+wchar_t* 
+charToWChar( const char *charStr ) 
+{
+    size_t len;
+    wchar_t *wcharStr;
+    len = mbstowcs( NULL, charStr, 0 ) + 1;
+    if ( len == (size_t)-1 ) {
+        return NULL;
+    }
+
+    wcharStr = malloc( len * sizeof(wchar_t) );
+    if ( wcharStr == NULL ) {
+        return NULL;
+    }
+
+    mbstowcs( wcharStr, charStr, len );
+
+    return wcharStr;
+}

@@ -23,51 +23,51 @@
 
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    
-    CHAR path[MAX_PATH] = "C:\\users\\";
-    CHAR username[256];
-    CHAR manifestPath[MAX_PATH];
-    LPSTR AppName;
+    WCHAR path[MAX_PATH] = L"C:\\users\\";
+    WCHAR username[256];
+    WCHAR manifestPath[MAX_PATH];
+    LPCWSTR AppName;
     DWORD username_len = sizeof(username);
 
     struct appx_package package;
 
-    GetModuleFileNameA(NULL, manifestPath, MAX_PATH);
-    PathRemoveFileSpecA(manifestPath);
-    PathAppendA(manifestPath, "AppxManifest.xml");
+    GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
+    PathRemoveFileSpecW(manifestPath);
+    PathAppendW(manifestPath, L"AppxManifest.xml");
 
     registerAppxPackage( manifestPath, &package );
 
-    AppName = (CHAR *)package.Package.Identity.Name;
+    AppName = package.Package.Identity.Name;
 
-    if (!GetUserNameA(username, &username_len)) {
+    if (!GetUserNameW(username, &username_len)) {
         return E_UNEXPECTED;
     }
 
-    PathAppendA(path, username);
-    PathAppendA(path, "AppData\\Local\\Packages");
-    PathAppendA(path, AppName); // Assuming AppName now holds the correct package name
+    PathAppendW(path, username);
+    PathAppendW(path, L"AppData\\Local\\Packages");
+    PathAppendW(path, AppName); // Assuming AppName now holds the correct package name
 
     if (!strcmp(FOLDERID, "cookies")) {
-        PathAppendA(path, "AC\\INetCookies");
+        PathAppendW(path, L"AC\\INetCookies");
     } else if (!strcmp(FOLDERID, "desktop")) {
-        PathAppendA(path, "LocalState\\Desktop");
+        PathAppendW(path, L"LocalState\\Desktop");
     } else if (!strcmp(FOLDERID, "documents")) {
-        PathAppendA(path, "LocalState\\Documents");
+        PathAppendW(path, L"LocalState\\Documents");
     } else if (!strcmp(FOLDERID, "favorites")) {
-        PathAppendA(path, "LocalState\\favorites");
+        PathAppendW(path, L"LocalState\\favorites");
     } else if (!strcmp(FOLDERID, "history")) {
-        PathAppendA(path, "AC\\INetHistory");
+        PathAppendW(path, L"AC\\INetHistory");
     } else if (!strcmp(FOLDERID, "internet_cache")) {
-        PathAppendA(path, "AC\\INetCache");
+        PathAppendW(path, L"AC\\INetCache");
     } else if (!strcmp(FOLDERID, "localappdata")) {
-        PathAppendA(path, "LocalState");
+        PathAppendW(path, L"LocalState");
     } else if (!strcmp(FOLDERID, "programdata")) {
-        PathAppendA(path, "LocalState\\ProgramData");
+        PathAppendW(path, L"LocalState\\ProgramData");
     } else if (!strcmp(FOLDERID, "roamingappdata")) {
-        PathAppendA(path, "RoamingState");
+        PathAppendW(path, L"RoamingState");
     }
 
-    if (WindowsCreateString(CharToLPCWSTR(path), strlen(path), value) != S_OK) {
+    if (WindowsCreateString( path, wcslen(path), value ) != S_OK) {
         return E_UNEXPECTED;
     }
     

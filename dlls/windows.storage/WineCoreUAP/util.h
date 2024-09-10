@@ -31,9 +31,7 @@
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 
 INT64 FileTimeToUnixTime( const FILETIME *ft );
-VOID GenerateUniqueFileName( LPSTR buffer, SIZE_T bufferSize );
-LPCWSTR CharToLPCWSTR( LPSTR charString );
-LPCSTR HStringToLPCSTR( HSTRING hString );
-VOID DeleteDirectoryRecursively(LPCSTR directoryPath);
+VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize );
+VOID DeleteDirectoryRecursively(LPCWSTR directoryPath);
 
 #endif

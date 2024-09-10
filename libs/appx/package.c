@@ -17,12 +17,27 @@ static appxstatus assignAppxResources( xmlNode * manifest, appxResourceList *Lis
  * registerAppxPackage
  */
 appxstatus
-registerAppxPackage( const char * manifestPath, struct appx_package *package )
+registerAppxPackage( const wchar_t * manifestPath, struct appx_package *package )
 {
     appxstatus status;
 
+    size_t len;
+    char *manifestPathStr;
+
+    len = wcstombs(NULL, manifestPath, 0) + 1;
+    if (len == (size_t)-1) {
+        return STATUS_FAIL;
+    }
+
+    manifestPathStr = malloc(len);
+    if (manifestPathStr == NULL) {
+        return STATUS_FAIL;
+    }
+
+    wcstombs(manifestPathStr, manifestPath, len);
+
     package->manifestPath = manifestPath;
-    status = readManifest( manifestPath, &package->manifest );
+    status = readManifest( manifestPathStr, &package->manifest );
     if ( !OK( status ) ) return STATUS_FAIL;
 
     status = verifyManifestRoot( package->manifest );
@@ -74,8 +89,8 @@ assignAppxIdentity( xmlNode * manifest, struct appx_identity *Identity )
         }
     }
 
-    Identity->Name = Name;
-    Identity->Publisher = Publisher;
+    Identity->Name = charToWChar( Name );
+    Identity->Publisher = charToWChar( Publisher );
 
     if ( xmlStrcmp( ProcArchitecture, (const xmlChar*)"x86" ) )
         Identity->Architecture = PROCESSOR_X86;
@@ -143,9 +158,9 @@ assignAppxProperties( xmlNode * manifest, struct appx_properties *Properties )
         }
     }
 
-    Properties->DisplayName = DisplayName;
-    Properties->PublisherDisplayName = PublisherDisplayName;
-    Properties->Logo = Logo;
+    Properties->DisplayName = charToWChar( DisplayName );
+    Properties->PublisherDisplayName = charToWChar( PublisherDisplayName );
+    Properties->Logo = charToWChar( Logo );
 
     return STATUS_SUCCESS;
 }

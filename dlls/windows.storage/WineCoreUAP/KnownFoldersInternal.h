@@ -32,6 +32,8 @@
 #include <appx.h>
 #include <shlwapi.h>
 
+#define MAX_BUFFER 1024
+
 struct known_folders_statics
 {
     IActivationFactory IActivationFactory_iface;

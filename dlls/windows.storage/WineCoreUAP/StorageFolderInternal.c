@@ -81,8 +81,8 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     DWORD attrib;
     BOOL Exists = FALSE;
     BOOL Replace = FALSE;
-    CHAR fullPath[MAX_PATH];
-    CHAR uuidName[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
+    WCHAR uuidName[MAX_PATH];
 
     struct storage_folder_creation_options *creation_options = (struct storage_folder_creation_options *)param;
     struct storage_folder *invokerFolder;
@@ -101,13 +101,13 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     invokerFolder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
     Path = impl_from_IStorageItem( &invokerFolder->IStorageItem_iface )->Path;
 
-    strcpy( fullPath, HStringToLPCSTR( Path ) );
+    wcscpy( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
 
     switch ( collisionOption )
     {
         case CreationCollisionOption_FailIfExists:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 status = E_INVALIDARG;
             else 
@@ -116,14 +116,14 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
 
         case CreationCollisionOption_GenerateUniqueName:
             GenerateUniqueFileName( uuidName, sizeof(uuidName) );
-            PathAppendA( fullPath, uuidName );
+            PathAppendW( fullPath, uuidName );
 
             status = S_OK;
             break;
         
         case CreationCollisionOption_OpenIfExists:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 Exists = TRUE;
             
@@ -131,8 +131,8 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
             break;
         
         case CreationCollisionOption_ReplaceExisting:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 Replace = TRUE;
 
@@ -143,14 +143,14 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     {
         if ( Replace )
         {
-            if ( !RemoveDirectoryA( fullPath ) )
+            if ( !RemoveDirectoryW( fullPath ) )
             {
                 return E_ABORT;
             }
         }
         if ( !Exists )
         {
-            if ( !CreateDirectoryA( fullPath, NULL ) )
+            if ( !CreateDirectoryW( fullPath, NULL ) )
             {
                 return E_ABORT;
             }
@@ -158,7 +158,7 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
         }
     }
 
-    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &Path );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &Path );
 
     status = storage_folder_AssignFolder( Path, &resultFolder->IStorageFolder_iface );
 
@@ -178,8 +178,8 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     DWORD attrib;
     BOOL Exists = FALSE;
     BOOL Replace = FALSE;
-    CHAR fullPath[MAX_PATH];
-    CHAR uuidName[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
+    WCHAR uuidName[MAX_PATH];
 
     struct storage_folder_creation_options *creation_options = (struct storage_folder_creation_options *)param;
     struct storage_folder *invokerFolder;
@@ -198,13 +198,13 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     invokerFolder = impl_from_IStorageFolder( (IStorageFolder *)invoker );
     Path = impl_from_IStorageItem( &invokerFolder->IStorageItem_iface )->Path;
 
-    strcpy( fullPath, HStringToLPCSTR( Path ) );
+    wcscpy( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
 
     switch ( collisionOption )
     {
         case CreationCollisionOption_FailIfExists:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 status = E_INVALIDARG;
             else 
@@ -213,14 +213,14 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
 
         case CreationCollisionOption_GenerateUniqueName:
             GenerateUniqueFileName( uuidName, sizeof(uuidName) );
-            PathAppendA( fullPath, uuidName );
+            PathAppendW( fullPath, uuidName );
 
             status = S_OK;
             break;
         
         case CreationCollisionOption_OpenIfExists:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 Exists = TRUE;
             
@@ -228,8 +228,8 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
             break;
         
         case CreationCollisionOption_ReplaceExisting:
-            PathAppendA( fullPath, HStringToLPCSTR( Name ));
-            attrib = GetFileAttributesA(fullPath);
+            PathAppendW( fullPath, WindowsGetStringRawBuffer( Name, NULL ));
+            attrib = GetFileAttributesW(fullPath);
             if (attrib != INVALID_FILE_ATTRIBUTES)
                 Replace = TRUE;
 
@@ -240,19 +240,19 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     {
         if ( Replace )
         {
-            if ( !DeleteFileA( fullPath ) )
+            if ( !DeleteFileW( fullPath ) )
             {
                 return E_ABORT;
             }
         }
         if ( !Exists )
         {
-            CloseHandle( CreateFileA( fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL) );
+            CloseHandle( CreateFileW( fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL) );
             status = S_OK;
         }
     }
 
-    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &Path );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &Path );
     status = storage_file_AssignFile( Path, &resultFile->IStorageFile_iface );
 
     if ( SUCCEEDED( status ) )
@@ -266,7 +266,7 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
 
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
-    CHAR fullPath[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
     HRESULT status;
     HSTRING Path;
     HSTRING itemPath;
@@ -285,9 +285,9 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     item->ref = 1;
 
-    PathAppendA( fullPath, HStringToLPCSTR( Path ) );
-    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
-    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &itemPath );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &itemPath );
 
     status = storage_item_Internal_CreateNew( itemPath, &item->IStorageItem_iface );
     
@@ -304,13 +304,13 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
 
 HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    WIN32_FIND_DATAA findFileData;
+    WIN32_FIND_DATAW findFileData;
     HANDLE hFind = INVALID_HANDLE_VALUE;
     HRESULT status = S_OK;
     HSTRING Path;
     HSTRING itemPath;
-    CHAR searchPath[MAX_PATH]; 
-    CHAR fullItemPath[MAX_PATH];
+    WCHAR searchPath[MAX_PATH]; 
+    WCHAR fullItemPath[MAX_PATH];
 
     struct storage_folder *invokerFolder;
     struct storage_item_vector_view *itemVector;
@@ -326,29 +326,29 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     itemVector->ref = 1;
     itemVector->size = 0;
 
-    snprintf( searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR( Path ) );
+    swprintf( searchPath, MAX_PATH, L"%s\\*.*", WindowsGetStringRawBuffer( Path, NULL ) );
 
     if ( param == NULL )
     {
-        hFind = FindFirstFileA( searchPath, &findFileData );
+        hFind = FindFirstFileW( searchPath, &findFileData );
 
         if ( hFind == INVALID_HANDLE_VALUE ) 
         {
             return E_ABORT;
         } 
 
-        while ( FindNextFileA( hFind, &findFileData ) != 0 ) 
+        while ( FindNextFileW( hFind, &findFileData ) != 0 ) 
         {
-            if ( strcmp( findFileData.cFileName, "." ) != 0 
-              && strcmp( findFileData.cFileName, ".." ) != 0 ) 
+            if ( wcscmp( findFileData.cFileName, L"." ) != 0 
+              && wcscmp( findFileData.cFileName, L".." ) != 0 ) 
             {
                 if (!(itemVector->elements[itemVector->size] = calloc( 1, sizeof(*itemVector->elements[itemVector->size]) ))) 
                     return E_OUTOFMEMORY;
                 itemVector->elements[itemVector->size]->lpVtbl = &storage_item_vtbl;
                 
-                PathAppendA( fullItemPath, HStringToLPCSTR( Path ) );
-                PathAppendA( fullItemPath, findFileData.cFileName );
-                WindowsCreateString( CharToLPCWSTR( fullItemPath ), wcslen( CharToLPCWSTR( fullItemPath ) ), &itemPath);
+                PathAppendW( fullItemPath, WindowsGetStringRawBuffer( Path, NULL ) );
+                PathAppendW( fullItemPath, findFileData.cFileName );
+                WindowsCreateString( fullItemPath, wcslen( fullItemPath ), &itemPath);
 
                 status = storage_item_Internal_CreateNew( itemPath, itemVector->elements[itemVector->size] );
 
@@ -371,7 +371,7 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
 
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    CHAR fullPath[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
@@ -391,9 +391,9 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     folderToFetch->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folderToFetch->ref = 1;
 
-    PathAppendA( fullPath, HStringToLPCSTR( Path ) );
-    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
-    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &folderPath );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &folderPath );
 
     status = storage_item_Internal_CreateNew( folderPath, &folderToFetch->IStorageItem_iface );
     
@@ -409,13 +409,13 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    WIN32_FIND_DATAA findFolderData;
+    WIN32_FIND_DATAW findFolderData;
     HANDLE hFind = INVALID_HANDLE_VALUE;
     HRESULT status = S_OK;
     HSTRING Path;
     HSTRING folderPath;
-    CHAR searchPath[MAX_PATH];
-    CHAR fullFolderPath[MAX_PATH];
+    WCHAR searchPath[MAX_PATH];
+    WCHAR fullFolderPath[MAX_PATH];
 
     struct storage_folder_vector_view *folderVector;
     struct storage_folder *invokerFolder;
@@ -431,21 +431,21 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
     folderVector->ref = 1;
     folderVector->size = 0;
 
-    snprintf( searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR( Path ) );
+    swprintf( searchPath, MAX_PATH, L"%s\\*.*", WindowsGetStringRawBuffer( Path, NULL ) );
 
     if ( param == NULL )
     {
-        hFind = FindFirstFileA( searchPath, &findFolderData );
+        hFind = FindFirstFileW( searchPath, &findFolderData );
 
         if ( hFind == INVALID_HANDLE_VALUE ) 
         {
             return E_ABORT;
         } 
 
-        while ( FindNextFileA( hFind, &findFolderData ) != 0 ) 
+        while ( FindNextFileW( hFind, &findFolderData ) != 0 ) 
         {
-            if ( strcmp( findFolderData.cFileName, "." ) != 0 
-              && strcmp( findFolderData.cFileName, ".." ) != 0 
+            if ( wcscmp( findFolderData.cFileName, L"." ) != 0 
+              && wcscmp( findFolderData.cFileName, L".." ) != 0 
               && findFolderData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) 
             {
                 if (!(folderVector->elements[folderVector->size] = calloc( 1, sizeof(*folderVector->elements[folderVector->size]) ))) 
@@ -453,9 +453,9 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
                 folderVector->elements[folderVector->size]->lpVtbl = &storage_folder_vtbl;
                 impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
 
-                PathAppendA( fullFolderPath, HStringToLPCSTR( Path ) );
-                PathAppendA( fullFolderPath, findFolderData.cFileName );
-                WindowsCreateString( CharToLPCWSTR( fullFolderPath ), wcslen( CharToLPCWSTR( fullFolderPath ) ), &folderPath);
+                PathAppendW( fullFolderPath, WindowsGetStringRawBuffer( Path, NULL ) );
+                PathAppendW( fullFolderPath, findFolderData.cFileName );
+                WindowsCreateString( fullFolderPath, wcslen( fullFolderPath ), &folderPath);
 
                 status = storage_item_Internal_CreateNew( folderPath, &impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageItem_iface );
 
@@ -481,7 +481,7 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
 
 HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    CHAR fullPath[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
@@ -501,9 +501,9 @@ HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PRO
     fileToFetch->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     fileToFetch->ref = 1;
 
-    PathAppendA( fullPath, HStringToLPCSTR( Path ) );
-    PathAppendA( fullPath, HStringToLPCSTR( (HSTRING)param ) );
-    WindowsCreateString( CharToLPCWSTR( fullPath ), wcslen( CharToLPCWSTR( fullPath ) ), &folderPath );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &folderPath );
 
     status = storage_file_AssignFile( folderPath, &fileToFetch->IStorageFile_iface );
     
@@ -519,13 +519,13 @@ HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PRO
 
 HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    WIN32_FIND_DATAA findFileData;
+    WIN32_FIND_DATAW findFileData;
     HANDLE hFind = INVALID_HANDLE_VALUE;
     HRESULT status = S_OK;
     HSTRING Path;
     HSTRING filePath;
-    CHAR searchPath[MAX_PATH]; 
-    CHAR fullFilePath[MAX_PATH];
+    WCHAR searchPath[MAX_PATH]; 
+    WCHAR fullFilePath[MAX_PATH];
 
     struct storage_folder *invokerFolder;
     struct storage_file_vector_view *fileVector;
@@ -541,30 +541,30 @@ HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *p
     fileVector->ref = 1;
     fileVector->size = 0;
 
-    snprintf( searchPath, MAX_PATH, "%s\\*.*", HStringToLPCSTR( Path ) );
+    swprintf( searchPath, MAX_PATH, L"%s\\*.*", WindowsGetStringRawBuffer( Path, NULL ) );
 
     if ( param == NULL )
     {
-        hFind = FindFirstFileA( searchPath, &findFileData );
+        hFind = FindFirstFileW( searchPath, &findFileData );
 
         if ( hFind == INVALID_HANDLE_VALUE ) 
         {
             return E_ABORT;
         } 
 
-        while ( FindNextFileA( hFind, &findFileData ) != 0 ) 
+        while ( FindNextFileW( hFind, &findFileData ) != 0 ) 
         {
-            if ( strcmp( findFileData.cFileName, "." ) != 0 
-              && strcmp( findFileData.cFileName, ".." ) != 0
+            if ( wcscmp( findFileData.cFileName, L"." ) != 0 
+              && wcscmp( findFileData.cFileName, L".." ) != 0
               && !(findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ) 
             {
                 if (!(fileVector->elements[fileVector->size] = calloc( 1, sizeof(*fileVector->elements[fileVector->size]) ))) 
                     return E_OUTOFMEMORY;
                 fileVector->elements[fileVector->size]->lpVtbl = &storage_file_vtbl;
                 
-                PathAppendA( fullFilePath, HStringToLPCSTR( Path ) );
-                PathAppendA( fullFilePath, findFileData.cFileName );
-                WindowsCreateString( CharToLPCWSTR( fullFilePath ), wcslen( CharToLPCWSTR( fullFilePath ) ), &filePath);
+                PathAppendW( fullFilePath, WindowsGetStringRawBuffer( Path, NULL ) );
+                PathAppendW( fullFilePath, findFileData.cFileName );
+                WindowsCreateString( fullFilePath, wcslen( fullFilePath ), &filePath);
 
                 status = storage_file_AssignFile( filePath, fileVector->elements[fileVector->size] );
 

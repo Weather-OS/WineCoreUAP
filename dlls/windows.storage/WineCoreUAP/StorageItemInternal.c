@@ -31,7 +31,7 @@ extern struct IActivationFactoryVtbl factory_vtbl;
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
 {
-    CHAR itemName[MAX_PATH];
+    WCHAR itemName[MAX_PATH];
     DWORD attributes;
     HANDLE itemFile;
     HSTRING tempName;
@@ -48,14 +48,14 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
     WindowsDuplicateString( itemPath, &item->Path );
     
-    attributes = GetFileAttributesA( HStringToLPCSTR( itemPath ) );
+    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 
     {
         status = E_INVALIDARG;
     } else 
     {
         //File Time
-        itemFile = CreateFileA( HStringToLPCSTR( itemPath ), GENERIC_READ, FILE_SHARE_READ, NULL,
+        itemFile = CreateFileW( WindowsGetStringRawBuffer( itemPath, NULL ), GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (itemFile == INVALID_HANDLE_VALUE) 
         {
@@ -96,8 +96,8 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
         WindowsDuplicateString( itemPath, &item->Path );
 
         //File Name
-        strcpy( itemName, strrchr( HStringToLPCSTR( itemPath ), '\\' ) );
-        WindowsCreateString( CharToLPCWSTR( itemName + 1 ), strlen(itemName), &tempName );
+        wcscpy( itemName, wcsrchr( WindowsGetStringRawBuffer( itemPath, NULL ), '\\' ) );
+        WindowsCreateString( itemName + 1, wcslen( itemName ), &tempName );
         WindowsDuplicateString( tempName, &item->Name );
 
         CloseHandle( itemFile );
@@ -113,8 +113,8 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
     DWORD attributes;
     HRESULT status = S_OK;
     HSTRING itemPath;
-    CHAR newItemPath[MAX_PATH];
-    CHAR uuidName[MAX_PATH];
+    WCHAR newItemPath[MAX_PATH];
+    WCHAR uuidName[MAX_PATH];
 
     struct storage_item *item;
     struct storage_item_rename_options *rename_options = (struct storage_item_rename_options *)param;
@@ -127,11 +127,11 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
     item = impl_from_IStorageItem( (IStorageItem *)invoker );
     WindowsDuplicateString( item->Path, &itemPath );
 
-    strcpy( newItemPath, HStringToLPCSTR( itemPath ) );
-    *strrchr( newItemPath, '\\' ) = '\0';
+    wcscpy( newItemPath, WindowsGetStringRawBuffer( itemPath, NULL ) );
+    *wcsrchr( newItemPath, L'\\' ) = '\0';
 
     //Perform rename
-    attributes = GetFileAttributesA( HStringToLPCSTR( itemPath ) );
+    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 
     {
         status = E_INVALIDARG;
@@ -140,9 +140,9 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
         switch (collisionOption)
         {
             case NameCollisionOption_FailIfExists:
-                PathAppendA( newItemPath, HStringToLPCSTR( name ) );
+                PathAppendW( newItemPath, WindowsGetStringRawBuffer( name, NULL ) );
 
-                attributes = GetFileAttributesA( newItemPath );
+                attributes = GetFileAttributesW( newItemPath );
                 if ( attributes != INVALID_FILE_ATTRIBUTES ) 
                     status = E_INVALIDARG;
                 else
@@ -151,9 +151,9 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
 
             case NameCollisionOption_GenerateUniqueName:
                 GenerateUniqueFileName( uuidName, sizeof(uuidName) );
-                PathAppendA( newItemPath, uuidName );
+                PathAppendW( newItemPath, uuidName );
 
-                attributes = GetFileAttributesA( newItemPath );
+                attributes = GetFileAttributesW( newItemPath );
                 if ( attributes != INVALID_FILE_ATTRIBUTES ) 
                     return E_ABORT;
                 else
@@ -161,12 +161,12 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
                 break;
 
             case NameCollisionOption_ReplaceExisting:
-                PathAppendA( newItemPath, HStringToLPCSTR( name ) );
+                PathAppendW( newItemPath, WindowsGetStringRawBuffer( name, NULL ) );
 
-                attributes = GetFileAttributesA( newItemPath );
+                attributes = GetFileAttributesW( newItemPath );
                 if ( attributes != INVALID_FILE_ATTRIBUTES ) 
                 {
-                    if ( !DeleteFileA( newItemPath ) )
+                    if ( !DeleteFileW( newItemPath ) )
                     {
                         return E_ABORT;
                     }
@@ -177,15 +177,15 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
         }
     }
 
-    if ( !MoveFileA( HStringToLPCSTR( item->Path ), newItemPath ) )
+    if ( !MoveFileW( WindowsGetStringRawBuffer( item->Path, NULL ), newItemPath ) )
     {
-        printf("Failed to move file %s to %s. Error code: %lu\n", HStringToLPCSTR( item->Path ), newItemPath, GetLastError() );
+        wprintf(L"Failed to move file %s to %s. Error code: %lu\n", WindowsGetStringRawBuffer( item->Path, NULL ), newItemPath, GetLastError() );
         status = E_ABORT;
     }
 
     if ( SUCCEEDED( status ) )
     {
-        WindowsCreateString( CharToLPCWSTR( newItemPath ), wcslen( CharToLPCWSTR( newItemPath ) ), &item->Path );
+        WindowsCreateString( newItemPath, wcslen( newItemPath ), &item->Path );
         WindowsDuplicateString( name, &item->Name );
     }
     return status;
@@ -207,7 +207,7 @@ HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARI
     WindowsDuplicateString( item->Path, &itemPath );
 
     //Perform delete
-    attributes = GetFileAttributesA( HStringToLPCSTR( itemPath ) );
+    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 
     {
         status = E_INVALIDARG;
@@ -219,12 +219,12 @@ HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARI
             case StorageDeleteOption_PermanentDelete:
                 if ( attributes == FILE_ATTRIBUTE_DIRECTORY )
                 {
-                    DeleteDirectoryRecursively( HStringToLPCSTR( itemPath ) );
+                    DeleteDirectoryRecursively( WindowsGetStringRawBuffer( itemPath, NULL ) );
                 } else
                 {
-                    if ( !DeleteFileA( HStringToLPCSTR( itemPath ) ) )
+                    if ( !DeleteFileW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
                     {
-                        printf("Failed to remove file %s. Error code: %lu\n", HStringToLPCSTR( itemPath ), GetLastError() );
+                        wprintf(L"Failed to remove file %s. Error code: %lu\n", WindowsGetStringRawBuffer( itemPath, NULL ), GetLastError() );
                         status = E_ABORT;
                     }
                 }
@@ -250,7 +250,7 @@ HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, P
     
     item = impl_from_IStorageItem( (IStorageItem *)invoker );
 
-    file = CreateFileA( HStringToLPCSTR( item->Path ), GENERIC_READ, FILE_SHARE_READ, NULL,
+    file = CreateFileW( WindowsGetStringRawBuffer( item->Path, NULL ), GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
 
     fileSize = GetFileSize( file, NULL );
@@ -281,16 +281,16 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
     DWORD attributes;
     HRESULT status = S_OK;
     HSTRING itemPath;
-    CHAR path[MAX_PATH];
+    WCHAR path[MAX_PATH];
 
     struct storage_item *item;
     
     item = impl_from_IStorageItem( iface );
     WindowsDuplicateString( item->Path, &itemPath );
     
-    strcpy( path, HStringToLPCSTR( itemPath ) );
+    wcscpy( path, WindowsGetStringRawBuffer( itemPath, NULL ) );
 
-    attributes = GetFileAttributesA( path );
+    attributes = GetFileAttributesW( path );
     if ( attributes == INVALID_FILE_ATTRIBUTES )
     {
         status = E_INVALIDARG;
