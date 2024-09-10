@@ -49,7 +49,7 @@ struct storage_item
 };
 
 /**
- * Parametized structs
+ * Parametizred structs
  */
 
 struct storage_item_rename_options

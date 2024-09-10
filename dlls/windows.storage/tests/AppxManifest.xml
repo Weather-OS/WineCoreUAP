@@ -8,7 +8,7 @@
     For more information on package manifest files, see http://go.microsoft.com/fwlink/?LinkID=241727
   -->
   <Identity Name="7bcb2567-5cea-4172-b50a-5375d94fd210" Publisher="CN=Office" Version="1.0.0.0" ProcessorArchitecture="x64" />
-  <mp:PhoneIdentity PhoneProductId="7bcb2567-5cea-4172-b50a-5375d94fd210" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+  <mp:PhoneIdentity PhoneProductId="7cb2567-5cea-4172-b50a-5375d94fd210" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>App1</DisplayName>
     <PublisherDisplayName>Office</PublisherDisplayName>

@@ -22,6 +22,8 @@
 #ifndef FILE_IO_INTERNAL_H
 #define FILE_IO_INTERNAL_H
 
+#include "StorageFileInternal.h"
+
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -31,5 +33,24 @@ struct file_io_statics
     IFileIOStatics IFileIOStatics_iface;
     LONG ref;
 };
+
+/**
+ * Parametizred structs
+ */
+struct file_io_read_text_options
+{
+    IStorageFile *file;
+    UnicodeEncoding encoding;
+};
+
+struct file_io_write_text_options
+{
+    IStorageFile *file;
+    HSTRING contents;
+    UnicodeEncoding encoding;
+};
+
+HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

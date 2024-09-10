@@ -45,13 +45,11 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     PathAppendW(manifestPath, L"AppxManifest.xml");
 
     if (!GetUserNameW(username, &username_len)) {
-        printf("Something went wrong\n.");
         return E_UNEXPECTED;
     }
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
-        printf("Something went wrong\n.");
         status = E_UNEXPECTED;
     }
 
@@ -218,7 +216,6 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
-        printf("Something went wrong\n.");
         status = E_UNEXPECTED;
     }
 

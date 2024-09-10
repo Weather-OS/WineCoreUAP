@@ -58,7 +58,7 @@ struct storage_file_statics
 };
 
 /**
- * Parametized structs
+ * Parametizred structs
  */
 
 struct storage_file_move_options

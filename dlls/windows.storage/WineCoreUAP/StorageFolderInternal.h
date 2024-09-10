@@ -58,7 +58,7 @@ struct storage_folder_statics
 };
 
 /**
- * Parametized structs
+ * Parametizred structs
  */
 
 struct storage_folder_creation_options

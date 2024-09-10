@@ -9,6 +9,7 @@ SOURCES = \
 	WineCoreUAP/DownloadsFolder.c \
 	WineCoreUAP/DownloadsFolderInternal.c \
 	WineCoreUAP/FileIO.c \
+	WineCoreUAP/FileIOInternal.c \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \

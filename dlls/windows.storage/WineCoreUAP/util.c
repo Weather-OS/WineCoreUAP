@@ -55,7 +55,6 @@ VOID DeleteDirectoryRecursively(LPCWSTR directoryPath)
     hFind = FindFirstFileW(searchPath, &findFileData);
     if (hFind == INVALID_HANDLE_VALUE) 
     {
-        wprintf(L"Error: Cannot open directory: %s\n", directoryPath);
         return;
     }
 
@@ -75,7 +74,7 @@ VOID DeleteDirectoryRecursively(LPCWSTR directoryPath)
             {
                 if (!DeleteFileW(fullPath)) 
                 {
-                    wprintf(L"Error: Unable to delete file: %s\n", fullPath);
+                    return;
                 }
             }
         }
@@ -86,6 +85,6 @@ VOID DeleteDirectoryRecursively(LPCWSTR directoryPath)
 
     if (!RemoveDirectoryW(directoryPath)) 
     {
-        wprintf(L"Error: Unable to delete directory: %s\n", directoryPath);
+        return;
     }
 }

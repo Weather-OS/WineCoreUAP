@@ -125,6 +125,77 @@ static IAsyncActionCompletedHandlerVtbl async_action_handler_vtbl =
 
 static struct async_action_handler default_async_action_handler = {{&async_action_handler_vtbl}};
 
+/**
+ * IAsyncOperationCompletedHandler_HSTRING
+ */
+
+struct hstring_async_handler
+{
+    IAsyncOperationCompletedHandler_HSTRING IAsyncOperationCompletedHandler_HSTRING_iface;
+    IAsyncOperation_HSTRING *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct hstring_async_handler *impl_from_IAsyncOperationCompletedHandler_HSTRING( IAsyncOperationCompletedHandler_HSTRING *iface )
+{
+    return CONTAINING_RECORD( iface, struct hstring_async_handler, IAsyncOperationCompletedHandler_HSTRING_iface );
+}
+
+static HRESULT WINAPI hstring_async_handler_QueryInterface( IAsyncOperationCompletedHandler_HSTRING *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_HSTRING ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI hstring_async_handler_AddRef( IAsyncOperationCompletedHandler_HSTRING *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI hstring_async_handler_Release( IAsyncOperationCompletedHandler_HSTRING *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI hstring_async_handler_Invoke( IAsyncOperationCompletedHandler_HSTRING *iface,
+                                                 IAsyncOperation_HSTRING *async, AsyncStatus status )
+{
+    struct hstring_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_HSTRING( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_HSTRINGVtbl hstring_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    hstring_async_handler_QueryInterface,
+    hstring_async_handler_AddRef,
+    hstring_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<HSTRING> methods ***/
+    hstring_async_handler_Invoke,
+};
+
+static struct hstring_async_handler default_hstring_async_handler = {{&hstring_async_handler_vtbl}};
 
 /**
  * IAsyncOperationCompletedHandler_KnownFoldersAccessStatus
@@ -765,7 +836,7 @@ static void test_AppDataPathsStatics(const wchar_t** pathStr)
     *pathStr = wstr;
 }
 
-static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
+static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile **file )
 {
     //This assumes test_AppDataPathsStatics passes every test.
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
@@ -1291,6 +1362,8 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item )
     
     ok( !strcmp(HStringToLPCSTR(NinethPath), pathtest), "Error: Original path not returned. NinethPath %s, pathtest %s\n", HStringToLPCSTR(NinethPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(NinethName), "TempFile"), "Error: Original name not returned. NinethName %s, name %s\n", HStringToLPCSTR(NinethName), "TempFile");
+
+    *file = storageFileResults3;
 }
 
 static void test_StorageItem( IStorageItem *customItem )
@@ -1524,6 +1597,122 @@ static void test_KnownFolders( void )
     printf("User requested %#x\n", accessStatus);
 }
 
+static void test_FileIO( IStorageFile *file )
+{
+    HRESULT hr = S_OK;
+    static const WCHAR *file_io_statics_name = L"Windows.Storage.FileIO";
+    static const WCHAR *text_to_write = L"This is a test.";
+    IFileIOStatics *fileIOStatics;
+    IAsyncAction *action;
+    IAsyncOperation_HSTRING *hstringOperation;
+    IAsyncActionCompletedHandler *actionHandler;
+    IAsyncOperationCompletedHandler_HSTRING *hstringHandler;
+    IActivationFactory *factory; 
+    HSTRING str;
+    HSTRING textToWrite;
+    HSTRING textToRead;
+    DWORD ret;
+    INT comparisonResult;
+
+    struct async_action_handler async_action_handler;
+    struct hstring_async_handler hstring_async_handler;
+
+    hr = WindowsCreateString( file_io_statics_name, wcslen( file_io_statics_name ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( text_to_write, wcslen( text_to_write ), &textToWrite );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
+    WindowsDeleteString( str );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( file_io_statics_name ) );
+    }
+
+    check_interface( factory, &IID_IUnknown );
+    check_interface( factory, &IID_IInspectable );
+    check_interface( factory, &IID_IAgileObject );
+
+    //fileIOStatics
+
+    hr = IActivationFactory_QueryInterface( factory, &IID_IFileIOStatics, (void **)&fileIOStatics );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IFileIOStatics_WriteTextWithEncodingAsync
+     */
+
+    hr = IFileIOStatics_WriteTextWithEncodingAsync( fileIOStatics, file, textToWrite, UnicodeEncoding_Utf8, &action );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( action, &IID_IUnknown );
+    check_interface( action, &IID_IInspectable );
+    check_interface( action, &IID_IAgileObject );
+    check_interface( action, &IID_IAsyncInfo );
+    check_interface( action, &IID_IAsyncAction );
+
+    hr = IAsyncAction_get_Completed( action, &actionHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( actionHandler == NULL, "got handler %p\n", actionHandler );
+
+    async_action_handler = default_async_action_handler;
+    async_action_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncAction_put_Completed( action, &async_action_handler.IAsyncActionCompletedHandler_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( async_action_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( async_action_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( async_action_handler.invoked, "handler not invoked\n" );
+    ok( async_action_handler.async == action, "got async %p\n", async_action_handler.async );
+    ok( async_action_handler.status == Completed || broken( async_action_handler.status == Error ), "got status %u\n", async_action_handler.status );
+
+    /**
+     * IFileIOStatics_ReadTextWithEncodingAsync
+     */
+
+    hr = IFileIOStatics_ReadTextWithEncodingAsync( fileIOStatics, file, UnicodeEncoding_Utf8, &hstringOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( hstringOperation, &IID_IUnknown );
+    check_interface( hstringOperation, &IID_IInspectable );
+    check_interface( hstringOperation, &IID_IAgileObject );
+    check_interface( hstringOperation, &IID_IAsyncInfo );
+    check_interface( hstringOperation, &IID_IAsyncOperation_HSTRING );
+
+    hr = IAsyncOperation_HSTRING_get_Completed( hstringOperation, &hstringHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( hstringHandler == NULL, "got handler %p\n", hstringHandler );
+
+    hstring_async_handler = default_hstring_async_handler;
+    hstring_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_HSTRING_put_Completed( hstringOperation, &hstring_async_handler.IAsyncOperationCompletedHandler_HSTRING_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( hstring_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( hstring_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( hstring_async_handler.invoked, "handler not invoked\n" );
+    ok( hstring_async_handler.async == hstringOperation, "got async %p\n", hstring_async_handler.async );
+    ok( hstring_async_handler.status == Completed || broken( hstring_async_handler.status == Error ), "got status %u\n", hstring_async_handler.status );
+
+    hr = IAsyncOperation_HSTRING_GetResults( hstringOperation, &textToRead );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCompareStringOrdinal( textToRead, textToWrite, &comparisonResult );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    ok ( !comparisonResult, "textToRead (%s) is not equal to textToWrite (%s)!\n", HStringToLPCSTR( textToRead ), HStringToLPCSTR( textToWrite ) );
+}
+
 static void test_DownloadsFolder( void )
 {
     HRESULT hr = S_OK;
@@ -1613,6 +1802,7 @@ START_TEST(storage)
     HRESULT hr;
     const wchar_t* apppath;
     IStorageItem *returnedItem = NULL;
+    IStorageFile *returnedFile = NULL;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
 
@@ -1621,7 +1811,8 @@ START_TEST(storage)
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
     test_AppDataPathsStatics(&apppath);
-    test_StorageFolder(apppath, &returnedItem);
+    test_StorageFolder(apppath, &returnedItem, &returnedFile);
+    test_FileIO(returnedFile);
     test_StorageItem(returnedItem);
     test_KnownFolders();
     test_DownloadsFolder();

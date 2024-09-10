@@ -179,7 +179,6 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
 
     if ( !MoveFileW( WindowsGetStringRawBuffer( item->Path, NULL ), newItemPath ) )
     {
-        wprintf(L"Failed to move file %s to %s. Error code: %lu\n", WindowsGetStringRawBuffer( item->Path, NULL ), newItemPath, GetLastError() );
         status = E_ABORT;
     }
 
@@ -224,7 +223,6 @@ HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARI
                 {
                     if ( !DeleteFileW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
                     {
-                        wprintf(L"Failed to remove file %s. Error code: %lu\n", WindowsGetStringRawBuffer( itemPath, NULL ), GetLastError() );
                         status = E_ABORT;
                     }
                 }
