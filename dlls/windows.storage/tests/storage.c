@@ -1601,7 +1601,9 @@ static void test_FileIO( IStorageFile *file )
 {
     HRESULT hr = S_OK;
     static const WCHAR *file_io_statics_name = L"Windows.Storage.FileIO";
-    static const WCHAR *text_to_write = L"This is a test.";
+    static const WCHAR *text_to_write_1 = L"This is a ";
+    static const WCHAR *text_to_write_2 = L"test.";
+    static const WCHAR *text_to_conclude = L"This is a test.";
     IFileIOStatics *fileIOStatics;
     IAsyncAction *action;
     IAsyncOperation_HSTRING *hstringOperation;
@@ -1609,7 +1611,9 @@ static void test_FileIO( IStorageFile *file )
     IAsyncOperationCompletedHandler_HSTRING *hstringHandler;
     IActivationFactory *factory; 
     HSTRING str;
-    HSTRING textToWrite;
+    HSTRING textToWrite1;
+    HSTRING textToWrite2;
+    HSTRING textToConclude;
     HSTRING textToRead;
     DWORD ret;
     INT comparisonResult;
@@ -1620,7 +1624,13 @@ static void test_FileIO( IStorageFile *file )
     hr = WindowsCreateString( file_io_statics_name, wcslen( file_io_statics_name ), &str );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    hr = WindowsCreateString( text_to_write, wcslen( text_to_write ), &textToWrite );
+    hr = WindowsCreateString( text_to_write_1, wcslen( text_to_write_1 ), &textToWrite1 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( text_to_write_2, wcslen( text_to_write_2 ), &textToWrite2 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( text_to_conclude, wcslen( text_to_conclude ), &textToConclude );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
@@ -1644,7 +1654,39 @@ static void test_FileIO( IStorageFile *file )
      * IFileIOStatics_WriteTextWithEncodingAsync
      */
 
-    hr = IFileIOStatics_WriteTextWithEncodingAsync( fileIOStatics, file, textToWrite, UnicodeEncoding_Utf8, &action );
+    hr = IFileIOStatics_WriteTextWithEncodingAsync( fileIOStatics, file, textToWrite1, UnicodeEncoding_Utf8, &action );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( action, &IID_IUnknown );
+    check_interface( action, &IID_IInspectable );
+    check_interface( action, &IID_IAgileObject );
+    check_interface( action, &IID_IAsyncInfo );
+    check_interface( action, &IID_IAsyncAction );
+
+    hr = IAsyncAction_get_Completed( action, &actionHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( actionHandler == NULL, "got handler %p\n", actionHandler );
+
+    async_action_handler = default_async_action_handler;
+    async_action_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncAction_put_Completed( action, &async_action_handler.IAsyncActionCompletedHandler_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( async_action_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( async_action_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( async_action_handler.invoked, "handler not invoked\n" );
+    ok( async_action_handler.async == action, "got async %p\n", async_action_handler.async );
+    ok( async_action_handler.status == Completed || broken( async_action_handler.status == Error ), "got status %u\n", async_action_handler.status );
+
+    /**
+     * IFileIOStatics_AppendTextWithEncodingAsync
+     */
+
+    hr = IFileIOStatics_AppendTextWithEncodingAsync( fileIOStatics, file, textToWrite2, UnicodeEncoding_Utf8, &action );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     check_interface( action, &IID_IUnknown );
@@ -1707,10 +1749,10 @@ static void test_FileIO( IStorageFile *file )
     hr = IAsyncOperation_HSTRING_GetResults( hstringOperation, &textToRead );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    hr = WindowsCompareStringOrdinal( textToRead, textToWrite, &comparisonResult );
+    hr = WindowsCompareStringOrdinal( textToRead, textToConclude, &comparisonResult );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    ok ( !comparisonResult, "textToRead (%s) is not equal to textToWrite (%s)!\n", HStringToLPCSTR( textToRead ), HStringToLPCSTR( textToWrite ) );
+    ok ( !comparisonResult, "textToRead (%s) is not equal to textToConclude (%s)!\n", HStringToLPCSTR( textToRead ), HStringToLPCSTR( textToConclude ) );
 }
 
 static void test_DownloadsFolder( void )

@@ -256,3 +256,102 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
 
     return status;
 }
+
+HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HSTRING filePath;
+    HSTRING contents;
+    HANDLE fileHandle;
+    LPSTR writeBufferChar;
+    LPWSTR contentsBE;
+    DWORD bytesWritten;
+    ULONG i;
+    BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
+    BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
+
+    struct storage_item *fileItem;
+
+    struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
+
+    //Parameters
+    struct storage_file *file = impl_from_IStorageFile( write_text_options->file );
+    UnicodeEncoding unicodeEncoding = write_text_options->encoding;
+    WindowsDuplicateString( write_text_options->contents, &contents );
+
+    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
+    WindowsDuplicateString( fileItem->Path, &filePath );
+
+    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), FILE_APPEND_DATA, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );    
+
+    switch ( unicodeEncoding )
+    {
+        case UnicodeEncoding_Utf8:
+            writeBufferChar = (LPSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
+            if ( !writeBufferChar )
+            {
+                CloseHandle( fileHandle );
+                status = E_OUTOFMEMORY;
+            }
+
+            WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( contents, NULL ), -1, writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), NULL, NULL );
+            
+            if ( !WriteFile( fileHandle, (LPCVOID)writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), &bytesWritten, NULL ) )
+            {
+                CloseHandle( fileHandle );
+                status = E_UNEXPECTED;
+            }
+            break;
+
+        case UnicodeEncoding_Utf16LE:
+            if ( !WriteFile( fileHandle, (LPCVOID)UTF16LEBOM, sizeof( UTF16LEBOM ), &bytesWritten, NULL ) )
+            {
+                CloseHandle( fileHandle );
+               status = E_UNEXPECTED;
+            }
+
+            if ( FAILED( status ) )
+                return status;
+
+            if ( !WriteFile( fileHandle, (LPCVOID)WindowsGetStringRawBuffer( contents, NULL ), 
+                        ( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) )
+            {
+                CloseHandle( fileHandle );
+                status = E_UNEXPECTED;
+            }
+            break;
+
+        case UnicodeEncoding_Utf16BE:
+            contentsBE = (LPWSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
+            if ( !contentsBE )
+            {
+                status = E_OUTOFMEMORY;
+            }
+
+            if ( !WriteFile( fileHandle, (LPCVOID)UTF16BEBOM, sizeof( UTF16BEBOM ), &bytesWritten, NULL ) )
+            {
+                CloseHandle( fileHandle );
+                status = E_UNEXPECTED;
+            }
+
+            if ( FAILED( status ) )
+                return status;
+
+            for ( i = 0; i < wcslen( WindowsGetStringRawBuffer( contents, NULL ) ); i++ ) 
+                contentsBE[i] = ( WindowsGetStringRawBuffer( contents, NULL )[i] >> 8) | ( WindowsGetStringRawBuffer( contents, NULL )[i] << 8 );
+
+            if ( !WriteFile( fileHandle, (LPCVOID)contentsBE, 
+                        ( wcslen( contentsBE ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) ) {
+                CloseHandle( fileHandle );
+                status = E_UNEXPECTED;
+            }
+            break;
+
+        default:
+            status = E_INVALIDARG;
+    }
+
+    CloseHandle( fileHandle );
+
+    return status;
+}
