@@ -23,9 +23,14 @@
 #define FILE_IO_INTERNAL_H
 
 #include "StorageFileInternal.h"
+#include "Vector/HSTRINGVector.h"
 
 #include "../private.h"
 #include "wine/debug.h"
+
+#define MAX_BUFFER 4096
+
+extern struct IVector_HSTRINGVtbl hstring_vector_vtbl;
 
 struct file_io_statics
 {
@@ -53,6 +58,6 @@ struct file_io_write_text_options
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-
+HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

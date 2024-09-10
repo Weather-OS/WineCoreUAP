@@ -198,14 +198,28 @@ static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatic
 
 static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, linesOperation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    struct file_io_read_text_options *read_text_options;
+    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
+
+    read_text_options->encoding = UnicodeEncoding_Utf8;
+    read_text_options->file = file;
+
+    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, linesOperation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    struct file_io_read_text_options *read_text_options;
+    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
+
+    read_text_options->encoding = encoding;
+    read_text_options->file = file;
+
+    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_WriteLineAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )

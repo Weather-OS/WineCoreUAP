@@ -198,6 +198,78 @@ static IAsyncOperationCompletedHandler_HSTRINGVtbl hstring_async_handler_vtbl =
 static struct hstring_async_handler default_hstring_async_handler = {{&hstring_async_handler_vtbl}};
 
 /**
+ * IAsyncOperationCompletedHandler_IVector_HSTRING
+ */
+
+struct hstring_vector_async_handler
+{
+    IAsyncOperationCompletedHandler_IVector_HSTRING IAsyncOperationCompletedHandler_IVector_HSTRING_iface;
+    IAsyncOperation_IVector_HSTRING *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct hstring_vector_async_handler *impl_from_IAsyncOperationCompletedHandler_IVector_HSTRING( IAsyncOperationCompletedHandler_IVector_HSTRING *iface )
+{
+    return CONTAINING_RECORD( iface, struct hstring_vector_async_handler, IAsyncOperationCompletedHandler_IVector_HSTRING_iface );
+}
+
+static HRESULT WINAPI hstring_vector_async_handler_QueryInterface( IAsyncOperationCompletedHandler_IVector_HSTRING *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_IVector_HSTRING ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI hstring_vector_async_handler_AddRef( IAsyncOperationCompletedHandler_IVector_HSTRING *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI hstring_vector_async_handler_Release( IAsyncOperationCompletedHandler_IVector_HSTRING *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI hstring_vector_async_handler_Invoke( IAsyncOperationCompletedHandler_IVector_HSTRING *iface,
+                                                 IAsyncOperation_IVector_HSTRING *async, AsyncStatus status )
+{
+    struct hstring_vector_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_IVector_HSTRING( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_IVector_HSTRINGVtbl hstring_vector_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    hstring_vector_async_handler_QueryInterface,
+    hstring_vector_async_handler_AddRef,
+    hstring_vector_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<HSTRING> methods ***/
+    hstring_vector_async_handler_Invoke,
+};
+
+static struct hstring_vector_async_handler default_hstring_vector_async_handler = {{&hstring_vector_async_handler_vtbl}};
+
+/**
  * IAsyncOperationCompletedHandler_KnownFoldersAccessStatus
  */
 
@@ -1606,9 +1678,12 @@ static void test_FileIO( IStorageFile *file )
     static const WCHAR *text_to_conclude = L"This is a test.";
     IFileIOStatics *fileIOStatics;
     IAsyncAction *action;
+    IVector_HSTRING *linesToRead;
     IAsyncOperation_HSTRING *hstringOperation;
+    IAsyncOperation_IVector_HSTRING *hstringVectorOperation;
     IAsyncActionCompletedHandler *actionHandler;
     IAsyncOperationCompletedHandler_HSTRING *hstringHandler;
+    IAsyncOperationCompletedHandler_IVector_HSTRING *hstringVectorHandler;
     IActivationFactory *factory; 
     HSTRING str;
     HSTRING textToWrite1;
@@ -1620,6 +1695,7 @@ static void test_FileIO( IStorageFile *file )
 
     struct async_action_handler async_action_handler;
     struct hstring_async_handler hstring_async_handler;
+    struct hstring_vector_async_handler hstring_vector_async_handler;
 
     hr = WindowsCreateString( file_io_statics_name, wcslen( file_io_statics_name ), &str );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
@@ -1747,6 +1823,49 @@ static void test_FileIO( IStorageFile *file )
     ok( hstring_async_handler.status == Completed || broken( hstring_async_handler.status == Error ), "got status %u\n", hstring_async_handler.status );
 
     hr = IAsyncOperation_HSTRING_GetResults( hstringOperation, &textToRead );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCompareStringOrdinal( textToRead, textToConclude, &comparisonResult );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    ok ( !comparisonResult, "textToRead (%s) is not equal to textToConclude (%s)!\n", HStringToLPCSTR( textToRead ), HStringToLPCSTR( textToConclude ) );
+
+    /**
+     * IFileIOStatics_ReadLinesWithEncodingAsync
+     */
+
+    hr = IFileIOStatics_ReadLinesWithEncodingAsync( fileIOStatics, file, UnicodeEncoding_Utf8, &hstringVectorOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( hstringVectorOperation, &IID_IUnknown );
+    check_interface( hstringVectorOperation, &IID_IInspectable );
+    check_interface( hstringVectorOperation, &IID_IAgileObject );
+    check_interface( hstringVectorOperation, &IID_IAsyncInfo );
+    check_interface( hstringVectorOperation, &IID_IAsyncOperation_IVector_HSTRING );
+
+    hr = IAsyncOperation_IVector_HSTRING_get_Completed( hstringVectorOperation, &hstringVectorHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( hstringVectorHandler == NULL, "got handler %p\n", hstringVectorHandler );
+
+    hstring_vector_async_handler = default_hstring_vector_async_handler;
+    hstring_vector_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IVector_HSTRING_put_Completed( hstringVectorOperation, &hstring_vector_async_handler.IAsyncOperationCompletedHandler_IVector_HSTRING_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( hstring_vector_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( hstring_vector_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( hstring_vector_async_handler.invoked, "handler not invoked\n" );
+    ok( hstring_vector_async_handler.async == hstringVectorOperation, "got async %p\n", hstring_vector_async_handler.async );
+    ok( hstring_vector_async_handler.status == Completed || broken( hstring_vector_async_handler.status == Error ), "got status %u\n", hstring_vector_async_handler.status );
+
+    hr = IAsyncOperation_IVector_HSTRING_GetResults( hstringVectorOperation, &linesToRead );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IVector_HSTRING_GetAt( linesToRead, 0, &textToRead );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     hr = WindowsCompareStringOrdinal( textToRead, textToConclude, &comparisonResult );

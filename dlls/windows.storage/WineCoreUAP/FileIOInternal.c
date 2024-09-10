@@ -355,3 +355,173 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
 
     return status;
 }
+
+//I only managed to hit my head against the wall twice while writing this function
+
+HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HSTRING filePath;
+    HANDLE fileHandle;
+    LPCSTR fileBufferChar;
+    LPWSTR fileBufferWChar;
+    LPWSTR outputBuffer;
+    LPWSTR tmpBuffer;
+    DWORD fileSize;
+    DWORD bytesRead;
+    ULONG i;
+    ULONG currChar;
+    BOOL readResult;
+    size_t INITIAL_BUFFER_SIZE = 100;
+
+    struct storage_item *fileItem;
+    struct hstring_vector *HSTRINGVector;
+
+    struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
+
+    //Parameters
+    struct storage_file *file = impl_from_IStorageFile( read_text_options->file );
+    UnicodeEncoding unicodeEncoding = read_text_options->encoding;
+
+    if (!(HSTRINGVector = calloc( 1, sizeof(*HSTRINGVector) ))) return E_OUTOFMEMORY;
+    HSTRINGVector->IVector_HSTRING_iface.lpVtbl = &hstring_vector_vtbl;
+    HSTRINGVector->size = 0;
+
+    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
+    WindowsDuplicateString( fileItem->Path, &filePath );
+
+    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+
+    fileSize = GetFileSize( fileHandle, NULL );
+
+    if ( fileSize == INVALID_FILE_SIZE )
+    {
+        CloseHandle( fileHandle );
+        status = E_INVALIDARG;
+    }
+
+    if ( FAILED( status ) )
+        return status;
+
+    outputBuffer = (LPWSTR)malloc( fileSize );
+
+    if ( !outputBuffer )
+    {
+        CloseHandle( fileHandle );
+        status = E_OUTOFMEMORY;
+    }
+
+    tmpBuffer = (LPWSTR)malloc( sizeof(wchar_t) * INITIAL_BUFFER_SIZE );
+
+    if ( !tmpBuffer )
+    {
+        CloseHandle( fileHandle );
+        status = E_OUTOFMEMORY;
+    }
+
+    if ( FAILED( status ) )
+        return status;
+
+    if ( unicodeEncoding == UnicodeEncoding_Utf8 )
+    {
+        fileBufferChar = (LPCSTR)malloc( fileSize );
+        if ( !fileBufferChar )
+        {
+            CloseHandle( fileHandle );
+            status = E_OUTOFMEMORY;
+        }
+        readResult = ReadFile( fileHandle, (LPVOID)fileBufferChar, fileSize, &bytesRead, NULL );
+    } else
+    {
+        fileBufferWChar = (LPWSTR)malloc( fileSize );
+        if ( !fileBufferWChar )
+        {
+            CloseHandle( fileHandle );
+            status = E_OUTOFMEMORY;
+        }
+        readResult = ReadFile( fileHandle, (LPVOID)fileBufferWChar, fileSize, &bytesRead, NULL );
+    }
+
+    if ( !readResult || bytesRead != fileSize )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( unicodeEncoding != UnicodeEncoding_Utf8 )
+    {
+        if ( fileSize % 2 != 0 )
+        {
+            CloseHandle( fileHandle );
+            status = E_INVALIDARG;
+        }
+    }
+
+    if ( FAILED( status ) )
+        return status;
+
+    CloseHandle( fileHandle );
+
+    switch ( unicodeEncoding )
+    {
+        case UnicodeEncoding_Utf8:
+            MultiByteToWideChar( CP_UTF8, 0, fileBufferChar, -1, outputBuffer, fileSize );
+            if ( !outputBuffer )
+                status = E_OUTOFMEMORY;
+            break;
+
+        case UnicodeEncoding_Utf16LE:
+            wcscpy( outputBuffer, fileBufferWChar );
+            break;
+
+        case UnicodeEncoding_Utf16BE:
+            for ( i = 0; i < fileSize / sizeof( WCHAR ); i++ )
+                fileBufferWChar[i] = ( fileBufferWChar[i] >> 8 ) | ( fileBufferWChar[i] << 8 );
+
+            wcscpy( outputBuffer, fileBufferWChar );
+            break;
+
+        default:
+            status = E_INVALIDARG;
+    }
+
+    outputBuffer[ fileSize ] = L'\0';
+    tmpBuffer[0] = L'\0';
+
+    for ( currChar = 0; currChar < wcslen( outputBuffer ); currChar++ )
+    {
+        if ( outputBuffer[ currChar ] == L'\n' )
+        {
+            HSTRINGVector->size++;
+            HSTRINGVector->elements = (HSTRING*)realloc(HSTRINGVector->elements, (HSTRINGVector->size) * sizeof(HSTRING));
+            WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &HSTRINGVector->elements[ HSTRINGVector->size - 1 ] );
+            tmpBuffer = (LPWSTR)malloc(sizeof(wchar_t) * INITIAL_BUFFER_SIZE);
+        } else
+        {
+            //Append the current character to tmpBuffer. We'll use tmpBuffer once control reaches line break.
+            size_t tmpBufferLen = wcslen(tmpBuffer);
+            if (tmpBufferLen + 1 >= INITIAL_BUFFER_SIZE) {
+                // Grow the buffer if necessary.
+                INITIAL_BUFFER_SIZE *= 2;
+                tmpBuffer = (LPWSTR)realloc(tmpBuffer, sizeof(wchar_t) * INITIAL_BUFFER_SIZE);
+            }
+            tmpBuffer[ tmpBufferLen ] = outputBuffer[ currChar ];
+            tmpBuffer[ tmpBufferLen + 1 ] = L'\0';
+        }
+    }
+
+    if ( tmpBuffer )
+    {
+        HSTRINGVector->size++;
+        HSTRINGVector->elements = (HSTRING*)realloc(HSTRINGVector->elements, (HSTRINGVector->size) * sizeof(HSTRING));
+        WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &HSTRINGVector->elements[ HSTRINGVector->size - 1] );
+    }
+
+    if ( SUCCEEDED ( status ) )
+    {
+        result->vt = VT_UNKNOWN;
+        result->ppunkVal = (IUnknown **)&HSTRINGVector->IVector_HSTRING_iface;
+    }
+
+    return status;
+}
