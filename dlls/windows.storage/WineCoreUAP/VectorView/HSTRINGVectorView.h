@@ -29,6 +29,7 @@
 struct hstring_vector_view
 {
     IVectorView_HSTRING IVectorView_HSTRING_iface;
+    IIterable_HSTRING IIterable_HSTRING_iface;
     struct vector_iids iids;
     LONG ref;
 
@@ -36,6 +37,17 @@ struct hstring_vector_view
     HSTRING *elements;
 };
 
+struct hstring_iterator
+{
+   IIterator_HSTRING IIterator_HSTRING_iface;
+   LONG ref;
+
+   IVectorView_HSTRING *view;
+   UINT32 index;
+   UINT32 size;
+};
+
 struct hstring_vector_view *impl_from_IVectorView_HSTRING( IVectorView_HSTRING *iface );
+struct hstring_iterator *impl_from_IIterator_HSTRING( IIterator_HSTRING *iface );
 
 #endif

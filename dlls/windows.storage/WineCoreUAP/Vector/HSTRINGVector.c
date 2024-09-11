@@ -297,7 +297,7 @@ struct IVector_HSTRINGVtbl hstring_vector_vtbl =
     hstring_vector_GetIids,
     hstring_vector_GetRuntimeClassName,
     hstring_vector_GetTrustLevel,
-    /* IVectorView<IStorageFile*> methods */
+    /* IVector<HSTRING> methods */
     hstring_vector_GetAt,
     hstring_vector_get_Size,
     hstring_vector_GetView,
