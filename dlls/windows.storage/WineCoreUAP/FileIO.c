@@ -222,28 +222,188 @@ static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteLineAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
+static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //Convert IIterable_HSTRING to HSTRING
+    HRESULT hr;
+    HSTRING *strings;
+    LPWSTR combinedString;
+    LPWSTR tmpStr;
+    UINT32 vectorSize;
+    UINT32 stringSize;
+    UINT32 totalSize;
+    UINT32 i;
+    IVectorView_HSTRING *hstringVector;
+
+    struct file_io_write_text_options *write_text_options;
+    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_QueryInterface( lines, &IID_IVectorView_HSTRING, (void **)&hstringVector );
+    if ( SUCCEEDED( hr ) )
+    {
+        IVectorView_HSTRING_get_Size( hstringVector, &vectorSize );
+        IVectorView_HSTRING_GetMany( hstringVector, 0, vectorSize, &strings, &stringSize );
+
+        for ( i = 0; i < stringSize; i++ ) {
+            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
+        }
+
+        combinedString = (LPWSTR)malloc( ( totalsize + 1 )  * sizeof( WCHAR ) );
+        combinedString[0] = L'\0';
+
+        for ( i = 0; i < stringSize; i++ )
+        {
+            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
+            wcscpy( tmpStr, "\n" );
+            wcscat( combinedString, tmpStr );
+        }
+    }
+
+    write_text_options->encoding = UnicodeEncoding_Utf8;
+    write_text_options->file = file;
+    write_text_options->contents = combinedString;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
+    return S_OK;
 }
 
 static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //Convert IIterable_HSTRING to HSTRING
+    HRESULT hr;
+    HSTRING *strings;
+    LPWSTR combinedString;
+    LPWSTR tmpStr;
+    UINT32 vectorSize;
+    UINT32 stringSize;
+    UINT32 totalSize;
+    UINT32 i;
+    IVectorView_HSTRING *hstringVector;
+
+    struct file_io_write_text_options *write_text_options;
+    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_QueryInterface( lines, &IID_IVectorView_HSTRING, (void **)&hstringVector );
+    if ( SUCCEEDED( hr ) )
+    {
+        IVectorView_HSTRING_get_Size( hstringVector, &vectorSize );
+        IVectorView_HSTRING_GetMany( hstringVector, 0, vectorSize, &strings, &stringSize );
+
+        for ( i = 0; i < stringSize; i++ ) {
+            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
+        }
+
+        combinedString = (LPWSTR)malloc( ( totalsize + 1 )  * sizeof( WCHAR ) );
+        combinedString[0] = L'\0';
+
+        for ( i = 0; i < stringSize; i++ )
+        {
+            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
+            wcscpy( tmpStr, "\n" );
+            wcscat( combinedString, tmpStr );
+        }
+    }
+
+    write_text_options->encoding = encoding;
+    write_text_options->file = file;
+    write_text_options->contents = combinedString;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
+    return S_OK;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //Convert IIterable_HSTRING to HSTRING
+    HRESULT hr;
+    HSTRING *strings;
+    LPWSTR combinedString;
+    LPWSTR tmpStr;
+    UINT32 vectorSize;
+    UINT32 stringSize;
+    UINT32 totalSize;
+    UINT32 i;
+    IVectorView_HSTRING *hstringVector;
+
+    struct file_io_write_text_options *write_text_options;
+    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_QueryInterface( lines, &IID_IVectorView_HSTRING, (void **)&hstringVector );
+    if ( SUCCEEDED( hr ) )
+    {
+        IVectorView_HSTRING_get_Size( hstringVector, &vectorSize );
+        IVectorView_HSTRING_GetMany( hstringVector, 0, vectorSize, &strings, &stringSize );
+
+        for ( i = 0; i < stringSize; i++ ) {
+            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
+        }
+
+        combinedString = (LPWSTR)malloc( ( totalsize + 1 )  * sizeof( WCHAR ) );
+        combinedString[0] = L'\0';
+
+        for ( i = 0; i < stringSize; i++ )
+        {
+            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
+            wcscpy( tmpStr, "\n" );
+            wcscat( combinedString, tmpStr );
+        }
+    }
+
+    write_text_options->encoding = UnicodeEncoding_Utf8;
+    write_text_options->file = file;
+    write_text_options->contents = combinedString;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
+    return S_OK;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    //Convert IIterable_HSTRING to HSTRING
+    HRESULT hr;
+    HSTRING *strings;
+    LPWSTR combinedString;
+    LPWSTR tmpStr;
+    UINT32 vectorSize;
+    UINT32 stringSize;
+    UINT32 totalSize;
+    UINT32 i;
+    IVectorView_HSTRING *hstringVector;
+
+    struct file_io_write_text_options *write_text_options;
+    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_QueryInterface( lines, &IID_IVectorView_HSTRING, (void **)&hstringVector );
+    if ( SUCCEEDED( hr ) )
+    {
+        IVectorView_HSTRING_get_Size( hstringVector, &vectorSize );
+        IVectorView_HSTRING_GetMany( hstringVector, 0, vectorSize, &strings, &stringSize );
+
+        for ( i = 0; i < stringSize; i++ ) {
+            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
+        }
+
+        combinedString = (LPWSTR)malloc( ( totalsize + 1 )  * sizeof( WCHAR ) );
+        combinedString[0] = L'\0';
+
+        for ( i = 0; i < stringSize; i++ )
+        {
+            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
+            wcscpy( tmpStr, "\n" );
+            wcscat( combinedString, tmpStr );
+        }
+    }
+
+    write_text_options->encoding = encoding;
+    write_text_options->file = file;
+    write_text_options->contents = combinedString;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
+    return S_OK;
 }
 
 static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
@@ -282,7 +442,7 @@ static const struct IFileIOStaticsVtbl file_io_statics_vtbl =
     file_io_statics_AppendTextWithEncodingAsync,
     file_io_statics_ReadLinesAsync,
     file_io_statics_ReadLinesWithEncodingAsync,
-    file_io_statics_WriteLineAsync,
+    file_io_statics_WriteLinesAsync,
     file_io_statics_WriteLinesWithEncodingAsync,
     file_io_statics_AppendLinesAsync,
     file_io_statics_AppendLinesWithEncodingAsync,
