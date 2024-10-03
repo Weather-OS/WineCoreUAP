@@ -74,6 +74,27 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IKnownFoldersCameraRollStatics ))
+    {
+        *out = &impl->IKnownFoldersCameraRollStatics_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IKnownFoldersPlaylistsStatics ))
+    {
+        *out = &impl->IKnownFoldersPlaylistsStatics_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IKnownFoldersSavedPicturesStatics ))
+    {
+        *out = &impl->IKnownFoldersSavedPicturesStatics_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
@@ -144,6 +165,7 @@ static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStati
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -171,6 +193,7 @@ static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersSt
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -198,6 +221,7 @@ static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStat
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -225,6 +249,7 @@ static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersS
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -252,6 +277,7 @@ static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics 
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -279,6 +305,7 @@ static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersS
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -306,6 +333,7 @@ static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFolder
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -354,6 +382,7 @@ static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -381,6 +410,7 @@ static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStati
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -408,6 +438,7 @@ static HRESULT WINAPI known_folders_statics2_get_RecordedCalls( IKnownFoldersSta
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -453,6 +484,7 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -508,6 +540,7 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -548,6 +581,7 @@ static HRESULT WINAPI known_folders_camera_roll_statics_get_CameraRoll( IKnownFo
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -590,6 +624,7 @@ static HRESULT WINAPI known_folders_playlists_statics_get_Playlists( IKnownFolde
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -632,6 +667,7 @@ static HRESULT WINAPI known_folders_saved_pictures_statics_get_SavedPictures( IK
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 

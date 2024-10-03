@@ -36,6 +36,7 @@ HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value
     folder = impl_from_IStorageFolder( value );
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -57,6 +58,7 @@ HRESULT WINAPI storage_folder_AssignFolderAsync ( IUnknown *invoker, IUnknown *p
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 
@@ -95,6 +97,7 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     if (!(resultFolder = calloc( 1, sizeof(*resultFolder) ))) return E_OUTOFMEMORY;
 
     resultFolder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    resultFolder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     resultFolder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     resultFolder->ref = 1;
 
@@ -143,10 +146,7 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     {
         if ( Replace )
         {
-            if ( !RemoveDirectoryW( fullPath ) )
-            {
-                return E_ABORT;
-            }
+            DeleteDirectoryRecursively( fullPath );
         }
         if ( !Exists )
         {
@@ -297,7 +297,6 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
         result->ppunkVal = (IUnknown **)&item->IStorageItem_iface;
     }
 
-
     return status;
 }
 
@@ -375,6 +374,7 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
+    boolean isFolder;
     
     struct storage_folder * folder;
     struct storage_folder * folderToFetch;
@@ -388,14 +388,20 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     if (!(folderToFetch = calloc( 1, sizeof(*folderToFetch) ))) return E_OUTOFMEMORY;
 
     folderToFetch->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folderToFetch->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folderToFetch->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folderToFetch->ref = 1;
+
 
     PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
     PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
     WindowsCreateString( fullPath, wcslen( fullPath ), &folderPath );
 
     status = storage_item_Internal_CreateNew( folderPath, &folderToFetch->IStorageItem_iface );
+    IStorageItem_IsOfType( &folderToFetch->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
+
+    if ( !isFolder )
+        status = E_INVALIDARG;
     
     if ( SUCCEEDED( status ) )
     {
@@ -452,6 +458,7 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
                     return E_OUTOFMEMORY;
                 folderVector->elements[folderVector->size]->lpVtbl = &storage_folder_vtbl;
                 impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+                impl_from_IStorageFolder( folderVector->elements[folderVector->size] )->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
 
                 PathAppendW( fullFolderPath, WindowsGetStringRawBuffer( Path, NULL ) );
                 PathAppendW( fullFolderPath, findFolderData.cFileName );
@@ -485,6 +492,7 @@ HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PRO
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
+    boolean isFile;
     
     struct storage_folder * folder;
     struct storage_file * fileToFetch;
@@ -506,6 +514,10 @@ HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PRO
     WindowsCreateString( fullPath, wcslen( fullPath ), &folderPath );
 
     status = storage_file_AssignFile( folderPath, &fileToFetch->IStorageFile_iface );
+        IStorageItem_IsOfType( &fileToFetch->IStorageItem_iface, StorageItemTypes_File, &isFile );
+
+    if ( !isFile )
+        status = E_INVALIDARG;
     
     if ( SUCCEEDED( status ) )
     {
@@ -586,4 +598,44 @@ HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *p
     }
 
     return status;
+}
+
+HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{    
+    WCHAR fullPath[MAX_PATH];
+    HRESULT status;
+    HSTRING Path;
+    HSTRING itemPath;
+
+    struct storage_folder * folder;
+    struct storage_item * item;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    folder = impl_from_IStorageFolder2( (IStorageFolder2 *)invoker );
+    Path = impl_from_IStorageItem( &folder->IStorageItem_iface )->Path;
+
+    if (!result) return E_INVALIDARG;
+    if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
+
+    item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    item->ref = 1;
+
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
+    PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
+    WindowsCreateString( fullPath, wcslen( fullPath ), &itemPath );
+
+    status = storage_item_Internal_CreateNew( itemPath, &item->IStorageItem_iface );
+    
+    if ( SUCCEEDED( status ) )
+    {
+        result->vt = VT_UNKNOWN;
+        result->ppunkVal = (IUnknown **)&item->IStorageItem_iface;
+    } else 
+    {
+        result->vt = VT_NULL;
+        result->ppunkVal = (IUnknown **)NULL;
+    }
+
+    return S_OK;
 }

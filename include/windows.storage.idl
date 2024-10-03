@@ -70,6 +70,7 @@ namespace Windows.Storage {
     interface ISetVersionDeferral;
     interface ISetVersionRequest;
     interface IStorageFolder;
+    interface IStorageFolder2;
     interface IStorageFolderStatics;
     interface IStorageFolderStatics2;
     interface IStorageFileStatics;
@@ -729,12 +730,31 @@ namespace Windows.Storage {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(E827E8B9-08D9-4A8E-A0AC-FE5ED3CBBBD3)
+    ]
+    interface IStorageFolder2 : IInspectable
+    {
+        HRESULT TryGetItemAsync([in] HSTRING name, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.IStorageItem*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Storage.StorageFolder),
         uuid(08F327FF-85D5-48B9-AEE9-28511E339F9F)
     ]
     interface IStorageFolderStatics : IInspectable
     {
         HRESULT GetFolderFromPathAsync([in] HSTRING path, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 10.0),
+        exclusiveto(Windows.Storage.StorageFolder),
+        uuid(B4656DC3-71D2-467D-8B29-371F0F62BF6F)
+    ]
+    interface IStorageFolderStatics2 : IInspectable
+    {
+        HRESULT GetFolderFromPathForUserAsync([in] Windows.System.User* user, [in] HSTRING path, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
     }
 
     [

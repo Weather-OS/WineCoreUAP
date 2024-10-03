@@ -41,10 +41,11 @@ struct storage_item
 {
     IStorageItem IStorageItem_iface;
 
-    DateTime DateCreated;
+    FileAttributes Attributes;    
     HSTRING Path;
-    HSTRING Name __attribute__((aligned(16)));
-    FileAttributes Attributes;
+    HSTRING Name;
+    DateTime DateCreated;
+
     LONG ref;
 };
 

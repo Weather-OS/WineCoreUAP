@@ -35,6 +35,7 @@
 #include "wine/debug.h"
 
 extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IStorageFolder2Vtbl storage_folder2_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
@@ -45,6 +46,7 @@ struct storage_folder
 {
     //Derivatives
     IStorageFolder IStorageFolder_iface;
+    IStorageFolder2 IStorageFolder2_iface;
     IStorageItem IStorageItem_iface;
 
     LONG ref;
@@ -54,6 +56,7 @@ struct storage_folder_statics
 {
     IActivationFactory IActivationFactory_iface;
     IStorageFolderStatics IStorageFolderStatics_iface;
+    IStorageFolderStatics2 IStorageFolderStatics2_iface;
     LONG ref;
 };
 
@@ -68,6 +71,7 @@ struct storage_folder_creation_options
 };
 
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
+struct storage_folder *impl_from_IStorageFolder2( IStorageFolder2 *iface );
 
 HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value );
 HRESULT WINAPI storage_folder_AssignFolderAsync( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
@@ -79,5 +83,6 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
 HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

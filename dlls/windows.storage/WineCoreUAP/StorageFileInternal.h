@@ -41,10 +41,11 @@ struct storage_file
 {
     //Derivatives
     IStorageFile IStorageFile_iface;
-    IStorageItem IStorageItem_iface;
 
     HSTRING FileType;
     HSTRING ContentType;
+    IStorageItem IStorageItem_iface;
+
     LONG ref;
 };
 

@@ -132,6 +132,13 @@ static HRESULT WINAPI storage_folder_QueryInterface( IStorageFolder *iface, REFI
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageFolder2 ))
+    {
+        *out = &impl->IStorageFolder2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     if (IsEqualGUID( iid, &IID_IStorageItem ))
     {
         *out = &impl->IStorageItem_iface;
@@ -315,6 +322,108 @@ struct IStorageFolderVtbl storage_folder_vtbl =
     storage_folder_GetItemsAsyncOverloadDefaultStartAndCount
 };
 
+struct storage_folder *impl_from_IStorageFolder2( IStorageFolder2 *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_folder, IStorageFolder2_iface );
+}
+
+static HRESULT WINAPI storage_folder2_QueryInterface( IStorageFolder2 *iface, REFIID iid, void **out )
+{
+    struct storage_folder *impl = impl_from_IStorageFolder2( iface );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IStorageFolder ))
+    {
+        *out = &impl->IStorageFolder_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageFolder2 ))
+    {
+        *out = &impl->IStorageFolder2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageItem ))
+    {
+        *out = &impl->IStorageItem_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_folder2_AddRef( IStorageFolder2 *iface )
+{
+    struct storage_folder *impl = impl_from_IStorageFolder2( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI storage_folder2_Release( IStorageFolder2 *iface )
+{
+    struct storage_folder *impl = impl_from_IStorageFolder2( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref) free( impl );
+    return ref;
+}
+
+static HRESULT WINAPI storage_folder2_GetIids( IStorageFolder2 *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_folder2_GetRuntimeClassName( IStorageFolder2 *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_folder2_GetTrustLevel( IStorageFolder2 *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::StorageFolder2
+*/
+
+static HRESULT WINAPI storage_folder2_TryGetItemAsync( IStorageFolder2 *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
+{
+    HRESULT hr;
+    hr = async_operation_storage_item_create( (IUnknown *)iface, (IUnknown *)name, storage_folder2_TryFetchItem, operation );
+    TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
+    return hr;
+}
+
+struct IStorageFolder2Vtbl storage_folder2_vtbl =
+{
+    storage_folder2_QueryInterface,
+    storage_folder2_AddRef,
+    storage_folder2_Release,
+    /* IInspectable methods */
+    storage_folder2_GetIids,
+    storage_folder2_GetRuntimeClassName,
+    storage_folder2_GetTrustLevel,
+    /* IStorageFolder methods */
+    storage_folder2_TryGetItemAsync
+};
+
 DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct storage_folder_statics, IActivationFactory_iface )
 
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
@@ -338,10 +447,35 @@ static const struct IStorageFolderStaticsVtbl storage_folder_statics_vtbl =
     storage_folder_statics_GetFolderFromPathAsync
 };
 
+DEFINE_IINSPECTABLE( storage_folder_statics2, IStorageFolderStatics2, struct storage_folder_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI storage_folder_statics2_GetFolderFromPathForUserAsync( IStorageFolderStatics2 *iface, IUser *user, HSTRING path, IAsyncOperation_StorageFolder **result )
+{
+    //IUser is not used
+    HRESULT hr;
+    hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, result );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
+    return hr;
+}
+
+static const struct IStorageFolderStatics2Vtbl storage_folder_statics2_vtbl =
+{
+    storage_folder_statics2_QueryInterface,
+    storage_folder_statics2_AddRef,
+    storage_folder_statics2_Release,
+    /* IInspectable methods */
+    storage_folder_statics2_GetIids,
+    storage_folder_statics2_GetRuntimeClassName,
+    storage_folder_statics2_GetTrustLevel,
+    /* IStorageFolderStatics2 methods */
+    storage_folder_statics2_GetFolderFromPathForUserAsync
+};
+
 static struct storage_folder_statics storage_folder_statics =
 {
     {&factory_vtbl},
     {&storage_folder_statics_vtbl},
+    {&storage_folder_statics2_vtbl},
     1,
 };
 

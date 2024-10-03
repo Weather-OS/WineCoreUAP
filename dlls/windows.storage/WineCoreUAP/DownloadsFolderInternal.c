@@ -33,6 +33,7 @@ HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, Creation
     folder = impl_from_IStorageFolder( outFolder );
 
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
+    folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     folder->ref = 1;
 

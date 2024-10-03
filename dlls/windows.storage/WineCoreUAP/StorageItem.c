@@ -46,22 +46,6 @@ static HRESULT WINAPI storage_item_QueryInterface( IStorageItem *iface, REFIID i
         return S_OK;
     }
 
-    if (IsEqualGUID( iid, &IID_IStorageFolder ))
-    {
-        //RECURSIVITY???
-        struct storage_folder *folderImpl;
-
-        if (!(folderImpl = calloc( 1, sizeof(struct storage_folder) + sizeof(struct storage_item) ))) return E_OUTOFMEMORY;
-        folderImpl->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
-        folderImpl->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
-
-        *impl_from_IStorageItem( &folderImpl->IStorageItem_iface ) = *impl;
-
-        *out = &folderImpl->IStorageFolder_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;

@@ -938,6 +938,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageFolder *storageFolderResults2;
     IStorageFolder *storageFolderResults3;
     IStorageFolder *storageFolderResults4;
+    IStorageFolder2 *storageFolder2Results;
     IBasicProperties *basicPropertiesResults;
     IStorageFolderStatics *storage_folder_statics;
     IVectorView_IStorageItem *storageItemVectorResults;
@@ -1129,6 +1130,48 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     ok( !strcmp(HStringToLPCSTR(SecondName), "Temp"), "Error: Original name not returned. SecondName %s, name %s\n", HStringToLPCSTR(SecondName), "Test");
 
     /**
+     * IStorageFolder2_TryGetItemAsync
+    */
+
+    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageFolder2, (void **)&storageFolder2Results );
+    hr = IStorageFolder2_TryGetItemAsync( storageFolder2Results, nameString, &storageItemOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( storageItemOperation, &IID_IUnknown );
+    check_interface( storageItemOperation, &IID_IInspectable );
+    check_interface( storageItemOperation, &IID_IAgileObject );
+    check_interface( storageItemOperation, &IID_IAsyncInfo );
+    check_interface( storageItemOperation, &IID_IAsyncOperation_IStorageItem );
+
+    hr = IAsyncOperation_IStorageItem_get_Completed( storageItemOperation, &storage_item_handler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( storage_item_handler == NULL, "got handler %p\n", storage_item_handler );
+
+    storage_item_async_handler = default_storage_item_async_handler;
+    storage_item_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IStorageItem_put_Completed( storageItemOperation, &storage_item_async_handler.IAsyncOperationCompletedHandler_IStorageItem_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( storage_item_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( storage_item_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( storage_item_async_handler.invoked, "handler not invoked\n" );
+    ok( storage_item_async_handler.async == storageItemOperation, "got async %p\n", storage_item_async_handler.async );
+    ok( storage_item_async_handler.status == Completed || broken( storage_item_async_handler.status == Error ), "got status %u\n", storage_item_async_handler.status );
+
+    hr = IAsyncOperation_IStorageItem_GetResults( storageItemOperation, &storageItemResults2 );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageItem_get_Path( storageItemResults2, &ThirdPath );
+    IStorageItem_get_Name( storageItemResults2, &ThirdName );
+
+    ok( !strcmp(HStringToLPCSTR(ThirdPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdPath), pathtest);
+    ok( !strcmp(HStringToLPCSTR(ThirdName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+
+    /**
      * IStorageFolder_GetItemAsync
     */
 
@@ -1168,6 +1211,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     ok( !strcmp(HStringToLPCSTR(ThirdPath), pathtest), "Error: Original path not returned. ThirdPath %s, pathtest %s\n", HStringToLPCSTR(ThirdPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(ThirdName), "Temp"), "Error: Original name not returned. ThirdName %s, name %s\n", HStringToLPCSTR(ThirdName), "Test");
+
 
     /**
      * IStorageFolder_GetFolderAsync
@@ -1434,7 +1478,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     
     ok( !strcmp(HStringToLPCSTR(NinethPath), pathtest), "Error: Original path not returned. NinethPath %s, pathtest %s\n", HStringToLPCSTR(NinethPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(NinethName), "TempFile"), "Error: Original name not returned. NinethName %s, name %s\n", HStringToLPCSTR(NinethName), "TempFile");
-
+   
     *file = storageFileResults3;
 }
 
