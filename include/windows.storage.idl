@@ -648,6 +648,17 @@ namespace Windows.Storage {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 10.0),
+        exclusiveto(Windows.Storage.StorageFile),
+        uuid(5C76A781-212E-4AF9-8F04-740CAE108974)
+    ]
+    interface IStorageFileStatics2 : IInspectable
+    {
+        HRESULT GetFileFromPathForUserAsync([in] Windows.System.User* user, [in] HSTRING path, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+    }
+
+
+    [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Storage.StorageFile),
         uuid(5984C710-DAF2-43C8-8BB4-A4D3EACFD03F)

@@ -54,6 +54,7 @@ struct storage_file_statics
 {
     IActivationFactory IActivationFactory_iface;
     IStorageFileStatics IStorageFileStatics_iface;
+    IStorageFileStatics2 IStorageFileStatics2_iface;
 
     LONG ref;
 };

@@ -455,10 +455,35 @@ static const struct IStorageFileStaticsVtbl storage_file_statics_vtbl =
     storage_file_statics_ReplaceWithStreamedFileFromUriAsync
 };
 
+DEFINE_IINSPECTABLE( storage_file_statics2, IStorageFileStatics2, struct storage_file_statics, IActivationFactory_iface )
+
+static HRESULT WINAPI storage_file_statics2_GetFileFromPathForUserAsync( IStorageFileStatics2 *iface, IUser *user, HSTRING path, IAsyncOperation_StorageFile **result )
+{
+    //User is not used.
+    HRESULT hr;
+    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
+    TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
+    return hr;
+}
+
+static const struct IStorageFileStatics2Vtbl storage_file_statics2_vtbl =
+{
+    storage_file_statics2_QueryInterface,
+    storage_file_statics2_AddRef,
+    storage_file_statics2_Release,
+    /* IInspectable methods */
+    storage_file_statics2_GetIids,
+    storage_file_statics2_GetRuntimeClassName,
+    storage_file_statics2_GetTrustLevel,
+    /* IStorageFileStatics methods */
+    storage_file_statics2_GetFileFromPathForUserAsync
+};
+
 static struct storage_file_statics storage_file_statics =
 {
     {&factory_vtbl},
     {&storage_file_statics_vtbl},
+    {&storage_file_statics2_vtbl},
     1,
 };
 
