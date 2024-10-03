@@ -122,10 +122,13 @@ static HRESULT WINAPI hstring_vector_GetView( IVector_HSTRING *iface, IVectorVie
     if (!(view = calloc( 1, sizeof(*view) ))) return E_OUTOFMEMORY;
 
     view->IVectorView_HSTRING_iface.lpVtbl = &hstring_vector_view_vtbl;
+    view->IIterable_HSTRING_iface.lpVtbl = &hstring_iterable_vtbl;
     view->elements = impl->elements;
     view->iids = impl->iids;
     view->size = impl->size;
-    view->ref = impl->ref;
+    view->ref = 1;
+
+    *value = &view->IVectorView_HSTRING_iface;
 
     TRACE( "iface %p, value %p\n", iface, value );
     

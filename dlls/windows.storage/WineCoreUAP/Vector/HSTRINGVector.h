@@ -27,6 +27,7 @@
 #include "wine/debug.h"
 
 extern struct IVectorView_HSTRINGVtbl hstring_vector_view_vtbl;
+extern struct IIterable_HSTRINGVtbl hstring_iterable_vtbl;
 
 struct hstring_vector
 {

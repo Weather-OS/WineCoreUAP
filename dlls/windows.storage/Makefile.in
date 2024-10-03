@@ -3,6 +3,7 @@ IMPORTS = $(APPX_PE_LIBS) $(XML2_PE_LIBS) shell32 user32 combase ole32 advapi32 
 EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
 
 SOURCES = \
+	main.c \
 	WineCoreUAP/util.c \
 	WineCoreUAP/KnownFolders.c \
 	WineCoreUAP/KnownFoldersInternal.c \
@@ -10,6 +11,8 @@ SOURCES = \
 	WineCoreUAP/DownloadsFolderInternal.c \
 	WineCoreUAP/FileIO.c \
 	WineCoreUAP/FileIOInternal.c \
+	WineCoreUAP/PathIO.c \
+	WineCoreUAP/PathIOInternal.c \
 	WineCoreUAP/AppInternalPaths.c \
 	WineCoreUAP/AppDataPaths.c \
 	WineCoreUAP/StorageFolder.c \
@@ -43,5 +46,4 @@ SOURCES = \
 	\
 	WineCoreUAP/FileProperties/AsyncOperation/BasicPropertiesAsync.c \
 	provider.idl \
-	classes.idl \
-	main.c
+	classes.idl 

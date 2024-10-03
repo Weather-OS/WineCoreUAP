@@ -62,6 +62,7 @@ extern IActivationFactory *known_folders_factory;
 extern IActivationFactory *basic_properties_factory;
 extern IActivationFactory *downloads_folder_factory;
 extern IActivationFactory *file_io_factory;
+extern IActivationFactory *path_io_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
@@ -86,7 +87,7 @@ extern HRESULT async_operation_storage_item_vector_view_create( IUnknown *invoke
                                               IAsyncOperation_IVectorView_IStorageItem **out );
 extern HRESULT async_operation_storage_folder_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IVectorView_StorageFolder **out );
-HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IAsyncAction **ret);
 
 extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,

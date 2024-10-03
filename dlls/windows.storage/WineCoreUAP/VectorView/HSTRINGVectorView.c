@@ -156,9 +156,13 @@ static HRESULT WINAPI hstring_vector_view_QueryInterface( IVectorView_HSTRING *i
     if (IsEqualGUID( iid, &IID_IUnknown ) ||
         IsEqualGUID( iid, &IID_IInspectable ) ||
         IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, impl->iids.view ))
+        IsEqualGUID( iid, &IID_IVectorView_HSTRING ))
     {
         IInspectable_AddRef( (*out = &impl->IVectorView_HSTRING_iface) );
+        return S_OK;
+    } else if ( IsEqualGUID( iid, &IID_IIterable_HSTRING ) )
+    {
+        IInspectable_AddRef( (*out = &impl->IIterable_HSTRING_iface) );
         return S_OK;
     }
 

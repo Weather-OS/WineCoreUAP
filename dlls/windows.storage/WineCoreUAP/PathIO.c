@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.FileIO Implementation
+/* WinRT Windows.Storage.PathIO Implementation
  *
  * Written by Weather
  *
@@ -19,21 +19,21 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "FileIOInternal.h"
+#include "PathIOInternal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-// File Input Output Operations
+// Path Input Output Operations
 
-static struct file_io_statics *impl_from_IActivationFactory( IActivationFactory *iface )
+static struct path_io_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
-    return CONTAINING_RECORD( iface, struct file_io_statics, IActivationFactory_iface );
+    return CONTAINING_RECORD( iface, struct path_io_statics, IActivationFactory_iface );
 }
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
 
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
+    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
@@ -47,9 +47,9 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
-    if (IsEqualGUID( iid, &IID_IFileIOStatics ))
+    if (IsEqualGUID( iid, &IID_IPathIOStatics ))
     {
-        *out = &impl->IFileIOStatics_iface;
+        *out = &impl->IPathIOStatics_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -61,7 +61,7 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
 
 static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
 {
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
+    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
     ULONG ref = InterlockedIncrement( &impl->ref );
     TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
     return ref;
@@ -69,7 +69,7 @@ static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
 
 static ULONG WINAPI factory_Release( IActivationFactory *iface )
 {
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
+    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
     ULONG ref = InterlockedDecrement( &impl->ref );
     TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
     return ref;
@@ -112,117 +112,117 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-DEFINE_IINSPECTABLE( file_io_statics, IFileIOStatics, struct file_io_statics, IActivationFactory_iface )
+DEFINE_IINSPECTABLE( path_io_statics, IPathIOStatics, struct path_io_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_HSTRING **textOperation )
+static HRESULT WINAPI path_io_statics_ReadTextAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_HSTRING **textOperation )
 {
     HRESULT hr;
-    struct file_io_read_text_options *read_text_options;
+    struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
-    read_text_options->file = file;
+    read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
+    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_HSTRING **textOperation )
+static HRESULT WINAPI path_io_statics_ReadTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, UnicodeEncoding encoding, IAsyncOperation_HSTRING **textOperation )
 {
     HRESULT hr;
-    struct file_io_read_text_options *read_text_options;
+    struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = encoding;
-    read_text_options->file = file;
+    read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
+    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
+static HRESULT WINAPI path_io_statics_WriteTextAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, IAsyncAction **textOperation )
 {
     HRESULT hr;
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
+static HRESULT WINAPI path_io_statics_WriteTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
 {
     HRESULT hr;
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
+static HRESULT WINAPI path_io_statics_AppendTextAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, IAsyncAction **textOperation )
 {
     HRESULT hr;
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
+static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
 {
     HRESULT hr;
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_IVector_HSTRING **linesOperation )
+static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
-    struct file_io_read_text_options *read_text_options;
+    struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
-    read_text_options->file = file;
+    read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, linesOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
+static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
-    struct file_io_read_text_options *read_text_options;
+    struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = encoding;
-    read_text_options->file = file;
+    read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, linesOperation );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
     //Convert IIterable_HSTRING to HSTRING
     HRESULT hr;
@@ -235,7 +235,7 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
     boolean strExists;
     IIterator_HSTRING *hstringIterator;
 
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -278,15 +278,15 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
     combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     if ( combinedString )
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
     return S_OK;
 }
 
-static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
     //Convert IIterable_HSTRING to HSTRING
     HRESULT hr;
@@ -299,7 +299,7 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
     boolean strExists;
     IIterator_HSTRING *hstringIterator;
 
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -342,15 +342,15 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
     combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
 
     write_text_options->encoding = encoding;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     if ( combinedString )
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
     return S_OK;
 }
 
-static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, IAsyncAction **operation )
 {
     //Convert IIterable_HSTRING to HSTRING
     HRESULT hr;
@@ -363,7 +363,7 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
     boolean strExists;
     IIterator_HSTRING *hstringIterator;
 
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -406,15 +406,15 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
     combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     if ( combinedString )
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
     return S_OK;
 }
 
-static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
 {
     //Convert IIterable_HSTRING to HSTRING
     HRESULT hr;
@@ -427,7 +427,7 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
     boolean strExists;
     IIterator_HSTRING *hstringIterator;
 
-    struct file_io_write_text_options *write_text_options;
+    struct path_io_write_text_options *write_text_options;
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -470,64 +470,64 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
     combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
 
     write_text_options->encoding = encoding;
-    write_text_options->file = file;
+    write_text_options->absolutePath = absolutePath;
     if ( combinedString )
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
     return S_OK;
 }
 
-static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
+static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
 {
     FIXME( "iface %p, operation %p stub!\n", iface, operation );
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, IStorageFile *file, IBuffer* buffer, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IBuffer* buffer, IAsyncAction **operation )
 {
     FIXME( "iface %p, operation %p stub!\n", iface, operation );
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IStorageFile *file, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
+static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HSTRING absolutePath, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
 {
     FIXME( "iface %p, operation %p stub!\n", iface, operation );
     return E_NOTIMPL;
 }
 
-static const struct IFileIOStaticsVtbl file_io_statics_vtbl =
+static const struct IPathIOStaticsVtbl path_io_statics_vtbl =
 {
-    file_io_statics_QueryInterface,
-    file_io_statics_AddRef,
-    file_io_statics_Release,
+    path_io_statics_QueryInterface,
+    path_io_statics_AddRef,
+    path_io_statics_Release,
     /* IInspectable methods */
-    file_io_statics_GetIids,
-    file_io_statics_GetRuntimeClassName,
-    file_io_statics_GetTrustLevel,
-    /* IFileIOStatics methods */
-    file_io_statics_ReadTextAsync,
-    file_io_statics_ReadTextWithEncodingAsync,
-    file_io_statics_WriteTextAsync,
-    file_io_statics_WriteTextWithEncodingAsync,
-    file_io_statics_AppendTextAsync,
-    file_io_statics_AppendTextWithEncodingAsync,
-    file_io_statics_ReadLinesAsync,
-    file_io_statics_ReadLinesWithEncodingAsync,
-    file_io_statics_WriteLinesAsync,
-    file_io_statics_WriteLinesWithEncodingAsync,
-    file_io_statics_AppendLinesAsync,
-    file_io_statics_AppendLinesWithEncodingAsync,
-    file_io_statics_ReadBufferAsync,
-    file_io_statics_WriteBufferAsync,
-    file_io_statics_WriteBytesAsync
+    path_io_statics_GetIids,
+    path_io_statics_GetRuntimeClassName,
+    path_io_statics_GetTrustLevel,
+    /* IPathIOStatics methods */
+    path_io_statics_ReadTextAsync,
+    path_io_statics_ReadTextWithEncodingAsync,
+    path_io_statics_WriteTextAsync,
+    path_io_statics_WriteTextWithEncodingAsync,
+    path_io_statics_AppendTextAsync,
+    path_io_statics_AppendTextWithEncodingAsync,
+    path_io_statics_ReadLinesAsync,
+    path_io_statics_ReadLinesWithEncodingAsync,
+    path_io_statics_WriteLinesAsync,
+    path_io_statics_WriteLinesWithEncodingAsync,
+    path_io_statics_AppendLinesAsync,
+    path_io_statics_AppendLinesWithEncodingAsync,
+    path_io_statics_ReadBufferAsync,
+    path_io_statics_WriteBufferAsync,
+    path_io_statics_WriteBytesAsync
 };
 
-static struct file_io_statics file_io_statics =
+static struct path_io_statics path_io_statics =
 {
     {&factory_vtbl},
-    {&file_io_statics_vtbl},
+    {&path_io_statics_vtbl},
     1,
 };
 
-IActivationFactory *file_io_factory = &file_io_statics.IActivationFactory_iface;
+IActivationFactory *path_io_factory = &path_io_statics.IActivationFactory_iface;
