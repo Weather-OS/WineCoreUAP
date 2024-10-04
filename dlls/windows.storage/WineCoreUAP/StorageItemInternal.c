@@ -47,6 +47,9 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     item = impl_from_IStorageItem( result );
 
     WindowsDuplicateString( itemPath, &item->Path );
+
+    if ( PathIsURLW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
+        status = E_INVALIDARG;
     
     attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 

@@ -50,8 +50,8 @@ struct file_io_read_text_options
 
 struct file_io_write_text_options
 {
-    IStorageFile *file;
     HSTRING contents;
+    IStorageFile *file;
     UnicodeEncoding encoding;
 };
 

@@ -169,7 +169,7 @@ static HRESULT WINAPI storage_item_get_DateCreated( IStorageItem *iface, DateTim
 }
 
 static HRESULT WINAPI storage_item_IsOfType( IStorageItem *iface, StorageItemTypes type, BOOLEAN *value )
-{
+{    
     HRESULT hr;
     StorageItemTypes fileType;
     hr = storage_item_GetType( iface, &fileType );
@@ -180,7 +180,6 @@ static HRESULT WINAPI storage_item_IsOfType( IStorageItem *iface, StorageItemTyp
         else
             *value = FALSE;
     }
-    
     return hr;
 }
 

@@ -38,9 +38,11 @@ extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageFolder2Vtbl storage_folder2_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFileVtbl storage_file_vtbl;
+extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl;
 extern struct IVectorView_IStorageItemVtbl storage_item_vector_view_vtbl;
 extern struct IVectorView_StorageFolderVtbl storage_folder_vector_view_vtbl;
 extern struct IVectorView_StorageFileVtbl storage_file_vector_view_vtbl;
+
 
 struct storage_folder
 {

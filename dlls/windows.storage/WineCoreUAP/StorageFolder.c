@@ -53,6 +53,13 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageFolderStatics2 ))
+    {
+        *out = &impl->IStorageFolderStatics2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
@@ -336,23 +343,9 @@ static HRESULT WINAPI storage_folder2_QueryInterface( IStorageFolder2 *iface, RE
     if (IsEqualGUID( iid, &IID_IUnknown ) ||
         IsEqualGUID( iid, &IID_IInspectable ) ||
         IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IStorageFolder ))
-    {
-        *out = &impl->IStorageFolder_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    if (IsEqualGUID( iid, &IID_IStorageFolder2 ))
+        IsEqualGUID( iid, &IID_IStorageFolder2 ))
     {
         *out = &impl->IStorageFolder2_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    if (IsEqualGUID( iid, &IID_IStorageItem ))
-    {
-        *out = &impl->IStorageItem_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }

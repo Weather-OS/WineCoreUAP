@@ -69,6 +69,8 @@ namespace Windows.Storage {
     interface IKnownFoldersStatics4;
     interface ISetVersionDeferral;
     interface ISetVersionRequest;
+    interface IStorageFile;
+    interface IStorageFilePropertiesWithAvailability;
     interface IStorageFolder;
     interface IStorageFolder2;
     interface IStorageFolderStatics;
@@ -76,6 +78,7 @@ namespace Windows.Storage {
     interface IStorageFileStatics;
     interface IStorageFileStatics2;
     interface IStorageItem;
+    interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
 
     runtimeclass AppDataPaths;
@@ -648,15 +651,13 @@ namespace Windows.Storage {
     }
 
     [
-        contract(Windows.Foundation.UniversalApiContract, 10.0),
-        exclusiveto(Windows.Storage.StorageFile),
-        uuid(5C76A781-212E-4AF9-8F04-740CAE108974)
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(AFCBBE9B-582B-4133-9648-E44CA46EE491)
     ]
-    interface IStorageFileStatics2 : IInspectable
+    interface IStorageFilePropertiesWithAvailability : IInspectable
     {
-        HRESULT GetFileFromPathForUserAsync([in] Windows.System.User* user, [in] HSTRING path, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+        [propget] HRESULT IsAvailable([out] [retval] boolean* value);
     }
-
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
@@ -691,6 +692,16 @@ namespace Windows.Storage {
             [in] Windows.Foundation.Uri* uri, 
             [in] Windows.Storage.Streams.IRandomAccessStreamReference* thumbnail, 
             [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 10.0),
+        exclusiveto(Windows.Storage.StorageFile),
+        uuid(5C76A781-212E-4AF9-8F04-740CAE108974)
+    ]
+    interface IStorageFileStatics2 : IInspectable
+    {
+        HRESULT GetFileFromPathForUserAsync([in] Windows.System.User* user, [in] HSTRING path, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile*>** operation);
     }
 
     [

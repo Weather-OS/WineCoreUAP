@@ -37,7 +37,7 @@ static inline struct async_action *impl_from_IAsyncAction(IAsyncAction *iface)
     return CONTAINING_RECORD(iface, struct async_action, IAsyncAction_iface);
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_QueryInterface(IAsyncAction *iface, REFIID iid, void **out)
+static HRESULT WINAPI async_action_QueryInterface(IAsyncAction *iface, REFIID iid, void **out)
 {
     struct async_action *action = impl_from_IAsyncAction(iface);
 
@@ -55,7 +55,7 @@ static HRESULT STDMETHODCALLTYPE async_action_QueryInterface(IAsyncAction *iface
     return IWineAsyncInfoImpl_QueryInterface( action->IWineAsyncInfoImpl_inner, iid, out );
 }
 
-static ULONG STDMETHODCALLTYPE async_action_AddRef(IAsyncAction *iface)
+static ULONG WINAPI async_action_AddRef(IAsyncAction *iface)
 {
     struct async_action *action = impl_from_IAsyncAction(iface);
     ULONG refcount = InterlockedIncrement(&action->refcount);
@@ -65,7 +65,7 @@ static ULONG STDMETHODCALLTYPE async_action_AddRef(IAsyncAction *iface)
     return refcount;
 }
 
-static ULONG STDMETHODCALLTYPE async_action_Release(IAsyncAction *iface)
+static ULONG WINAPI async_action_Release(IAsyncAction *iface)
 {
     struct async_action *action = impl_from_IAsyncAction(iface);
     ULONG refcount = InterlockedDecrement(&action->refcount);
@@ -82,7 +82,7 @@ static ULONG STDMETHODCALLTYPE async_action_Release(IAsyncAction *iface)
     return refcount;
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_GetIids(
+static HRESULT WINAPI async_action_GetIids(
         IAsyncAction *iface, ULONG *iid_count, IID **iids)
 {
     FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
@@ -90,7 +90,7 @@ static HRESULT STDMETHODCALLTYPE async_action_GetIids(
     return E_NOTIMPL;
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_GetRuntimeClassName(
+static HRESULT WINAPI async_action_GetRuntimeClassName(
         IAsyncAction *iface, HSTRING *class_name)
 {
     FIXME("iface %p, class_name %p stub!\n", iface, class_name);
@@ -98,7 +98,7 @@ static HRESULT STDMETHODCALLTYPE async_action_GetRuntimeClassName(
     return E_NOTIMPL;
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_GetTrustLevel(
+static HRESULT WINAPI async_action_GetTrustLevel(
         IAsyncAction *iface, TrustLevel *trust_level)
 {
     FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
@@ -106,21 +106,21 @@ static HRESULT STDMETHODCALLTYPE async_action_GetTrustLevel(
     return E_NOTIMPL;
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_put_Completed(IAsyncAction *iface, IAsyncActionCompletedHandler *handler)
+static HRESULT WINAPI async_action_put_Completed(IAsyncAction *iface, IAsyncActionCompletedHandler *handler)
 {
     struct async_action *impl = impl_from_IAsyncAction( iface );
     TRACE( "iface %p, handler %p.\n", iface, handler );
     return IWineAsyncInfoImpl_put_Completed( impl->IWineAsyncInfoImpl_inner, (IWineAsyncOperationCompletedHandler *)handler );
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_get_Completed(IAsyncAction *iface, IAsyncActionCompletedHandler **handler)
+static HRESULT WINAPI async_action_get_Completed(IAsyncAction *iface, IAsyncActionCompletedHandler **handler)
 {
     struct async_action *impl = impl_from_IAsyncAction( iface );
     TRACE( "iface %p, handler %p.\n", iface, handler );
     return IWineAsyncInfoImpl_get_Completed( impl->IWineAsyncInfoImpl_inner, (IWineAsyncOperationCompletedHandler **)handler );
 }
 
-static HRESULT STDMETHODCALLTYPE async_action_GetResults(IAsyncAction *iface)
+static HRESULT WINAPI async_action_GetResults(IAsyncAction *iface)
 {
     //IAsyncAction does not return anything upon completion
     return S_OK;

@@ -45,12 +45,16 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     file = impl_from_IStorageFile( result );
 
     file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
-    file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     file->ref = 1;
 
     WindowsDuplicateString( filePath, &path );
 
     status = storage_item_Internal_CreateNew( path, &file->IStorageItem_iface );
+
+    file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
+
+    if ( FAILED( status ) ) return status;
 
     IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
     if ( !isFile )
@@ -87,6 +91,7 @@ HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param
 
     file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
     file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
     file->ref = 1;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -129,6 +134,7 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
 
     newFile->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
     newFile->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    newFile->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
     newFile->ref = 1;
 
     destFolder = impl_from_IStorageFolder( folder );
@@ -207,7 +213,7 @@ HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param,
 
     *targetFile = *invokerFile;
 
-    status = storage_item_Internal_CreateNew( targetFileItem->Path, &targetFile->IStorageItem_iface );
+    status = storage_file_AssignFile( targetFileItem->Path, &targetFile->IStorageFile_iface );
 
     return status;
 }
@@ -278,7 +284,7 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
     if ( SUCCEEDED( status ) )
     {
         WindowsCreateString( folderPathStr, wcslen( folderPathStr ), &destPath );
-        storage_item_Internal_CreateNew( destPath, &invokerFile->IStorageItem_iface );
+        storage_file_AssignFile( destPath, &invokerFile->IStorageFile_iface );
     }
 
     return status;
@@ -307,7 +313,20 @@ HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param,
 
     *targetFile = *invokerFile;
 
-    status = storage_item_Internal_CreateNew( targetFileItem->Path, &targetFile->IStorageItem_iface );
+    status = storage_file_AssignFile( targetFileItem->Path, &targetFile->IStorageFile_iface );
 
     return status;
+}
+
+HRESULT WINAPI storage_file_properties_with_availability_IsAvailable ( IStorageItem *fileItem, boolean *value )
+{
+    if ( GetFileAttributesW( WindowsGetStringRawBuffer( impl_from_IStorageItem( fileItem )->Path, NULL ) ) == INVALID_FILE_ATTRIBUTES )
+    {
+        *value = FALSE;
+    } else
+    {
+        *value = TRUE;
+    }
+
+    return S_OK;
 }

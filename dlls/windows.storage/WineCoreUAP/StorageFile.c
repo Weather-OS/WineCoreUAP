@@ -54,6 +54,13 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageFileStatics2 ))
+    {
+        *out = &impl->IStorageFileStatics2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
@@ -136,6 +143,13 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
     if (IsEqualGUID( iid, &IID_IStorageItem ))
     {
         *out = &impl->IStorageItem_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageFilePropertiesWithAvailability ))
+    {
+        *out = &impl->IStorageFilePropertiesWithAvailability_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -356,6 +370,93 @@ struct IStorageFileVtbl storage_file_vtbl =
     storage_file_MoveOverloadDefaultOptions,
     storage_file_MoveOverload,
     storage_file_MoveAndReplaceAsync
+};
+
+struct storage_file *impl_from_IStorageFilePropertiesWithAvailability( IStorageFilePropertiesWithAvailability *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_file, IStorageFilePropertiesWithAvailability_iface );
+}
+
+static HRESULT WINAPI storage_file_properties_with_availability_QueryInterface( IStorageFilePropertiesWithAvailability *iface, REFIID iid, void **out )
+{
+    struct storage_file *impl = impl_from_IStorageFilePropertiesWithAvailability( iface );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IStorageFilePropertiesWithAvailability ))
+    {
+        *out = &impl->IStorageFilePropertiesWithAvailability_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_file_properties_with_availability_AddRef( IStorageFilePropertiesWithAvailability *iface )
+{
+    struct storage_file *impl = impl_from_IStorageFilePropertiesWithAvailability( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI storage_file_properties_with_availability_Release( IStorageFilePropertiesWithAvailability *iface )
+{
+    struct storage_file *impl = impl_from_IStorageFilePropertiesWithAvailability( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref) free( impl );
+    return ref;
+}
+
+static HRESULT WINAPI storage_file_properties_with_availability_GetIids( IStorageFilePropertiesWithAvailability *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_file_properties_with_availability_GetRuntimeClassName( IStorageFilePropertiesWithAvailability *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_file_properties_with_availability_GetTrustLevel( IStorageFilePropertiesWithAvailability *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::StorageFile
+*/
+
+static HRESULT WINAPI storage_file_properties_with_availability_get_IsAvailable( IStorageFilePropertiesWithAvailability *iface, boolean *value )
+{
+    struct storage_file *impl = impl_from_IStorageFilePropertiesWithAvailability( iface );
+    storage_file_properties_with_availability_IsAvailable( &impl->IStorageItem_iface, value );
+    return S_OK;
+}
+
+struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl =
+{
+    storage_file_properties_with_availability_QueryInterface,
+    storage_file_properties_with_availability_AddRef,
+    storage_file_properties_with_availability_Release,
+    /* IInspectable methods */
+    storage_file_properties_with_availability_GetIids,
+    storage_file_properties_with_availability_GetRuntimeClassName,
+    storage_file_properties_with_availability_GetTrustLevel,
+    /* IStorageFilePropertiesWithAvailability methods */
+    storage_file_properties_with_availability_get_IsAvailable
 };
 
 DEFINE_IINSPECTABLE( storage_file_statics, IStorageFileStatics, struct storage_file_statics, IActivationFactory_iface )

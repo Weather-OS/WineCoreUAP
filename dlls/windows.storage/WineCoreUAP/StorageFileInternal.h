@@ -36,15 +36,17 @@
 
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl;
 
 struct storage_file
 {
-    //Derivatives
-    IStorageFile IStorageFile_iface;
+    //Derivatives 
+    IStorageFile IStorageFile_iface;  
 
+    IStorageItem IStorageItem_iface;
+    IStorageFilePropertiesWithAvailability IStorageFilePropertiesWithAvailability_iface;
     HSTRING FileType;
     HSTRING ContentType;
-    IStorageItem IStorageItem_iface;
 
     LONG ref;
 };
@@ -85,5 +87,6 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
 HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_properties_with_availability_IsAvailable ( IStorageItem *fileItem, boolean *value );
 
 #endif
