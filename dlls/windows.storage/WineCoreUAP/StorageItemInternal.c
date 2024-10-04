@@ -262,7 +262,7 @@ HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, P
     if (!result) return E_INVALIDARG;
     if (!(properties = calloc( 1, sizeof(*properties) ))) return E_OUTOFMEMORY;
 
-    properties->IActivationFactory_iface.lpVtbl = &factory_vtbl;
+    properties->IActivationFactory_iface.lpVtbl = basic_properties_factory->lpVtbl;
     properties->IBasicProperties_iface.lpVtbl = &basic_properties_vtbl;
 
     properties->DateModified.UniversalTime = FileTimeToUnixTime( &lastWrite );

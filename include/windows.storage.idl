@@ -78,6 +78,9 @@ namespace Windows.Storage {
     interface IStorageFileStatics;
     interface IStorageFileStatics2;
     interface IStorageItem;
+    interface IStorageItemProperties;
+    interface IStorageItemPropertiesWithProvider;
+    interface IStorageProvider;
     interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
 
@@ -92,6 +95,7 @@ namespace Windows.Storage {
     runtimeclass SetVersionRequest;
     runtimeclass StorageFolder;
     runtimeclass StorageFile;
+    runtimeclass StorageProvider;
     runtimeclass StorageStreamTransaction;
     runtimeclass StreamedFileDataRequest;
 
@@ -803,6 +807,28 @@ namespace Windows.Storage {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(861BF39B-6368-4DEE-B40E-74684A5CE714)
+    ]
+    interface IStorageItemPropertiesWithProvider : IInspectable
+        requires
+            Windows.Storage.IStorageItemProperties
+    {
+        [propget] HRESULT Provider([out] [retval] Windows.Storage.StorageProvider** value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.StorageProvider),
+        uuid(E705EED4-D478-47D6-BA46-1A8EBE114A20)
+    ]
+    interface IStorageProvider : IInspectable
+    {
+        [propget] HRESULT Id([out] [retval] HSTRING* value);
+        [propget] HRESULT DisplayName([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Storage.StorageStreamTransaction),
         uuid(f67cf363-a53d-4d94-ae2c-67232d93acdd)
     ]
@@ -955,6 +981,16 @@ namespace Windows.Storage {
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IStorageFolder2;
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IStorageItemPropertiesWithProvider;
         [contract(Windows.Foundation.UniversalApiContract, 6.0)] interface Windows.Storage.IStorageFolder3;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(standard)
+    ]
+    runtimeclass StorageProvider
+    {
+        [default] interface Windows.Storage.IStorageProvider;
+        [contract(Windows.Foundation.UniversalApiContract, 5.0)] interface Windows.Storage.IStorageProvider2;
     }
 
     [

@@ -1052,10 +1052,6 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder, (void **)&storageFolderResults );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
-    hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder, (void **)&storageFolderResults );
-    ok( hr == S_OK, "got hr %#lx.\n", hr );
-
     IStorageItem_GetBasicPropertiesAsync( storageItem, &basicPropertiesOperation );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
     
@@ -1144,7 +1140,10 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
      * IStorageFolder2_TryGetItemAsync
     */
 
-    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageFolder2, (void **)&storageFolder2Results );
+    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
+    hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder2, (void **)&storageFolder2Results );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
     hr = IStorageFolder2_TryGetItemAsync( storageFolder2Results, nameString, &storageItemOperation );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 

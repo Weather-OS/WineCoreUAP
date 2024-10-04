@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.FileProperties.BasicProperties Implementation
+/* WinRT Windows.Storage.StorageProvider Implementation
  *
  * Written by Weather
  *
@@ -19,20 +19,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "BasicPropertiesInternal.h"
+#include "StorageProviderInternal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(storage);
 
-// Basic Properties
+// Storage Provider
 
-static struct basic_properties *impl_from_IActivationFactory( IActivationFactory *iface )
+static struct storage_provider *impl_from_IActivationFactory( IActivationFactory *iface )
 {
-    return CONTAINING_RECORD( iface, struct basic_properties, IActivationFactory_iface );
+    return CONTAINING_RECORD( iface, struct storage_provider, IActivationFactory_iface );
 }
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
-    struct basic_properties *impl = impl_from_IActivationFactory( iface );
+    struct storage_provider *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
@@ -46,9 +46,9 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
-    if (IsEqualGUID( iid, &IID_IBasicProperties ))
+    if (IsEqualGUID( iid, &IID_IStorageProvider ))
     {
-        *out = &impl->IBasicProperties_iface;
+        *out = &impl->IStorageProvider_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -60,7 +60,7 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
 
 static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
 {
-    struct basic_properties *impl = impl_from_IActivationFactory( iface );
+    struct storage_provider *impl = impl_from_IActivationFactory( iface );
     ULONG ref = InterlockedIncrement( &impl->ref );
     TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
     return ref;
@@ -68,7 +68,7 @@ static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
 
 static ULONG WINAPI factory_Release( IActivationFactory *iface )
 {
-    struct basic_properties *impl = impl_from_IActivationFactory( iface );
+    struct storage_provider *impl = impl_from_IActivationFactory( iface );
     ULONG ref = InterlockedDecrement( &impl->ref );
     TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
     return ref;
@@ -111,52 +111,43 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-DEFINE_IINSPECTABLE( basic_properties, IBasicProperties, struct basic_properties, IActivationFactory_iface )
+DEFINE_IINSPECTABLE( storage_provider, IStorageProvider, struct storage_provider, IActivationFactory_iface )
 
-static HRESULT WINAPI basic_properties_get_Size( IBasicProperties *iface, UINT64 *value )
+static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
 {
-    struct basic_properties *impl = impl_from_IBasicProperties( iface );
-    *value = impl->size;
+    struct storage_provider *impl = impl_from_IStorageProvider( iface );
+    WindowsDuplicateString( impl->DisplayName, value );
     return S_OK;
 }
 
-static HRESULT WINAPI basic_properties_get_DateModified( IBasicProperties *iface, DateTime *value )
+static HRESULT WINAPI storage_provider_get_Id( IStorageProvider *iface, HSTRING *value )
 {
-    struct basic_properties *impl = impl_from_IBasicProperties( iface );
-    *value = impl->DateModified;
+    struct storage_provider *impl = impl_from_IStorageProvider( iface );
+    WindowsDuplicateString( impl->Id, value );
     return S_OK;
 }
 
-static HRESULT WINAPI basic_properties_get_TimeDate( IBasicProperties *iface, DateTime *value )
+const struct IStorageProviderVtbl storage_provider_vtbl =
 {
-    struct basic_properties *impl = impl_from_IBasicProperties( iface );
-    *value = impl->ItemDate;
-    return S_OK;
-}
-
-const struct IBasicPropertiesVtbl basic_properties_vtbl =
-{
-    basic_properties_QueryInterface,
-    basic_properties_AddRef,
-    basic_properties_Release,
+    storage_provider_QueryInterface,
+    storage_provider_AddRef,
+    storage_provider_Release,
     /* IInspectable methods */
-    basic_properties_GetIids,
-    basic_properties_GetRuntimeClassName,
-    basic_properties_GetTrustLevel,
-    /* IBasicProperties methods */
-    basic_properties_get_Size,
-    basic_properties_get_DateModified,
-    basic_properties_get_TimeDate
+    storage_provider_GetIids,
+    storage_provider_GetRuntimeClassName,
+    storage_provider_GetTrustLevel,
+    /* IStorageProvider methods */
+    storage_provider_get_DisplayName,
+    storage_provider_get_Id
 };
 
-static struct basic_properties basic_properties =
+static struct storage_provider storage_provider =
 {
     {&factory_vtbl},
-    {&basic_properties_vtbl},
-    {0},
-    {0},
-    0,
+    {&storage_provider_vtbl},
+    NULL,
+    NULL,
     1,
 };
 
-IActivationFactory *basic_properties_factory = &basic_properties.IActivationFactory_iface;
+IActivationFactory *storage_provider_factory = &storage_provider.IActivationFactory_iface;
