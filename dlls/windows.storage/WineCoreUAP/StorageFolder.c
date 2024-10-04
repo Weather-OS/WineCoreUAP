@@ -340,19 +340,7 @@ static HRESULT WINAPI storage_folder2_QueryInterface( IStorageFolder2 *iface, RE
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IStorageFolder2 ))
-    {
-        *out = &impl->IStorageFolder2_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
+    return IStorageFolder_QueryInterface( &impl->IStorageFolder_iface, iid, out );
 }
 
 static ULONG WINAPI storage_folder2_AddRef( IStorageFolder2 *iface )

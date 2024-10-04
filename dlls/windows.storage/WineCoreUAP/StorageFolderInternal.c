@@ -43,6 +43,7 @@ HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value
     status = storage_item_Internal_CreateNew( path, &folder->IStorageItem_iface );
 
     IStorageItem_IsOfType( &folder->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
+
     if ( !isFolder )
         status = E_INVALIDARG;
 
@@ -658,17 +659,14 @@ HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param,
     if ( SUCCEEDED( status ) )
     {
         IStorageItem_IsOfType( &item->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
-        printf("hello there!\n");
         if ( isFolder )
         {
-            printf("folder!\n");
             if (!(newFolder = calloc( 1, sizeof(*newFolder) ))) return E_OUTOFMEMORY;
             storage_folder_AssignFolder( itemPath, &newFolder->IStorageFolder_iface );
             result->vt = VT_UNKNOWN;
             result->ppunkVal = (IUnknown **)&newFolder->IStorageItem_iface;
         } else
         {
-            printf("file!\n");
             if (!(newFile = calloc( 1, sizeof(*newFile) ))) return E_OUTOFMEMORY;
             storage_file_AssignFile( itemPath, &newFile->IStorageFile_iface );
             result->vt = VT_UNKNOWN;

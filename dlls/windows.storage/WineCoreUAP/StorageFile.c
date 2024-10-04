@@ -383,19 +383,7 @@ static HRESULT WINAPI storage_file_properties_with_availability_QueryInterface( 
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IStorageFilePropertiesWithAvailability ))
-    {
-        *out = &impl->IStorageFilePropertiesWithAvailability_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
+    return IStorageFile_QueryInterface( &impl->IStorageFile_iface, iid, out );
 }
 
 static ULONG WINAPI storage_file_properties_with_availability_AddRef( IStorageFilePropertiesWithAvailability *iface )

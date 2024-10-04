@@ -34,6 +34,10 @@ static HRESULT WINAPI storage_item_QueryInterface( IStorageItem *iface, REFIID i
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
 
+    // Inheritence 
+    struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItem_iface, struct storage_folder, IStorageItem_iface );
+    struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItem_iface, struct storage_file, IStorageItem_iface );
+
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
     if (IsEqualGUID( iid, &IID_IUnknown ) ||
@@ -44,6 +48,16 @@ static HRESULT WINAPI storage_item_QueryInterface( IStorageItem *iface, REFIID i
         *out = &impl->IStorageItem_iface;
         IInspectable_AddRef( *out );
         return S_OK;
+    }
+
+    if (IS_INHERITED(inheritedFile, sizeof(struct storage_file)))
+    {
+        return IStorageFile_QueryInterface( &inheritedFile->IStorageFile_iface, iid, out );
+    }
+
+    if (IS_INHERITED(inheritedFolder, sizeof(struct storage_folder)))
+    {
+        return IStorageFolder_QueryInterface( &inheritedFolder->IStorageFolder_iface, iid, out );
     }
 
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );

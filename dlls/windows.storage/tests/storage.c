@@ -1045,6 +1045,17 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageItem_get_Path( storageItem, &Path );
     ok( pathString == Path, "Error: Original path not returned. Path %s\n", HStringToLPCSTR(Path));
 
+    hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder, (void **)&storageFolderResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
+    hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder, (void **)&storageFolderResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IStorageFolder_QueryInterface( storageFolderResults, &IID_IStorageItem, (void **)&storageItem);
+    hr = IStorageItem_QueryInterface( storageItem, &IID_IStorageFolder, (void **)&storageFolderResults );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
     IStorageItem_GetBasicPropertiesAsync( storageItem, &basicPropertiesOperation );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
     
