@@ -37,4 +37,6 @@ struct storage_provider
     LONG ref;
 };
 
+struct storage_provider *impl_from_IStorageProvider( IStorageProvider *iface );
+
 #endif
