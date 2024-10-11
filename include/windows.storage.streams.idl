@@ -246,18 +246,6 @@ namespace Windows.Storage.Streams {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
-        uuid(905A0FE6-BC53-11DF-8C49-001E4FC686DA)
-    ]
-    interface IOutputStream : IInspectable
-        requires
-            Windows.Foundation.IClosable
-    {
-        HRESULT WriteAsync([in] Windows.Storage.Streams.IBuffer* buffer, [out] [retval] Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32>** operation);
-        HRESULT FlushAsync([out] [retval] Windows.Foundation.IAsyncOperation<boolean>** operation);
-    }
-
-    [
-        contract(Windows.Foundation.UniversalApiContract, 1.0),
         marshaling_behavior(agile),
         static(Windows.Storage.Streams.IRandomAccessStreamStatics, Windows.Foundation.UniversalApiContract, 1.0)
     ]

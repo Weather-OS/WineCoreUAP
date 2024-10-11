@@ -719,6 +719,8 @@ ZLIB_PE_LIBS
 ZLIB_PE_CFLAGS
 XSLT_PE_LIBS
 XSLT_PE_CFLAGS
+APPX_PE_LIBS
+APPX_PE_CFLAGS
 XML2_PE_LIBS
 XML2_PE_CFLAGS
 VKD3D_PE_LIBS
@@ -1496,6 +1498,7 @@ enable_windows_networking
 enable_windows_perception_stub
 enable_windows_security_authentication_onlineid
 enable_windows_security_credentials_ui_userconsentverifier
+enable_windows_storage
 enable_windows_storage_applicationdata
 enable_windows_system_profile_systemmanufacturers
 enable_windows_ui
@@ -1610,6 +1613,7 @@ enable_xtajit64
 enable_fonts
 enable_include
 enable_adsiid
+enable_appx
 enable_dmoguids
 enable_dxerr8
 enable_dxerr9
@@ -1796,6 +1800,8 @@ VKD3D_PE_CFLAGS
 VKD3D_PE_LIBS
 XML2_PE_CFLAGS
 XML2_PE_LIBS
+APPX_PE_CFLAGS
+APPX_PE_LIBS
 XSLT_PE_CFLAGS
 XSLT_PE_LIBS
 ZLIB_PE_CFLAGS
@@ -2619,6 +2625,10 @@ Some influential environment variables:
               C compiler flags for the PE xml2, overriding the bundled version
   XML2_PE_LIBS
               Linker flags for the PE xml2, overriding the bundled version
+  APPX_PE_CFLAGS
+              C compiler flags for the PE appx, overriding the bundled version
+  APPX_PE_LIBS
+              Linker flags for the PE appx, overriding the bundled version
   XSLT_PE_CFLAGS
               C compiler flags for the PE xslt, overriding the bundled version
   XSLT_PE_LIBS
@@ -13394,6 +13404,137 @@ CPPFLAGS=$ac_save_CPPFLAGS
         as_fn_append wine_notices "|libvkd3d ${notice_platform}MinGW development files not found (or too old); using bundled version."
     fi
 
+    if ${APPX_PE_CFLAGS:+false} :
+then :
+  if test ${MINGW_PKG_CONFIG+y}
+then :
+  APPX_PE_CFLAGS=`$MINGW_PKG_CONFIG --cflags libappx 2>/dev/null`
+fi
+fi
+if ${APPX_PE_LIBS:+false} :
+then :
+  if test ${MINGW_PKG_CONFIG+y}
+then :
+  APPX_PE_LIBS=`$MINGW_PKG_CONFIG --libs libappx 2>/dev/null`
+fi
+fi
+APPX_PE_LIBS=${APPX_PE_LIBS:-"-lappx"}
+ac_save_CPPFLAGS=$CPPFLAGS
+CPPFLAGS="$CPPFLAGS $APPX_PE_CFLAGS"
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for MinGW appx.h" >&5
+printf %s "checking for MinGW appx.h... " >&6; }
+if test ${ac_cv_mingw_header_appx_h+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) ac_wine_check_headers_saved_cc=$CC
+ac_wine_check_headers_saved_exeext=$ac_exeext
+eval CC=\$${wine_arch}_CC
+ac_exeext=".exe"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <appx.h>
+int
+main (void)
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  ac_cv_mingw_header_appx_h=yes
+else case e in #(
+  e) ac_cv_mingw_header_appx_h=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+CC=$ac_wine_check_headers_saved_cc
+ac_exeext=$ac_wine_check_headers_saved_exeext ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_mingw_header_appx_h" >&5
+printf "%s\n" "$ac_cv_mingw_header_appx_h" >&6; }
+if test "x$ac_cv_mingw_header_appx_h" = xyes
+then :
+
+fi
+        if test "$ac_cv_mingw_header_appx_h" = "yes"
+        then
+            { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for appx_set_log_callback in MinGW -lappx" >&5
+printf %s "checking for appx_set_log_callback in MinGW -lappx... " >&6; }
+if test ${ac_cv_mingw_lib_appx+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) ac_wine_check_headers_saved_cc=$CC
+ac_wine_check_headers_saved_exeext=$ac_exeext
+ac_wine_check_headers_saved_libs=$LIBS
+eval CC=\$${wine_arch}_CC
+ac_exeext=".exe"
+LIBS="-lappx $APPX_PE_LIBS $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.
+   The 'extern "C"' is for builds by C++ compilers;
+   although this is not generally supported in C code supporting it here
+   has little cost and some practical benefit (sr 110532).  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char appx_set_log_callback (void);
+int
+main (void)
+{
+return appx_set_log_callback ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ac_cv_mingw_lib_appx=yes
+else case e in #(
+  e) ac_cv_mingw_lib_appx=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+CC=$ac_wine_check_headers_saved_cc
+ac_exeext=$ac_wine_check_headers_saved_exeext
+LIBS=$ac_wine_check_headers_saved_libs ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_mingw_lib_appx" >&5
+printf "%s\n" "$ac_cv_mingw_lib_appx" >&6; }
+if test "x$ac_cv_mingw_lib_appx" = xyes
+then :
+  :
+else case e in #(
+  e) : ;;
+esac
+fi
+            if test "$ac_cv_mingw_lib_appx" = "no"
+            then
+                APPX_PE_CFLAGS=""
+                APPX_PE_LIBS=""
+            fi
+        else
+            APPX_PE_CFLAGS=""
+            APPX_PE_LIBS=""
+        fi
+CPPFLAGS=$ac_save_CPPFLAGS
+
+    if test "x$APPX_PE_LIBS" = "x"
+    then
+        as_fn_append wine_notices "|libappx ${notice_platform}MinGW development files not found (or too old); using bundled version."
+    fi
+
     if ${ZLIB_PE_CFLAGS:+false} :
 then :
   if test ${MINGW_PKG_CONFIG+y}
@@ -13737,6 +13878,23 @@ esac
 fi
 printf "%s\n" "$as_me:${as_lineno-$LINENO}: xml2 cflags: $XML2_PE_CFLAGS" >&5
 printf "%s\n" "$as_me:${as_lineno-$LINENO}: xml2 libs: $XML2_PE_LIBS" >&5
+
+if ${APPX_PE_LIBS:+false} :
+then :
+  APPX_PE_LIBS=appx
+   if ${APPX_PE_CFLAGS:+false} :
+then :
+  APPX_PE_CFLAGS="-I\$(top_srcdir)/libs/appx/include"
+else case e in #(
+  e) enable_appx=no ;;
+esac
+fi
+else case e in #(
+  e) enable_appx=no ;;
+esac
+fi
+printf "%s\n" "$as_me:${as_lineno-$LINENO}: appx cflags: $APPX_PE_CFLAGS" >&5
+printf "%s\n" "$as_me:${as_lineno-$LINENO}: appx libs: $APPX_PE_LIBS" >&5
 
 if ${XSLT_PE_LIBS:+false} :
 then :
@@ -22634,6 +22792,8 @@ wine_fn_config_makefile dlls/windows.security.authentication.onlineid enable_win
 wine_fn_config_makefile dlls/windows.security.authentication.onlineid/tests enable_tests
 wine_fn_config_makefile dlls/windows.security.credentials.ui.userconsentverifier enable_windows_security_credentials_ui_userconsentverifier
 wine_fn_config_makefile dlls/windows.security.credentials.ui.userconsentverifier/tests enable_tests
+wine_fn_config_makefile dlls/windows.storage enable_windows_storage
+wine_fn_config_makefile dlls/windows.storage/tests enable_tests
 wine_fn_config_makefile dlls/windows.storage.applicationdata enable_windows_storage_applicationdata
 wine_fn_config_makefile dlls/windows.storage.applicationdata/tests enable_tests
 wine_fn_config_makefile dlls/windows.system.profile.systemmanufacturers enable_windows_system_profile_systemmanufacturers
@@ -22787,6 +22947,7 @@ wine_fn_config_makefile dlls/xtajit64 enable_xtajit64
 wine_fn_config_makefile fonts enable_fonts
 wine_fn_config_makefile include enable_include
 wine_fn_config_makefile libs/adsiid enable_adsiid
+wine_fn_config_makefile libs/appx enable_appx
 wine_fn_config_makefile libs/dmoguids enable_dmoguids
 wine_fn_config_makefile libs/dxerr8 enable_dxerr8
 wine_fn_config_makefile libs/dxerr9 enable_dxerr9
@@ -23960,6 +24121,8 @@ VKD3D_PE_CFLAGS = $VKD3D_PE_CFLAGS
 VKD3D_PE_LIBS = $VKD3D_PE_LIBS
 XML2_PE_CFLAGS = $XML2_PE_CFLAGS
 XML2_PE_LIBS = $XML2_PE_LIBS
+APPX_PE_CFLAGS = $APPX_PE_CFLAGS
+APPX_PE_LIBS = $APPX_PE_LIBS
 XSLT_PE_CFLAGS = $XSLT_PE_CFLAGS
 XSLT_PE_LIBS = $XSLT_PE_LIBS
 ZLIB_PE_CFLAGS = $ZLIB_PE_CFLAGS

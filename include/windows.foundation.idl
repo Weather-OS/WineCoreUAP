@@ -31,6 +31,7 @@ namespace Windows.Foundation.Collections {
     interface IPropertySet;
 
     runtimeclass PropertySet;
+    runtimeclass ValueSet;
 
     declare {
         interface Windows.Foundation.Collections.IKeyValuePair<HSTRING, HSTRING>;
@@ -66,6 +67,20 @@ namespace Windows.Foundation.Collections {
         threading(both)
     ]
     runtimeclass PropertySet
+    {
+        [default] interface Windows.Foundation.Collections.IPropertySet;
+        interface Windows.Foundation.Collections.IObservableMap<HSTRING, IInspectable *>;
+        interface Windows.Foundation.Collections.IMap<HSTRING, IInspectable *>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Foundation.Collections.IKeyValuePair<HSTRING, IInspectable *> *>;
+    }
+
+    [
+        activatable(Windows.Foundation.FoundationContract, 1.0),
+        contract(Windows.Foundation.FoundationContract, 1.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass ValueSet
     {
         [default] interface Windows.Foundation.Collections.IPropertySet;
         interface Windows.Foundation.Collections.IObservableMap<HSTRING, IInspectable *>;
