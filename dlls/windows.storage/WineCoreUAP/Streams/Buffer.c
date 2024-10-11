@@ -274,4 +274,4 @@ static struct buffer_statics buffer_statics =
     1,
 };
 
-IActivationFactory *buffer_statics_factory = &buffer_statics.IActivationFactory_iface;
+IActivationFactory *buffer_factory = &buffer_statics.IActivationFactory_iface;

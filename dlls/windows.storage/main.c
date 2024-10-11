@@ -65,6 +65,12 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
         IActivationFactory_QueryInterface( path_io_factory, &IID_IActivationFactory, (void **)factory );
 
     /**
+     * Windows.Storage.Streams
+    */
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_Buffer ))
+        IActivationFactory_QueryInterface( buffer_factory, &IID_IActivationFactory, (void **)factory );
+
+    /**
      * Windows.Storage.FileProperties
      */
     //Runtime class not meant to be registered. Please refrain from registring it.
