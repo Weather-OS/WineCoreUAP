@@ -222,7 +222,16 @@ WCHAR *WCMD_fgets(WCHAR *buf, DWORD noChars, HANDLE h)
   /* We can't use the native f* functions because of the filename syntax differences
      between DOS and Unix. Also need to lose the LF (or CRLF) from the line. */
 
-  if (!ReadConsoleW(h, buf, noChars, &charsRead, NULL)) {
+  if (VerifyConsoleIoHandle(h) && ReadConsoleW(h, buf, noChars, &charsRead, NULL) && charsRead) {
+      if (!charsRead) return NULL;
+
+      /* Find first EOL */
+      for (i = 0; i < charsRead; i++) {
+          if (buf[i] == '\n' || buf[i] == '\r')
+              break;
+      }
+  }
+  else {
       LARGE_INTEGER filepos;
       char *bufA;
       UINT cp;
@@ -253,15 +262,6 @@ WCHAR *WCMD_fgets(WCHAR *buf, DWORD noChars, HANDLE h)
 
       i = MultiByteToWideChar(cp, 0, bufA, p - bufA, buf, noChars);
       free(bufA);
-  }
-  else {
-      if (!charsRead) return NULL;
-
-      /* Find first EOL */
-      for (i = 0; i < charsRead; i++) {
-          if (buf[i] == '\n' || buf[i] == '\r')
-              break;
-      }
   }
 
   /* Truncate at EOL (or end of buffer) */
@@ -369,9 +369,8 @@ void WCMD_HandleTildeModifiers(WCHAR **start, BOOL atExecute)
       break;
 
     } else {
-      int foridx = for_var_char_to_index(*lastModifier);
       /* Its a valid parameter identifier - OK */
-      if ((foridx >= 0) && (forloopcontext->variable[foridx] != NULL)) break;
+      if (for_var_is_valid(*lastModifier) && forloopcontext->variable[*lastModifier] != NULL) break;
 
       /* Its not a valid parameter identifier - step backwards */
       lastModifier--;
@@ -397,9 +396,8 @@ void WCMD_HandleTildeModifiers(WCHAR **start, BOOL atExecute)
                             *lastModifier-'0' + context -> shift_count[*lastModifier-'0'],
                             NULL, FALSE, TRUE));
   } else {
-    int foridx = for_var_char_to_index(*lastModifier);
-    if (foridx != -1)
-        lstrcpyW(outputparam, forloopcontext->variable[foridx]);
+    if (for_var_is_valid(*lastModifier))
+        lstrcpyW(outputparam, forloopcontext->variable[*lastModifier]);
   }
 
   /* 1. Handle '~' : Strip surrounding quotes */
@@ -639,7 +637,7 @@ RETURN_CODE WCMD_call(WCHAR *command)
             return_code = errorlevel = NO_ERROR;
         else
         {
-            WCMD_run_program(buffer, TRUE);
+            WCMD_call_command(buffer);
             /* If the thing we try to run does not exist, call returns 1 */
             if (errorlevel == RETURN_CODE_CANT_LAUNCH)
                 errorlevel = ERROR_INVALID_FUNCTION;

@@ -467,6 +467,8 @@ if 1==0 (echo q1) else echo q2&echo q3
 echo ------------- Testing internal commands return codes
 setlocal EnableDelayedExpansion
 
+rem All the success/failure tests are meant to be duplicated in test_builtins.bat
+rem So be sure to update both files at once
 echo --- success/failure for basics
 call :setError 0 &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!
 call :setError 33 &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!
@@ -491,18 +493,9 @@ call :setError 666 & Idontexist.exe & echo ERRORLEVEL !errorlevel!
 call :setError 666 & (cmd.exe /c "echo foo & exit /b 0" &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!)
 call :setError 666 & (cmd.exe /c "echo foo & exit /b 1024" &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!)
 call :setError 666 & (I\dont\exist.html &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!)
-rem native cmd on Windows 7 shows a dialog for missing association, and waits for its dismisal...
-rem later native cmd.exe shows the dialog, but is not blocking. so, skip the Windows7 case
-rem FIRMWARE_TYPE (undocumented readonly dynamic env variable) appears from Windows 8 onwards
-set foobar_doskip=
-if not defined WINEPREFIX if not defined FIRMWARE_TYPE (set foobar_doskip=1)
-if defined foobar_doskip (
-  echo Skipping on Win7
-  set foobar_doskip=
-) else (
-  echo:>foobar.IDontExist
-  call :setError 666 & (foobar.IDontExist &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!)
-)
+rem can't run this test, generates a nice popup under windows
+rem echo:>foobar.IDontExist
+rem call :setError 666 & (foobar.IDontExist &&echo SUCCESS !errorlevel!||echo FAILURE !errorlevel!)
 cd .. && rd /q /s foo
 echo --- success/failure for CALL command
 mkdir foo & cd foo
@@ -871,6 +864,7 @@ echo bar| cmd /v:on /c "set /p WINE_FOO=prompt & echo X!WINE_FOO!X"
 echo:| cmd /v:on /c "set /p WINE_FOO=prompt & echo Y!WINE_FOO!Y"
 echo:| cmd /v:on /c "set /p WINE_FOO='prompt' & echo Y!WINE_FOO!Y"
 echo:| cmd /v:on /c "set /p WINE_FOO="prompt" & echo Y!WINE_FOO!Y"
+set =
 
 echo ------------ Testing 'choice' ------------
 
@@ -2053,6 +2047,15 @@ for %%i in (test) do (
     )
     echo d4
 )
+echo --- EXIT /B inside FOR loops
+goto :after_exitBinsideForLoop
+:exitBinsideForLoop
+for /l %%i in (1,1,3) do (
+  echo %%i
+  if %%i==2 exit /b 0
+)
+:after_exitBinsideForLoop
+call :exitBinsideForLoop
 echo --- set /a
 goto :testseta
 
@@ -2432,14 +2435,20 @@ for /f "tokens=1,2,3*" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k 
 for /f "tokens=3,2,1*" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o
 rem Duplicates are ignored
 for /f "tokens=1,2,1*" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o
+rem errors can exist
+(for /f "tokens=1,2*,4" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o) || echo failure %%i
 rem Large tokens are allowed
 for /f "tokens=25,1,5*" %%i in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o
 rem Show tokens blanked in advance regardless of uniqueness of requested tokens
 for /f "tokens=1,1,1,2*" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o
 for /f "tokens=1-2,1-2,1-2" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m n=%%n o=%%o
-rem Show No wrapping from z to A BUT wrapping sort of occurs Z to a occurs
+rem Show mapping of most of the ASCII characters (on top of letters & digits)
 for /f "tokens=1-20" %%u in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo u=%%u v=%%v w=%%w x=%%x y=%%y z=%%z A=%%A a=%%a
-for /f "tokens=1-20" %%U in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo U=%%U V=%%V W=%%W X=%%X Y=%%Y Z=%%Z A=%%A a=%%a
+for /f "tokens=1-20" %%U in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo U=%%U V=%%V W=%%W X=%%X Y=%%Y Z=%%Z ^[=%%^[ ^\=%%^\ ^]=%%^] ^^=%%^^ _=%%_ `=%%` A=%%A a=%%a
+rem Testing limits (max number of contiguous variables, limit at 127)
+(for /f "tokens=1-31" %%A in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo U=%%U V=%%V W=%%W X=%%X Y=%%Y Z=%%Z ^[=%%^[ ^\=%%^\ ^]=%%^] ^^=%%^^ _=%%_ `=%%` A=%%A a=%%a) || echo failure
+(for /f "tokens=1-32" %%A in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo U=%%U V=%%V W=%%W X=%%X Y=%%Y Z=%%Z ^[=%%^[ ^\=%%^\ ^]=%%^] ^^=%%^^ _=%%_ `=%%` A=%%A a=%%a) || echo failure %%A
+for /f "tokens=1-20" %%} in ("a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z") do echo ^}=%%^} ^~=%%^~
 rem Show negative ranges have no effect
 for /f "tokens=1-3,5" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m o=%%o
 for /f "tokens=3-1,5" %%i in ("a b c d e f g") do echo h=%%h i=%%i j=%%j k=%%k l=%%l m=%%m o=%%o
@@ -3156,6 +3165,39 @@ call echo %1 %2 %3
 exit /b 0
 
 :call_expand_done
+
+echo --- search with dots
+echo @echo a> .bat
+call .bat
+echo @echo b> f00.bat.bat
+call f00.bat || echo fail1
+call f00 2> nul || echo fail2
+
+cd .. & rd /s/q foobar
+
+echo --- builtin in expansions
+
+mkdir foobar & cd foobar
+
+set foobar=echo
+
+echo echo %%*>bar.bat
+%foobar% bar p1 %foobar%
+%%foobar%% bar p2 %%foobar%%
+%%%foobar%%% bar p3 %%%foobar%%%
+call %foobar% bar cp1 %foobar%
+call %%foobar%% bar cp2 %%foobar%%
+call %%%foobar%%% bar cp3 %%%foobar%%%
+setlocal EnableDelayedExpansion
+!foobar! bar b1 !foobar!
+!!foobar!! bar b2 !!foobar!!
+!!!foobar!!! bar b3 !!!foobar!!!
+call !foobar! bar cb1 !foobar!
+call !!foobar!! bar cb2 !!foobar!!
+call !!!foobar!!! bar cb3 !!!foobar!!!
+call !!!!foobar!!!! bar cb4 !!!!foobar!!!!
+setlocal DisableDelayedExpansion
+set foobar=
 
 cd .. & rd /s/q foobar
 

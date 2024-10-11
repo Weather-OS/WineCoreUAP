@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: Wine\n"
 "Report-Msgid-Bugs-To: https://bugs.winehq.org\n"
 "POT-Creation-Date: N/A\n"
-"PO-Revision-Date: 2024-09-03 00:39+0300\n"
+"PO-Revision-Date: 2024-09-20 00:23+0300\n"
 "Last-Translator: Aurimas Fišeras <aurimas@members.fsf.org>\n"
 "Language-Team: Lithuanian <komp_lt@konf.lt>\n"
 "Language: lt\n"
@@ -167,15 +167,16 @@ msgid ""
 "install it for you.\n"
 "\n"
 "Note: it is recommended to use your distribution's packages instead. See <a "
-"href=\"https://wiki.winehq.org/Gecko\">https://wiki.winehq.org/Gecko</a> for "
-"details."
+"href=\"https://gitlab.winehq.org/wine/wine/-/wikis/Gecko\">https://gitlab."
+"winehq.org/wine/wine/-/wikis/Gecko</a> for details."
 msgstr ""
 "„Wine“ nepavyko rasti „Gecko“ paketo reikalingo programoms, įterpiančioms "
 "HTML, teisingai veikti. „Wine“ gali automatiškai atsiųsti ir įdiegti šį "
 "paketą.\n"
 "\n"
 "Pastaba: rekomenduojama naudoti distribucijos paketus. Daugiau informacijos "
-"<a href=\"https://wiki.winehq.org/Gecko\">https://wiki.winehq.org/Gecko</a>."
+"<a href=\"https://gitlab.winehq.org/wine/wine/-/wikis/Gecko\">https://gitlab."
+"winehq.org/wine/wine/-/wikis/Gecko</a>."
 
 #: dlls/appwiz.cpl/appwiz.rc:110 dlls/appwiz.cpl/appwiz.rc:125
 msgid "&Install"
@@ -235,14 +236,15 @@ msgid ""
 "it for you.\n"
 "\n"
 "Note: it is recommended to use your distribution's packages instead. See <a "
-"href=\"https://wiki.winehq.org/Mono\">https://wiki.winehq.org/Mono</a> for "
-"details."
+"href=\"https://gitlab.winehq.org/wine/wine/-/wikis/Wine-Mono\">https://"
+"gitlab.winehq.org/wine/wine/-/wikis/Wine-Mono</a> for details."
 msgstr ""
 "„Wine“ nepavyko rasti „wine-mono“ paketo reikalingo .NET programoms "
 "teisingai veikti. „Wine“ gali automatiškai atsiųsti ir įdiegti šį paketą.\n"
 "\n"
 "Pastaba: rekomenduojama naudoti distribucijos paketus. Daugiau informacijos "
-"<a href=\"https://wiki.winehq.org/Mono\">https://wiki.winehq.org/Mono</a>."
+"<a href=\"https://gitlab.winehq.org/wine/wine/-/wikis/Wine-Mono\">https://"
+"gitlab.winehq.org/wine/wine/-/wikis/Wine-Mono</a>."
 
 #: dlls/appwiz.cpl/appwiz.rc:31
 msgid "Add/Remove Programs"
@@ -408,6 +410,7 @@ msgid "Properties for %s"
 msgstr "%s savybės"
 
 #: dlls/comctl32/comctl32.rc:73 dlls/comdlg32/comdlg32.rc:265
+#: dlls/desk.cpl/desk.rc:41
 msgid "&Apply"
 msgstr "&Vykdyti"
 
@@ -3149,6 +3152,26 @@ msgstr "Išrinkite liudijimą"
 msgid "Not yet implemented"
 msgstr "Dar nerealizuota"
 
+#: dlls/desk.cpl/desk.rc:35
+msgid "Desktop"
+msgstr "Darbalaukis"
+
+#: dlls/desk.cpl/desk.rc:38
+msgid "Virtual Desktop"
+msgstr "Virtualus darbalaukis"
+
+#: dlls/desk.cpl/desk.rc:40 dlls/joy.cpl/joy.rc:41
+msgid "&Reset"
+msgstr "&Atkurti"
+
+#: dlls/desk.cpl/desk.rc:29
+msgid "Display Settings"
+msgstr "Rodymo nuostatos"
+
+#: dlls/desk.cpl/desk.rc:30
+msgid "Configure monitors and display devices."
+msgstr "Konfigūruoti monitorius ir rodymo įrenginius."
+
 #: dlls/dinput/dinput.rc:34
 msgid "Configure Devices"
 msgstr "Įtaisų konfigūravimas"
@@ -3732,59 +3755,59 @@ msgstr "Vairasvirtės"
 msgid "&Disable"
 msgstr "&Išjungti"
 
-#: dlls/joy.cpl/joy.rc:41
-msgid "&Reset"
-msgstr "&Atkurti"
-
 #: dlls/joy.cpl/joy.rc:42
-msgid "&Enable"
-msgstr "Įj&ungti"
-
-#: dlls/joy.cpl/joy.rc:43
 msgid "&Override"
 msgstr "&Nustelbti"
 
+#: dlls/joy.cpl/joy.rc:43
+msgid "&Enable"
+msgstr "Įj&ungti"
+
 #: dlls/joy.cpl/joy.rc:44
-msgid "Connected"
-msgstr "Prijungta"
+msgid "Connected (DirectInput devices)"
+msgstr "Prijungta (DirectInput įrenginiai)"
 
 #: dlls/joy.cpl/joy.rc:46
-msgid "Connected (xinput device)"
-msgstr "Prijungta (xinput įrenginys)"
+msgid "Connected (XInput devices)"
+msgstr "Prijungta (XInput įrenginiai)"
 
 #: dlls/joy.cpl/joy.rc:48
 msgid "Disabled"
 msgstr "Išjungta"
 
-#: dlls/joy.cpl/joy.rc:50
-msgid ""
-"After disabling or enabling a device, the connected joysticks won't be "
-"updated here until you restart this applet."
-msgstr ""
-"Po įtaiso išjungimo ar įjungimo, prijungtos vairasvirtės nebus automatiškai "
-"čia atnaujintos, kol nepaleisite šios programėlės iš naujo."
+#: dlls/joy.cpl/joy.rc:51
+msgid "Advanced settings (restart prefix required to take effect)"
+msgstr "Išsamios nuostatos (reikia perleisti prefiksą, kad įsigaliotų)"
 
-#: dlls/joy.cpl/joy.rc:55
+#: dlls/joy.cpl/joy.rc:52
+msgid "Enable SDL"
+msgstr "Įjungti SDL"
+
+#: dlls/joy.cpl/joy.rc:53
+msgid "Disable hidraw"
+msgstr "Išjungti „hidraw“"
+
+#: dlls/joy.cpl/joy.rc:58
 msgid "DInput"
 msgstr "DInput"
 
-#: dlls/joy.cpl/joy.rc:59
+#: dlls/joy.cpl/joy.rc:62
 msgid "Axes"
 msgstr "Ašys"
 
-#: dlls/joy.cpl/joy.rc:60
+#: dlls/joy.cpl/joy.rc:63
 msgid "POVs"
 msgstr "POV"
 
-#: dlls/joy.cpl/joy.rc:61
+#: dlls/joy.cpl/joy.rc:64
 msgid "Buttons"
 msgstr "Mygtukai"
 
-#: dlls/joy.cpl/joy.rc:62
+#: dlls/joy.cpl/joy.rc:65
 msgid "Force Feedback Effect"
 msgstr "„Force Feedback“ efektas"
 
-#: dlls/joy.cpl/joy.rc:64
+#: dlls/joy.cpl/joy.rc:67
 msgid ""
 "Press any button in the controller to activate the chosen effect. The effect "
 "direction can be changed with the controller axis."
@@ -3792,27 +3815,27 @@ msgstr ""
 "Spauskite bet kurį valdiklio mygtuką pasirinktam efektui aktyvuoti. Efekto "
 "kryptis gali būti pakeista valdiklio ašimi."
 
-#: dlls/joy.cpl/joy.rc:70
+#: dlls/joy.cpl/joy.rc:73
 msgid "XInput"
 msgstr "XInput"
 
-#: dlls/joy.cpl/joy.rc:73
+#: dlls/joy.cpl/joy.rc:76
 msgid "User #0"
 msgstr "Naudotojas #0"
 
-#: dlls/joy.cpl/joy.rc:74
+#: dlls/joy.cpl/joy.rc:77
 msgid "User #1"
 msgstr "Naudotojas #1"
 
-#: dlls/joy.cpl/joy.rc:75
+#: dlls/joy.cpl/joy.rc:78
 msgid "User #2"
 msgstr "Naudotojas #2"
 
-#: dlls/joy.cpl/joy.rc:76
+#: dlls/joy.cpl/joy.rc:79
 msgid "User #3"
 msgstr "Naudotojas #3"
 
-#: dlls/joy.cpl/joy.rc:78
+#: dlls/joy.cpl/joy.rc:81
 msgid ""
 "No user detected on slot #0, make sure your gamepad is plugged in, and not "
 "overridden for DInput in the Joysticks tab."
@@ -3820,7 +3843,7 @@ msgstr ""
 "Nerastas naudotojas lizde #0, įsitikinkite, kad žaidimų pultas prijungtas ir "
 "nenustelbtas dėl DInput Vairasvirčių kortelėje."
 
-#: dlls/joy.cpl/joy.rc:82
+#: dlls/joy.cpl/joy.rc:85
 msgid ""
 "No user detected on slot #1, make sure your gamepad is plugged in, and not "
 "overridden for DInput in the Joysticks tab."
@@ -3828,7 +3851,7 @@ msgstr ""
 "Nerastas naudotojas lizde #1, įsitikinkite, kad žaidimų pultas prijungtas ir "
 "nenustelbtas dėl DInput Vairasvirčių kortelėje."
 
-#: dlls/joy.cpl/joy.rc:86
+#: dlls/joy.cpl/joy.rc:89
 msgid ""
 "No user detected on slot #2, make sure your gamepad is plugged in, and not "
 "overridden for DInput in the Joysticks tab."
@@ -3836,7 +3859,7 @@ msgstr ""
 "Nerastas naudotojas lizde #2, įsitikinkite, kad žaidimų pultas prijungtas ir "
 "nenustelbtas dėl DInput Vairasvirčių kortelėje."
 
-#: dlls/joy.cpl/joy.rc:90
+#: dlls/joy.cpl/joy.rc:93
 msgid ""
 "No user detected on slot #3, make sure your gamepad is plugged in, and not "
 "overridden for DInput in the Joysticks tab."
@@ -3844,8 +3867,8 @@ msgstr ""
 "Nerastas naudotojas lizde #3, įsitikinkite, kad žaidimų pultas prijungtas ir "
 "nenustelbtas dėl DInput Vairasvirčių kortelėje."
 
-#: dlls/joy.cpl/joy.rc:95 dlls/joy.cpl/joy.rc:96 dlls/joy.cpl/joy.rc:97
-#: dlls/joy.cpl/joy.rc:98
+#: dlls/joy.cpl/joy.rc:98 dlls/joy.cpl/joy.rc:99 dlls/joy.cpl/joy.rc:100
+#: dlls/joy.cpl/joy.rc:101
 msgid "Rumble"
 msgstr "Vibravimas"
 
@@ -3893,167 +3916,171 @@ msgstr "Objektas nepalaiko šio veiksmo"
 msgid "Argument not optional"
 msgstr "Argumentas yra privalomas"
 
-#: dlls/jscript/jscript.rc:37
+#: dlls/jscript/jscript.rc:37 dlls/vbscript/vbscript.rc:56
+msgid "Object not a collection"
+msgstr "Objektas nėra rinkinys"
+
+#: dlls/jscript/jscript.rc:38
 msgid "Syntax error"
 msgstr "Sintaksės klaida"
 
-#: dlls/jscript/jscript.rc:38
+#: dlls/jscript/jscript.rc:39
 msgid "Expected ';'"
 msgstr "Tikėtasi „;“"
 
-#: dlls/jscript/jscript.rc:39
+#: dlls/jscript/jscript.rc:40
 msgid "Expected '('"
 msgstr "Tikėtasi „(“"
 
-#: dlls/jscript/jscript.rc:40
+#: dlls/jscript/jscript.rc:41
 msgid "Expected ')'"
 msgstr "Tikėtasi „)“"
 
-#: dlls/jscript/jscript.rc:41
+#: dlls/jscript/jscript.rc:42
 msgid "Expected identifier"
 msgstr "Tikėtasi identifikatoriaus"
 
-#: dlls/jscript/jscript.rc:42
+#: dlls/jscript/jscript.rc:43
 msgid "Expected '='"
 msgstr "Tikėtasi „=“"
 
-#: dlls/jscript/jscript.rc:43
+#: dlls/jscript/jscript.rc:44
 msgid "Invalid character"
 msgstr "Neteisingas simbolis"
 
-#: dlls/jscript/jscript.rc:44
+#: dlls/jscript/jscript.rc:45
 msgid "Unterminated string constant"
 msgstr "Nebaigta eilutės konstanta"
 
-#: dlls/jscript/jscript.rc:45
+#: dlls/jscript/jscript.rc:46
 msgid "'return' statement outside of function"
 msgstr "Sakinys „return“ ne funkcijoje"
 
-#: dlls/jscript/jscript.rc:46
+#: dlls/jscript/jscript.rc:47
 msgid "Can't have 'break' outside of loop"
 msgstr "Negalima turėti „break“ ne cikle"
 
-#: dlls/jscript/jscript.rc:47
+#: dlls/jscript/jscript.rc:48
 msgid "Can't have 'continue' outside of loop"
 msgstr "Negalima turėti „continue“ ne cikle"
 
-#: dlls/jscript/jscript.rc:48
+#: dlls/jscript/jscript.rc:49
 msgid "Label redefined"
 msgstr "Žymė apibrėžta iš naujo"
 
-#: dlls/jscript/jscript.rc:49
+#: dlls/jscript/jscript.rc:50
 msgid "Label not found"
 msgstr "Žymė nerasta"
 
-#: dlls/jscript/jscript.rc:50
+#: dlls/jscript/jscript.rc:51
 msgid "Expected '@end'"
 msgstr "Tikėtasi „@end“"
 
-#: dlls/jscript/jscript.rc:51
+#: dlls/jscript/jscript.rc:52
 msgid "Conditional compilation is turned off"
 msgstr "Sąlyginis kompiliavimas išjungtas"
 
-#: dlls/jscript/jscript.rc:52
+#: dlls/jscript/jscript.rc:53
 msgid "Expected '@'"
 msgstr "Tikėtasi „@“"
 
-#: dlls/jscript/jscript.rc:89
+#: dlls/jscript/jscript.rc:90
 msgid "Microsoft JScript compilation error"
 msgstr "Microsoft JScript kompiliavimo klaida"
 
-#: dlls/jscript/jscript.rc:90
+#: dlls/jscript/jscript.rc:91
 msgid "Microsoft JScript runtime error"
 msgstr "Microsoft JScript vykdymo klaida"
 
-#: dlls/jscript/jscript.rc:91 dlls/vbscript/vbscript.rc:64
+#: dlls/jscript/jscript.rc:92 dlls/vbscript/vbscript.rc:64
 msgid "Unknown runtime error"
 msgstr "Nežinoma vykdymo klaida"
 
-#: dlls/jscript/jscript.rc:55
+#: dlls/jscript/jscript.rc:56
 msgid "Number expected"
 msgstr "Tikėtasi skaičiaus"
 
-#: dlls/jscript/jscript.rc:53
+#: dlls/jscript/jscript.rc:54
 msgid "Function expected"
 msgstr "Tikėtasi funkcijos"
 
-#: dlls/jscript/jscript.rc:54
+#: dlls/jscript/jscript.rc:55
 msgid "'[object]' is not a date object"
 msgstr "„[objektas]“ nėra datos objektas"
 
-#: dlls/jscript/jscript.rc:56
+#: dlls/jscript/jscript.rc:57
 msgid "Object expected"
 msgstr "Tikėtasi objekto"
 
-#: dlls/jscript/jscript.rc:57
+#: dlls/jscript/jscript.rc:58
 msgid "Illegal assignment"
 msgstr "Neleistinas priskyrimas"
 
-#: dlls/jscript/jscript.rc:58
+#: dlls/jscript/jscript.rc:59
 msgid "'|' is undefined"
 msgstr "„|“ neapibrėžtas"
 
-#: dlls/jscript/jscript.rc:59
+#: dlls/jscript/jscript.rc:60
 msgid "Boolean object expected"
 msgstr "Tikėtasi loginio objekto"
 
-#: dlls/jscript/jscript.rc:60
+#: dlls/jscript/jscript.rc:61
 msgid "Cannot delete '|'"
 msgstr "Negalima pašalinti „|“"
 
-#: dlls/jscript/jscript.rc:61
+#: dlls/jscript/jscript.rc:62
 msgid "VBArray object expected"
 msgstr "Tikėtasi VBArray objekto"
 
-#: dlls/jscript/jscript.rc:62
+#: dlls/jscript/jscript.rc:63
 msgid "JScript object expected"
 msgstr "Tikėtasi JScript objekto"
 
-#: dlls/jscript/jscript.rc:63
+#: dlls/jscript/jscript.rc:64
 msgid "Enumerator object expected"
 msgstr "Tikėtasi enumeratoriaus objekto"
 
-#: dlls/jscript/jscript.rc:64
+#: dlls/jscript/jscript.rc:65
 msgid "Regular Expression object expected"
 msgstr "Tikėtasi reguliariojo reiškinio objekto"
 
-#: dlls/jscript/jscript.rc:65
+#: dlls/jscript/jscript.rc:66
 msgid "Syntax error in regular expression"
 msgstr "Sintaksės klaida reguliariajame reiškinyje"
 
-#: dlls/jscript/jscript.rc:66
+#: dlls/jscript/jscript.rc:67
 msgid "Unexpected quantifier"
 msgstr "Netikėtas kvantorius"
 
-#: dlls/jscript/jscript.rc:67
+#: dlls/jscript/jscript.rc:68
 msgid "Exception thrown and not caught"
 msgstr "Išimtinė situacija sugeneruota ir neapdorota"
 
-#: dlls/jscript/jscript.rc:69
+#: dlls/jscript/jscript.rc:70
 msgid "URI to be encoded contains invalid characters"
 msgstr "Koduotiname URI yra netinkamų simbolių"
 
-#: dlls/jscript/jscript.rc:68
+#: dlls/jscript/jscript.rc:69
 msgid "URI to be decoded is incorrect"
 msgstr "Dekoduojamas URI neteisingas"
 
-#: dlls/jscript/jscript.rc:70
+#: dlls/jscript/jscript.rc:71
 msgid "Number of fraction digits is out of range"
 msgstr "Trupmeninės dalies skaitmenų skaičius nepatenka į rėžius"
 
-#: dlls/jscript/jscript.rc:71
+#: dlls/jscript/jscript.rc:72
 msgid "Precision is out of range"
 msgstr "Tikslumas nepatenka į rėžius"
 
-#: dlls/jscript/jscript.rc:72
+#: dlls/jscript/jscript.rc:73
 msgid "Array length must be a finite positive integer"
 msgstr "Masyvo dydis turi būti teigiamas sveikasis skaičius"
 
-#: dlls/jscript/jscript.rc:73
+#: dlls/jscript/jscript.rc:74
 msgid "Array object expected"
 msgstr "Tikėtasi masyvo objekto"
 
-#: dlls/jscript/jscript.rc:74
+#: dlls/jscript/jscript.rc:75
 msgid ""
 "'writable' attribute on the property descriptor cannot be set to 'true' on "
 "this object"
@@ -4061,56 +4088,56 @@ msgstr ""
 "savybės aprašo atributas „writable“ negali būti nustatytas į „tiesa“ šiam "
 "objektui"
 
-#: dlls/jscript/jscript.rc:75
+#: dlls/jscript/jscript.rc:76
 msgid "Cyclic __proto__ value"
 msgstr "Ciklinė __proto__ reikšmė"
 
-#: dlls/jscript/jscript.rc:76
+#: dlls/jscript/jscript.rc:77
 msgid "Cannot create property for a non-extensible object"
 msgstr "Negalima sukurti savybės neišplečiamam objektui"
 
-#: dlls/jscript/jscript.rc:77
+#: dlls/jscript/jscript.rc:78
 msgid "Cannot define property '|': object is not extensible"
 msgstr "Negalima apibrėžti savybės „|“: objektas nėra išplečiamas"
 
-#: dlls/jscript/jscript.rc:78
+#: dlls/jscript/jscript.rc:79
 msgid "Cannot redefine non-configurable property '|'"
 msgstr "Negalima iš naujo apibrėžti nekonfigūruojamos savybės „|“"
 
-#: dlls/jscript/jscript.rc:79
+#: dlls/jscript/jscript.rc:80
 msgid "Cannot modify non-writable property '|'"
 msgstr "Negalima modifikuoti nerašomos savybės „|“"
 
-#: dlls/jscript/jscript.rc:80
+#: dlls/jscript/jscript.rc:81
 msgid "'this' is not a DataView object"
 msgstr "„Šis“ nėra DataView objektas"
 
-#: dlls/jscript/jscript.rc:81
+#: dlls/jscript/jscript.rc:82
 msgid "Required argument offset or value in DataView method is not specified"
 msgstr ""
 "DataView metode nenurodytas reikalingas argumentas poslinkis ar reikšmė"
 
-#: dlls/jscript/jscript.rc:82
+#: dlls/jscript/jscript.rc:83
 msgid "DataView operation access beyond specified buffer length"
 msgstr "DataView operacijos kreiptis už nurodyto buferio ilgio"
 
-#: dlls/jscript/jscript.rc:83
+#: dlls/jscript/jscript.rc:84
 msgid "DataView constructor argument offset is invalid"
 msgstr "DataView konstruktoriaus argumentas poslinkis yra netinkamas"
 
-#: dlls/jscript/jscript.rc:84
+#: dlls/jscript/jscript.rc:85
 msgid "'this' is not a | object"
 msgstr "„Šis“ nėra | objektas"
 
-#: dlls/jscript/jscript.rc:85
+#: dlls/jscript/jscript.rc:86
 msgid "'key' is not an object"
 msgstr "„raktas“ nėra objektas"
 
-#: dlls/jscript/jscript.rc:86
+#: dlls/jscript/jscript.rc:87
 msgid "ArrayBuffer object expected"
 msgstr "Tikėtasi ArrayBuffer objekto"
 
-#: dlls/jscript/jscript.rc:87
+#: dlls/jscript/jscript.rc:88
 msgid "Property cannot have both accessors and a value"
 msgstr "Savybė negali turėti ir kreipiklių, ir reikšmės"
 
@@ -12579,10 +12606,6 @@ msgstr "Įvardytas elementas nerastas"
 msgid "Wrong number of arguments or invalid property assignment"
 msgstr "Neteisingas argumentų skaičius ar neteisingas savybės priskyrimas"
 
-#: dlls/vbscript/vbscript.rc:56
-msgid "Object not a collection"
-msgstr "Objektas nėra rinkinys"
-
 #: dlls/vbscript/vbscript.rc:57
 msgid "Specified DLL function not found"
 msgstr "Nurodyta DLL funkcija nerasta"
@@ -18987,13 +19010,13 @@ msgstr "Išsamiau apie programos klaidą"
 msgid ""
 "If this problem is not present under Windows and has not been reported yet, "
 "you can save the detailed information to a file using the \"Save As\" "
-"button, then <a href=\"https://wiki.winehq.org/Bugs\">file a bug report</a> "
-"and attach that file to the report."
+"button, then <a href=\"https://gitlab.winehq.org/wine/wine/-/wikis/"
+"Bugs\">file a bug report</a> and attach that file to the report."
 msgstr ""
 "Jei šios problemos nėra „Windows“ sistemoje ir apie ją dar nebuvo pranešta, "
 "galite išsaugoti išsamią informaciją į failą naudodami mygtuką „Išsaugoti "
-"kaip“, tada <a href=\"https://wiki.winehq.org/Bugs\">užregistruoti klaidą</"
-"a> ir prikabinti tą failą prie pranešimo."
+"kaip“, tada <a href=\"https://gitlab.winehq.org/wine/wine/-/wikis/"
+"Bugs\">užregistruoti klaidą</a> ir prikabinti tą failą prie pranešimo."
 
 #: programs/winedbg/winedbg.rc:40
 msgid ""

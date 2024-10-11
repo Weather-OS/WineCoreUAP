@@ -1855,8 +1855,11 @@ static void wined3d_cs_exec_set_transform(struct wined3d_cs *cs, const void *dat
     const struct wined3d_cs_set_transform *op = data;
 
     cs->state.transforms[op->state] = op->matrix;
-    if (op->state < WINED3D_TS_WORLD_MATRIX(cs->c.device->adapter->d3d_info.limits.ffp_vertex_blend_matrices))
-        device_invalidate_state(cs->c.device, STATE_TRANSFORM(op->state));
+    /* Fog behaviour depends on the projection matrix. */
+    if (op->state == WINED3D_TS_PROJECTION
+            && cs->state.render_states[WINED3D_RS_FOGENABLE]
+            && cs->state.render_states[WINED3D_RS_FOGTABLEMODE] != WINED3D_FOG_NONE)
+        device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_VERTEX));
 }
 
 void wined3d_device_context_emit_set_transform(struct wined3d_device_context *context,
@@ -1998,12 +2001,6 @@ static void wined3d_cs_exec_set_light(struct wined3d_cs *cs, const void *data)
         rb_put(&cs->state.light_state.lights_tree, (void *)(ULONG_PTR)light_idx, &light_info->entry);
     }
 
-    if (light_info->glIndex != -1)
-    {
-        if (light_info->OriginalParms.type != op->light.OriginalParms.type)
-            device_invalidate_state(cs->c.device, STATE_LIGHT_TYPE);
-    }
-
     light_info->OriginalParms = op->light.OriginalParms;
     light_info->constants = op->light.constants;
 }
@@ -2032,8 +2029,7 @@ static void wined3d_cs_exec_set_light_enable(struct wined3d_cs *cs, const void *
         return;
     }
 
-    if (wined3d_light_state_enable_light(&cs->state.light_state, &device->adapter->d3d_info, light_info, op->enable))
-        device_invalidate_state(device, STATE_LIGHT_TYPE);
+    wined3d_light_state_enable_light(&cs->state.light_state, &device->adapter->d3d_info, light_info, op->enable);
 }
 
 void wined3d_device_context_emit_set_light_enable(struct wined3d_device_context *context, unsigned int idx, BOOL enable)

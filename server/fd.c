@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <poll.h>
 #ifdef HAVE_LINUX_MAJOR_H
 #include <linux/major.h>
@@ -72,9 +73,6 @@
 #include <sys/event.h>
 #undef LIST_INIT
 #undef LIST_ENTRY
-#endif
-#ifdef HAVE_STDINT_H
-#include <stdint.h>
 #endif
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -1831,8 +1829,7 @@ char *dup_fd_name( struct fd *root, const char *name )
 
 static WCHAR *dup_nt_name( struct fd *root, struct unicode_str name, data_size_t *len )
 {
-    WCHAR *ret;
-    data_size_t retlen;
+    WCHAR *ptr, *ret;
 
     if (!root)
     {
@@ -1841,7 +1838,6 @@ static WCHAR *dup_nt_name( struct fd *root, struct unicode_str name, data_size_t
         return memdup( name.str, name.len );
     }
     if (!root->nt_namelen) return NULL;
-    retlen = root->nt_namelen;
 
     /* skip . prefix */
     if (name.len && name.str[0] == '.' && (name.len == sizeof(WCHAR) || name.str[1] == '\\'))
@@ -1849,17 +1845,12 @@ static WCHAR *dup_nt_name( struct fd *root, struct unicode_str name, data_size_t
         name.str++;
         name.len -= sizeof(WCHAR);
     }
-    if ((ret = malloc( retlen + name.len + sizeof(WCHAR) )))
+    if ((ret = malloc( root->nt_namelen + name.len + sizeof(WCHAR) )))
     {
-        memcpy( ret, root->nt_name, root->nt_namelen );
-        if (name.len && name.str[0] != '\\' &&
-            root->nt_namelen && root->nt_name[root->nt_namelen / sizeof(WCHAR) - 1] != '\\')
-        {
-            ret[retlen / sizeof(WCHAR)] = '\\';
-            retlen += sizeof(WCHAR);
-        }
-        memcpy( ret + retlen / sizeof(WCHAR), name.str, name.len );
-        *len = retlen + name.len;
+        ptr = mem_append( ret, root->nt_name, root->nt_namelen );
+        if (name.len && name.str[0] != '\\' && ptr[-1] != '\\') *ptr++ = '\\';
+        ptr = mem_append( ptr, name.str, name.len );
+        *len = (ptr - ret) * sizeof(WCHAR);
     }
     return ret;
 }
@@ -2726,7 +2717,7 @@ DECL_HANDLER(flush)
 
     if (!fd) return;
 
-    if ((async = create_request_async( fd, fd->comp_flags, &req->async )))
+    if ((async = create_request_async( fd, fd->comp_flags, &req->async, 0 )))
     {
         fd->fd_ops->flush( fd, async );
         reply->event = async_handoff( async, NULL, 1 );
@@ -2755,7 +2746,7 @@ DECL_HANDLER(get_volume_info)
 
     if (!fd) return;
 
-    if ((async = create_request_async( fd, fd->comp_flags, &req->async )))
+    if ((async = create_request_async( fd, fd->comp_flags, &req->async, 0 )))
     {
         fd->fd_ops->get_volume_info( fd, async, req->info_class );
         reply->wait = async_handoff( async, NULL, 1 );
@@ -2831,7 +2822,7 @@ DECL_HANDLER(read)
 
     if (!fd) return;
 
-    if ((async = create_request_async( fd, fd->comp_flags, &req->async )))
+    if ((async = create_request_async( fd, fd->comp_flags, &req->async, 0 )))
     {
         fd->fd_ops->read( fd, async, req->pos );
         reply->wait = async_handoff( async, NULL, 0 );
@@ -2849,7 +2840,7 @@ DECL_HANDLER(write)
 
     if (!fd) return;
 
-    if ((async = create_request_async( fd, fd->comp_flags, &req->async )))
+    if ((async = create_request_async( fd, fd->comp_flags, &req->async, 0 )))
     {
         fd->fd_ops->write( fd, async, req->pos );
         reply->wait = async_handoff( async, &reply->size, 0 );
@@ -2868,7 +2859,7 @@ DECL_HANDLER(ioctl)
 
     if (!fd) return;
 
-    if ((async = create_request_async( fd, fd->comp_flags, &req->async )))
+    if ((async = create_request_async( fd, fd->comp_flags, &req->async, 0 )))
     {
         fd->fd_ops->ioctl( fd, req->code, async );
         reply->wait = async_handoff( async, NULL, 0 );

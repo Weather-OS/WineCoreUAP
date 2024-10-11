@@ -2099,8 +2099,13 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         if (is_desktop_window( hwnd )) return 0;
         return set_window_style( hwnd, wparam, lparam );
     case WM_WINE_SETACTIVEWINDOW:
+    {
+        HWND prev;
+
         if (!wparam && NtUserGetForegroundWindow() == hwnd) return 0;
-        return (LRESULT)NtUserSetActiveWindow( (HWND)wparam );
+        if (!set_active_window( (HWND)wparam, &prev, FALSE, TRUE, lparam )) return 0;
+        return (LRESULT)prev;
+    }
     case WM_WINE_KEYBOARD_LL_HOOK:
     case WM_WINE_MOUSE_LL_HOOK:
     {
@@ -2116,6 +2121,12 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
     case WM_WINE_SETCURSOR:
         FIXME( "Unexpected non-hardware WM_WINE_SETCURSOR message\n" );
         return FALSE;
+    case WM_WINE_IME_NOTIFY:
+    {
+        HWND ime_hwnd = get_default_ime_window( hwnd );
+        if (!ime_hwnd || ime_hwnd == NtUserGetParent( hwnd )) return 0;
+        return send_message( ime_hwnd, WM_IME_NOTIFY, wparam, lparam );
+    }
     case WM_WINE_UPDATEWINDOWSTATE:
         update_window_state( hwnd );
         return 0;

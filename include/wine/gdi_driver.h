@@ -219,7 +219,7 @@ struct gdi_dc_funcs
 };
 
 /* increment this when you change the DC function table */
-#define WINE_GDI_DRIVER_VERSION 96
+#define WINE_GDI_DRIVER_VERSION 100
 
 #define GDI_PRIORITY_NULL_DRV        0  /* null driver */
 #define GDI_PRIORITY_FONT_DRV      100  /* any font driver */
@@ -312,7 +312,7 @@ struct gdi_monitor
 struct gdi_device_manager
 {
     void (*add_gpu)( const char *name, const struct pci_id *pci_id, const GUID *vulkan_uuid, void *param );
-    void (*add_source)( const char *name, UINT state_flags, void *param );
+    void (*add_source)( const char *name, UINT state_flags, UINT dpi, void *param );
     void (*add_monitor)( const struct gdi_monitor *monitor, void *param );
     void (*add_modes)( const DEVMODEW *current, UINT modes_count, const DEVMODEW *modes, void *param );
 };
@@ -340,7 +340,7 @@ struct user_driver_funcs
     /* IME functions */
     UINT    (*pImeProcessKey)(HIMC,UINT,UINT,const BYTE*);
     void    (*pNotifyIMEStatus)(HWND,UINT);
-    BOOL    (*pSetIMECompositionWindowPos)(HWND, const POINT *);
+    BOOL    (*pSetIMECompositionRect)(HWND,RECT);
     /* cursor/icon functions */
     void    (*pDestroyCursorIcon)(HCURSOR);
     void    (*pSetCursor)(HWND,HCURSOR);
@@ -359,8 +359,6 @@ struct user_driver_funcs
     void    (*pUpdateClipboard)(void);
     /* display modes */
     LONG    (*pChangeDisplaySettings)(LPDEVMODEW,LPCWSTR,HWND,DWORD,LPVOID);
-    BOOL    (*pGetCurrentDisplaySettings)(LPCWSTR,BOOL,LPDEVMODEW);
-    INT     (*pGetDisplayDepth)(LPCWSTR,BOOL);
     UINT    (*pUpdateDisplayDevices)(const struct gdi_device_manager *,void*);
     /* windowing functions */
     BOOL    (*pCreateDesktop)(const WCHAR *,UINT,UINT);
@@ -388,8 +386,8 @@ struct user_driver_funcs
     BOOL    (*pWindowPosChanging)(HWND,UINT,BOOL,const struct window_rects *);
     BOOL    (*pGetWindowStyleMasks)(HWND,UINT,UINT,UINT*,UINT*);
     BOOL    (*pCreateWindowSurface)(HWND,BOOL,const RECT *,struct window_surface**);
-    void    (*pMoveWindowBits)(HWND,const struct window_rects *,const RECT *);
-    void    (*pWindowPosChanged)(HWND,HWND,UINT,const struct window_rects*,struct window_surface*);
+    void    (*pMoveWindowBits)(HWND,const struct window_rects *,const struct window_rects *,const RECT *);
+    void    (*pWindowPosChanged)(HWND,HWND,UINT,BOOL,const struct window_rects*,struct window_surface*);
     /* system parameters */
     BOOL    (*pSystemParametersInfo)(UINT,UINT,void*,UINT);
     /* vulkan support */

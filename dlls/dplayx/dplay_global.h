@@ -37,16 +37,18 @@ typedef struct tagEnumSessionAsyncCallbackData
   GUID         requestGuid;
   DWORD        dwEnumSessionFlags;
   DWORD        dwTimeout;
+  WCHAR       *password;
   HANDLE       hSuicideRequest;
 } EnumSessionAsyncCallbackData;
 
 typedef struct tagDP_MSG_REPLY_STRUCT
 {
   HANDLE hReceipt;
-  WORD   wExpectedReply;
+  WORD  *expectedReplies;
+  DWORD  expectedReplyCount;
   LPVOID lpReplyMsg;
   DWORD  dwMsgBodySize;
-  /* FIXME: Is the message header required as well? */
+  void  *replyMsgHeader;
 } DP_MSG_REPLY_STRUCT, *LPDP_MSG_REPLY_STRUCT;
 
 typedef struct tagDP_MSG_REPLY_STRUCT_LIST
@@ -60,7 +62,8 @@ struct PlayerData
   /* Individual player information */
   DPID dpid;
 
-  DPNAME name;
+  DPNAME *name;
+  DPNAME *nameA;
   HANDLE hEvent;
 
   ULONG  uRef;  /* What is the reference count on this data? */
@@ -103,7 +106,8 @@ struct GroupData
   DWORD dwFlags; /* Flags describing anything special about the group */
 
   DPID   dpid;
-  DPNAME name;
+  DPNAME *name;
+  DPNAME *nameA;
 
   /* View of local data */
   LPVOID lpLocalData;
@@ -198,6 +202,10 @@ typedef struct IDirectPlayImpl
 HRESULT DP_HandleMessage( IDirectPlayImpl *This, const void *lpMessageBody,
         DWORD  dwMessageBodySize, const void *lpMessageHeader, WORD wCommandId, WORD wVersion,
         void **lplpReply, DWORD *lpdwMsgSize );
+DPSESSIONDESC2 *DP_DuplicateSessionDesc( const DPSESSIONDESC2 *src, BOOL dstAnsi, BOOL srcAnsi );
+HRESULT DP_CreatePlayer( IDirectPlayImpl *This, void *msgHeader, DPID *lpid, DPNAME *lpName,
+                         void *data, DWORD dataSize, void *spData, DWORD spDataSize, DWORD dwFlags,
+                         HANDLE hEvent, BOOL bAnsi );
 
 /* DP SP external interfaces into DirectPlay */
 extern HRESULT DP_GetSPPlayerData( IDirectPlayImpl *lpDP, DPID idPlayer, void **lplpData );

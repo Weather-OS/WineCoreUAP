@@ -136,6 +136,8 @@ static void create_offscreen_window_surface( HWND hwnd, const RECT *surface_rect
     info->bmiHeader.biCompression = BI_RGB;
 
     *window_surface = window_surface_create( sizeof(*surface), &offscreen_window_surface_funcs, hwnd, surface_rect, info, 0 );
+
+    if (previous) window_surface_release( previous );
 }
 
 struct scaled_surface
@@ -274,16 +276,20 @@ void create_window_surface( HWND hwnd, BOOL create_layered, const RECT *surface_
     UINT dpi = get_dpi_for_window( hwnd );
     RECT monitor_rect;
 
-    if ((driver_surface = get_driver_window_surface( *window_surface, monitor_dpi )))
-        window_surface_add_ref( driver_surface );
 
     monitor_rect = get_surface_rect( map_dpi_rect( *surface_rect, dpi, monitor_dpi ) );
+    if ((driver_surface = get_driver_window_surface( *window_surface, monitor_dpi )))
+    {
+        /* reuse the underlying driver surface only if it also matches the target monitor rect */
+        if (EqualRect( &driver_surface->rect, &monitor_rect )) window_surface_add_ref( driver_surface );
+        else window_surface_add_ref( (driver_surface = &dummy_surface) );
+    }
+
     if (!user_driver->pCreateWindowSurface( hwnd, create_layered, &monitor_rect, &driver_surface ))
     {
         if (driver_surface) window_surface_release( driver_surface );
         if (*window_surface)
         {
-            window_surface_release( *window_surface );
             /* create an offscreen window surface if the driver doesn't implement CreateWindowSurface */
             create_offscreen_window_surface( hwnd, surface_rect, window_surface );
         }
@@ -302,11 +308,13 @@ void create_window_surface( HWND hwnd, BOOL create_layered, const RECT *surface_
     {
         struct scaled_surface *surface = get_scaled_surface( previous );
         scaled_surface_set_target( surface, driver_surface, monitor_dpi );
+        window_surface_release( driver_surface );
         return;
     }
     if (previous) window_surface_release( previous );
 
     *window_surface = scaled_surface_create( hwnd, surface_rect, dpi, monitor_dpi, driver_surface );
+    window_surface_release( driver_surface );
 }
 
 struct window_surface *get_driver_window_surface( struct window_surface *surface, UINT monitor_dpi )

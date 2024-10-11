@@ -55,6 +55,27 @@ struct vec4
     float x, y, z, w;
 };
 
+enum range {
+    RANGE_FULL  = 0,
+    RANGE_UNORM = 1,
+    RANGE_SNORM = 2,
+};
+
+struct d3dx_color
+{
+    struct vec4 value;
+    enum range rgb_range;
+    enum range a_range;
+};
+
+static inline void set_d3dx_color(struct d3dx_color *color, const struct vec4 *value, enum range rgb_range,
+        enum range a_range)
+{
+    color->value = *value;
+    color->rgb_range = rgb_range;
+    color->a_range = a_range;
+}
+
 struct volume
 {
     UINT width;
@@ -70,13 +91,19 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
 }
 
 /* for internal use */
-enum format_type {
-    FORMAT_ARGB,   /* unsigned */
-    FORMAT_ARGBF16,/* float 16 */
-    FORMAT_ARGBF,  /* float */
-    FORMAT_DXT,
-    FORMAT_INDEX,
-    FORMAT_UNKNOWN
+enum component_type
+{
+    CTYPE_EMPTY,
+    CTYPE_UNORM,
+    CTYPE_SNORM,
+    CTYPE_FLOAT,
+    CTYPE_LUMA,
+    CTYPE_INDEX,
+};
+
+enum format_flag
+{
+    FMT_FLAG_DXT  = 0x01,
 };
 
 struct pixel_format_desc {
@@ -87,9 +114,9 @@ struct pixel_format_desc {
     UINT block_width;
     UINT block_height;
     UINT block_byte_count;
-    enum format_type type;
-    void (*from_rgba)(const struct vec4 *src, struct vec4 *dst);
-    void (*to_rgba)(const struct vec4 *src, struct vec4 *dst, const PALETTEENTRY *palette);
+    enum component_type a_type;
+    enum component_type rgb_type;
+    uint32_t flags;
 };
 
 struct d3dx_pixels
@@ -126,15 +153,16 @@ struct d3dx_image
     uint32_t layer_count;
 
     BYTE *pixels;
+    PALETTEENTRY *palette;
     uint32_t layer_pitch;
 
     /*
-     * image_buf and palette are pointers to allocated memory used to store
+     * image_buf and image_palette are pointers to allocated memory used to store
      * image data. If they are non-NULL, they need to be freed when no longer
      * in use.
      */
     void *image_buf;
-    PALETTEENTRY *palette;
+    PALETTEENTRY *image_palette;
 
     D3DXIMAGE_FILEFORMAT image_file_format;
 };
@@ -154,20 +182,43 @@ struct d3dx_include_from_file
 extern CRITICAL_SECTION from_file_mutex;
 extern const struct ID3DXIncludeVtbl d3dx_include_from_file_vtbl;
 
+static inline BOOL is_unknown_format(const struct pixel_format_desc *format)
+{
+    return (format->format == D3DFMT_UNKNOWN);
+}
+
+static inline BOOL is_index_format(const struct pixel_format_desc *format)
+{
+    return (format->a_type == CTYPE_INDEX || format->rgb_type == CTYPE_INDEX);
+}
+
+static inline BOOL is_compressed_format(const struct pixel_format_desc *format)
+{
+    return !!(format->flags & FMT_FLAG_DXT);
+}
+
+static inline BOOL format_types_match(const struct pixel_format_desc *src, const struct pixel_format_desc *dst)
+{
+    if ((src->a_type && dst->a_type) && (src->a_type != dst->a_type))
+        return FALSE;
+
+    if ((src->rgb_type && dst->rgb_type) && (src->rgb_type != dst->rgb_type))
+        return FALSE;
+
+    if (src->flags != dst->flags)
+        return FALSE;
+
+    return (src->rgb_type == dst->rgb_type || src->a_type == dst->a_type);
+}
+
 static inline BOOL is_conversion_from_supported(const struct pixel_format_desc *format)
 {
-    if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT)
-        return TRUE;
-    return !!format->to_rgba;
+    return !is_unknown_format(format);
 }
 
 static inline BOOL is_conversion_to_supported(const struct pixel_format_desc *format)
 {
-    if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT)
-        return TRUE;
-    return !!format->from_rgba;
+    return !is_index_format(format) && !is_unknown_format(format);
 }
 
 HRESULT map_view_of_file(const WCHAR *filename, void **buffer, DWORD *length);
@@ -178,7 +229,9 @@ HRESULT write_buffer_to_file(const WCHAR *filename, ID3DXBuffer *buffer);
 const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
-void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, struct vec4 *dst);
+void format_to_d3dx_color(const struct pixel_format_desc *format, const BYTE *src, const PALETTEENTRY *palette,
+        struct d3dx_color *dst);
+void format_from_d3dx_color(const struct pixel_format_desc *format, const struct d3dx_color *src, BYTE *dst);
 
 void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
     BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,

@@ -832,6 +832,7 @@ SOURCES = \
 	windows.applicationmodel.core.idl \
 	windows.applicationmodel.idl \
 	windows.data.json.idl \
+	windows.data.xml.dom.idl \
 	windows.devices.bluetooth.idl \
 	windows.devices.enumeration.idl \
 	windows.devices.geolocation.idl \
@@ -873,6 +874,7 @@ SOURCES = \
 	windows.perception.spatial.idl \
 	windows.perception.spatial.surfaces.idl \
 	windows.security.authentication.onlineid.idl \
+	windows.security.authorization.appcapabilityaccess.idl \
 	windows.security.credentials.idl \
 	windows.security.credentials.ui.idl \
 	windows.security.cryptography.idl \
@@ -893,8 +895,11 @@ SOURCES = \
 	windows.ui.core.idl \
 	windows.ui.idl \
 	windows.ui.input.idl \
+	windows.ui.notifications.idl \
 	windows.ui.viewmanagement.idl \
 	windows.ui.xaml.hosting.desktopwindowxamlsource.idl \
+	windows.ui.xaml.idl \
+	windows.ui.xaml.interop.idl \
 	windowscontracts.idl \
 	windowsx.h \
 	wine/afd.h \
@@ -940,6 +945,7 @@ SOURCES = \
 	wine/windef16.h \
 	wine/wine_common_ver.rc \
 	wine/wined3d.h \
+	wine/winedmo.h \
 	wine/winedxgi.idl \
 	wine/wingdi16.h \
 	wine/winnet16.h \

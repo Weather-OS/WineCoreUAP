@@ -24,6 +24,7 @@
 #include <dplay.h>
 #include <dplobby.h>
 #include <netfw.h>
+#include <winsock2.h>
 
 static HRESULT (WINAPI *pDirectPlayEnumerateA)( LPDPENUMDPCALLBACKA, void* );
 static HRESULT (WINAPI *pDirectPlayEnumerateW)( LPDPENUMDPCALLBACKW, void* );
@@ -624,7 +625,7 @@ static void check_messages( IDirectPlay4 *pDP, DPID *dpid, DWORD dpidSize,
     DPID idFrom, idTo;
     UINT i;
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
     HRESULT hr;
     char temp[5];
 
@@ -652,7 +653,914 @@ static void check_messages( IDirectPlay4 *pDP, DPID *dpid, DWORD dpidSize,
     callbackData->dwCounter1 = i;
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
+}
+
+typedef struct
+{
+    IDirectPlay4 *dp;
+    DPSESSIONDESC2 *dpsd;
+    DWORD timeout;
+    LPDPENUMSESSIONSCALLBACK2 callback;
+    void *context;
+    DWORD flags;
+
+    HRESULT hr;
+
+    HANDLE thread;
+} EnumSessionsParam;
+
+static CALLBACK DWORD enumSessionsProc( void *p )
+{
+    EnumSessionsParam *param = p;
+
+    param->hr = IDirectPlayX_EnumSessions( param->dp, param->dpsd, param->timeout, param->callback,
+                                           param->context, param->flags );
+
+    return 0;
+}
+
+static HANDLE enumSessionsAsync( IDirectPlay4 *dp, DPSESSIONDESC2 *dpsd, DWORD timeout,
+                                 LPDPENUMSESSIONSCALLBACK2 callback, void *context, DWORD flags )
+{
+    EnumSessionsParam *param;
+
+    param = calloc( 1, sizeof( EnumSessionsParam ) );
+
+    param->dp = dp;
+    param->dpsd = dpsd;
+    param->timeout = timeout;
+    param->callback = callback;
+    param->context = context;
+    param->flags = flags;
+
+    param->thread = CreateThread( NULL, 0, enumSessionsProc, param, 0, NULL );
+
+    return param;
+}
+
+static HRESULT enumSessionsAsyncWait( EnumSessionsParam *param, DWORD timeout )
+{
+    HRESULT hr = 0xdeadbeef;
+    DWORD waitResult;
+
+    waitResult = WaitForSingleObject( param->thread, timeout );
+    CloseHandle( param->thread );
+    if ( waitResult == WAIT_OBJECT_0 )
+    {
+        hr = param->hr;
+        free( param );
+    }
+
+    return hr;
+}
+
+typedef struct
+{
+    IDirectPlay4 *dp;
+    DPSESSIONDESC2 *dpsd;
+    DWORD flags;
+
+    HRESULT hr;
+
+    HANDLE thread;
+} OpenParam;
+
+static CALLBACK DWORD openProc( void *p )
+{
+    OpenParam *param = p;
+
+    param->hr = IDirectPlayX_Open( param->dp, param->dpsd, param->flags );
+
+    return 0;
+}
+
+static OpenParam *openAsync( IDirectPlay4 *dp, DPSESSIONDESC2 *dpsd, DWORD flags )
+{
+    OpenParam *param;
+
+    param = calloc( 1, sizeof( OpenParam ) );
+
+    param->dp = dp;
+    param->dpsd = dpsd;
+    param->flags = flags;
+
+    param->thread = CreateThread( NULL, 0, openProc, param, 0, NULL );
+
+    return param;
+}
+
+static HRESULT openAsyncWait( OpenParam *param, DWORD timeout )
+{
+    HRESULT hr = 0xdeadbeef;
+    DWORD waitResult;
+
+    waitResult = WaitForSingleObject( param->thread, timeout );
+    CloseHandle( param->thread );
+    if ( waitResult == WAIT_OBJECT_0 )
+    {
+        hr = param->hr;
+        free( param );
+    }
+
+    return hr;
+}
+
+#include "pshpack1.h"
+
+typedef struct
+{
+    DWORD mixed;
+    SOCKADDR_IN addr;
+} SpHeader;
+
+typedef struct
+{
+    DWORD magic;
+    WORD command;
+    WORD version;
+} MessageHeader;
+
+typedef struct
+{
+    SOCKADDR_IN tcpAddr;
+    SOCKADDR_IN udpAddr;
+} SpData;
+
+typedef struct
+{
+    DWORD size;
+    DWORD flags;
+    DPID id;
+    DWORD shortNameLength;
+    DWORD longNameLength;
+    DWORD spDataSize;
+    DWORD playerDataSize;
+    DWORD playerCount;
+    DPID systemPlayerId;
+    DWORD fixedSize;
+    DWORD playerVersion;
+    DPID parentId;
+} PackedPlayer;
+
+typedef struct
+{
+    DWORD size;
+    DWORD flags;
+    DPID id;
+    DWORD infoMask;
+    DWORD versionOrSystemPlayerId;
+} SuperPackedPlayer;
+
+typedef struct
+{
+    MessageHeader header;
+    GUID appGuid;
+    DWORD passwordOffset;
+    DWORD flags;
+} EnumSessionsRequest;
+
+typedef struct
+{
+    MessageHeader header;
+    DPSESSIONDESC2 dpsd;
+    DWORD nameOffset;
+} EnumSessionsReply;
+
+typedef struct
+{
+    MessageHeader header;
+    DWORD flags;
+} RequestPlayerId;
+
+typedef struct
+{
+    MessageHeader header;
+    DPID id;
+    DPSECURITYDESC secDesc;
+    DWORD sspiProviderOffset;
+    DWORD capiProviderOffset;
+    HRESULT result;
+    WCHAR sspiProvider[ 16 ];
+    WCHAR capiProvider[ 16 ];
+} RequestPlayerReply;
+
+typedef struct
+{
+    MessageHeader header;
+    DPID toId;
+    DPID playerId;
+    DPID groupId;
+    DWORD createOffset;
+    DWORD passwordOffset;
+    PackedPlayer playerInfo;
+    SpData spData;
+} AddForwardRequest;
+
+typedef struct
+{
+    MessageHeader header;
+    DWORD playerCount;
+    DWORD groupCount;
+    DWORD packedOffset;
+    DWORD shortcutCount;
+    DWORD descriptionOffset;
+    DWORD nameOffset;
+    DWORD passwordOffset;
+} SuperEnumPlayersReply;
+
+typedef struct
+{
+    MessageHeader header;
+    HRESULT result;
+} AddForwardReply;
+
+typedef struct
+{
+    MessageHeader header;
+    DPID toId;
+    DPID playerId;
+    DPID groupId;
+    DWORD createOffset;
+    DWORD passwordOffset;
+    PackedPlayer playerInfo;
+    SpData spData;
+} AddForward;
+
+typedef struct
+{
+    MessageHeader header;
+    DPID playerId;
+} AddForwardAck;
+
+#include "poppack.h"
+
+#define bindUdp( port ) bindUdp_( __LINE__, port )
+static SOCKET bindUdp_( int line, unsigned short port )
+{
+    u_long nbio = 1;
+    SOCKADDR_IN addr;
+    int wsResult;
+    SOCKET sock;
+
+    sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+    ok_( __FILE__, line) ( sock != INVALID_SOCKET, "got UDP socket %#Ix.\n", sock );
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons( port );
+    addr.sin_addr.s_addr = htonl( INADDR_ANY );
+    wsResult = bind( sock, (SOCKADDR *) &addr, sizeof( addr ) );
+    ok_( __FILE__, line)( !wsResult, "bind() returned %d.\n", wsResult );
+
+    wsResult = ioctlsocket( sock, FIONBIO, &nbio );
+    ok_( __FILE__, line)( !wsResult, "ioctlsocket() returned %d.\n", wsResult );
+
+    return sock;
+}
+
+#define listenTcp( port ) listenTcp_( __LINE__, port )
+static SOCKET listenTcp_( int line, unsigned short port )
+{
+    u_long nbio = 1;
+    SOCKADDR_IN addr;
+    int wsResult;
+    SOCKET sock;
+
+    sock = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+    ok_( __FILE__, line)( sock != INVALID_SOCKET, "got TCP listen socket %#Ix.\n", sock );
+
+    memset( &addr, 0, sizeof( addr ) );
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons( port );
+    addr.sin_addr.s_addr = INADDR_ANY;
+
+    wsResult = bind( sock, (SOCKADDR *) &addr, sizeof( addr ) );
+    ok_( __FILE__, line )( wsResult != SOCKET_ERROR, "bind() returned %d.\n", wsResult );
+
+    wsResult = listen( sock, SOMAXCONN );
+    ok_( __FILE__, line )( wsResult != SOCKET_ERROR, "listen() returned %d.\n", wsResult );
+
+    wsResult = ioctlsocket( sock, FIONBIO, &nbio );
+    ok_( __FILE__, line)( wsResult != SOCKET_ERROR, "ioctlsocket() returned %d.\n", wsResult );
+
+    return sock;
+}
+
+#define acceptTcp( listenSock ) acceptTcp_( __LINE__, listenSock )
+static SOCKET acceptTcp_( int line, SOCKET listenSock )
+{
+    struct timeval timeout;
+    SOCKADDR_IN addr;
+    int addrSize;
+    int wsResult;
+    SOCKET sock;
+    fd_set fds;
+
+    FD_ZERO( &fds );
+    FD_SET( listenSock, &fds );
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    wsResult = select( listenSock + 1, &fds, NULL, &fds, &timeout );
+    ok_( __FILE__, line )( wsResult != SOCKET_ERROR, "select() returned %d.\n", wsResult );
+
+    addrSize = sizeof( addr );
+    sock = accept( listenSock, (SOCKADDR *) &addr, &addrSize );
+
+    return sock;
+}
+
+#define checkNoMoreAccepts( listenSock ) checkNoMoreAccepts_( __LINE__, listenSock )
+static void checkNoMoreAccepts_( int line, SOCKET listenSock )
+{
+    struct timeval timeout;
+    int wsResult;
+    fd_set fds;
+
+    FD_ZERO( &fds );
+    FD_SET( listenSock, &fds );
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100000;
+    wsResult = select( listenSock + 1, &fds, NULL, &fds, &timeout );
+    ok_( __FILE__, line )( !wsResult, "select() returned %d.\n", wsResult );
+}
+
+#define connectTcp( port ) connectTcp_( __LINE__, port )
+static SOCKET connectTcp_( int line, unsigned short port )
+{
+    SOCKADDR_IN addr;
+    int wsResult;
+    SOCKET sock;
+
+    sock = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+    ok_( __FILE__, line)( sock != INVALID_SOCKET, "got send socket %#Ix.\n", sock );
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons( port );
+    addr.sin_addr.s_addr = htonl( INADDR_LOOPBACK );
+    wsResult = connect( sock, (SOCKADDR *) &addr, sizeof( addr ) );
+    ok_( __FILE__, line)( !wsResult, "connect returned %d.\n", wsResult );
+
+    return sock;
+}
+
+#define receiveMessage( sock, buffer, size ) receiveMessage_( __LINE__, sock, buffer, size )
+static int receiveMessage_( int line, SOCKET sock, void *buffer, int size )
+{
+    struct timeval timeout;
+    int recvResult;
+    int wsResult;
+    fd_set fds;
+
+    FD_ZERO( &fds );
+    FD_SET( sock, &fds );
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    wsResult = select( sock + 1, &fds, NULL, &fds, &timeout );
+    ok_( __FILE__, line )( wsResult != SOCKET_ERROR, "select() returned %d.\n", wsResult );
+
+    memset( buffer, 0xcc, size );
+    recvResult = recv( sock, buffer, size, 0 );
+
+    return recvResult;
+}
+
+#define checkNoMoreMessages( sock ) checkNoMoreMessages_( __LINE__, sock )
+static void checkNoMoreMessages_( int line, SOCKET sock )
+{
+    struct timeval timeout;
+    char buffer[ 1024 ];
+    int wsResult;
+    fd_set fds;
+
+    FD_ZERO( &fds );
+    FD_SET( sock, &fds );
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100000;
+    select( sock + 1, &fds, NULL, &fds, &timeout );
+
+    wsResult = recv( sock, buffer, sizeof( buffer ), 0 );
+    ok_( __FILE__, line )( !wsResult || wsResult == SOCKET_ERROR, "recv() returned %d.\n", wsResult );
+}
+
+#define checkSpHeader( header, expectedSize, sizeTodo ) checkSpHeader_( __LINE__, header, expectedSize, sizeTodo )
+static unsigned short checkSpHeader_( int line, SpHeader *header, DWORD expectedSize, BOOL sizeTodo )
+{
+    todo_wine_if( sizeTodo ) ok_( __FILE__, line )( header->mixed == 0xfab00000 + expectedSize, "got mixed %#lx.\n",
+                                                    header->mixed );
+    ok_( __FILE__, line )( header->addr.sin_family == AF_INET, "got family %d.\n", header->addr.sin_family );
+    ok_( __FILE__, line )( 2300 <= ntohs( header->addr.sin_port ) && ntohs( header->addr.sin_port ) < 2350,
+                           "got port %d.\n", ntohs( header->addr.sin_port ) );
+    ok_( __FILE__, line )( !header->addr.sin_addr.s_addr, "got address %#lx.\n", header->addr.sin_addr.s_addr );
+
+    return ntohs( header->addr.sin_port );
+}
+
+#define checkMessageHeader( header, expectedCommand ) checkMessageHeader_( __LINE__, header, expectedCommand )
+static void checkMessageHeader_( int line, MessageHeader *header, WORD expectedCommand )
+{
+    ok_( __FILE__, line )( header->magic == 0x79616c70, "got magic %#lx.\n", header->magic );
+    ok_( __FILE__, line )( header->command == expectedCommand, "got command %d.\n", header->command );
+}
+
+#define checkSpData( spData ) checkSpData_( __LINE__, spData )
+static void checkSpData_( int line, SpData *spData )
+{
+    ok_( __FILE__, line )( spData->tcpAddr.sin_family == AF_INET, "got TCP family %d.\n", spData->tcpAddr.sin_family );
+    ok_( __FILE__, line )( 2300 <= ntohs( spData->tcpAddr.sin_port ) && ntohs( spData->tcpAddr.sin_port ) < 2350,
+                           "got TCP port %d.\n", ntohs( spData->tcpAddr.sin_port ) );
+    ok_( __FILE__, line )( !spData->tcpAddr.sin_addr.s_addr, "got TCP address %#lx.\n",
+                           spData->tcpAddr.sin_addr.s_addr );
+    ok_( __FILE__, line )( spData->udpAddr.sin_family == AF_INET, "got UDP family %d.\n", spData->udpAddr.sin_family );
+    todo_wine ok_( __FILE__, line )( 2350 <= ntohs( spData->udpAddr.sin_port ) && ntohs( spData->udpAddr.sin_port ) < 2400,
+                                     "got UDP port %d.\n", ntohs( spData->udpAddr.sin_port ) );
+    ok_( __FILE__, line )( !spData->udpAddr.sin_addr.s_addr, "got UDP address %#lx.\n",
+                           spData->udpAddr.sin_addr.s_addr );
+}
+
+static void checkPackedPlayer_( int line, PackedPlayer *player, DWORD expectedFlags, DPID expectedId,
+                                DWORD expectedShortNameLength, DWORD expectedLongNameLength,
+                                DPID expectedSystemPlayerId, BOOL flagsTodo, BOOL shortNameTodo )
+{
+    DWORD expectedSize = sizeof( PackedPlayer ) + expectedShortNameLength + expectedLongNameLength + sizeof( SpData );
+
+    todo_wine_if( shortNameTodo ) ok_( __FILE__, line )( player->size == expectedSize, "got player info size %lu.\n",
+                                                         player->size );
+    todo_wine_if( flagsTodo ) ok_( __FILE__, line )( player->flags == expectedFlags, "got flags %#lx.\n", player->flags );
+    ok_( __FILE__, line )( player->id == expectedId, "got player info player id %#lx.\n", player->id );
+    todo_wine_if( shortNameTodo ) ok_( __FILE__, line )( player->shortNameLength == expectedShortNameLength,
+                                                         "got short name length %lu.\n", player->shortNameLength );
+    ok_( __FILE__, line )( player->longNameLength == expectedLongNameLength, "got long name length %lu.\n",
+                           player->longNameLength );
+    ok_( __FILE__, line )( player->spDataSize == sizeof( SpData ), "got SP data size %lu.\n", player->spDataSize );
+    ok_( __FILE__, line )( !player->playerDataSize, "got player data size %lu.\n", player->playerDataSize );
+    ok_( __FILE__, line )( !player->playerCount, "got player count %lu.\n", player->playerCount );
+    ok_( __FILE__, line )( player->systemPlayerId == expectedSystemPlayerId, "got system player id %#lx.\n",
+                           player->systemPlayerId );
+    ok_( __FILE__, line )( player->fixedSize == sizeof( PackedPlayer ), "got fixed size %lu.\n", player->fixedSize );
+    ok_( __FILE__, line )( !player->parentId, "got parent id %#lx.\n", player->parentId );
+}
+
+#define receiveEnumSessionsRequest( sock, expectedAppGuid, expectedPassword, expectedFlags ) \
+        receiveEnumSessionsRequest_( __LINE__, sock, expectedAppGuid, expectedPassword, expectedFlags )
+static unsigned short receiveEnumSessionsRequest_( int line, SOCKET sock, const GUID *expectedAppGuid,
+                                                   const WCHAR *expectedPassword, DWORD expectedFlags )
+{
+    struct
+    {
+        SpHeader spHeader;
+        EnumSessionsRequest request;
+        WCHAR password[ 256 ];
+    } request;
+    DWORD expectedPasswordSize;
+    unsigned short port;
+    DWORD expectedSize;
+    int wsResult;
+
+    expectedPasswordSize = expectedPassword ? (lstrlenW( expectedPassword ) + 1) * sizeof( WCHAR ) : 0;
+    expectedSize = sizeof( request.spHeader ) + sizeof( request.request ) + expectedPasswordSize;
+
+    wsResult = receiveMessage_( line, sock, &request, sizeof( request ) );
+    ok_( __FILE__, line )( wsResult == expectedSize, "recv() returned %d.\n", wsResult );
+    if ( wsResult == SOCKET_ERROR )
+        return 0;
+
+    port = checkSpHeader_( line, &request.spHeader, expectedSize, FALSE );
+    checkMessageHeader_( line, &request.request.header, 2 );
+    ok_( __FILE__, line )( IsEqualGUID( &request.request.appGuid, expectedAppGuid ), "got app guid %s.\n",
+                           wine_dbgstr_guid( &request.request.appGuid ) );
+    if ( expectedPassword )
+    {
+        ok_( __FILE__, line )( request.request.passwordOffset == 32, "got password offset %lu.\n",
+                               request.request.passwordOffset );
+        ok_( __FILE__, line )( !lstrcmpW( request.password, expectedPassword ), "got password %s.\n",
+                               wine_dbgstr_w( request.password ) );
+    }
+    else
+    {
+        ok_( __FILE__, line )( !request.request.passwordOffset, "got password offset %lu.\n",
+                               request.request.passwordOffset );
+    }
+    ok_( __FILE__, line )( request.request.flags == expectedFlags, "got flags %#lx.\n", request.request.flags );
+
+    return port;
+}
+
+#define sendEnumSessionsReply( sock, port, dpsd ) sendEnumSessionsReply_( __LINE__, sock, port, dpsd )
+static void sendEnumSessionsReply_( int line, SOCKET sock, unsigned short port, const DPSESSIONDESC2 *dpsd )
+{
+    struct
+    {
+        SpHeader spHeader;
+        EnumSessionsReply reply;
+        WCHAR name[ 256 ];
+    } reply =
+    {
+        .spHeader =
+        {
+            .mixed = 0xfab00000,
+            .addr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( port ),
+            },
+        },
+        .reply =
+        {
+            .header =
+            {
+                .magic = 0x79616c70,
+                .command = 1,
+                .version = 14,
+            },
+            .dpsd = *dpsd,
+            .nameOffset = sizeof( reply.reply ),
+        },
+    };
+    DWORD passwordSize;
+    int wsResult;
+    DWORD size;
+
+    passwordSize = (lstrlenW( dpsd->lpszSessionName ) + 1) * sizeof( WCHAR );
+    size = sizeof( reply.spHeader ) + sizeof( reply.reply ) + passwordSize;
+
+    reply.spHeader.mixed += size;
+    reply.reply.dpsd.lpszSessionName = NULL;
+    reply.reply.dpsd.lpszPassword = NULL;
+    memcpy( reply.name, dpsd->lpszSessionName, passwordSize );
+
+    wsResult = send( sock, (char *) &reply, size, 0 );
+    ok_( __FILE__, line )( wsResult == size, "send() returned %d.\n", wsResult );
+}
+
+#define receiveRequestPlayerId( sock, expectedFlags ) receiveRequestPlayerId_( __LINE__, sock, expectedFlags )
+static unsigned short receiveRequestPlayerId_( int line, SOCKET sock, DWORD expectedFlags )
+{
+    struct
+    {
+        SpHeader spHeader;
+        RequestPlayerId request;
+    } request;
+    unsigned short port;
+    int wsResult;
+
+    wsResult = receiveMessage_( line, sock, &request, sizeof( request ) );
+    ok_( __FILE__, line )( wsResult == sizeof( request ), "recv() returned %d.\n", wsResult );
+
+    port = checkSpHeader_( line, &request.spHeader, sizeof( request ), FALSE );
+    checkMessageHeader_( line, &request.request.header, 5 );
+    ok_( __FILE__, line )( request.request.flags == expectedFlags, "got flags %#lx.\n", request.request.flags );
+
+    return port;
+}
+
+#define sendRequestPlayerReply( sock, port, id, result ) sendRequestPlayerReply_( __LINE__, sock, port, id, result )
+static void sendRequestPlayerReply_( int line, SOCKET sock, unsigned short port, DPID id, HRESULT result )
+{
+    struct
+    {
+        SpHeader spHeader;
+        RequestPlayerReply reply;
+    } reply =
+    {
+        .spHeader =
+        {
+            .mixed = 0xfab00000 + sizeof( reply ),
+            .addr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( port ),
+            },
+        },
+        .reply =
+        {
+            .header =
+            {
+                .magic = 0x79616c70,
+                .command = 7,
+                .version = 14,
+            },
+            .id = id,
+            .result = result,
+        },
+    };
+    int wsResult;
+
+    wsResult = send( sock, (char *) &reply, sizeof( reply ), 0 );
+    ok_( __FILE__, line )( wsResult == sizeof( reply ), "send() returned %d.\n", wsResult );
+}
+
+#define receiveAddForwardRequest( sock, expectedPlayerId, expectedPassword, expectedTickCount ) \
+        receiveAddForwardRequest_( __LINE__, sock, expectedPlayerId, expectedPassword, expectedTickCount )
+static unsigned short receiveAddForwardRequest_( int line, SOCKET sock, DPID expectedPlayerId,
+                                                 const WCHAR *expectedPassword, DWORD expectedTickCount )
+{
+    struct
+    {
+        SpHeader spHeader;
+        AddForwardRequest request;
+    } request;
+    DWORD expectedPasswordSize;
+    WCHAR password[ 256 ];
+    unsigned short port;
+    DWORD expectedSize;
+    DWORD tickCount;
+    int wsResult;
+
+    expectedPasswordSize = (lstrlenW( expectedPassword ) + 1) * sizeof( WCHAR );
+    expectedSize = sizeof( request ) + expectedPasswordSize + sizeof( DWORD );
+
+    wsResult = receiveMessage_( line, sock, &request, sizeof( request ) );
+    ok_( __FILE__, line )( wsResult == sizeof( request ), "recv() returned %d.\n", wsResult );
+    if ( wsResult == SOCKET_ERROR )
+        return 0;
+
+    port = checkSpHeader_( line, &request.spHeader, expectedSize, FALSE );
+    checkMessageHeader_( line, &request.request.header, 19 );
+    ok_( __FILE__, line )( !request.request.toId, "got destination id %#lx.\n", request.request.toId );
+    ok_( __FILE__, line )( request.request.playerId == expectedPlayerId, "got player id %#lx.\n",
+                           request.request.playerId );
+    ok_( __FILE__, line )( !request.request.groupId, "got group id %#lx.\n", request.request.groupId );
+    ok_( __FILE__, line )( request.request.createOffset == 28, "got create offset %lu.\n",
+                           request.request.createOffset );
+    ok_( __FILE__, line )( request.request.passwordOffset == 108, "got password offset %lu.\n",
+                           request.request.passwordOffset );
+    checkPackedPlayer_( line, &request.request.playerInfo, 0x9, expectedPlayerId, 0, 0, expectedPlayerId, FALSE,
+                        FALSE );
+    checkSpData_( line, &request.request.spData );
+
+    wsResult = receiveMessage_( line, sock, password, expectedPasswordSize );
+
+    ok_( __FILE__, line )( wsResult == expectedPasswordSize, "recv() returned %d.\n", wsResult );
+    ok_( __FILE__, line )( !lstrcmpW( password, expectedPassword ), "got password %s.\n", wine_dbgstr_w( password ) );
+
+    wsResult = receiveMessage_( line, sock, &tickCount, sizeof( DWORD ) );
+
+    ok_( __FILE__, line )( wsResult == sizeof( DWORD ), "recv() returned %d.\n", wsResult );
+    ok_( __FILE__, line )( tickCount == expectedTickCount, "got tick count %#lx.\n", tickCount );
+
+    return port;
+}
+
+#define sendSuperEnumPlayersReply( sock, tcpPort, udpPort, dpsd, sessionName ) \
+        sendSuperEnumPlayersReply_( __LINE__, sock, tcpPort, udpPort, dpsd, sessionName )
+static void sendSuperEnumPlayersReply_( int line, SOCKET sock, unsigned short tcpPort, unsigned short udpPort,
+                                        const DPSESSIONDESC2 *dpsd, const WCHAR *sessionName )
+{
+#define SHORT_NAME L"short name"
+#define LONG_NAME L"long name"
+    struct
+    {
+        SpHeader spHeader;
+        SuperEnumPlayersReply reply;
+        DPSESSIONDESC2 dpsd;
+        WCHAR sessionName[ 256 ];
+        SuperPackedPlayer superPackedPlayer0;
+        BYTE spDataLength0;
+        SpData spData0;
+        SuperPackedPlayer superPackedPlayer1;
+        BYTE spDataLength1;
+        SpData spData1;
+        SuperPackedPlayer superPackedPlayer2;
+        WCHAR shortName[ ARRAYSIZE( SHORT_NAME ) ];
+        WCHAR longName[ ARRAYSIZE( LONG_NAME ) ];
+        BYTE playerDataLength2;
+        BYTE playerData[ 4 ];
+        BYTE spDataLength2;
+        SpData spData2;
+    } reply =
+    {
+        .spHeader =
+        {
+            .mixed = 0xfab00000 + sizeof( reply ),
+            .addr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( tcpPort ),
+            },
+        },
+        .reply =
+        {
+            .header =
+            {
+                .magic = 0x79616c70,
+                .command = 41,
+                .version = 14,
+            },
+            .playerCount = 3,
+            .groupCount = 0,
+            .packedOffset = sizeof( reply.reply ) + sizeof( reply.dpsd ) + sizeof( reply.sessionName ),
+            .shortcutCount = 0,
+            .descriptionOffset = sizeof( reply.reply ),
+            .nameOffset = sizeof( reply.reply ) + sizeof( reply.dpsd ),
+            .passwordOffset = 0,
+        },
+        .dpsd = *dpsd,
+        .superPackedPlayer0 =
+        {
+            .size = 16,
+            .flags = 0x5,
+            .id = 0x12345678,
+            .infoMask = 0x4,
+            .versionOrSystemPlayerId = 14,
+        },
+        .spDataLength0 = sizeof( SpData ),
+        .spData0 =
+        {
+            .tcpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( tcpPort ),
+            },
+            .udpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( udpPort ),
+            },
+        },
+        .superPackedPlayer1 =
+        {
+            .size = 16,
+            .flags = 0xf,
+            .id = 0x51573,
+            .infoMask = 0x4,
+            .versionOrSystemPlayerId = 14,
+        },
+        .spDataLength1 = sizeof( SpData ),
+        .spData1 =
+        {
+            .tcpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( tcpPort ),
+            },
+            .udpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( udpPort ),
+            },
+        },
+        .superPackedPlayer2 =
+        {
+            .size = 16,
+            .flags = 0x8,
+            .id = 0x1337,
+            .infoMask = 0x17,
+            .versionOrSystemPlayerId = 14,
+        },
+        .shortName = SHORT_NAME,
+        .longName = LONG_NAME,
+        .playerDataLength2 = 4,
+        .playerData = { 1, 2, 3, 4, },
+        .spDataLength2 = sizeof( SpData ),
+        .spData2 =
+        {
+            .tcpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( tcpPort ),
+            },
+            .udpAddr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( udpPort ),
+            },
+        },
+    };
+#undef LONG_NAME
+#undef SHORT_NAME
+    int wsResult;
+
+    reply.dpsd.lpszSessionName = NULL;
+    reply.dpsd.lpszPassword = NULL;
+
+    lstrcpyW( reply.sessionName, sessionName );
+
+    wsResult = send( sock, (char *) &reply, sizeof( reply ), 0 );
+    ok_( __FILE__, line )( wsResult == sizeof( reply ), "send() returned %d.\n", wsResult );
+}
+
+#define sendAddForwardReply( sock, port, result ) sendAddForwardReply_( __LINE__, sock, port, result )
+static void sendAddForwardReply_( int line, SOCKET sock, unsigned short port, HRESULT result )
+{
+    struct
+    {
+        SpHeader spHeader;
+        AddForwardReply reply;
+    } reply =
+    {
+        .spHeader =
+        {
+            .mixed = 0xfab00000 + sizeof( reply ),
+            .addr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( port ),
+            },
+        },
+        .reply =
+        {
+            .header =
+            {
+                .magic = 0x79616c70,
+                .command = 36,
+                .version = 14,
+            },
+            .result = result,
+        },
+    };
+    int wsResult;
+
+    wsResult = send( sock, (char *) &reply, sizeof( reply ), 0 );
+    ok_( __FILE__, line )( wsResult == sizeof( reply ), "send() returned %d.\n", wsResult );
+}
+
+#define sendAddForward( sock, port, tcpPort, udpPort ) sendAddForward_( __LINE__, sock, port, tcpPort, udpPort )
+static void sendAddForward_( int line, SOCKET sock, unsigned short port, unsigned short tcpPort, unsigned short udpPort )
+{
+    struct
+    {
+        SpHeader spHeader;
+        AddForward reply;
+    } reply =
+    {
+        .spHeader =
+        {
+            .mixed = 0xfab00000 + sizeof( reply ),
+            .addr =
+            {
+                .sin_family = AF_INET,
+                .sin_port = htons( port ),
+            },
+        },
+        .reply =
+        {
+            .header =
+            {
+                .magic = 0x79616c70,
+                .command = 46,
+                .version = 14,
+            },
+            .toId = 0,
+            .playerId = 0x07734,
+            .groupId = 0,
+            .createOffset = 28,
+            .passwordOffset = 0,
+            .playerInfo =
+            {
+                .size = 48 + sizeof( SpData ),
+                .flags = 0x5,
+                .id = 0x07734,
+                .shortNameLength = 0,
+                .longNameLength = 0,
+                .spDataSize = sizeof( SpData ),
+                .playerDataSize = 0,
+                .playerCount = 0,
+                .systemPlayerId = 0x07734,
+                .fixedSize = 48,
+                .playerVersion = 14,
+                .parentId = 0,
+            },
+            .spData = {
+                .tcpAddr =
+                {
+                    .sin_family = AF_INET,
+                    .sin_port = htons( tcpPort ),
+                },
+                .udpAddr =
+                {
+                    .sin_family = AF_INET,
+                    .sin_port = htons( udpPort ),
+                },
+            },
+        },
+    };
+
+    int wsResult;
+
+    wsResult = send( sock, (char *) &reply, sizeof( reply ), 0 );
+    ok_( __FILE__, line )( wsResult == sizeof( reply ), "send() returned %d.\n", wsResult );
+}
+
+#define receiveAddForwardAck( sock, expectedPlayerId ) receiveAddForwardAck_( __LINE__, sock, expectedPlayerId )
+static unsigned short receiveAddForwardAck_( int line, SOCKET sock, DPID expectedPlayerId )
+{
+    struct
+    {
+        SpHeader spHeader;
+        AddForwardAck request;
+    } request;
+    unsigned short port;
+    int wsResult;
+
+    wsResult = receiveMessage_( line, sock, &request, sizeof( request ) );
+    todo_wine ok_( __FILE__, line )( wsResult == sizeof( request ), "recv() returned %d.\n", wsResult );
+    if ( wsResult == SOCKET_ERROR )
+        return 0;
+
+    port = checkSpHeader_( line, &request.spHeader, sizeof( request ), FALSE );
+    checkMessageHeader_( line, &request.request.header, 47 );
+
+    return port;
 }
 
 static void init_TCPIP_provider( IDirectPlay4 *pDP, LPCSTR strIPAddressString, WORD port )
@@ -694,7 +1602,7 @@ static void init_TCPIP_provider( IDirectPlay4 *pDP, LPCSTR strIPAddressString, W
 
     if( hr == DPERR_BUFFERTOOSMALL )
     {
-        pAddress = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwAddressSize );
+        pAddress = calloc( 1, dwAddressSize );
         hr = IDirectPlayLobby_CreateCompoundAddress( pDPL, addressElements, 2,
                                                      pAddress, &dwAddressSize );
         checkHR( DP_OK, hr );
@@ -703,7 +1611,7 @@ static void init_TCPIP_provider( IDirectPlay4 *pDP, LPCSTR strIPAddressString, W
     hr = IDirectPlayX_InitializeConnection( pDP, pAddress, 0 );
     checkHR( DP_OK, hr );
 
-    HeapFree( GetProcessHeap(), 0, pAddress );
+    free( pAddress );
     IDirectPlayLobby_Release(pDPL);
 }
 
@@ -1169,7 +2077,7 @@ static void test_EnumAddressTypes(void)
 
     if( hr == DPERR_BUFFERTOOSMALL )
     {
-        pAddress = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwAddressSize );
+        pAddress = calloc( 1, dwAddressSize );
         hr = IDirectPlayLobby_CreateCompoundAddress( pDPL, addressElements, 2,
                                                      pAddress, &dwAddressSize );
         checkHR( DP_OK, hr );
@@ -1179,7 +2087,7 @@ static void test_EnumAddressTypes(void)
     IDirectPlayX_Release(pDP);
     IDirectPlayLobby_Release(pDPL);
 
-    HeapFree( GetProcessHeap(), 0, pAddress );
+    free( pAddress );
 }
 
 /* Open */
@@ -1226,7 +2134,418 @@ static BOOL CALLBACK EnumSessions_cb2( LPCDPSESSIONDESC2 lpThisSD,
     return TRUE;
 }
 
+typedef struct
+{
+    DPID expectedDpid;
+    DWORD expectedPlayerType;
+    const char *expectedShortName;
+    const char *expectedLongName;
+    DWORD expectedFlags;
+    BYTE *expectedPlayerData;
+    DWORD expectedPlayerDataSize;
+    int actualCount;
+} ExpectedPlayer;
+
+typedef struct
+{
+    int line;
+    IDirectPlay4 *dp;
+    ExpectedPlayer *expectedPlayers;
+    int expectedPlayerCount;
+    int actualPlayerCount;
+} CheckPlayerListCallbackData;
+
+static BOOL CALLBACK checkPlayerListCallback( DPID dpid, DWORD playerType, const DPNAME *name, DWORD flags,
+                                              void *context )
+{
+    CheckPlayerListCallbackData *data = context;
+    int i;
+
+    for ( i = 0; i < data->expectedPlayerCount; ++i )
+    {
+        ExpectedPlayer *player = &data->expectedPlayers[ i ];
+        if ( player->expectedDpid == dpid )
+        {
+            BYTE playerData[ 256 ];
+            DWORD playerDataSize;
+            BYTE nameData[ 256 ];
+            DWORD nameDataSize;
+            char *shortName;
+            char *longName;
+            HRESULT hr;
+
+            if ( player->actualCount )
+                ok_( __FILE__, data->line )( 0, "duplicate player dpid %#lx.\n", dpid );
+            ok_( __FILE__, data->line )( playerType == player->expectedPlayerType, "got player type %lu.\n",
+                                         playerType );
+            if ( player->expectedShortName )
+            {
+                ok_( __FILE__, data->line )( name->lpszShortNameA && !strcmp( name->lpszShortNameA, player->expectedShortName ),
+                                             "got short name %s.\n", wine_dbgstr_a( name->lpszShortNameA ) );
+            }
+            else
+            {
+                ok_( __FILE__, data->line )( !name->lpszShortNameA, "got short name %s.\n",
+                                             wine_dbgstr_a( name->lpszShortNameA ) );
+            }
+            if ( player->expectedLongName )
+            {
+                ok_( __FILE__, data->line )( name->lpszLongNameA && !strcmp( name->lpszLongNameA, player->expectedLongName ),
+                                             "got long name %s.\n", wine_dbgstr_a( name->lpszLongNameA ) );
+            }
+            else
+            {
+                ok_( __FILE__, data->line )( !name->lpszLongNameA, "got long name %s.\n",
+                                             wine_dbgstr_a( name->lpszLongNameA ) );
+            }
+            ok_( __FILE__, data->line )( flags == player->expectedFlags, "got flags %#lx.\n", flags );
+
+            memset( &playerData, 0xcc, sizeof( playerData ) );
+            playerDataSize = sizeof( playerData );
+            hr = IDirectPlayX_GetPlayerData( data->dp, dpid, playerData, &playerDataSize, DPGET_REMOTE );
+            ok_( __FILE__, data->line )( hr == DP_OK, "GetPlayerData() returned %#lx.\n", hr );
+            todo_wine ok_( __FILE__, data->line )( playerDataSize == player->expectedPlayerDataSize,
+                                                   "got player data size %lu.\n", playerDataSize );
+            ok_( __FILE__, data->line )( !memcmp( playerData, player->expectedPlayerData, player->expectedPlayerDataSize ),
+                                         "player data doesn't match.\n" );
+
+            memset( &nameData, 0xcc, sizeof( nameData ) );
+            nameDataSize = sizeof( nameData );
+            hr = IDirectPlayX_GetPlayerName( data->dp, dpid, &nameData, &nameDataSize );
+            ok_( __FILE__, data->line )( hr == DP_OK, "GetPlayerName() returned %#lx.\n", hr );
+            ok_( __FILE__, data->line )( ((DPNAME *) nameData)->dwSize == sizeof( DPNAME ),
+                                         "got name size %lu.\n", ((DPNAME *) nameData)->dwSize );
+            ok_( __FILE__, data->line )( !((DPNAME *) nameData)->dwFlags, "got name flags %#lx.\n",
+                                         ((DPNAME *) nameData)->dwFlags );
+            shortName = ((DPNAME *) nameData)->lpszShortNameA;
+            if ( player->expectedShortName )
+            {
+                if ( (char *) nameData <= shortName && shortName < (char *) nameData + nameDataSize )
+                {
+                    ok_( __FILE__, data->line )( shortName && !strcmp( shortName, player->expectedShortName ),
+                                                 "got short name %s.\n", wine_dbgstr_a( shortName ) );
+                }
+                else
+                {
+                    ok_( __FILE__, data->line)( 0, "got short name %p.\n", shortName );
+                }
+            }
+            else
+            {
+                ok_( __FILE__, data->line )( !shortName, "got short name %s.\n", wine_dbgstr_a( shortName ) );
+            }
+            longName = ((DPNAME *) nameData)->lpszLongNameA;
+            if ( player->expectedLongName )
+            {
+                if ( (char *) nameData <= longName && longName < (char *) nameData + nameDataSize )
+                {
+                    ok_( __FILE__, data->line )( longName && !strcmp( longName, player->expectedLongName ),
+                                                 "got long name %s.\n", wine_dbgstr_a( longName ) );
+                }
+                else
+                {
+                    ok_( __FILE__, data->line)( 0, "got long name %p.\n", longName );
+                }
+            }
+            else
+            {
+                ok_( __FILE__, data->line )( !longName, "got long name %s.\n", wine_dbgstr_a( longName ) );
+            }
+
+            ++player->actualCount;
+            ++data->actualPlayerCount;
+
+            return TRUE;
+        }
+    }
+
+    ok_( __FILE__, data->line )( 0, "unexpected player dpid %#lx.\n", dpid );
+
+    ++data->actualPlayerCount;
+
+    return TRUE;
+}
+
+#define checkPlayerList( dp, expectedPlayers, expectedPlayerCount ) checkPlayerList_( __LINE__, dp, expectedPlayers, expectedPlayerCount )
+static void checkPlayerList_( int line, IDirectPlay4 *dp, ExpectedPlayer *expectedPlayers, int expectedPlayerCount )
+{
+    CheckPlayerListCallbackData data = {
+        .line = line,
+        .dp = dp,
+        .expectedPlayers = expectedPlayers,
+        .expectedPlayerCount = expectedPlayerCount,
+    };
+    HRESULT hr;
+
+    hr = IDirectPlayX_EnumPlayers( dp, NULL, checkPlayerListCallback, &data, 0 );
+    ok_( __FILE__, line )( hr == DP_OK, "EnumPlayers() returned %#lx.\n", hr );
+    ok_( __FILE__, line )( data.actualPlayerCount == data.expectedPlayerCount, "got player count %d.\n",
+                           data.actualPlayerCount );
+}
+
+#define check_Open( dp, dpsd, serverDpsd, idRequestExpected, forwardRequestExpected, listenPort, expectedPassword, \
+                    idReplyHr, addForwardReplyHr, expectedHr ) \
+        check_Open_( __LINE__, dp, dpsd, serverDpsd, idRequestExpected, forwardRequestExpected, listenPort, expectedPassword, \
+                     idReplyHr, addForwardReplyHr, expectedHr )
+static void check_Open_( int line, IDirectPlay4A *dp, DPSESSIONDESC2 *dpsd, const DPSESSIONDESC2 *serverDpsd,
+                         BOOL idRequestExpected, BOOL forwardRequestExpected, unsigned short listenPort,
+                         const WCHAR *expectedPassword, HRESULT idReplyHr, HRESULT addForwardReplyHr,
+                         HRESULT expectedHr )
+{
+    SOCKET listenSock;
+    OpenParam *param;
+    WSADATA wsaData;
+    SOCKET recvSock;
+    SOCKET sendSock;
+    int wsResult;
+    HRESULT hr;
+
+    wsResult = WSAStartup( MAKEWORD( 2, 0 ), &wsaData );
+    ok_( __FILE__, line )( !wsResult, "WSAStartup() returned %d.\n", wsResult );
+
+    listenSock = listenTcp_( line, listenPort );
+
+    param = openAsync( dp, dpsd, DPOPEN_JOIN );
+
+    if ( idRequestExpected )
+    {
+        unsigned short port;
+
+        recvSock = acceptTcp_( line, listenSock );
+        ok_( __FILE__, line )( recvSock != INVALID_SOCKET, "accept() returned %#Ix.\n", recvSock );
+
+        port = receiveRequestPlayerId_( line, recvSock, 0x9 );
+
+        sendSock = connectTcp_( line, port );
+
+        sendRequestPlayerReply_( line, sendSock, listenPort, 0x12345678, idReplyHr );
+
+        if ( forwardRequestExpected )
+        {
+            receiveAddForwardRequest_( line, recvSock, 0x12345678, expectedPassword, serverDpsd->dwReserved1 );
+
+            if ( addForwardReplyHr == DP_OK )
+                sendSuperEnumPlayersReply_( line, sendSock, listenPort, 2399, serverDpsd, L"normal" );
+            else
+                sendAddForwardReply_( line, sendSock, listenPort, addForwardReplyHr );
+
+            hr = openAsyncWait( param, 7000 );
+            ok_( __FILE__, line )( hr == expectedHr, "Open() returned %#lx.\n", hr );
+
+            checkNoMoreMessages_( line, recvSock );
+
+            if ( hr == DP_OK )
+            {
+                BYTE expectedPlayerData[] = { 1, 2, 3, 4, };
+                ExpectedPlayer expectedPlayers[] = {
+                    {
+                        .expectedDpid = 0x1337,
+                        .expectedPlayerType = DPPLAYERTYPE_PLAYER,
+                        .expectedShortName = "short name",
+                        .expectedLongName = "long name",
+                        .expectedFlags = 0,
+                        .expectedPlayerData = expectedPlayerData,
+                        .expectedPlayerDataSize = sizeof( expectedPlayerData ),
+                    },
+                };
+
+                checkPlayerList_( line, dp, expectedPlayers, ARRAYSIZE( expectedPlayers ) );
+
+                hr = IDirectPlayX_Close( dp );
+                checkHR( DP_OK, hr );
+            }
+        }
+        else
+        {
+            hr = openAsyncWait( param, 7000 );
+            ok_( __FILE__, line )( hr == expectedHr, "Open() returned %#lx.\n", hr );
+        }
+        closesocket( sendSock );
+        closesocket( recvSock );
+    }
+    else
+    {
+        hr = openAsyncWait( param, 7000 );
+        ok_( __FILE__, line )( hr == expectedHr, "Open() returned %#lx.\n", hr );
+    }
+
+    checkNoMoreAccepts_( line, listenSock );
+
+    closesocket( listenSock );
+    WSACleanup();
+}
+
+static BOOL CALLBACK countSessionsCallback( const DPSESSIONDESC2 *thisSd,
+                                            DWORD *timeout,
+                                            DWORD flags,
+                                            void *context )
+{
+    int *count = context;
+
+    if (flags & DPESC_TIMEDOUT)
+        return FALSE;
+
+    ++*count;
+
+    return TRUE;
+}
+
 static void test_Open(void)
+{
+    DPSESSIONDESC2 dpsdZero =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+    };
+    DPSESSIONDESC2 dpsdAppGuid =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .guidInstance = appGuid,
+        .guidApplication = appGuid,
+    };
+    DPSESSIONDESC2 normalDpsd =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .guidApplication = appGuid,
+        .guidInstance = appGuid,
+        .dwMaxPlayers = 10,
+        .lpszSessionName = (WCHAR *) L"normal",
+        .dwReserved1 = 0xaabbccdd,
+    };
+    DPSESSIONDESC2 protectedDpsd =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .dwFlags = DPSESSION_PASSWORDREQUIRED,
+        .guidApplication = appGuid,
+        .guidInstance = appGuid,
+        .dwMaxPlayers = 10,
+        .lpszSessionName = (WCHAR *) L"protected",
+        .lpszPassword = (WCHAR *) L"hadouken",
+        .dwReserved1 = 0xaabbccdd,
+    };
+    EnumSessionsParam *enumSessionsParam;
+    DPSESSIONDESC2 replyDpsd;
+    DPSESSIONDESC2 dpsd;
+    unsigned short port;
+    IDirectPlay4 *dp;
+    SOCKET enumSock;
+    int tryIndex;
+    SOCKET sock;
+    HRESULT hr;
+
+    hr = CoCreateInstance( &CLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER, &IID_IDirectPlay4A, (void **) &dp );
+    ok( hr == DP_OK, "got hr %#lx.\n", hr );
+
+    dpsd = dpsdZero;
+    dpsd.dwSize = 0;
+    check_Open( dp, &dpsd, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_INVALIDPARAMS );
+
+    check_Open( dp, &dpsdZero, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_UNINITIALIZED );
+
+    init_TCPIP_provider( dp, "127.0.0.1", 0 );
+
+    /* Joining sessions */
+    /* - Checking how strict dplay is with sizes */
+    dpsd = dpsdZero;
+    dpsd.dwSize = 0;
+    check_Open( dp, &dpsd, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_INVALIDPARAMS );
+
+    dpsd = dpsdZero;
+    dpsd.dwSize = sizeof( DPSESSIONDESC2 ) - 1;
+    check_Open( dp, &dpsd, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_INVALIDPARAMS );
+
+    dpsd = dpsdZero;
+    dpsd.dwSize = sizeof( DPSESSIONDESC2 ) + 1;
+    check_Open( dp, &dpsd, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_INVALIDPARAMS );
+
+    check_Open( dp, &dpsdZero, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_NOSESSIONS );
+
+    check_Open( dp, &dpsdAppGuid, NULL, FALSE, FALSE, 2349, NULL, DP_OK, DP_OK, DPERR_NOSESSIONS );
+
+    enumSock = bindUdp( 47624 );
+
+    /* Join to normal session */
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        int count = 0;
+
+        enumSessionsParam = enumSessionsAsync( dp, &dpsdAppGuid, 100, countSessionsCallback, &count, 0 );
+
+        port = receiveEnumSessionsRequest( enumSock, &appGuid, NULL, 0 );
+
+        sock = connectTcp( port );
+
+        sendEnumSessionsReply( sock, 2349, &normalDpsd );
+
+        replyDpsd = normalDpsd;
+        replyDpsd.guidInstance = appGuid2;
+        sendEnumSessionsReply( sock, 2348, &replyDpsd );
+
+        hr = enumSessionsAsyncWait( enumSessionsParam, 2000 );
+        checkHR( DP_OK, hr );
+
+        closesocket( sock );
+
+        if ( tryIndex < 19 && count < 2 )
+            continue;
+
+        ok( count == 2, "got session count %d.\n", count );
+
+        break;
+    }
+
+    check_Open( dp, &dpsdAppGuid, &normalDpsd, TRUE, FALSE, 2349, L"", DPERR_CANTCREATEPLAYER, DP_OK,
+                DPERR_CANTCREATEPLAYER );
+
+    check_Open( dp, &dpsdAppGuid, &normalDpsd, TRUE, TRUE, 2349, L"", DP_OK, DP_OK, DP_OK );
+
+    dpsd = dpsdAppGuid;
+    dpsd.guidInstance = appGuid2;
+    replyDpsd = normalDpsd;
+    replyDpsd.guidInstance = appGuid2;
+    check_Open( dp, &dpsd, &replyDpsd, TRUE, TRUE, 2348, L"", DP_OK, DP_OK, DP_OK );
+
+    /* Join to protected session */
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        int count = 0;
+
+        enumSessionsParam = enumSessionsAsync( dp, &dpsdAppGuid, 100, countSessionsCallback, &count,
+                                               DPENUMSESSIONS_PASSWORDREQUIRED );
+
+        port = receiveEnumSessionsRequest( enumSock, &appGuid, NULL, DPENUMSESSIONS_PASSWORDREQUIRED );
+
+        sock = connectTcp( port );
+
+        sendEnumSessionsReply( sock, 2349, &protectedDpsd );
+
+        hr = enumSessionsAsyncWait( enumSessionsParam, 2000 );
+        checkHR( DP_OK, hr );
+
+        closesocket( sock );
+
+        if ( tryIndex < 19 && count < 1 )
+            continue;
+
+        ok( count == 1, "got session count %d.\n", count );
+
+        break;
+    }
+
+    dpsd = dpsdAppGuid;
+    dpsd.lpszPasswordA = (char *) "hadouken";
+    check_Open( dp, &dpsd, &protectedDpsd, TRUE, TRUE, 2349, L"hadouken", DP_OK, DP_OK, DP_OK );
+
+    dpsd = dpsdAppGuid;
+    dpsd.lpszPasswordA = (char *) "sonic boom";
+    check_Open( dp, &dpsd, &protectedDpsd, TRUE, TRUE, 2349, L"sonic boom", DP_OK, DPERR_INVALIDPASSWORD,
+                DPERR_INVALIDPASSWORD );
+
+    closesocket( enumSock );
+
+    IDirectPlayX_Release( dp );
+}
+
+static void test_interactive_Open(void)
 {
 
     IDirectPlay4 *pDP, *pDP_server;
@@ -1355,6 +2674,104 @@ static void test_Open(void)
 
 }
 
+#define joinSession( dp, dpsd, serverDpsd, sendSock, recvSock ) \
+        joinSession_( __LINE__, dp, dpsd, serverDpsd, sendSock, recvSock )
+static void joinSession_( int line, IDirectPlay4 *dp, DPSESSIONDESC2 *dpsd, DPSESSIONDESC2 *serverDpsd,
+                          SOCKET *sendSock, SOCKET *recvSock )
+{
+    EnumSessionsParam *enumSessionsParam;
+    OpenParam *openParam;
+    unsigned short port;
+    SOCKET listenSock;
+    SOCKET enumSock;
+    int tryIndex;
+    HRESULT hr;
+
+    enumSock = bindUdp_( line, 47624 );
+
+    listenSock = listenTcp_( line, 2349 );
+
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        int count = 0;
+
+        enumSessionsParam = enumSessionsAsync( dp, dpsd, 100, countSessionsCallback, &count, 0 );
+
+        port = receiveEnumSessionsRequest_( line, enumSock, &appGuid, NULL, 0 );
+
+        *sendSock = connectTcp_( line, port );
+
+        sendEnumSessionsReply_( line, *sendSock, 2349, serverDpsd );
+
+        hr = enumSessionsAsyncWait( enumSessionsParam, 2000 );
+        ok_( __FILE__, line )( hr == DP_OK, "EnumSessions() returned %#lx.\n", hr );
+
+        if ( tryIndex < 19 && count < 1 )
+            continue;
+
+        ok( count == 1, "got session count %d.\n", count );
+
+        break;
+    }
+
+    openParam = openAsync( dp, dpsd, DPOPEN_JOIN );
+
+    *recvSock = acceptTcp_( line, listenSock );
+    ok_( __FILE__, line )( *recvSock != INVALID_SOCKET, "accept() returned %#Ix.\n", *recvSock );
+
+    receiveRequestPlayerId_( line, *recvSock, 0x9 );
+    sendRequestPlayerReply_( line, *sendSock, 2349, 0x12345678, DP_OK );
+    receiveAddForwardRequest_( line, *recvSock, 0x12345678, L"", serverDpsd->dwReserved1 );
+    sendSuperEnumPlayersReply_( line, *sendSock, 2349, 2399, serverDpsd, L"normal" );
+    checkNoMoreMessages_( line, *recvSock );
+
+    checkNoMoreAccepts_( line, listenSock );
+
+    hr = openAsyncWait( openParam, 2000 );
+    ok_( __FILE__, line )( hr == DP_OK, "Open() returned %#lx.\n", hr );
+
+    closesocket( listenSock );
+    closesocket( enumSock );
+}
+
+static void test_ADDFORWARD(void)
+{
+    DPSESSIONDESC2 appGuidDpsd =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .guidInstance = appGuid,
+        .guidApplication = appGuid,
+    };
+    DPSESSIONDESC2 serverDpsd =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .guidApplication = appGuid,
+        .guidInstance = appGuid,
+        .lpszSessionName = (WCHAR *) L"normal",
+        .dwReserved1 = 0xaabbccdd,
+    };
+    IDirectPlay4A *dp;
+    SOCKET sendSock;
+    SOCKET recvSock;
+    HRESULT hr;
+
+    hr = CoCreateInstance( &CLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER, &IID_IDirectPlay4A, (void **) &dp );
+    ok( hr == DP_OK, "got hr %#lx.\n", hr );
+
+    init_TCPIP_provider( dp, "127.0.0.1", 0 );
+
+    joinSession( dp, &appGuidDpsd, &serverDpsd, &sendSock, &recvSock );
+
+    sendAddForward( sendSock, 2349, 2348, 2398 );
+    receiveAddForwardAck( recvSock, 0x07734 );
+    checkNoMoreMessages( recvSock );
+
+    closesocket( recvSock );
+    closesocket( sendSock );
+
+    IDirectPlayX_Release( dp );
+}
+
 /* EnumSessions */
 
 static BOOL CALLBACK EnumSessions_cb( LPCDPSESSIONDESC2 lpThisSD,
@@ -1422,7 +2839,405 @@ static IDirectPlay4 *create_session(DPSESSIONDESC2 *lpdpsd)
 
 }
 
+typedef struct
+{
+    DPSESSIONDESC2 dpsd;
+    int actualCount;
+} ExpectedSession;
+
+typedef struct
+{
+    int line;
+    ExpectedSession *expectedSessions;
+    int expectedCount;
+    int actualCount;
+    int timeoutCount;
+} CheckSessionListCallbackData;
+
+static BOOL CALLBACK checkSessionListCallback( const DPSESSIONDESC2 *thisSd, DWORD *timeout, DWORD flags, void *context )
+{
+    CheckSessionListCallbackData *data = context;
+    ExpectedSession *expectedSession;
+    int i;
+
+    if ( flags & DPESC_TIMEDOUT )
+    {
+        ++data->timeoutCount;
+
+        return FALSE;
+    }
+
+    ++data->actualCount;
+
+    for ( i = 0; i < data->expectedCount; ++i )
+    {
+        expectedSession = &data->expectedSessions[ i ];
+        if ( !IsEqualGUID( &expectedSession->dpsd.guidInstance, &thisSd->guidInstance ) )
+            continue;
+
+        ok_( __FILE__, data->line )( !expectedSession->actualCount, "duplicate session %s.\n",
+                                     wine_dbgstr_guid( &thisSd->guidInstance ) );
+
+        ok_( __FILE__, data->line )( thisSd->dwSize == expectedSession->dpsd.dwSize, "got size %lu.\n",
+                                     thisSd->dwSize );
+        ok_( __FILE__, data->line )( thisSd->dwFlags == expectedSession->dpsd.dwFlags, "got flags %#lx.\n",
+                                     thisSd->dwFlags );
+        ok_( __FILE__, data->line )( IsEqualGUID( &thisSd->guidApplication, &expectedSession->dpsd.guidApplication ),
+                                     "got application GUID %s.\n", wine_dbgstr_guid( &thisSd->guidApplication ) );
+        ok_( __FILE__, data->line )( thisSd->dwMaxPlayers == expectedSession->dpsd.dwMaxPlayers,
+                                     "got current player count %lu.\n", thisSd->dwMaxPlayers );
+        ok_( __FILE__, data->line )( thisSd->dwCurrentPlayers == expectedSession->dpsd.dwCurrentPlayers,
+                                     "got max player count %lu.\n", thisSd->dwCurrentPlayers );
+        ok_( __FILE__, data->line )( !strcmp( thisSd->lpszSessionNameA, expectedSession->dpsd.lpszSessionNameA ),
+                                     "got session name %s.\n", wine_dbgstr_a( thisSd->lpszSessionNameA ) );
+        ok_( __FILE__, data->line )( !thisSd->lpszPasswordA, "got password %s.\n",
+                                     wine_dbgstr_a( thisSd->lpszPasswordA ) );
+        ok_( __FILE__, data->line )( thisSd->dwReserved1 == expectedSession->dpsd.dwReserved1, "got reserved1 %#lx.\n",
+                                     thisSd->dwReserved1 );
+        ok_( __FILE__, data->line )( thisSd->dwReserved2 == expectedSession->dpsd.dwReserved2, "got reserved2 %#lx.\n",
+                                     thisSd->dwReserved2 );
+        ok_( __FILE__, data->line )( thisSd->dwUser1 == expectedSession->dpsd.dwUser1, "got user1 %#lx.\n",
+                                     thisSd->dwUser1 );
+        ok_( __FILE__, data->line )( thisSd->dwUser2 == expectedSession->dpsd.dwUser2, "got user2 %#lx.\n",
+                                     thisSd->dwUser2 );
+        ok_( __FILE__, data->line )( thisSd->dwUser3 == expectedSession->dpsd.dwUser3, "got user3 %#lx.\n",
+                                     thisSd->dwUser3 );
+        ok_( __FILE__, data->line )( thisSd->dwUser4 == expectedSession->dpsd.dwUser4, "got user4 %#lx.\n",
+                                     thisSd->dwUser4 );
+
+        ++expectedSession->actualCount;
+
+        return TRUE;
+    }
+
+    ok_( __FILE__, data->line )( 0, "unexpected session %s.\n", wine_dbgstr_guid( &thisSd->guidInstance ) );
+
+    return TRUE;
+}
+
+#define check_EnumSessions( dp, dpsd, flags, expectedHr, expectedSessionCount, timeoutExpected, \
+                            requestExpected, expectedPassword, replyCount, hrTodo ) \
+        check_EnumSessions_( __LINE__, dp, dpsd, flags, expectedHr, expectedSessionCount, timeoutExpected, \
+                             requestExpected, expectedPassword, replyCount, hrTodo )
+static void check_EnumSessions_( int line, IDirectPlay4 *dp, DPSESSIONDESC2 *dpsd, DWORD flags, HRESULT expectedHr,
+                                 DWORD expectedSessionCount, BOOL timeoutExpected, BOOL requestExpected,
+                                 const WCHAR *expectedPassword, DWORD replyCount, BOOL hrTodo )
+{
+    DPSESSIONDESC2 replyDpsds[] =
+    {
+        {
+            .dwSize = sizeof( DPSESSIONDESC2 ),
+            .dwFlags = 0,
+            .guidInstance = appGuid,
+            .guidApplication = appGuid,
+            .dwMaxPlayers = 10,
+            .dwCurrentPlayers = 0,
+            .lpszSessionName = (WCHAR *) L"normal",
+            .dwReserved1 = 0x11223344,
+            .dwReserved2 = 0,
+            .dwUser1 = 1,
+            .dwUser2 = 2,
+            .dwUser3 = 3,
+            .dwUser4 = 4,
+        },
+        {
+            .dwSize = sizeof( DPSESSIONDESC2 ),
+            .dwFlags = DPSESSION_JOINDISABLED | DPSESSION_PASSWORDREQUIRED | DPSESSION_PRIVATE,
+            .guidInstance = appGuid2,
+            .guidApplication = appGuid2,
+            .dwMaxPlayers = 10,
+            .dwCurrentPlayers = 10,
+            .lpszSessionName = (WCHAR *) L"private",
+            .dwReserved1 = 0xaabbccdd,
+            .dwReserved2 = 0,
+            .dwUser1 = 5,
+            .dwUser2 = 6,
+            .dwUser3 = 7,
+            .dwUser4 = 8,
+        },
+    };
+    ExpectedSession expectedSessions[ ARRAYSIZE( replyDpsds ) ];
+    CheckSessionListCallbackData callbackData;
+    EnumSessionsParam *param;
+    unsigned short port = 0;
+    WSADATA wsaData;
+    SOCKET enumSock;
+    int tryIndex;
+    int wsResult;
+    SOCKET sock;
+    HRESULT hr;
+    int i;
+
+    wsResult = WSAStartup( MAKEWORD( 2, 0 ), &wsaData );
+    ok_( __FILE__, line )( !wsResult, "WSAStartup() returned %d.\n", wsResult );
+
+    enumSock = bindUdp_( line, 47624 );
+
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        memset( &expectedSessions, 0, sizeof( expectedSessions ) );
+        expectedSessions[ 0 ].dpsd = replyDpsds [ 0 ];
+        expectedSessions[ 0 ].dpsd.lpszSessionNameA = (char *) "normal";
+        expectedSessions[ 1 ].dpsd = replyDpsds [ 1 ];
+        expectedSessions[ 1 ].dpsd.lpszSessionNameA = (char *) "private";
+
+        memset( &callbackData, 0, sizeof( callbackData ) );
+        callbackData.line = line;
+        callbackData.expectedSessions = expectedSessions;
+        callbackData.expectedCount = expectedSessionCount;
+
+        param = enumSessionsAsync( dp, dpsd, 100, checkSessionListCallback, &callbackData, flags );
+
+        if ( requestExpected )
+            port = receiveEnumSessionsRequest_( line, enumSock, &appGuid, expectedPassword, flags );
+
+        for ( i = 0; i < replyCount; ++i )
+        {
+            sock = connectTcp_( line, port );
+            if ( sock == INVALID_SOCKET )
+                continue;
+
+            sendEnumSessionsReply_( line, sock, 2349 - i, &replyDpsds[ i ] );
+
+            closesocket( sock );
+        }
+
+        checkNoMoreMessages_( line, enumSock );
+
+        hr = enumSessionsAsyncWait( param, 2000 );
+        todo_wine_if( hrTodo ) ok_( __FILE__, line )( hr == expectedHr, "got hr %#lx.\n", hr );
+
+        if ( tryIndex < 19 && callbackData.actualCount < callbackData.expectedCount )
+            continue;
+
+        ok_( __FILE__, line )( callbackData.actualCount == callbackData.expectedCount, "got session count %d.\n",
+                               callbackData.actualCount );
+        ok_( __FILE__, line )( !!callbackData.timeoutCount == timeoutExpected, "got timeout count %d.\n",
+                               callbackData.timeoutCount );
+
+        break;
+    }
+
+    closesocket( enumSock );
+    WSACleanup();
+}
+
+#define check_EnumSessions_async( dpsd, dp ) check_EnumSessions_async_( __LINE__, dpsd, dp )
+static void check_EnumSessions_async_( int line, DPSESSIONDESC2 *dpsd, IDirectPlay4 *dp )
+{
+    DPSESSIONDESC2 replyDpsds[] =
+    {
+        {
+            .dwSize = sizeof( DPSESSIONDESC2 ),
+            .dwFlags = 0,
+            .guidInstance = appGuid,
+            .guidApplication = appGuid,
+            .dwMaxPlayers = 10,
+            .dwCurrentPlayers = 0,
+            .lpszSessionName = (WCHAR *) L"normal",
+            .dwReserved1 = 0x11223344,
+            .dwReserved2 = 0,
+            .dwUser1 = 1,
+            .dwUser2 = 2,
+            .dwUser3 = 3,
+            .dwUser4 = 4,
+        },
+        {
+            .dwSize = sizeof( DPSESSIONDESC2 ),
+            .dwFlags = DPSESSION_JOINDISABLED | DPSESSION_PASSWORDREQUIRED | DPSESSION_PRIVATE,
+            .guidInstance = appGuid2,
+            .guidApplication = appGuid2,
+            .dwMaxPlayers = 10,
+            .dwCurrentPlayers = 10,
+            .lpszSessionName = (WCHAR *) L"private",
+            .dwReserved1 = 0xaabbccdd,
+            .dwReserved2 = 0,
+            .dwUser1 = 5,
+            .dwUser2 = 6,
+            .dwUser3 = 7,
+            .dwUser4 = 8,
+        },
+    };
+    CheckSessionListCallbackData callbackData;
+    ExpectedSession expectedSessions[ 2 ];
+    EnumSessionsParam *param;
+    unsigned short port;
+    SOCKET enumSock;
+    int tryIndex;
+    SOCKET sock;
+    HRESULT hr;
+    int i;
+
+    enumSock = bindUdp_( line, 47624 );
+
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        memset( expectedSessions, 0, sizeof( expectedSessions ) );
+        expectedSessions[ 0 ].dpsd = replyDpsds [ 0 ];
+        expectedSessions[ 0 ].dpsd.lpszSessionNameA = (char *) "normal";
+
+        memset( &callbackData, 0, sizeof( callbackData ) );
+        callbackData.line = line;
+        callbackData.expectedSessions = expectedSessions;
+        callbackData.expectedCount = 1;
+
+        /* Do a sync enumeration first to fill the cache */
+        param = enumSessionsAsync( dp, dpsd, 100, checkSessionListCallback, &callbackData, 0 );
+
+        port = receiveEnumSessionsRequest_( line, enumSock, &appGuid, NULL, 0 );
+
+        sock = connectTcp_( line, port );
+
+        if ( sock != INVALID_SOCKET )
+        {
+            sendEnumSessionsReply_( line, sock, 2349, &replyDpsds[ 0 ] );
+
+            closesocket( sock );
+        }
+
+        checkNoMoreMessages_( line, enumSock );
+
+        hr = enumSessionsAsyncWait( param, 2000 );
+        ok_( __FILE__, line )( hr == DP_OK, "got hr %#lx.\n", hr );
+
+        if ( tryIndex < 19 && callbackData.actualCount < callbackData.expectedCount )
+            continue;
+
+        ok_( __FILE__, line )( callbackData.actualCount == callbackData.expectedCount, "got session count %d.\n",
+                               callbackData.actualCount );
+        ok_( __FILE__, line )( callbackData.timeoutCount, "got timeout count %d.\n", callbackData.timeoutCount );
+
+        break;
+    }
+
+    memset( expectedSessions, 0, sizeof( expectedSessions ) );
+    expectedSessions[ 0 ].dpsd = replyDpsds [ 0 ];
+    expectedSessions[ 0 ].dpsd.lpszSessionNameA = (char *) "normal";
+
+    memset( &callbackData, 0, sizeof( callbackData ) );
+    callbackData.line = line;
+    callbackData.expectedSessions = expectedSessions;
+    callbackData.expectedCount = 1;
+
+    /* Read cache of last sync enumeration */
+    param = enumSessionsAsync( dp, dpsd, 100, checkSessionListCallback, &callbackData, DPENUMSESSIONS_ASYNC );
+
+    receiveEnumSessionsRequest_( line, enumSock, &appGuid, NULL, DPENUMSESSIONS_ASYNC );
+
+    hr = enumSessionsAsyncWait( param, 2000 );
+    ok_( __FILE__, line )( hr == DP_OK, "got hr %#lx.\n", hr );
+
+    ok_( __FILE__, line )( callbackData.actualCount == callbackData.expectedCount, "got session count %d.\n",
+                           callbackData.actualCount );
+    ok_( __FILE__, line )( callbackData.timeoutCount, "got timeout count %d.\n", callbackData.timeoutCount );
+
+    /* Check that requests are sent periodically */
+    for ( i = 0; i < 2; ++i )
+        port = receiveEnumSessionsRequest_( line, enumSock, &appGuid, NULL, DPENUMSESSIONS_ASYNC );
+
+    for ( i = 0; i < ARRAYSIZE( replyDpsds ); ++i )
+    {
+        sock = connectTcp_( line, port );
+        if ( sock == INVALID_SOCKET )
+            continue;
+
+        sendEnumSessionsReply_( line, sock, 2349 - i, &replyDpsds[ i ] );
+
+        closesocket( sock );
+    }
+
+    for ( tryIndex = 0; ; ++tryIndex )
+    {
+        memset( expectedSessions, 0, sizeof( expectedSessions ) );
+        expectedSessions[ 0 ].dpsd = replyDpsds [ 0 ];
+        expectedSessions[ 0 ].dpsd.lpszSessionNameA = (char *) "normal";
+        expectedSessions[ 1 ].dpsd = replyDpsds [ 1 ];
+        expectedSessions[ 1 ].dpsd.lpszSessionNameA = (char *) "private";
+
+        memset( &callbackData, 0, sizeof( callbackData ) );
+        callbackData.line = line;
+        callbackData.expectedSessions = expectedSessions;
+        callbackData.expectedCount = ARRAYSIZE( expectedSessions );
+
+        /* Retrieve results */
+        param = enumSessionsAsync( dp, dpsd, 100, checkSessionListCallback, &callbackData, DPENUMSESSIONS_ASYNC );
+        hr = enumSessionsAsyncWait( param, 2000 );
+        ok_( __FILE__, line )( hr == DP_OK, "got hr %#lx.\n", hr );
+
+        if ( tryIndex < 19 && callbackData.actualCount < callbackData.expectedCount )
+            continue;
+
+        ok_( __FILE__, line )( callbackData.actualCount == callbackData.expectedCount, "got session count %d.\n",
+                               callbackData.actualCount );
+        ok_( __FILE__, line )( callbackData.timeoutCount, "got timeout count %d.\n", callbackData.timeoutCount );
+
+        break;
+    }
+
+    memset( &callbackData, 0, sizeof( callbackData ) );
+    callbackData.line = line;
+    callbackData.expectedSessions = NULL;
+    callbackData.expectedCount = 0;
+
+    /* Stop enumeration */
+    param = enumSessionsAsync( dp, dpsd, 100, checkSessionListCallback, &callbackData, DPENUMSESSIONS_STOPASYNC );
+    hr = enumSessionsAsyncWait( param, 2000 );
+    ok_( __FILE__, line )( hr == DP_OK, "got hr %#lx.\n", hr );
+
+    ok_( __FILE__, line )( !callbackData.actualCount, "got session count %d.\n", callbackData.actualCount );
+    todo_wine ok_( __FILE__, line )( callbackData.timeoutCount, "got timeout count %d.\n", callbackData.timeoutCount );
+
+    closesocket( enumSock );
+}
+
 static void test_EnumSessions(void)
+{
+    DPSESSIONDESC2 appGuidDpsd =
+    {
+        .dwSize = sizeof( DPSESSIONDESC2 ),
+        .guidApplication = appGuid,
+        .guidInstance = appGuid,
+    };
+    DPSESSIONDESC2 dpsd;
+    IDirectPlay4 *dp;
+    HRESULT hr;
+
+    hr = CoCreateInstance( &CLSID_DirectPlay, NULL, CLSCTX_INPROC_SERVER, &IID_IDirectPlay4A, (void **) &dp );
+    ok( hr == DP_OK, "got hr %#lx.\n", hr );
+
+    /* Service provider not initialized */
+    check_EnumSessions( dp, &appGuidDpsd, 0, DPERR_UNINITIALIZED, 0, FALSE, FALSE, NULL, 0, FALSE );
+
+    init_TCPIP_provider( dp, "127.0.0.1", 0 );
+
+    /* Session with no size */
+    dpsd = appGuidDpsd;
+    dpsd.dwSize = 0;
+    check_EnumSessions( dp, &dpsd, 0, DPERR_INVALIDPARAMS, 0, FALSE, FALSE, NULL, 0, FALSE );
+
+    /* No sessions */
+    check_EnumSessions( dp, &appGuidDpsd, 0, DP_OK, 0, TRUE, TRUE, NULL, 0, FALSE );
+
+    /* Invalid params */
+    check_EnumSessions( dp, &appGuidDpsd, -1, DPERR_INVALIDPARAMS, 0, FALSE, FALSE, NULL, 0, TRUE );
+    check_EnumSessions( dp, NULL, 0, DPERR_INVALIDPARAMS, 0, FALSE, FALSE, NULL, 0, FALSE );
+
+    /* All sessions are enumerated regardless of flags */
+    check_EnumSessions( dp, &appGuidDpsd, 0, DP_OK, 2, TRUE, TRUE, NULL, 2, FALSE );
+    check_EnumSessions( dp, &appGuidDpsd, DPENUMSESSIONS_AVAILABLE, DP_OK, 2, TRUE, TRUE, NULL, 2, FALSE );
+
+    /* Async enumeration */
+    check_EnumSessions_async( &appGuidDpsd, dp );
+
+    /* Enumeration with password */
+    dpsd = appGuidDpsd;
+    dpsd.lpszPasswordA = (char *) "password";
+    check_EnumSessions( dp, &dpsd, 0, DP_OK, 2, TRUE, TRUE, L"password", 2, FALSE );
+
+    IDirectPlayX_Release( dp );
+}
+
+static void test_interactive_EnumSessions(void)
 {
 
 #define N_SESSIONS 6
@@ -1859,9 +3674,9 @@ static void test_SessionDesc(void)
         /* Players, only to receive messages */
         IDirectPlayX_CreatePlayer( pDP[i], &dpid[i], NULL, NULL, NULL, 0, 0 );
 
-        lpData[i] = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );
+        lpData[i] = calloc( 1, 1024 );
     }
-    lpDataMsg = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );
+    lpDataMsg = calloc( 1, 1024 );
 
 
     /* Incorrect parameters */
@@ -1965,10 +3780,10 @@ if(0)
     checkStr( "S1,S1,S1,S1,S1,S1,", callbackData.szTrace1 );
     checkStr( "90,90,90,90,90,90,", callbackData.szTrace2 );
 
-    HeapFree( GetProcessHeap(), 0, lpDataMsg );
+    free( lpDataMsg );
     for (i=0; i<2; i++)
     {
-        HeapFree( GetProcessHeap(), 0, lpData[i] );
+        free( lpData[i] );
         IDirectPlayX_Release( pDP[i] );
     }
 
@@ -2330,8 +4145,7 @@ static void test_PlayerData(void)
     LPCSTR lpDataLocal    = "local_data";
     DWORD dwDataSizeLocal = strlen(lpDataLocal)+1;
 
-    LPSTR lpDataGet       = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY,
-                                       dwDataSizeFake );
+    LPSTR lpDataGet       = calloc( 1, dwDataSizeFake );
     DWORD dwDataSizeGet   = dwDataSizeFake;
 
 
@@ -2571,7 +4385,7 @@ static void test_PlayerData(void)
     checkStr( lpDataFake, lpDataGet );
 
 
-    HeapFree( GetProcessHeap(), 0, lpDataGet );
+    free( lpDataGet );
     IDirectPlayX_Release( pDP );
 }
 
@@ -2589,7 +4403,7 @@ static void test_PlayerName(void)
 
     DPNAME playerName;
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
     CallbackData callbackData;
 
 
@@ -2821,7 +4635,7 @@ if(0)
     checkStr( "28,57,28,57,57,59,", callbackData.szTrace2 );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -2872,7 +4686,7 @@ static void test_GetPlayerAccount(void)
     UINT i;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
 
 
     for (i=0; i<2; i++)
@@ -2998,7 +4812,7 @@ static void test_GetPlayerAccount(void)
     check( 1024, dwDataSize );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -3058,7 +4872,7 @@ static void test_GetPlayerAddress(void)
     UINT i;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
 
 
     for (i=0; i<2; i++)
@@ -3176,7 +4990,7 @@ static void test_GetPlayerAddress(void)
     check( 8, callbackData.dwCounter1 );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
 
 cleanup:
     IDirectPlayX_Release( pDP[0] );
@@ -3306,9 +5120,7 @@ static void test_CreateGroup(void)
 
     LPCSTR lpData = "data";
     DWORD dwDataSize = strlen(lpData)+1;
-    LPDPMSG_CREATEPLAYERORGROUP lpDataGet = HeapAlloc( GetProcessHeap(),
-                                                       HEAP_ZERO_MEMORY,
-                                                       1024 );
+    LPDPMSG_CREATEPLAYERORGROUP lpDataGet = calloc( 1, 1024 );
     DWORD dwDataSizeGet = 1024;
     CallbackData callbackData;
 
@@ -3596,7 +5408,7 @@ static void test_CreateGroup(void)
                                                  shouldn't be messages... */
 
 
-    HeapFree( GetProcessHeap(), 0, lpDataGet );
+    free( lpDataGet );
     IDirectPlayX_Release( pDP );
 
 }
@@ -4566,7 +6378,7 @@ static void test_groups_p2p(void)
     UINT i;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );
+    LPVOID lpData = calloc( 1, 1024 );
     CallbackData callbackData;
 
 
@@ -4785,7 +6597,7 @@ static void test_groups_p2p(void)
     checkStr( "54,", callbackData.szTrace1 );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -4802,7 +6614,7 @@ static void test_groups_cs(void)
     UINT i;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );
+    LPVOID lpData = calloc( 1, 1024 );
 
 
     for (i=0; i<2; i++)
@@ -5020,7 +6832,7 @@ static void test_groups_cs(void)
     checkStr( "54,", callbackData.szTrace1 );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -5039,7 +6851,7 @@ static void test_Send(void)
     LPCSTR message = "message";
     DWORD messageSize = strlen(message) + 1;
     DWORD dwDataSize = 1024;
-    LPDPMSG_GENERIC lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPDPMSG_GENERIC lpData = calloc( 1, dwDataSize );
     LPDPMSG_SECUREMESSAGE lpDataSecure;
     UINT i;
 
@@ -5355,7 +7167,7 @@ static void test_Send(void)
     checkHR( DPERR_INVALIDPARAMS, hr );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -5373,8 +7185,7 @@ static void test_Receive(void)
     LPCSTR message = "message";
     DWORD messageSize = strlen(message) + 1;
     DWORD dwDataSize = 1024;
-    LPDPMSG_GENERIC lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY,
-                                        dwDataSize );
+    LPDPMSG_GENERIC lpData = calloc( 1, dwDataSize );
     LPDPMSG_CREATEPLAYERORGROUP lpDataCreate;
     LPDPMSG_DESTROYPLAYERORGROUP lpDataDestroy;
 
@@ -5641,7 +7452,7 @@ static void test_Receive(void)
     checkHR( DPERR_NOMESSAGES, hr );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP );
 
 }
@@ -5659,7 +7470,7 @@ static void test_GetMessageCount(void)
     DWORD dwCount;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
     CallbackData callbackData;
 
 
@@ -5863,7 +7674,7 @@ static void test_GetMessageCount(void)
     check( 0, dwCount );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -5883,7 +7694,7 @@ static void test_GetMessageQueue(void)
     DWORD dwNumMsgs, dwNumBytes;
 
     DWORD dwDataSize = 1024;
-    LPVOID lpData = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, dwDataSize );
+    LPVOID lpData = calloc( 1, dwDataSize );
 
 
     for (i=0; i<2; i++)
@@ -6176,7 +7987,7 @@ if(0)
     check( 0, dwNumBytes );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -6196,14 +8007,12 @@ static void test_remote_data_replication(void)
     DWORD dwFlags, dwDataSize = 1024;
     DWORD dwCount;
 
-    LPDPMSG_SETPLAYERORGROUPDATA lpData = HeapAlloc( GetProcessHeap(),
-                                                     HEAP_ZERO_MEMORY,
-                                                     dwDataSize );
+    LPDPMSG_SETPLAYERORGROUPDATA lpData = calloc( 1, dwDataSize );
 
     LPCSTR lpDataLocal[] = { "local_0", "local_1" };
     LPCSTR lpDataRemote[] = { "remote_0", "remote_1" };
     LPCSTR lpDataFake = "ugly_fake_data";
-    LPSTR lpDataGet = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 32 );
+    LPSTR lpDataGet = calloc( 1, 32 );
     DWORD dwDataSizeLocal = strlen(lpDataLocal[0])+1,
         dwDataSizeRemote = strlen(lpDataRemote[0])+1,
         dwDataSizeFake = strlen(lpDataFake)+1,
@@ -6403,8 +8212,8 @@ static void test_remote_data_replication(void)
     checkStr( "", callbackData.szTrace1 );
 
 
-    HeapFree( GetProcessHeap(), 0, lpDataGet );
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpDataGet );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -6423,9 +8232,7 @@ static void test_host_migration(void)
     DWORD dwCount;
 
     DWORD dwDataSize = 1024;
-    LPDPMSG_DESTROYPLAYERORGROUP lpData = HeapAlloc( GetProcessHeap(),
-                                                     HEAP_ZERO_MEMORY,
-                                                     dwDataSize );
+    LPDPMSG_DESTROYPLAYERORGROUP lpData = calloc( 1, dwDataSize );
 
 
     for (i=0; i<2; i++)
@@ -6538,7 +8345,7 @@ static void test_host_migration(void)
     checkHR( DPERR_NOMESSAGES, hr );
 
 
-    HeapFree( GetProcessHeap(), 0, lpData );
+    free( lpData );
     IDirectPlayX_Release( pDP[0] );
     IDirectPlayX_Release( pDP[1] );
 
@@ -6660,53 +8467,32 @@ static void test_COM_dplobby(void)
     hr = CoCreateInstance(&CLSID_DirectPlayLobby, NULL, CLSCTX_INPROC_SERVER, &IID_IDirectPlayLobby,
             (void**)&dpl);
     ok(hr == S_OK, "DirectPlayLobby create failed: %08lx, expected S_OK\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dpl);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
 
     hr = IDirectPlayLobby_QueryInterface(dpl, &IID_IDirectPlayLobbyA, (void**)&dplA);
     ok(hr == S_OK, "QueryInterface for IID_IDirectPlayLobbyA failed: %08lx\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dplA);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
     IDirectPlayLobby_Release(dplA);
 
     hr = IDirectPlayLobby_QueryInterface(dpl, &IID_IDirectPlayLobby2, (void**)&dpl2);
     ok(hr == S_OK, "QueryInterface for IID_IDirectPlayLobby2 failed: %08lx\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dpl2);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
     IDirectPlayLobby_Release(dpl2);
 
     hr = IDirectPlayLobby_QueryInterface(dpl, &IID_IDirectPlayLobby2A, (void**)&dpl2A);
     ok(hr == S_OK, "QueryInterface for IID_IDirectPlayLobby2A failed: %08lx\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dpl2A);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
     IDirectPlayLobby_Release(dpl2A);
 
     hr = IDirectPlayLobby_QueryInterface(dpl, &IID_IDirectPlayLobby3, (void**)&dpl3);
     ok(hr == S_OK, "QueryInterface for IID_IDirectPlayLobby3 failed: %08lx\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dpl3);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
     IDirectPlayLobby_Release(dpl3);
 
     hr = IDirectPlayLobby_QueryInterface(dpl, &IID_IDirectPlayLobby3A, (void**)&dpl3A);
     ok(hr == S_OK, "QueryInterface for IID_IDirectPlayLobby3A failed: %08lx\n", hr);
-    refcount = IDirectPlayLobby_AddRef(dpl3A);
-    ok(refcount == 2, "refcount == %lu, expected 2\n", refcount);
     IDirectPlayLobby_Release(dpl3A);
 
     /* IDirectPlayLobby and IUnknown share a refcount */
     hr = IDirectPlayX_QueryInterface(dpl, &IID_IUnknown, (void**)&unk);
     ok(hr == S_OK, "QueryInterface for IID_IUnknown failed: %08lx\n", hr);
-    refcount = IUnknown_AddRef(unk);
-    ok(refcount == 4, "refcount == %lu, expected 4\n", refcount);
-    IDirectPlayLobby_Release(unk);
-
     IUnknown_Release(unk);
-    IDirectPlayLobby_Release(dpl3);
-    IDirectPlayLobby_Release(dpl3A);
-    IDirectPlayLobby_Release(dpl2);
-    IDirectPlayLobby_Release(dpl2A);
-    IDirectPlayLobby_Release(dplA);
-    IDirectPlayLobby_Release(dpl);
+
     refcount = IDirectPlayLobby_Release(dpl);
     ok(refcount == 0, "refcount == %lu, expected 0\n", refcount);
 }
@@ -6876,7 +8662,7 @@ static BOOL is_stub_dll(const char *filename)
     size = GetFileVersionInfoSizeA(filename, &ver);
     if (!size) return FALSE;
 
-    data = HeapAlloc(GetProcessHeap(), 0, size);
+    data = malloc(size);
     if (!data) return FALSE;
 
     if (GetFileVersionInfoA(filename, ver, size, data))
@@ -6887,7 +8673,7 @@ static BOOL is_stub_dll(const char *filename)
         if (VerQueryValueA(data, buf, (void**)&p, &size))
             isstub = !lstrcmpiA("wcodstub.dll", p);
     }
-    HeapFree(GetProcessHeap(), 0, data);
+    free(data);
 
     return isstub;
 }
@@ -6944,6 +8730,9 @@ START_TEST(dplayx)
     test_InitializeConnection();
     test_GetCaps();
     test_EnumAddressTypes();
+    test_EnumSessions();
+    test_Open();
+    test_ADDFORWARD();
 
     if (!winetest_interactive)
     {
@@ -6953,10 +8742,10 @@ START_TEST(dplayx)
 
     trace("Running in interactive mode, tests will take a while\n");
 
-    /* test_Open() takes almost a minute, */
-    test_Open();
-    /* test_EnumSession takes three minutes */
-    test_EnumSessions();
+    /* test_interactive_Open() takes almost a minute, */
+    test_interactive_Open();
+    /* test_interactive_EnumSessions takes three minutes */
+    test_interactive_EnumSessions();
     test_SessionDesc();
 
     /* test_CreatePlayer() takes over a minute */

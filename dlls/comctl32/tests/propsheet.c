@@ -672,20 +672,20 @@ static const struct message property_sheet_seq[] = {
     { WM_NCCALCSIZE, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
     { DM_REPOSITION, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
     { WM_WINDOWPOSCHANGING, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
-    { WM_WINDOWPOSCHANGING, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_WINDOWPOSCHANGING, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_WINDOWPOSCHANGED, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
-    { WM_ACTIVATEAPP, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_ACTIVATEAPP, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
     /*{ WM_NCACTIVATE, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_GETTEXT, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_GETICON, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_GETICON, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_GETICON, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_GETTEXT, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
-    { WM_ACTIVATE, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_ACTIVATE, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
     /*{ WM_IME_SETCONTEXT, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_IME_NOTIFY, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
-    { WM_SETFOCUS, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
-    { WM_KILLFOCUS, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_SETFOCUS, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_KILLFOCUS, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
     /*{ WM_IME_SETCONTEXT, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
     { WM_PARENTNOTIFY, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_INITDIALOG, sent|id, 0, 0, RECEIVER_PAGE },
@@ -704,6 +704,11 @@ static const struct message property_sheet_seq[] = {
     { WM_GETICON, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
     { WM_SETTEXT, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { WM_SHOWWINDOW, sent|id, 0, 0, RECEIVER_PAGE },
+    { WM_WINDOWPOSCHANGING, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_ACTIVATEAPP, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_ACTIVATEAPP, sent|id|optional, 0, 0, RECEIVER_PAGE },
+    { WM_ACTIVATE, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
+    { WM_ACTIVATE, sent|id|optional, 0, 0, RECEIVER_PAGE },
     /*{ 0x00000401, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },
     { 0x00000400, sent|id, 0, 0, RECEIVER_SHEET_WINPROC },*/
     { WM_CHANGEUISTATE, sent|id|optional, 0, 0, RECEIVER_SHEET_WINPROC },
@@ -1643,10 +1648,14 @@ static void test_hotkey_navigation(void)
 
     thread = CreateThread(NULL, 0, hotkey_dialog_thread, NULL, 0, NULL);
 
-    WaitForSingleObject(hotkey_dialog_idle, INFINITE);
+    WaitForSingleObject(hotkey_dialog_idle, 10000);
     ResetEvent(active_page_changed);
     success = SetForegroundWindow(hotkey_dialog);
-    ok(success, "SetForegroundWindow failed\n");
+    if (!success)
+    {
+        skip( "Window not in foreground\n" );
+        goto done;
+    }
     SetFocus(hotkey_dialog);
 
     control = (HWND)SendMessageA(hotkey_dialog, PSM_GETCURRENTPAGEHWND, 0, 0);
@@ -1665,7 +1674,7 @@ static void test_hotkey_navigation(void)
     WaitForSingleObject(active_page_changed, 1000);
     ok(active_page == 1, "Got %ld\n", active_page);
     PostMessageW(hotkey_dialog, WM_DIALOG_IDLE, 0, 0);
-    WaitForSingleObject(hotkey_dialog_idle, INFINITE);
+    WaitForSingleObject(hotkey_dialog_idle, 10000);
 
     inputs[0].ki.wVk = VK_CONTROL;
     inputs[0].ki.dwFlags = 0;
@@ -1679,7 +1688,7 @@ static void test_hotkey_navigation(void)
     WaitForSingleObject(active_page_changed, 1000);
     ok(active_page == 0, "Got %ld\n", active_page);
     PostMessageW(hotkey_dialog, WM_DIALOG_IDLE, 0, 0);
-    WaitForSingleObject(hotkey_dialog_idle, INFINITE);
+    WaitForSingleObject(hotkey_dialog_idle, 10000);
 
     inputs[0].ki.wVk = VK_CONTROL;
     inputs[0].ki.dwFlags = 0;
@@ -1693,7 +1702,7 @@ static void test_hotkey_navigation(void)
     WaitForSingleObject(active_page_changed, 1000);
     ok(active_page == 1, "Got %ld\n", active_page);
     PostMessageW(hotkey_dialog, WM_DIALOG_IDLE, 0, 0);
-    WaitForSingleObject(hotkey_dialog_idle, INFINITE);
+    WaitForSingleObject(hotkey_dialog_idle, 10000);
 
     inputs[0].ki.wVk = VK_CONTROL;
     inputs[0].ki.dwFlags = 0;
@@ -1711,10 +1720,11 @@ static void test_hotkey_navigation(void)
     WaitForSingleObject(active_page_changed, 1000);
     ok(active_page == 0, "Got %ld\n", active_page);
     PostMessageW(hotkey_dialog, WM_DIALOG_IDLE, 0, 0);
-    WaitForSingleObject(hotkey_dialog_idle, INFINITE);
+    WaitForSingleObject(hotkey_dialog_idle, 10000);
 
+done:
     PostMessageA(hotkey_dialog, WM_CLOSE, 0, 0);
-    WaitForSingleObject(thread, INFINITE);
+    WaitForSingleObject(thread, 10000);
     CloseHandle(thread);
     CloseHandle(hotkey_dialog_idle);
     CloseHandle(active_page_changed);

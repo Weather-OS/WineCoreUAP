@@ -317,6 +317,7 @@ static void test_D3DXCheckTextureRequirements(IDirect3DDevice9 *device)
 {
     UINT width, height, mipmaps;
     D3DFORMAT format, expected;
+    unsigned int expected_size;
     D3DCAPS9 caps;
     HRESULT hr;
     IDirect3D9 *d3d;
@@ -538,8 +539,11 @@ static void test_D3DXCheckTextureRequirements(IDirect3DDevice9 *device)
     if(SUCCEEDED(IDirect3D9_CheckDeviceFormat(d3d, params.AdapterOrdinal, params.DeviceType,
             mode.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_L16)))
         expected = D3DFMT_L16;
-    else
+    else if (SUCCEEDED(IDirect3D9_CheckDeviceFormat(d3d, params.AdapterOrdinal, params.DeviceType,
+            mode.Format, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE, D3DFMT_A16B16G16R16)))
         expected = D3DFMT_A16B16G16R16;
+    else
+        expected = D3DFMT_A2R10G10B10;
 
     format = D3DFMT_L16;
     hr = D3DXCheckTextureRequirements(device, NULL, NULL, NULL, D3DUSAGE_RENDERTARGET, &format, D3DPOOL_DEFAULT);
@@ -581,8 +585,12 @@ static void test_D3DXCheckTextureRequirements(IDirect3DDevice9 *device)
         height = 9;
         hr = D3DXCheckTextureRequirements(device, &width, &height, &mipmaps, 0, &format, D3DPOOL_DEFAULT);
         ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
-        ok(width == 12, "Got unexpected width %u.\n", width);
-        ok(height == 12, "Got unexpected height %u.\n", height);
+        if (caps.TextureCaps & D3DPTEXTURECAPS_POW2)
+            expected_size = 16;
+        else
+            expected_size = 12;
+        ok(width == expected_size, "Unexpected width %u, expected %u.\n", width, expected_size);
+        ok(height == expected_size, "Unexpected height %u, expected %u.\n", height, expected_size);
         ok(mipmaps == 1, "Got unexpected level count %u.\n", mipmaps);
         ok(format == D3DFMT_DXT5, "Got unexpected format %u.\n", format);
     }
@@ -1666,11 +1674,17 @@ static void test_D3DXFillCubeTexture(IDirect3DDevice9 *device)
     /* A1R5G5B5 */
     hr = IDirect3DDevice9_CreateCubeTexture(device, 4, 1, 0, D3DFMT_A1R5G5B5,
             D3DPOOL_MANAGED, &tex, NULL);
-    ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
-    hr = D3DXFillCubeTexture(tex, fillfunc_cube, NULL);
-    ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
-    compare_cube_texture(tex, fillfunc_cube, 2);
-    IDirect3DCubeTexture9_Release(tex);
+    if (SUCCEEDED(hr))
+    {
+        hr = D3DXFillCubeTexture(tex, fillfunc_cube, NULL);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+        compare_cube_texture(tex, fillfunc_cube, 2);
+        IDirect3DCubeTexture9_Release(tex);
+    }
+    else
+    {
+        skip("Texture format D3DFMT_A1R5G5B5 unsupported.\n");
+    }
 }
 
 static void WINAPI fillfunc_volume(D3DXVECTOR4 *value, const D3DXVECTOR3 *texcoord,

@@ -267,6 +267,20 @@ HRESULT d3d11_unordered_access_view_create(struct d3d_device *device, ID3D11Reso
 struct d3d11_unordered_access_view *unsafe_impl_from_ID3D11UnorderedAccessView(
         ID3D11UnorderedAccessView *iface);
 
+struct d3d_video_decoder_output_view
+{
+    ID3D11VideoDecoderOutputView ID3D11VideoDecoderOutputView_iface;
+    LONG refcount;
+
+    struct wined3d_private_store private_store;
+    D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC desc;
+    ID3D11Resource *resource;
+    struct d3d_device *device;
+};
+
+HRESULT d3d_video_decoder_output_view_create(struct d3d_device *device, ID3D11Resource *resource,
+        const D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC *desc, struct d3d_video_decoder_output_view **view);
+
 /* ID3D11InputLayout, ID3D10InputLayout */
 struct d3d_input_layout
 {
@@ -534,6 +548,7 @@ struct d3d11_device_context
 {
     ID3D11DeviceContext1 ID3D11DeviceContext1_iface;
     ID3D11Multithread ID3D11Multithread_iface;
+    ID3D11VideoContext ID3D11VideoContext_iface;
     ID3DUserDefinedAnnotation ID3DUserDefinedAnnotation_iface;
     LONG refcount;
 
@@ -552,6 +567,7 @@ struct d3d_device
     ID3D10Device1 ID3D10Device1_iface;
     ID3D10Multithread ID3D10Multithread_iface;
     IWineDXGIDeviceParent IWineDXGIDeviceParent_iface;
+    ID3D11VideoDevice1 ID3D11VideoDevice1_iface;
     IUnknown *outer_unk;
     LONG refcount;
 
@@ -599,6 +615,18 @@ static inline struct d3d_device *impl_from_ID3D10Device(ID3D10Device1 *iface)
 }
 
 void d3d_device_init(struct d3d_device *device, void *outer_unknown);
+
+struct d3d_video_decoder
+{
+    ID3D11VideoDecoder ID3D11VideoDecoder_iface;
+    LONG refcount;
+
+    struct wined3d_private_store private_store;
+    struct d3d_device *device;
+};
+
+HRESULT d3d_video_decoder_create(struct d3d_device *device, const D3D11_VIDEO_DECODER_DESC *desc,
+        const D3D11_VIDEO_DECODER_CONFIG *config, struct d3d_video_decoder **decoder);
 
 /* Layered device */
 enum dxgi_device_layer_id

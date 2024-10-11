@@ -52,7 +52,7 @@ extern "C" {
 #define FASTCALL __fastcall
 
 #ifndef DECLSPEC_IMPORT
-# if defined(_MSC_VER)
+# if __has_declspec_attribute(dllimport)
 #  define DECLSPEC_IMPORT __declspec(dllimport)
 # elif defined(__MINGW32__) || defined(__CYGWIN__)
 #  define DECLSPEC_IMPORT __attribute__((dllimport))
@@ -64,7 +64,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_NORETURN
-# if defined(_MSC_VER) && (_MSC_VER >= 1200) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(noreturn) && !defined(MIDL_PASS)
 #  define DECLSPEC_NORETURN __declspec(noreturn)
 # elif defined(__GNUC__)
 #  define DECLSPEC_NORETURN __attribute__((noreturn))
@@ -74,7 +74,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_ALIGN
-# if defined(_MSC_VER) && (_MSC_VER >= 1300) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(align) && !defined(MIDL_PASS)
 #  define DECLSPEC_ALIGN(x) __declspec(align(x))
 # elif defined(__GNUC__)
 #  define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
@@ -84,7 +84,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_NOTHROW
-# if defined(_MSC_VER) && (_MSC_VER >= 1200) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(nothrow) && !defined(MIDL_PASS)
 #  define DECLSPEC_NOTHROW __declspec(nothrow)
 # elif defined(__GNUC__)
 #  define DECLSPEC_NOTHROW __attribute__((nothrow))
@@ -98,7 +98,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_UUID
-# if defined(_MSC_VER) && (_MSC_VER >= 1100) && defined (__cplusplus)
+# if __has_declspec_attribute(uuid) && defined (__cplusplus)
 #  define DECLSPEC_UUID(x) __declspec(uuid(x))
 # else
 #  define DECLSPEC_UUID(x)
@@ -106,7 +106,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_NOVTABLE
-# if defined(_MSC_VER) && (_MSC_VER >= 1100) && defined(__cplusplus)
+# if __has_declspec_attribute(novtable) && defined(__cplusplus)
 #  define DECLSPEC_NOVTABLE __declspec(novtable)
 # else
 #  define DECLSPEC_NOVTABLE
@@ -114,7 +114,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_SELECTANY
-#if defined(_MSC_VER) && (_MSC_VER >= 1100)
+# if __has_declspec_attribute(selectany)
 #define DECLSPEC_SELECTANY __declspec(selectany)
 #elif defined(__MINGW32__)
 #define DECLSPEC_SELECTANY __attribute__((selectany))
@@ -126,19 +126,15 @@ extern "C" {
 #endif
 
 #ifndef NOP_FUNCTION
-# if defined(_MSC_VER)
-#  if (_MSC_VER >= 1210)
-#   define NOP_FUNCTION __noop
-#  else
-#   define NOP_FUNCTION (void)0
-#  endif
+# ifdef _MSC_VER
+#  define NOP_FUNCTION __noop
 # else
 #  define NOP_FUNCTION(...)
 # endif
 #endif
 
 #ifndef DECLSPEC_ADDRSAFE
-# if defined(_MSC_VER) && (_MSC_VER >= 1200) && (defined(_M_ALPHA) || defined(_M_AXP64))
+# if __has_declspec_attribute(address_safe) && (defined(_M_ALPHA) || defined(_M_AXP64))
 #  define DECLSPEC_ADDRSAFE __declspec(address_safe)
 # else
 #  define DECLSPEC_ADDRSAFE
@@ -146,7 +142,7 @@ extern "C" {
 #endif
 
 #ifndef FORCEINLINE
-# if defined(_MSC_VER) && (_MSC_VER >= 1200)
+# ifdef _MSC_VER
 #  define FORCEINLINE __forceinline
 # elif defined(__GNUC__) && ((__GNUC__ > 3) || ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 2)))
 #  define FORCEINLINE inline __attribute__((always_inline))
@@ -156,7 +152,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_NOINLINE
-# if defined(_MSC_VER) && (_MSC_VER >= 1300)
+# if __has_declspec_attribute(noinline)
 #  define DECLSPEC_NOINLINE  __declspec(noinline)
 # elif defined(__GNUC__)
 #  define DECLSPEC_NOINLINE __attribute__((noinline))
@@ -166,7 +162,7 @@ extern "C" {
 #endif
 
 #ifndef DECLSPEC_DEPRECATED
-# if defined(_MSC_VER) && (_MSC_VER >= 1300) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(deprecated) && !defined(MIDL_PASS)
 #  define DECLSPEC_DEPRECATED __declspec(deprecated)
 #  define DEPRECATE_SUPPORTED
 # elif defined(__GNUC__) && ((__GNUC__ > 3) || ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 2)))
@@ -183,7 +179,7 @@ extern "C" {
 #if defined(__WINESRC__) && !defined(WINE_UNIX_LIB)
 /* Wine uses .spec file for PE exports */
 # define DECLSPEC_EXPORT
-#elif defined(_MSC_VER)
+#elif __has_declspec_attribute(dllexport)
 # define DECLSPEC_EXPORT __declspec(dllexport)
 #elif defined(__MINGW32__)
 # define DECLSPEC_EXPORT __attribute__((dllexport))
@@ -206,7 +202,7 @@ extern "C" {
 #ifndef DECLSPEC_CHPE_PATCHABLE
 # ifndef __arm64ec__
 #  define DECLSPEC_CHPE_PATCHABLE
-# elif defined(_MSC_VER)
+# elif __has_declspec_attribute(hybrid_patchable)
 #  define DECLSPEC_CHPE_PATCHABLE __declspec(hybrid_patchable)
 # else
 #  define DECLSPEC_CHPE_PATCHABLE __attribute__((hybrid_patchable))
@@ -411,7 +407,7 @@ extern "C" {
 #define MEMORY_ALLOCATION_ALIGNMENT 8
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1300) && defined(__cplusplus)
+#if defined(_MSC_VER) && defined(__cplusplus)
 # define TYPE_ALIGNMENT(t) __alignof(t)
 #elif defined(__GNUC__)
 # define TYPE_ALIGNMENT(t) __alignof__(t)
@@ -437,7 +433,7 @@ extern "C" {
 #endif
 
 /* Eliminate Microsoft C/C++ compiler warning 4715 */
-#if defined(_MSC_VER) && (_MSC_VER > 1200)
+#ifdef _MSC_VER
 # define DEFAULT_UNREACHABLE default: __assume(0)
 #elif defined(__clang__) || (defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 5))))
 # define DEFAULT_UNREACHABLE default: __builtin_unreachable()
@@ -2479,12 +2475,11 @@ static FORCEINLINE struct _TEB * WINAPI NtCurrentTeb(void)
     return teb;
 }
 #elif defined(__i386__) && defined(_MSC_VER)
+DWORD __readfsdword(DWORD);
+#pragma intrinsic(__readfsdword)
 static FORCEINLINE struct _TEB * WINAPI NtCurrentTeb(void)
 {
-  struct _TEB *teb;
-  __asm mov eax, fs:[0x18];
-  __asm mov teb, eax;
-  return teb;
+    return (struct _TEB *)__readfsdword( 0x18 );
 }
 #elif (defined(__aarch64__) || defined(__arm64ec__)) && defined(__GNUC__)
 register struct _TEB *__wine_current_teb __asm__("x18");
@@ -6070,6 +6065,7 @@ typedef struct _TAPE_GET_MEDIA_PARAMETERS {
 #define DEVICEFAMILYDEVICEFORM_MAX                    0x21
 
 NTSYSAPI void WINAPI RtlGetDeviceFamilyInfoEnum(ULONGLONG*,DWORD*,DWORD*);
+NTSYSAPI DWORD WINAPI RtlConvertDeviceFamilyInfoToString(DWORD *,DWORD *,WCHAR *,WCHAR *);
 
 #define EVENTLOG_SUCCESS                0x0000
 #define EVENTLOG_ERROR_TYPE             0x0001

@@ -222,7 +222,7 @@ BOOL WCMD_ReadFile(const HANDLE hIn, WCHAR *intoBuf, const DWORD maxChars, LPDWO
     char *buffer;
 
     /* Try to read from console as Unicode */
-    if (ReadConsoleW(hIn, intoBuf, maxChars, charsRead, NULL)) return TRUE;
+    if (VerifyConsoleIoHandle(hIn) && ReadConsoleW(hIn, intoBuf, maxChars, charsRead, NULL)) return TRUE;
 
     /* We assume it's a file handle and read then convert from assumed OEM codepage */
     if (!(buffer = get_file_buffer()))
@@ -514,157 +514,78 @@ WCHAR *WCMD_strip_quotes(WCHAR *cmd) {
   return lastquote;
 }
 
-
-/*************************************************************************
- * WCMD_is_magic_envvar
- * Return TRUE if s is '%'magicvar'%'
- * and is not masked by a real environment variable.
- */
-
-static inline BOOL WCMD_is_magic_envvar(const WCHAR *s, const WCHAR *magicvar)
-{
-    int len;
-
-    if (s[0] != '%')
-        return FALSE;         /* Didn't begin with % */
-    len = lstrlenW(s);
-    if (len < 2 || s[len-1] != '%')
-        return FALSE;         /* Didn't end with another % */
-
-    if (CompareStringW(LOCALE_USER_DEFAULT,
-                       NORM_IGNORECASE | SORT_STRINGSORT,
-                       s+1, len-2, magicvar, -1) != CSTR_EQUAL) {
-        /* Name doesn't match. */
-        return FALSE;
-    }
-
-    if (GetEnvironmentVariableW(magicvar, NULL, 0) > 0) {
-        /* Masked by real environment variable. */
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 /*************************************************************************
  * WCMD_expand_envvar
  *
  *	Expands environment variables, allowing for WCHARacter substitution
  */
-static WCHAR *WCMD_expand_envvar(WCHAR *start, WCHAR startchar)
+static WCHAR *WCMD_expand_envvar(WCHAR *start)
 {
     WCHAR *endOfVar = NULL, *s;
     WCHAR *colonpos = NULL;
     WCHAR thisVar[MAXSTRING];
     WCHAR thisVarContents[MAXSTRING];
-    WCHAR savedchar = 0x00;
     int len;
-    WCHAR Delims[] = L"%:"; /* First char gets replaced appropriately */
 
-    WINE_TRACE("Expanding: %s (%c)\n", wine_dbgstr_w(start), startchar);
+    WINE_TRACE("Expanding: %s\n", wine_dbgstr_w(start));
 
-    /* Find the end of the environment variable, and extract name */
-    Delims[0] = startchar;
-    endOfVar = wcspbrk(start+1, Delims);
+    endOfVar = wcschr(start + 1, *start);
+    if (!endOfVar)
+        /* no corresponding closing char... either skip startchar in batch, or leave untouched otherwise */
+        return context ? WCMD_strsubstW(start, start + 1, NULL, 0) : start + 1;
 
-    if (endOfVar == NULL || *endOfVar==' ') {
-
-      /* In batch program, missing terminator for % and no following
-         ':' just removes the '%'                                   */
-      if (context) {
-        return WCMD_strsubstW(start, start + 1, NULL, 0);
-      } else {
-
-        /* In command processing, just ignore it - allows command line
-           syntax like: for %i in (a.a) do echo %i                     */
-        return start+1;
-      }
-    }
-
-    /* If ':' found, process remaining up until '%' (or stop at ':' if
-       a missing '%' */
-    if (*endOfVar==':') {
-        WCHAR *endOfVar2 = wcschr(endOfVar+1, startchar);
-        if (endOfVar2 != NULL) endOfVar = endOfVar2;
-    }
-
-    memcpy(thisVar, start, ((endOfVar - start) + 1) * sizeof(WCHAR));
-    thisVar[(endOfVar - start)+1] = 0x00;
-    colonpos = wcschr(thisVar+1, ':');
+    memcpy(thisVar, start + 1, (endOfVar - start - 1) * sizeof(WCHAR));
+    thisVar[endOfVar - start - 1] = L'\0';
+    colonpos = wcschr(thisVar, L':');
 
     /* If there's complex substitution, just need %var% for now
-       to get the expanded data to play with                    */
-    if (colonpos) {
-        *colonpos = '%';
-        savedchar = *(colonpos+1);
-        *(colonpos+1) = 0x00;
-    }
+     * to get the expanded data to play with
+     */
+    if (colonpos) colonpos[0] = L'\0';
 
-    /* By now, we know the variable we want to expand but it may be
-       surrounded by '!' if we are in delayed expansion - if so convert
-       to % signs.                                                      */
-    if (startchar=='!') {
-      thisVar[0]                  = '%';
-      thisVar[(endOfVar - start)] = '%';
-    }
-    WINE_TRACE("Retrieving contents of %s\n", wine_dbgstr_w(thisVar));
+    TRACE("Retrieving contents of %s\n", wine_dbgstr_w(thisVar));
 
-    /* Expand to contents, if unchanged, return */
-    /* Handle DATE, TIME, ERRORLEVEL and CD replacements allowing */
-    /* override if existing env var called that name              */
-    if (WCMD_is_magic_envvar(thisVar, L"ERRORLEVEL")) {
-      len = wsprintfW(thisVarContents, L"%d", errorlevel);
-    } else if (WCMD_is_magic_envvar(thisVar, L"DATE")) {
-      len = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, NULL,
-                           NULL, thisVarContents, ARRAY_SIZE(thisVarContents));
-    } else if (WCMD_is_magic_envvar(thisVar, L"TIME")) {
-      len = GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, NULL,
-                           NULL, thisVarContents, ARRAY_SIZE(thisVarContents));
-    } else if (WCMD_is_magic_envvar(thisVar, L"CD")) {
-      len = GetCurrentDirectoryW(ARRAY_SIZE(thisVarContents), thisVarContents);
-    } else if (WCMD_is_magic_envvar(thisVar, L"RANDOM")) {
-      len = wsprintfW(thisVarContents, L"%d", rand() % 32768);
-    } else {
-      if ((len = ExpandEnvironmentStringsW(thisVar, thisVarContents, ARRAY_SIZE(thisVarContents)))) len--;
+    /* env variables (when set) have priority over magic env variables */
+    len = GetEnvironmentVariableW(thisVar, thisVarContents, ARRAY_SIZE(thisVarContents));
+    if (!len)
+    {
+        if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT, thisVar, -1, L"ERRORLEVEL", -1) == CSTR_EQUAL)
+            len = wsprintfW(thisVarContents, L"%d", errorlevel);
+        else if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT, thisVar, -1, L"DATE", -1) == CSTR_EQUAL)
+            len = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, NULL,
+                                 NULL, thisVarContents, ARRAY_SIZE(thisVarContents));
+        else if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT, thisVar, -1, L"TIME", -1) == CSTR_EQUAL)
+            len = GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, NULL,
+                                 NULL, thisVarContents, ARRAY_SIZE(thisVarContents));
+        else if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT, thisVar, -1, L"CD", -1) == CSTR_EQUAL)
+            len = GetCurrentDirectoryW(ARRAY_SIZE(thisVarContents), thisVarContents);
+        else if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT, thisVar, -1, L"RANDOM", -1) == CSTR_EQUAL)
+            len = wsprintfW(thisVarContents, L"%d", rand() % 32768);
     }
-
-    if (len == 0)
-      return endOfVar+1;
+    /* Restore complex bit */
+    if (colonpos) colonpos[0] = L':';
 
     /* In a batch program, unknown env vars are replaced with nothing,
-         note syntax %garbage:1,3% results in anything after the ':'
-         except the %
-       From the command line, you just get back what you entered      */
-    if (lstrcmpiW(thisVar, thisVarContents) == 0) {
+     * note syntax %garbage:1,3% results in anything after the ':'
+     * except the %
+     * From the command line, you just get back what you entered
+     */
+    if (!len)
+    {
+        /* Command line - just ignore this */
+        if (context == NULL) return endOfVar + 1;
 
-      /* Restore the complex part after the compare */
-      if (colonpos) {
-        *colonpos = ':';
-        *(colonpos+1) = savedchar;
-      }
-
-      /* Command line - just ignore this */
-      if (context == NULL) return endOfVar+1;
-
-      /* Batch - replace unknown env var with nothing */
-      if (colonpos == NULL)
-        return WCMD_strsubstW(start, endOfVar + 1, NULL, 0);
-      len = lstrlenW(thisVar);
-      thisVar[len-1] = 0x00;
-      /* If %:...% supplied, : is retained */
-      if (colonpos == thisVar+1)
-          return WCMD_strsubstW(start, endOfVar + 1, colonpos, -1);
-      return WCMD_strsubstW(start, endOfVar + 1, colonpos + 1, -1);
+        /* Batch - replace unknown env var with nothing */
+        if (colonpos == NULL)
+            return WCMD_strsubstW(start, endOfVar + 1, NULL, 0);
+        if (colonpos == thisVar)
+            return WCMD_strsubstW(start, endOfVar + 1, colonpos, -1);
+        return WCMD_strsubstW(start, endOfVar + 1, colonpos + 1, -1);
     }
 
-    /* See if we need to do complex substitution (any ':'s), if not
-       then our work here is done                                  */
+    /* See if we need to do complex substitution (any ':'s) */
     if (colonpos == NULL)
       return WCMD_strsubstW(start, endOfVar + 1, thisVarContents, -1);
-
-    /* Restore complex bit */
-    *colonpos = ':';
-    *(colonpos+1) = savedchar;
 
     /*
         Handle complex substitutions:
@@ -677,10 +598,10 @@ static WCHAR *WCMD_expand_envvar(WCHAR *start, WCHAR startchar)
      */
 
     /* ~ is substring manipulation */
-    if (savedchar == '~') {
+    if (colonpos[1] == L'~') {
 
       int   substrposition, substrlength = 0;
-      WCHAR *commapos = wcschr(colonpos+2, ',');
+      WCHAR *commapos = wcschr(colonpos+2, L',');
       WCHAR *startCopy;
 
       substrposition = wcstol(colonpos+2, NULL, 10);
@@ -707,7 +628,7 @@ static WCHAR *WCMD_expand_envvar(WCHAR *start, WCHAR startchar)
       return WCMD_strsubstW(start, endOfVar + 1, startCopy, substrlength);
     /* search and replace manipulation */
     } else {
-      WCHAR *equalspos = wcsstr(colonpos, L"=");
+      WCHAR *equalspos = wcschr(colonpos, L'=');
       WCHAR *replacewith = equalspos+1;
       WCHAR *found       = NULL;
       WCHAR *searchIn;
@@ -799,11 +720,10 @@ static void handleExpansion(WCHAR *cmd, BOOL atExecute) {
   WCHAR *normalp;
 
   /* Display the FOR variables in effect */
-  for (i=0;i<MAX_FOR_VARIABLES;i++) {
+  for (i=0;i<ARRAY_SIZE(forloopcontext->variable);i++) {
     if (forloopcontext->variable[i]) {
-      WINE_TRACE("FOR variable context: %c = '%s'\n",
-                 for_var_index_to_char(i),
-                 wine_dbgstr_w(forloopcontext->variable[i]));
+      TRACE("FOR variable context: %s = '%s'\n",
+            debugstr_for_var((WCHAR)i), wine_dbgstr_w(forloopcontext->variable[i]));
     }
   }
 
@@ -822,16 +742,12 @@ static void handleExpansion(WCHAR *cmd, BOOL atExecute) {
                    wine_dbgstr_w(cmd), atExecute, wine_dbgstr_w(p));
     i = *(p+1) - '0';
 
-    /* Don't touch %% unless it's in Batch */
-    if (!atExecute && *(p+1) == startchar) {
-      if (context) {
-        WCMD_strsubstW(p, p+1, NULL, 0);
-        p++;
-      }
-      else p+=2;
-
+    /* handle consecutive % or ! */
+    if ((!atExecute || startchar == L'!') && p[1] == startchar) {
+        if (context) WCMD_strsubstW(p, p + 1, NULL, 0);
+        if (!context || startchar == L'%') p++;
     /* Replace %~ modifications if in batch program */
-    } else if (*(p+1) == '~') {
+    } else if (p[1] == L'~' && p[2] && !iswspace(p[2])) {
       WCMD_HandleTildeModifiers(&p, atExecute);
       p++;
 
@@ -853,13 +769,19 @@ static void handleExpansion(WCHAR *cmd, BOOL atExecute) {
         p = WCMD_strsubstW(p, p+2, NULL, 0);
 
     } else {
-      int forvaridx = for_var_char_to_index(*(p+1));
-      if (startchar == '%' && forvaridx != -1 && forloopcontext->variable[forvaridx]) {
+      if (startchar == L'%' && for_var_is_valid(p[1]) && forloopcontext->variable[p[1]]) {
         /* Replace the 2 characters, % and for variable character */
-        p = WCMD_strsubstW(p, p + 2, forloopcontext->variable[forvaridx], -1);
-      } else if (!atExecute || startchar == '!') {
-        p = WCMD_expand_envvar(p, startchar);
-
+        p = WCMD_strsubstW(p, p + 2, forloopcontext->variable[p[1]], -1);
+      } else if (!atExecute || startchar == L'!') {
+        BOOL first = p == cmd;
+        p = WCMD_expand_envvar(p);
+        /* FIXME: maybe this more likely calls for a specific handling of first arg? */
+        if (context && startchar == L'!' && first)
+        {
+            WCHAR *last;
+            for (last = p; *last == startchar; last++) {}
+            p = WCMD_strsubstW(p, last, NULL, 0);
+        }
       /* In a FOR loop, see if this is the variable to replace */
       } else { /* Ignore %'s on second pass of batch program */
         p++;
@@ -1050,16 +972,16 @@ const char *debugstr_for_control(const CMD_FOR_CONTROL *for_ctrl)
         options = "";
         break;
     }
-    return wine_dbg_sprintf("[FOR] %s %s%s%%%c (%ls)",
+    return wine_dbg_sprintf("[FOR] %s %s%s%s (%ls)",
                             for_ctrl_strings[for_ctrl->operator], flags, options,
-                            for_var_index_to_char(for_ctrl->variable_index), for_ctrl->set);
+                            debugstr_for_var(for_ctrl->variable_index), for_ctrl->set);
 }
 
-static void for_control_create(enum for_control_operator for_op, unsigned flags, const WCHAR *options, int var_idx, CMD_FOR_CONTROL *for_ctrl)
+static void for_control_create(enum for_control_operator for_op, unsigned flags, const WCHAR *options, unsigned varidx, CMD_FOR_CONTROL *for_ctrl)
 {
     for_ctrl->operator = for_op;
     for_ctrl->flags = flags;
-    for_ctrl->variable_index = var_idx;
+    for_ctrl->variable_index = varidx;
     for_ctrl->set = NULL;
     switch (for_ctrl->operator)
     {
@@ -1071,13 +993,13 @@ static void for_control_create(enum for_control_operator for_op, unsigned flags,
     }
 }
 
-static void for_control_create_fileset(unsigned flags, int var_idx, WCHAR eol, int num_lines_to_skip, BOOL use_backq,
+static void for_control_create_fileset(unsigned flags, unsigned varidx, WCHAR eol, int num_lines_to_skip, BOOL use_backq,
                                        const WCHAR *delims, const WCHAR *tokens,
                                        CMD_FOR_CONTROL *for_ctrl)
 {
     for_ctrl->operator = CMD_FOR_FILE_SET;
     for_ctrl->flags = flags;
-    for_ctrl->variable_index = var_idx;
+    for_ctrl->variable_index = varidx;
     for_ctrl->set = NULL;
 
     for_ctrl->eol = eol;
@@ -1377,8 +1299,6 @@ static void init_msvcrt_io_block(STARTUPINFOW* st)
     }
 }
 
-static RETURN_CODE execute_single_command(const WCHAR *command);
-
 /* Attempt to open a file at a known path. */
 static RETURN_CODE run_full_path(const WCHAR *file, WCHAR *full_cmdline, BOOL called)
 {
@@ -1463,213 +1383,248 @@ static RETURN_CODE run_full_path(const WCHAR *file, WCHAR *full_cmdline, BOOL ca
     return errorlevel;
 }
 
-/******************************************************************************
- * WCMD_run_program
- *
- *	Execute a command line as an external program. Must allow recursion.
- *
- *      Precedence:
- *        Manual testing under windows shows PATHEXT plays a key part in this,
- *      and the search algorithm and precedence appears to be as follows.
- *
- *      Search locations:
- *        If directory supplied on command, just use that directory
- *        If extension supplied on command, look for that explicit name first
- *        Otherwise, search in each directory on the path
- *      Precedence:
- *        If extension supplied on command, look for that explicit name first
- *        Then look for supplied name .* (even if extension supplied, so
- *          'garbage.exe' will match 'garbage.exe.cmd')
- *        If any found, cycle through PATHEXT looking for name.exe one by one
- *      Launching
- *        Once a match has been found, it is launched - Code currently uses
- *          findexecutable to achieve this which is left untouched.
- *        If an executable has not been found, and we were launched through
- *          a call, we need to check if the command is an internal command,
- *          so go back through wcmd_execute.
- */
-
-RETURN_CODE WCMD_run_program(WCHAR *command, BOOL called)
+struct search_command
 {
-  WCHAR  temp[MAX_PATH];
-  WCHAR  pathtosearch[MAXSTRING];
-  WCHAR *pathposn;
-  WCHAR  stemofsearch[MAX_PATH];    /* maximum allowed executable name is
-                                       MAX_PATH, including null character */
-  WCHAR *lastSlash;
-  WCHAR  pathext[MAXSTRING];
-  WCHAR *firstParam;
-  BOOL  extensionsupplied = FALSE;
-  BOOL  explicit_path = FALSE;
-  DWORD len;
+    WCHAR path[MAX_PATH];
+    BOOL has_path; /* if input has path part (ie cannot be a builtin command) */
+    BOOL has_extension; /* if extension was given to input */
+    int cmd_index; /* potential index to builtin command */
+};
 
-  /* Quick way to get the filename is to extract the first argument. */
-  WINE_TRACE("Running '%s' (%d)\n", wine_dbgstr_w(command), called);
-  firstParam = WCMD_parameter(command, 0, NULL, FALSE, TRUE);
-
-  if (!firstParam[0]) return NO_ERROR;
-
-  /* Calculate the search path and stem to search for */
-  if (wcspbrk(firstParam, L"/\\:") == NULL) {  /* No explicit path given, search path */
-    lstrcpyW(pathtosearch, L".;");
-    len = GetEnvironmentVariableW(L"PATH", &pathtosearch[2], ARRAY_SIZE(pathtosearch)-2);
-    if ((len == 0) || (len >= ARRAY_SIZE(pathtosearch) - 2)) {
-      lstrcpyW(pathtosearch, L".");
-    }
-    if (wcschr(firstParam, '.') != NULL) extensionsupplied = TRUE;
-    if (lstrlenW(firstParam) >= MAX_PATH)
+static BOOL search_in_pathext(WCHAR *path)
+{
+    static struct
     {
-        WCMD_output_asis_stderr(WCMD_LoadMessage(WCMD_LINETOOLONG));
-        return ERROR_INVALID_FUNCTION;
+        unsigned short offset; /* into cached_data */
+        unsigned short length;
+    } *cached_pathext;
+    static WCHAR *cached_data;
+    static unsigned cached_count;
+    WCHAR pathext[MAX_PATH];
+    WIN32_FIND_DATAW find;
+    WCHAR *pos;
+    HANDLE h;
+    unsigned efound;
+    DWORD len;
+
+    len = GetEnvironmentVariableW(L"PATHEXT", pathext, ARRAY_SIZE(pathext));
+    if (len == 0 || len >= ARRAY_SIZE(pathext))
+        wcscpy(pathext, L".bat;.com;.cmd;.exe");
+    /* erase cache if PATHEXT has changed */
+    if (cached_data && wcscmp(cached_data, pathext))
+    {
+        free(cached_pathext);
+        cached_pathext = NULL;
+        free(cached_data);
+        cached_data = NULL;
+        cached_count = 0;
+    }
+    /* (re)create cache if needed */
+    if (!cached_pathext)
+    {
+        size_t c;
+        WCHAR *p, *n;
+
+        cached_data = xstrdupW(pathext);
+        for (p = cached_data, c = 1; (p = wcschr(p, L';')) != NULL; c++, p++) {}
+        cached_pathext = xalloc(sizeof(cached_pathext[0]) * c);
+        cached_count = c;
+        for (c = 0, p = cached_data; (n = wcschr(p, L';')) != NULL; c++, p = n + 1)
+        {
+            cached_pathext[c].offset = p - cached_data;
+            cached_pathext[c].length = n - p;
+        }
+        cached_pathext[c].offset = p - cached_data;
+        cached_pathext[c].length = wcslen(p);
     }
 
-    lstrcpyW(stemofsearch, firstParam);
-
-  } else {
-
-    /* Convert eg. ..\fred to include a directory by removing file part */
-    if (!WCMD_get_fullpath(firstParam, ARRAY_SIZE(pathtosearch), pathtosearch, NULL))
-        return ERROR_INVALID_FUNCTION;
-    lastSlash = wcsrchr(pathtosearch, '\\');
-    if (lastSlash && wcschr(lastSlash, '.') != NULL) extensionsupplied = TRUE;
-    lstrcpyW(stemofsearch, lastSlash+1);
-
-    /* Reduce pathtosearch to a path with trailing '\' to support c:\a.bat and
-       c:\windows\a.bat syntax                                                 */
-    if (lastSlash) *(lastSlash + 1) = 0x00;
-    explicit_path = TRUE;
-  }
-
-  /* Now extract PATHEXT */
-  len = GetEnvironmentVariableW(L"PATHEXT", pathext, ARRAY_SIZE(pathext));
-  if ((len == 0) || (len >= ARRAY_SIZE(pathext))) {
-    lstrcpyW(pathext, L".bat;.com;.cmd;.exe");
-  }
-
-  /* Loop through the search path, dir by dir */
-  pathposn = pathtosearch;
-  WINE_TRACE("Searching in '%s' for '%s'\n", wine_dbgstr_w(pathtosearch),
-             wine_dbgstr_w(stemofsearch));
-  while (pathposn) {
-    WCHAR  thisDir[MAX_PATH] = {'\0'};
-    int    length            = 0;
-    WCHAR *pos               = NULL;
-    BOOL  found             = FALSE;
-    BOOL inside_quotes      = FALSE;
-    DWORD attribs;
-
-    if (explicit_path)
+    pos = &path[wcslen(path)]; /* Pos = end of name */
+    wcscpy(pos, L".*");
+    efound = cached_count;
+    if ((h = FindFirstFileW(path, &find)) != INVALID_HANDLE_VALUE)
     {
-        lstrcpyW(thisDir, pathposn);
-        pathposn = NULL;
+        do
+        {
+            WCHAR *last;
+            size_t basefound_len;
+            unsigned i;
+
+            if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            if (!(last = wcsrchr(find.cFileName, L'.'))) continue;
+            basefound_len = last - find.cFileName;
+            /* skip foo.bar.exe when looking for foo.exe */
+            if (pos < path + basefound_len || wcsnicmp(pos - basefound_len, find.cFileName, basefound_len))
+                continue;
+            for (i = 0; i < efound; i++)
+                if (!wcsnicmp(last, cached_data + cached_pathext[i].offset, cached_pathext[i].length) &&
+                    !last[cached_pathext[i].length])
+                    efound = i;
+        } while (FindNextFileW(h, &find));
+        CloseHandle(h);
+    }
+    if (efound == cached_count) return FALSE;
+
+    memcpy(pos, cached_data + cached_pathext[efound].offset, cached_pathext[efound].length * sizeof(WCHAR));
+    pos[cached_pathext[efound].length] = L'\0';
+    return TRUE;
+}
+
+static RETURN_CODE search_command(WCHAR *command, struct search_command *sc, BOOL fast)
+{
+    WCHAR  temp[MAX_PATH];
+    WCHAR  pathtosearch[MAXSTRING];
+    WCHAR *pathposn;
+    WCHAR  stemofsearch[MAX_PATH];    /* maximum allowed executable name is
+                                         MAX_PATH, including null character */
+    WCHAR *lastSlash;
+    WCHAR *firstParam;
+    DWORD  len;
+    WCHAR *p;
+
+    /* Quick way to get the filename is to extract the first argument. */
+    firstParam = WCMD_parameter(command, 0, NULL, FALSE, TRUE);
+
+    sc->cmd_index = WCMD_EXIT + 1;
+
+    if (!firstParam[0])
+    {
+        sc->path[0] = L'\0';
+        return NO_ERROR;
+    }
+    for (p = firstParam; *p && IsCharAlphaW(*p); p++) {}
+    if (p > firstParam && (!*p || wcschr(L" \t+./(;=:", *p)))
+    {
+        for (sc->cmd_index = 0; sc->cmd_index <= WCMD_EXIT; sc->cmd_index++)
+            if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT,
+                               firstParam, p - firstParam, inbuilt[sc->cmd_index], -1) == CSTR_EQUAL)
+                break;
+    }
+    if (firstParam[1] == L':' && (!firstParam[2] || iswspace(firstParam[2])))
+    {
+        sc->cmd_index = WCMD_CHGDRIVE;
+        fast = TRUE;
+    }
+
+    if (fast && sc->cmd_index <= WCMD_EXIT && firstParam[wcslen(inbuilt[sc->cmd_index])] != L'.')
+    {
+        sc->path[0] = L'\0';
+        sc->has_path = sc->has_extension = FALSE;
+        return RETURN_CODE_CANT_LAUNCH;
+    }
+
+    /* Calculate the search path and stem to search for */
+    if (wcspbrk(firstParam, L"/\\:") == NULL)
+    {
+        /* No explicit path given, search path */
+        wcscpy(pathtosearch, L".;");
+        len = GetEnvironmentVariableW(L"PATH", &pathtosearch[2], ARRAY_SIZE(pathtosearch)-2);
+        if (len == 0 || len >= ARRAY_SIZE(pathtosearch) - 2)
+            wcscpy(pathtosearch, L".");
+        sc->has_extension = wcschr(firstParam, L'.') != NULL;
+        if (wcslen(firstParam) >= MAX_PATH)
+        {
+            WCMD_output_asis_stderr(WCMD_LoadMessage(WCMD_LINETOOLONG));
+            return ERROR_INVALID_FUNCTION;
+        }
+
+        wcscpy(stemofsearch, firstParam);
+        sc->has_path = FALSE;
     }
     else
     {
-        /* Work on the next directory on the search path */
-        pos = pathposn;
-        while ((inside_quotes || *pos != ';') && *pos != 0)
-        {
-            if (*pos == '"')
-                inside_quotes = !inside_quotes;
-            pos++;
-        }
+        /* Convert eg. ..\fred to include a directory by removing file part */
+        if (!WCMD_get_fullpath(firstParam, ARRAY_SIZE(pathtosearch), pathtosearch, NULL))
+            return ERROR_INVALID_FUNCTION;
+        lastSlash = wcsrchr(pathtosearch, L'\\');
+        sc->has_extension = wcschr(lastSlash ? lastSlash + 1 : firstParam, L'.') != NULL;
+        wcscpy(stemofsearch, lastSlash ? lastSlash + 1 : firstParam);
 
-        if (*pos)  /* Reached semicolon */
+        /* Reduce pathtosearch to a path with trailing '\' to support c:\a.bat and
+           c:\windows\a.bat syntax                                                 */
+        if (lastSlash) *(lastSlash + 1) = L'\0';
+        sc->has_path = TRUE;
+    }
+
+    /* Loop through the search path, dir by dir */
+    pathposn = pathtosearch;
+    WINE_TRACE("Searching in '%s' for '%s'\n", wine_dbgstr_w(pathtosearch),
+               wine_dbgstr_w(stemofsearch));
+    while (pathposn)
+    {
+        int    length            = 0;
+        WCHAR *pos               = NULL;
+        BOOL   found             = FALSE;
+        BOOL   inside_quotes     = FALSE;
+
+        sc->path[0] = L'\0';
+
+        if (sc->has_path)
         {
-            memcpy(thisDir, pathposn, (pos-pathposn) * sizeof(WCHAR));
-            thisDir[(pos-pathposn)] = 0x00;
-            pathposn = pos+1;
-        }
-        else       /* Reached string end */
-        {
-            lstrcpyW(thisDir, pathposn);
+            wcscpy(sc->path, pathposn);
             pathposn = NULL;
         }
-
-        /* Remove quotes */
-        length = lstrlenW(thisDir);
-        if (thisDir[length - 1] == '"')
-            thisDir[length - 1] = 0;
-
-        if (*thisDir != '"')
-            lstrcpyW(temp, thisDir);
         else
-            lstrcpyW(temp, thisDir + 1);
+        {
+            /* Work on the next directory on the search path */
+            pos = pathposn;
+            while ((inside_quotes || *pos != ';') && *pos != 0)
+            {
+                if (*pos == '"')
+                    inside_quotes = !inside_quotes;
+                pos++;
+            }
 
-        /* When temp is an empty string, skip over it. This needs
-           to be done before the expansion, because WCMD_get_fullpath
-           fails when given an empty string                         */
-        if (*temp == '\0')
-            continue;
+            if (*pos)  /* Reached semicolon */
+            {
+                memcpy(sc->path, pathposn, (pos-pathposn) * sizeof(WCHAR));
+                sc->path[(pos-pathposn)] = 0x00;
+                pathposn = pos+1;
+            }
+            else       /* Reached string end */
+            {
+                wcscpy(sc->path, pathposn);
+                pathposn = NULL;
+            }
 
-        /* Since you can have eg. ..\.. on the path, need to expand
-           to full information                                      */
-        if (!WCMD_get_fullpath(temp, ARRAY_SIZE(thisDir), thisDir, NULL))
-            return ERROR_INVALID_FUNCTION;
-    }
+            /* Remove quotes */
+            length = wcslen(sc->path);
+            if (sc->path[length - 1] == L'"')
+                sc->path[length - 1] = 0;
 
-    /* 1. If extension supplied, see if that file exists */
-    lstrcatW(thisDir, L"\\");
-    lstrcatW(thisDir, stemofsearch);
-    pos = &thisDir[lstrlenW(thisDir)]; /* Pos = end of name */
+            if (*sc->path != L'"')
+                wcscpy(temp, sc->path);
+            else
+                wcscpy(temp, sc->path + 1);
 
-    /* 1. If extension supplied, see if that file exists */
-    if (extensionsupplied) {
-      attribs = GetFileAttributesW(thisDir);
-      if (attribs != INVALID_FILE_ATTRIBUTES && !(attribs & FILE_ATTRIBUTE_DIRECTORY)) {
-        found = TRUE;
-      }
-    }
+            /* When temp is an empty string, skip over it. This needs
+               to be done before the expansion, because WCMD_get_fullpath
+               fails when given an empty string                         */
+            if (*temp == L'\0')
+                continue;
 
-    /* 2. Any .* matches? */
-    if (!found) {
-      HANDLE          h;
-      WIN32_FIND_DATAW finddata;
-
-      lstrcatW(thisDir, L".*");
-      h = FindFirstFileW(thisDir, &finddata);
-      FindClose(h);
-      if (h != INVALID_HANDLE_VALUE) {
-
-        WCHAR *thisExt = pathext;
-
-        /* 3. Yes - Try each path ext */
-        while (thisExt) {
-          WCHAR *nextExt = wcschr(thisExt, ';');
-
-          if (nextExt) {
-            memcpy(pos, thisExt, (nextExt-thisExt) * sizeof(WCHAR));
-            pos[(nextExt-thisExt)] = 0x00;
-            thisExt = nextExt+1;
-          } else {
-            lstrcpyW(pos, thisExt);
-            thisExt = NULL;
-          }
-
-          attribs = GetFileAttributesW(thisDir);
-          if (attribs != INVALID_FILE_ATTRIBUTES && !(attribs & FILE_ATTRIBUTE_DIRECTORY)) {
-            found = TRUE;
-            thisExt = NULL;
-          }
+            /* Since you can have eg. ..\.. on the path, need to expand
+               to full information                                      */
+            if (!WCMD_get_fullpath(temp, ARRAY_SIZE(sc->path), sc->path, NULL))
+                return ERROR_INVALID_FUNCTION;
         }
-      }
+
+        if (wcslen(sc->path) + 1 + wcslen(stemofsearch) >= ARRAY_SIZE(sc->path))
+            return ERROR_INVALID_FUNCTION;
+
+        /* 1. If extension supplied, see if that file exists */
+        wcscat(sc->path, L"\\");
+        wcscat(sc->path, stemofsearch);
+
+        if (sc->has_extension)
+        {
+            DWORD attribs = GetFileAttributesW(sc->path);
+            found = attribs != INVALID_FILE_ATTRIBUTES && !(attribs & FILE_ATTRIBUTE_DIRECTORY);
+        }
+        /* if foo.bat was given but not found, try to match foo.bat.bat (or any valid ext) */
+        if (!found) found = search_in_pathext(sc->path);
+        if (found) return NO_ERROR;
     }
-
-    if (found)
-      return run_full_path(thisDir, command, called);
-  }
-
-  /* Not found anywhere - were we called? */
-  if (called)
-      return errorlevel = execute_single_command(command);
-
-  /* Not found anywhere - give up */
-  WCMD_output_stderr(WCMD_LoadMessage(WCMD_NO_COMMAND_FOUND), command);
-
-  /* If a command fails to launch, it sets errorlevel 9009 - which
-     does not seem to have any associated constant definition     */
-  errorlevel = RETURN_CODE_CANT_LAUNCH;
-  return ERROR_INVALID_FUNCTION;
+    return RETURN_CODE_CANT_LAUNCH;
 }
 
 static BOOL set_std_redirections(CMD_REDIRECTION *redir)
@@ -1744,6 +1699,159 @@ static BOOL set_std_redirections(CMD_REDIRECTION *redir)
     return TRUE;
 }
 
+RETURN_CODE WCMD_run_builtin_command(int cmd_index, WCHAR *cmd)
+{
+    size_t count = wcslen(inbuilt[cmd_index]);
+    WCHAR *parms_start = WCMD_skip_leading_spaces(&cmd[count]);
+    RETURN_CODE return_code;
+
+    WCMD_parse(parms_start, quals, param1, param2);
+    TRACE("param1: %s, param2: %s\n", wine_dbgstr_w(param1), wine_dbgstr_w(param2));
+
+    if (cmd_index <= WCMD_EXIT && (parms_start[0] == '/') && (parms_start[1] == '?'))
+    {
+        /* this is a help request for a builtin program */
+        cmd_index = WCMD_HELP;
+        wcscpy(parms_start, inbuilt[cmd_index]);
+    }
+
+    switch (cmd_index)
+    {
+    case WCMD_CALL:
+        return_code = WCMD_call(parms_start);
+        break;
+    case WCMD_CD:
+    case WCMD_CHDIR:
+        return_code = WCMD_setshow_default(parms_start);
+        break;
+    case WCMD_CLS:
+        return_code = WCMD_clear_screen();
+        break;
+    case WCMD_COPY:
+        return_code = WCMD_copy(parms_start);
+        break;
+    case WCMD_DATE:
+        return_code = WCMD_setshow_date();
+	break;
+    case WCMD_DEL:
+    case WCMD_ERASE:
+        return_code = WCMD_delete(parms_start);
+        break;
+    case WCMD_DIR:
+        return_code = WCMD_directory(parms_start);
+        break;
+    case WCMD_ECHO:
+        return_code = WCMD_echo(&cmd[count]);
+        break;
+    case WCMD_GOTO:
+        return_code = WCMD_goto();
+        break;
+    case WCMD_HELP:
+        return_code = WCMD_give_help(parms_start);
+        break;
+    case WCMD_LABEL:
+        return_code = WCMD_label();
+        break;
+    case WCMD_MD:
+    case WCMD_MKDIR:
+        return_code = WCMD_create_dir(parms_start);
+        break;
+    case WCMD_MOVE:
+        return_code = WCMD_move();
+        break;
+    case WCMD_PATH:
+        return_code = WCMD_setshow_path(parms_start);
+        break;
+    case WCMD_PAUSE:
+        return_code = WCMD_pause();
+        break;
+    case WCMD_PROMPT:
+        return_code = WCMD_setshow_prompt();
+        break;
+    case WCMD_REM:
+        return_code = NO_ERROR;
+        break;
+    case WCMD_REN:
+    case WCMD_RENAME:
+        return_code = WCMD_rename();
+	break;
+    case WCMD_RD:
+    case WCMD_RMDIR:
+        return_code = WCMD_remove_dir(parms_start);
+        break;
+    case WCMD_SETLOCAL:
+        return_code = WCMD_setlocal(parms_start);
+        break;
+    case WCMD_ENDLOCAL:
+        return_code = WCMD_endlocal();
+        break;
+    case WCMD_SET:
+        return_code = WCMD_setshow_env(parms_start);
+        break;
+    case WCMD_SHIFT:
+        return_code = WCMD_shift(parms_start);
+        break;
+    case WCMD_START:
+        return_code = WCMD_start(parms_start);
+        break;
+    case WCMD_TIME:
+        return_code = WCMD_setshow_time();
+        break;
+    case WCMD_TITLE:
+        return_code = WCMD_title(parms_start);
+        break;
+    case WCMD_TYPE:
+        return_code = WCMD_type(parms_start);
+        break;
+    case WCMD_VER:
+        return_code = WCMD_version();
+        break;
+    case WCMD_VERIFY:
+        return_code = WCMD_verify();
+        break;
+    case WCMD_VOL:
+        return_code = WCMD_volume();
+        break;
+    case WCMD_PUSHD:
+        return_code = WCMD_pushd(parms_start);
+        break;
+    case WCMD_POPD:
+        return_code = WCMD_popd();
+        break;
+    case WCMD_ASSOC:
+        return_code = WCMD_assoc(parms_start, TRUE);
+        break;
+    case WCMD_COLOR:
+        return_code = WCMD_color();
+        break;
+    case WCMD_FTYPE:
+        return_code = WCMD_assoc(parms_start, FALSE);
+        break;
+    case WCMD_MORE:
+        return_code = WCMD_more(parms_start);
+        break;
+    case WCMD_CHOICE:
+        return_code = WCMD_choice(parms_start);
+        break;
+    case WCMD_MKLINK:
+        return_code = WCMD_mklink(parms_start);
+        break;
+    case WCMD_CHGDRIVE:
+        return_code = WCMD_change_drive(cmd[0]);
+        break;
+    case WCMD_EXIT:
+        return_code = WCMD_exit();
+        break;
+    default:
+        FIXME("Shouldn't happen %d\n", cmd_index);
+    case WCMD_FOR: /* can happen in 'call for...' and should fail */
+    case WCMD_IF:
+        return_code = RETURN_CODE_CANT_LAUNCH;
+        break;
+    }
+    return return_code;
+}
+
 /*****************************************************************************
  * Process one command. If the command is EXIT this routine does not return.
  * We will recurse through here executing batch files.
@@ -1753,206 +1861,67 @@ static BOOL set_std_redirections(CMD_REDIRECTION *redir)
  */
 static RETURN_CODE execute_single_command(const WCHAR *command)
 {
+    struct search_command sc;
     RETURN_CODE return_code;
-    WCHAR *cmd, *parms_start;
-    int cmd_index, count;
-    BOOL prev_echo_mode;
+    WCHAR *cmd;
 
     TRACE("command on entry:%s\n", wine_dbgstr_w(command));
 
     /* Move copy of the command onto the heap so it can be expanded */
     cmd = xalloc(MAXSTRING * sizeof(WCHAR));
     lstrcpyW(cmd, command);
+    handleExpansion(cmd, TRUE);
 
     TRACE("Command: '%s'\n", wine_dbgstr_w(cmd));
 
-    /* Check if the command entered is internal, and identify which one */
-    count = 0;
-    while (IsCharAlphaNumericW(cmd[count])) {
-      count++;
+    return_code = search_command(cmd, &sc, TRUE);
+    if (return_code != NO_ERROR && sc.cmd_index == WCMD_EXIT + 1)
+    {
+        /* Not found anywhere - give up */
+        WCMD_output_stderr(WCMD_LoadMessage(WCMD_NO_COMMAND_FOUND), cmd);
+
+        /* If a command fails to launch, it sets errorlevel 9009 - which
+         * does not seem to have any associated constant definition
+         */
+        errorlevel = RETURN_CODE_CANT_LAUNCH;
+        return_code = ERROR_INVALID_FUNCTION;
     }
-    for (cmd_index=0; cmd_index<=WCMD_EXIT; cmd_index++) {
-      if (count && CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE | SORT_STRINGSORT,
-                                  cmd, count, inbuilt[cmd_index], -1) == CSTR_EQUAL) break;
-    }
-    parms_start = WCMD_skip_leading_spaces(&cmd[count]);
-
-    handleExpansion(cmd, TRUE);
-
-/*
- * Changing default drive has to be handled as a special case, anything
- * else if it exists after whitespace is ignored
- */
-
-    if (cmd[1] == L':' && (!cmd[2] || iswspace(cmd[2]))) {
-      WCHAR envvar[5];
-      WCHAR dir[MAX_PATH];
-
-      /* Ignore potential garbage on the same line */
-      cmd[2] = L'\0';
-
-      /* According to MSDN CreateProcess docs, special env vars record
-         the current directory on each drive, in the form =C:
-         so see if one specified, and if so go back to it             */
-      lstrcpyW(envvar, L"=");
-      lstrcatW(envvar, cmd);
-      if (GetEnvironmentVariableW(envvar, dir, ARRAY_SIZE(dir)) == 0) {
-        wsprintfW(cmd, L"%s\\", cmd);
-        WINE_TRACE("No special directory settings, using dir of %s\n", wine_dbgstr_w(cmd));
-      }
-      WINE_TRACE("Got directory %s as %s\n", wine_dbgstr_w(envvar), wine_dbgstr_w(cmd));
-      if (!SetCurrentDirectoryW(cmd))
-      {
-          WCMD_print_error();
-          return_code = errorlevel = ERROR_INVALID_FUNCTION;
-      }
-      else return_code = NO_ERROR;
-      goto cleanup;
-    }
-
-    WCMD_parse(parms_start, quals, param1, param2);
-    TRACE("param1: %s, param2: %s\n", wine_dbgstr_w(param1), wine_dbgstr_w(param2));
-
-    if (cmd_index <= WCMD_EXIT && (parms_start[0] == '/') && (parms_start[1] == '?')) {
-      /* this is a help request for a builtin program */
-      cmd_index = WCMD_HELP;
-      memcpy(parms_start, cmd, count * sizeof(WCHAR));
-      parms_start[count] = '\0';
-    }
-
-    switch (cmd_index) {
-
-      case WCMD_CALL:
-        return_code = WCMD_call(parms_start);
-        break;
-      case WCMD_CD:
-      case WCMD_CHDIR:
-        return_code = WCMD_setshow_default(parms_start);
-        break;
-      case WCMD_CLS:
-        return_code = WCMD_clear_screen();
-        break;
-      case WCMD_COPY:
-        return_code = WCMD_copy(parms_start);
-        break;
-      case WCMD_DATE:
-        return_code = WCMD_setshow_date();
-	break;
-      case WCMD_DEL:
-      case WCMD_ERASE:
-        return_code = WCMD_delete(parms_start);
-        break;
-      case WCMD_DIR:
-        return_code = WCMD_directory(parms_start);
-        break;
-      case WCMD_ECHO:
-        return_code = WCMD_echo(&cmd[count]);
-        break;
-      case WCMD_GOTO:
-        return_code = WCMD_goto();
-        break;
-      case WCMD_HELP:
-        return_code = WCMD_give_help(parms_start);
-        break;
-      case WCMD_LABEL:
-        return_code = WCMD_label();
-        break;
-      case WCMD_MD:
-      case WCMD_MKDIR:
-        return_code = WCMD_create_dir(parms_start);
-        break;
-      case WCMD_MOVE:
-        return_code = WCMD_move();
-        break;
-      case WCMD_PATH:
-        return_code = WCMD_setshow_path(parms_start);
-        break;
-      case WCMD_PAUSE:
-        return_code = WCMD_pause();
-        break;
-      case WCMD_PROMPT:
-        return_code = WCMD_setshow_prompt();
-        break;
-      case WCMD_REM:
-        return_code = NO_ERROR;
-        break;
-      case WCMD_REN:
-      case WCMD_RENAME:
-        return_code = WCMD_rename();
-	break;
-      case WCMD_RD:
-      case WCMD_RMDIR:
-        return_code = WCMD_remove_dir(parms_start);
-        break;
-      case WCMD_SETLOCAL:
-        return_code = WCMD_setlocal(parms_start);
-        break;
-      case WCMD_ENDLOCAL:
-        return_code = WCMD_endlocal();
-        break;
-      case WCMD_SET:
-        return_code = WCMD_setshow_env(parms_start);
-        break;
-      case WCMD_SHIFT:
-        return_code = WCMD_shift(parms_start);
-        break;
-      case WCMD_START:
-        return_code = WCMD_start(parms_start);
-        break;
-      case WCMD_TIME:
-        return_code = WCMD_setshow_time();
-        break;
-      case WCMD_TITLE:
-        return_code = WCMD_title(parms_start);
-        break;
-      case WCMD_TYPE:
-        return_code = WCMD_type(parms_start);
-        break;
-      case WCMD_VER:
-        return_code = WCMD_version();
-        break;
-      case WCMD_VERIFY:
-        return_code = WCMD_verify();
-        break;
-      case WCMD_VOL:
-        return_code = WCMD_volume();
-        break;
-      case WCMD_PUSHD:
-        return_code = WCMD_pushd(parms_start);
-        break;
-      case WCMD_POPD:
-        return_code = WCMD_popd();
-        break;
-      case WCMD_ASSOC:
-        return_code = WCMD_assoc(parms_start, TRUE);
-        break;
-      case WCMD_COLOR:
-        return_code = WCMD_color();
-        break;
-      case WCMD_FTYPE:
-        return_code = WCMD_assoc(parms_start, FALSE);
-        break;
-      case WCMD_MORE:
-        return_code = WCMD_more(parms_start);
-        break;
-      case WCMD_CHOICE:
-        return_code = WCMD_choice(parms_start);
-        break;
-      case WCMD_MKLINK:
-        return_code = WCMD_mklink(parms_start);
-        break;
-      case WCMD_EXIT:
-        return_code = WCMD_exit();
-        break;
-      default:
-        prev_echo_mode = echo_mode;
-        return_code = WCMD_run_program(cmd, FALSE);
+    else if (sc.cmd_index <= WCMD_EXIT && (return_code != NO_ERROR || (!sc.has_path && !sc.has_extension)))
+        return_code = WCMD_run_builtin_command(sc.cmd_index, cmd);
+    else
+    {
+        BOOL prev_echo_mode = echo_mode;
+        if (*sc.path)
+            return_code = run_full_path(sc.path, cmd, FALSE);
         echo_mode = prev_echo_mode;
     }
-
-cleanup:
     free(cmd);
     return return_code;
+}
+
+RETURN_CODE WCMD_call_command(WCHAR *command)
+{
+  struct search_command sc;
+  RETURN_CODE return_code;
+
+  return_code = search_command(command, &sc, FALSE);
+  if (return_code == NO_ERROR)
+  {
+      if (!*sc.path) return NO_ERROR;
+      return run_full_path(sc.path, command, TRUE);
+  }
+
+  if (sc.cmd_index <= WCMD_EXIT)
+      return errorlevel = WCMD_run_builtin_command(sc.cmd_index, command);
+
+  /* Not found anywhere - give up */
+  WCMD_output_stderr(WCMD_LoadMessage(WCMD_NO_COMMAND_FOUND), command);
+
+  /* If a command fails to launch, it sets errorlevel 9009 - which
+   * does not seem to have any associated constant definition
+   */
+  errorlevel = RETURN_CODE_CANT_LAUNCH;
+  return ERROR_INVALID_FUNCTION;
 }
 
 /*************************************************************************
@@ -2053,7 +2022,7 @@ static CMD_FOR_CONTROL *for_control_parse(WCHAR *opts_var)
     WCHAR *arg;
     unsigned flags = 0;
     int arg_index;
-    int var_idx;
+    unsigned varidx;
 
     options[0] = L'\0';
     /* native allows two options only in the /D /R case, a repetition of the option
@@ -2135,8 +2104,9 @@ static CMD_FOR_CONTROL *for_control_parse(WCHAR *opts_var)
 
     /* Ensure line continues with variable */
     arg = WCMD_parameter(opts_var, arg_index++, NULL, FALSE, FALSE);
-    if (!arg || *arg != L'%' || (var_idx = for_var_char_to_index(arg[1])) == -1)
+    if (!arg || *arg != L'%' || !for_var_is_valid(arg[1]))
         goto syntax_error; /* FIXME native prints the offending token "%<whatever>" was unexpected at this time */
+    varidx = arg[1];
     for_ctrl = xalloc(sizeof(*for_ctrl));
     if (for_op == CMD_FOR_FILE_SET)
     {
@@ -2200,12 +2170,12 @@ static CMD_FOR_CONTROL *for_control_parse(WCHAR *opts_var)
                 goto syntax_error;
             }
         }
-        for_control_create_fileset(flags, var_idx, eol, num_lines_to_skip, use_backq,
+        for_control_create_fileset(flags, varidx, eol, num_lines_to_skip, use_backq,
                                    delims ? delims : xstrdupW(L" \t"),
                                    tokens ? tokens : xstrdupW(L"1"), for_ctrl);
     }
     else
-        for_control_create(for_op, flags, options, var_idx, for_ctrl);
+        for_control_create(for_op, flags, options, varidx, for_ctrl);
     return for_ctrl;
 syntax_error:
     WCMD_output_stderr(WCMD_LoadMessage(WCMD_SYNTAXERR));
@@ -3290,82 +3260,131 @@ static BOOL if_condition_evaluate(CMD_IF_CONDITION *cond, int *test)
     return TRUE;
 }
 
-static RETURN_CODE for_loop_fileset_parse_line(CMD_NODE *node, int varidx, WCHAR *buffer,
+struct for_loop_variables
+{
+    unsigned char table[32];
+    unsigned last, num_duplicates;
+    unsigned has_star;
+};
+
+static void for_loop_variables_init(struct for_loop_variables *flv)
+{
+    flv->last = flv->num_duplicates = 0;
+    flv->has_star = FALSE;
+}
+
+static BOOL for_loop_variables_push(struct for_loop_variables *flv, unsigned char o)
+{
+    unsigned i;
+    for (i = 0; i < flv->last; i++)
+         if (flv->table[i] == o)
+         {
+             flv->num_duplicates++;
+             return TRUE;
+         }
+    if (flv->last >= ARRAY_SIZE(flv->table)) return FALSE;
+    flv->table[flv->last] = o;
+    flv->last++;
+    return TRUE;
+}
+
+static int my_flv_compare(const void *a1, const void *a2)
+{
+    return *(const char*)a1 - *(const char*)a2;
+}
+
+static unsigned for_loop_variables_max(const struct for_loop_variables *flv)
+{
+    return flv->last == 0 ? -1 : flv->table[flv->last - 1];
+}
+
+static BOOL for_loop_fill_variables(const WCHAR *forf_tokens, struct for_loop_variables *flv)
+{
+    const WCHAR *pos = forf_tokens;
+
+    /* Loop through the token string, parsing it.
+     * Valid syntax is: token=m or x-y with comma delimiter and optionally * to finish
+     */
+    while (*pos)
+    {
+        unsigned num;
+        WCHAR *nextchar;
+
+        if (*pos == L'*')
+        {
+            if (pos[1] != L'\0') return FALSE;
+            qsort(flv->table, flv->last, sizeof(flv->table[0]), my_flv_compare);
+            if (flv->num_duplicates)
+            {
+                flv->num_duplicates++;
+                return TRUE;
+            }
+            flv->has_star = TRUE;
+            return for_loop_variables_push(flv, for_loop_variables_max(flv) + 1);
+        }
+
+        /* Get the next number */
+        num = wcstoul(pos, &nextchar, 10);
+        if (!num || num >= 32) return FALSE;
+        num--;
+        /* range x-y */
+        if (*nextchar == L'-')
+        {
+            unsigned int end = wcstoul(nextchar + 1, &nextchar, 10);
+            if (!end || end >= 32) return FALSE;
+            end--;
+            while (num <= end)
+                if (!for_loop_variables_push(flv, num++)) return FALSE;
+        }
+        else if (!for_loop_variables_push(flv, num)) return FALSE;
+
+        pos = nextchar;
+        if (*pos == L',') pos++;
+    }
+    if (flv->last)
+        qsort(flv->table, flv->last, sizeof(flv->table[0]), my_flv_compare);
+    else
+        for_loop_variables_push(flv, 0);
+    return TRUE;
+}
+
+static RETURN_CODE for_loop_fileset_parse_line(CMD_NODE *node, unsigned varidx, WCHAR *buffer,
                                                WCHAR forf_eol, const WCHAR *forf_delims, const WCHAR *forf_tokens)
 {
     RETURN_CODE return_code = NO_ERROR;
+    struct for_loop_variables flv;
     WCHAR *parm;
-    int varoffset;
-    int nexttoken, lasttoken = -1;
-    BOOL starfound = FALSE;
-    BOOL thisduplicate = FALSE;
-    BOOL anyduplicates = FALSE;
-    int  totalfound;
-    static WCHAR emptyW[] = L"";
+    unsigned i;
 
-    /* Extract the parameters based on the tokens= value (There will always
-       be some value, as if it is not supplied, it defaults to tokens=1).
-       Rough logic:
-       Count how many tokens are named in the line, identify the lowest
-       Empty (set to null terminated string) that number of named variables
-       While lasttoken != nextlowest
-       %letter = parameter number 'nextlowest'
-       letter++ (if >26 or >52 abort)
-       Go through token= string finding next lowest number
-       If token ends in * set %letter = raw position of token(nextnumber+1)
-    */
-    lasttoken = -1;
-    nexttoken = WCMD_for_nexttoken(lasttoken, forf_tokens, &totalfound,
-                                   &starfound, &thisduplicate);
-
-    TRACE("Using var=%lc on %d max\n", for_var_index_to_char(varidx), totalfound);
-    /* Empty out variables */
-    for (varoffset = 0;
-         varoffset < totalfound && for_var_index_in_range(varidx, varoffset);
-         varoffset++)
-        WCMD_set_for_loop_variable(varidx + varoffset, emptyW);
-
-    /* Loop extracting the tokens
-     * Note: nexttoken of 0 means there were no tokens requested, to handle
-     * the special case of tokens=*
-     */
-    varoffset = 0;
-    TRACE("Parsing buffer into tokens: '%s'\n", wine_dbgstr_w(buffer));
-    while (nexttoken > 0 && (nexttoken > lasttoken))
+    for_loop_variables_init(&flv);
+    if (!for_loop_fill_variables(forf_tokens, &flv))
     {
-        anyduplicates |= thisduplicate;
+        TRACE("Error while parsing tokens=%ls\n", forf_tokens);
+        return ERROR_INVALID_FUNCTION;
+    }
 
-        if (!for_var_index_in_range(varidx, varoffset))
+    TRACE("Using var=%s on %u max%s\n", debugstr_for_var(varidx), flv.last, flv.has_star ? " with star" : "");
+    /* Empty out variables */
+    for (i = 0; i < flv.last + flv.num_duplicates; i++)
+        WCMD_set_for_loop_variable(varidx + i, L"");
+
+    for (i = 0; i < flv.last; i++)
+    {
+        if (flv.has_star && i + 1 == flv.last)
         {
-            WARN("Out of range offset\n");
+            WCMD_parameter_with_delims(buffer, flv.table[i], &parm, FALSE, FALSE, forf_delims);
+            TRACE("Parsed all remaining tokens %d(%s) as parameter %s\n",
+                  flv.table[i], debugstr_for_var(varidx + i), wine_dbgstr_w(parm));
+            if (parm)
+                WCMD_set_for_loop_variable(varidx + i, parm);
             break;
         }
         /* Extract the token number requested and set into the next variable context */
-        parm = WCMD_parameter_with_delims(buffer, (nexttoken-1), NULL, TRUE, FALSE, forf_delims);
-        TRACE("Parsed token %d(%d) as parameter %s\n", nexttoken,
-              varidx + varoffset, wine_dbgstr_w(parm));
+        parm = WCMD_parameter_with_delims(buffer, flv.table[i], NULL, TRUE, FALSE, forf_delims);
+        TRACE("Parsed token %d(%s) as parameter %s\n",
+              flv.table[i], debugstr_for_var(varidx + i), wine_dbgstr_w(parm));
         if (parm)
-        {
-            WCMD_set_for_loop_variable(varidx + varoffset, parm);
-            varoffset++;
-        }
-
-        /* Find the next token */
-        lasttoken = nexttoken;
-        nexttoken = WCMD_for_nexttoken(lasttoken, forf_tokens, NULL,
-                                       &starfound, &thisduplicate);
-    }
-    /* If all the rest of the tokens were requested, and there is still space in
-     * the variable range, write them now
-     */
-    if (!anyduplicates && starfound && for_var_index_in_range(varidx, varoffset))
-    {
-        nexttoken++;
-        WCMD_parameter_with_delims(buffer, (nexttoken-1), &parm, FALSE, FALSE, forf_delims);
-        TRACE("Parsed all remaining tokens (%d) as parameter %s\n",
-              varidx + varoffset, wine_dbgstr_w(parm));
-        if (parm)
-            WCMD_set_for_loop_variable(varidx + varoffset, parm);
+            WCMD_set_for_loop_variable(varidx + i, parm);
     }
 
     /* Execute the body of the for loop with these values */
@@ -3394,13 +3413,13 @@ void WCMD_save_for_loop_context(BOOL reset)
 void WCMD_restore_for_loop_context(void)
 {
     FOR_CONTEXT *old = forloopcontext->previous;
-    int varidx;
+    unsigned varidx;
     if (!old)
     {
         FIXME("Unexpected situation\n");
         return;
     }
-    for (varidx = 0; varidx < MAX_FOR_VARIABLES; varidx++)
+    for (varidx = 0; varidx < ARRAY_SIZE(forloopcontext->variable); varidx++)
     {
         if (forloopcontext->variable[varidx] != old->variable[varidx])
             free(forloopcontext->variable[varidx]);
@@ -3409,13 +3428,13 @@ void WCMD_restore_for_loop_context(void)
     forloopcontext = old;
 }
 
-void WCMD_set_for_loop_variable(int var_idx, const WCHAR *value)
+void WCMD_set_for_loop_variable(unsigned varidx, const WCHAR *value)
 {
-    if (var_idx < 0 || var_idx >= MAX_FOR_VARIABLES) return;
+    if (!for_var_is_valid(varidx)) return;
     if (forloopcontext->previous &&
-        forloopcontext->previous->variable[var_idx] != forloopcontext->variable[var_idx])
-        free(forloopcontext->variable[var_idx]);
-    forloopcontext->variable[var_idx] = xstrdupW(value);
+        forloopcontext->previous->variable[varidx] != forloopcontext->variable[varidx])
+        free(forloopcontext->variable[varidx]);
+    forloopcontext->variable[varidx] = xstrdupW(value);
 }
 
 static BOOL match_ending_delim(WCHAR *string)
@@ -3440,7 +3459,7 @@ static RETURN_CODE for_control_execute_from_FILE(CMD_FOR_CONTROL *for_ctrl, FILE
     RETURN_CODE return_code = NO_ERROR;
 
     /* Read line by line until end of file */
-    while (fgetws(buffer, ARRAY_SIZE(buffer), input))
+    while (return_code != RETURN_CODE_ABORTED && fgetws(buffer, ARRAY_SIZE(buffer), input))
     {
         size_t len;
 
@@ -3508,7 +3527,7 @@ static RETURN_CODE for_control_execute_fileset(CMD_FOR_CONTROL *for_ctrl, CMD_NO
     }
     else
     {
-        for (i = 0; ; i++)
+        for (i = 0; return_code != RETURN_CODE_ABORTED; i++)
         {
             WCHAR *element = WCMD_parameter(args, i, NULL, TRUE, FALSE);
             if (!element || !*element) break;
@@ -3549,7 +3568,7 @@ static RETURN_CODE for_control_execute_set(CMD_FOR_CONTROL *for_ctrl, const WCHA
 
     wcscpy(set, for_ctrl->set);
     handleExpansion(set, TRUE);
-    for (i = 0; ; i++)
+    for (i = 0; return_code != RETURN_CODE_ABORTED; i++)
     {
         WCHAR *element = WCMD_parameter(set, i, NULL, TRUE, FALSE);
         if (!element || !*element) break;
@@ -3585,7 +3604,7 @@ static RETURN_CODE for_control_execute_set(CMD_FOR_CONTROL *for_ctrl, const WCHA
                 wcscpy(&buffer[insert_pos], fd.cFileName);
                 WCMD_set_for_loop_variable(for_ctrl->variable_index, buffer);
                 return_code = node_execute(node);
-            } while (FindNextFileW(hff, &fd) != 0);
+            } while (return_code != RETURN_CODE_ABORTED && FindNextFileW(hff, &fd) != 0);
             FindClose(hff);
         }
         else
@@ -3614,7 +3633,7 @@ static RETURN_CODE for_control_execute_walk_files(CMD_FOR_CONTROL *for_ctrl, CMD
     else dirs_to_walk = WCMD_dir_stack_create(NULL, NULL);
     ref_len = wcslen(dirs_to_walk->dirName);
 
-    while (dirs_to_walk)
+    while (return_code != RETURN_CODE_ABORTED && dirs_to_walk)
     {
         TRACE("About to walk %p %ls for %s\n", dirs_to_walk, dirs_to_walk->dirName, debugstr_for_control(for_ctrl));
         if (for_ctrl->flags & CMD_FOR_FLAG_TREE_RECURSE)
@@ -3653,7 +3672,7 @@ static RETURN_CODE for_control_execute_numbers(CMD_FOR_CONTROL *for_ctrl, CMD_NO
     }
 
     for (var = numbers[0];
-         (numbers[1] < 0) ? var >= numbers[2] : var <= numbers[2];
+         return_code != RETURN_CODE_ABORTED && ((numbers[1] < 0) ? var >= numbers[2] : var <= numbers[2]);
          var += numbers[1])
     {
         WCHAR tmp[32];

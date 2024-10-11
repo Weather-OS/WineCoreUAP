@@ -76,7 +76,11 @@
 
 #ifndef NULL
 #ifdef __cplusplus
-#define NULL  0
+#ifndef _WIN64
+#define NULL 0
+#else
+#define NULL 0LL
+#endif
 #else
 #define NULL  ((void *)0)
 #endif
@@ -84,6 +88,14 @@
 
 #ifndef __has_attribute
 #define __has_attribute(x) 0
+#endif
+
+#ifndef __has_declspec_attribute
+# if defined(_MSC_VER)
+#  define __has_declspec_attribute(x) 1
+# else
+#  define __has_declspec_attribute(x) 0
+# endif
 #endif
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
@@ -132,7 +144,7 @@
 #endif
 
 #ifndef DECLSPEC_NORETURN
-# if defined(_MSC_VER) && (_MSC_VER >= 1200) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(noreturn) && !defined(MIDL_PASS)
 #  define DECLSPEC_NORETURN __declspec(noreturn)
 # elif defined(__GNUC__)
 #  define DECLSPEC_NORETURN __attribute__((noreturn))
@@ -142,7 +154,7 @@
 #endif
 
 #ifndef DECLSPEC_ALIGN
-# if defined(_MSC_VER) && (_MSC_VER >= 1300) && !defined(MIDL_PASS)
+# if __has_declspec_attribute(align) &&  !defined(MIDL_PASS)
 #  define DECLSPEC_ALIGN(x) __declspec(align(x))
 # elif defined(__GNUC__)
 #  define DECLSPEC_ALIGN(x) __attribute__((aligned(x)))
@@ -154,7 +166,7 @@
 #ifndef _ACRTIMP
 # ifdef _CRTIMP
 #  define _ACRTIMP _CRTIMP
-# elif defined(_MSC_VER)
+# elif __has_declspec_attribute(dllimport)
 #  define _ACRTIMP __declspec(dllimport)
 # elif defined(__MINGW32__) || defined(__CYGWIN__)
 #  define _ACRTIMP __attribute__((dllimport))

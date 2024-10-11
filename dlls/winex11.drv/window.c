@@ -113,15 +113,6 @@ static const WCHAR clip_window_prop[] =
 static pthread_mutex_t win_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-/**********************************************************************
- *       get_win_monitor_dpi
- */
-UINT get_win_monitor_dpi( HWND hwnd )
-{
-    return NtUserGetSystemDpiForProcess( NULL );  /* FIXME: get monitor dpi */
-}
-
-
 /***********************************************************************
  * http://standards.freedesktop.org/startup-notification-spec
  */
@@ -297,7 +288,7 @@ static inline BOOL is_window_resizable( struct x11drv_win_data *data, DWORD styl
 {
     if (style & WS_THICKFRAME) return TRUE;
     /* Metacity needs the window to be resizable to make it fullscreen */
-    return NtUserIsWindowRectFullScreen( &data->rects.visible, get_win_monitor_dpi( data->hwnd ) );
+    return data->is_fullscreen;
 }
 
 /***********************************************************************
@@ -512,7 +503,8 @@ static unsigned long *get_bitmap_argb( HDC hdc, HBITMAP color, HBITMAP mask, uns
     char buffer[FIELD_OFFSET( BITMAPINFO, bmiColors[256] )];
     BITMAPINFO *info = (BITMAPINFO *)buffer;
     BITMAP bm;
-    unsigned int *ptr, *bits = NULL;
+    unsigned long *bits = NULL;
+    unsigned int *ptr;
     unsigned char *mask_bits = NULL;
     int i, j;
     BOOL has_alpha = FALSE;
@@ -530,15 +522,16 @@ static unsigned long *get_bitmap_argb( HDC hdc, HBITMAP color, HBITMAP mask, uns
     info->bmiHeader.biClrUsed = 0;
     info->bmiHeader.biClrImportant = 0;
     *size = bm.bmWidth * bm.bmHeight + 2;
-    if (!(bits = malloc( *size * sizeof(long) ))) goto failed;
-    if (!NtGdiGetDIBitsInternal( hdc, color, 0, bm.bmHeight, bits + 2, info, DIB_RGB_COLORS, 0, 0 ))
+    if (!(bits = malloc( *size * sizeof(*bits) ))) goto failed;
+    ptr = (unsigned int *)bits;
+    if (!NtGdiGetDIBitsInternal( hdc, color, 0, bm.bmHeight, ptr + 2, info, DIB_RGB_COLORS, 0, 0 ))
         goto failed;
 
-    bits[0] = bm.bmWidth;
-    bits[1] = bm.bmHeight;
+    ptr[0] = bm.bmWidth;
+    ptr[1] = bm.bmHeight;
 
     for (i = 0; i < bm.bmWidth * bm.bmHeight; i++)
-        if ((has_alpha = (bits[i + 2] & 0xff000000) != 0)) break;
+        if ((has_alpha = (ptr[i + 2] & 0xff000000) != 0)) break;
 
     if (!has_alpha)
     {
@@ -549,7 +542,7 @@ static unsigned long *get_bitmap_argb( HDC hdc, HBITMAP color, HBITMAP mask, uns
         if (!(mask_bits = malloc( info->bmiHeader.biSizeImage ))) goto failed;
         if (!NtGdiGetDIBitsInternal( hdc, mask, 0, bm.bmHeight, mask_bits, info, DIB_RGB_COLORS, 0, 0 ))
             goto failed;
-        ptr = bits + 2;
+        ptr = (unsigned int *)bits + 2;
         for (i = 0; i < bm.bmHeight; i++)
             for (j = 0; j < bm.bmWidth; j++, ptr++)
                 if (!((mask_bits[i * width_bytes + j / 8] << (j % 8)) & 0x80)) *ptr |= 0xff000000;
@@ -558,9 +551,11 @@ static unsigned long *get_bitmap_argb( HDC hdc, HBITMAP color, HBITMAP mask, uns
 
     /* convert to array of longs */
     if (bits && sizeof(long) > sizeof(int))
-        for (i = *size - 1; i >= 0; i--) ((unsigned long *)bits)[i] = bits[i];
-
-    return (unsigned long *)bits;
+    {
+        ptr = (unsigned int *)bits;
+        for (i = *size - 1; i >= 0; i--) bits[i] = ptr[i];
+    }
+    return bits;
 
 failed:
     free( bits );
@@ -926,7 +921,7 @@ static void make_owner_managed( HWND hwnd )
     if (is_managed( owner )) return;
     if (!is_managed( hwnd )) return;
 
-    set_window_pos( owner, 0, 0, 0, 0, 0, flags );
+    NtUserSetWindowPos( owner, 0, 0, 0, 0, 0, flags );
 }
 
 
@@ -1099,7 +1094,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
     style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
     if (style & WS_MINIMIZE)
         new_state |= data->net_wm_state & ((1 << NET_WM_STATE_FULLSCREEN)|(1 << NET_WM_STATE_MAXIMIZED));
-    if (NtUserIsWindowRectFullScreen( &data->rects.visible, get_win_monitor_dpi( data->hwnd ) ))
+    if (data->is_fullscreen)
     {
         if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
@@ -1387,18 +1382,13 @@ static void sync_client_position( struct x11drv_win_data *data, const struct win
 
     changes.x      = data->rects.client.left - data->rects.visible.left;
     changes.y      = data->rects.client.top - data->rects.visible.top;
-    changes.width  = min( max( 1, data->rects.client.right - data->rects.client.left ), 65535 );
-    changes.height = min( max( 1, data->rects.client.bottom - data->rects.client.top ), 65535 );
-
     if (changes.x != old_rects->client.left - old_rects->visible.left) mask |= CWX;
     if (changes.y != old_rects->client.top  - old_rects->visible.top)  mask |= CWY;
-    if (changes.width  != old_rects->client.right - old_rects->client.left) mask |= CWWidth;
-    if (changes.height != old_rects->client.bottom - old_rects->client.top) mask |= CWHeight;
 
     if (mask)
     {
-        TRACE( "setting client win %lx pos %d,%d,%dx%d changes=%x\n",
-               data->client_window, changes.x, changes.y, changes.width, changes.height, mask );
+        TRACE( "setting client win %lx pos %d,%d changes=%x\n",
+               data->client_window, changes.x, changes.y, mask );
         XConfigureWindow( gdi_display, data->client_window, mask, &changes );
     }
 }
@@ -1470,9 +1460,9 @@ static void move_window_bits( HWND hwnd, Window window, const RECT *old_rect, co
             /* map region to client rect since we are using DCX_WINDOW */
             NtGdiOffsetRgn( rgn, new_window_rect->left - new_client_rect->left,
                        new_window_rect->top - new_client_rect->top );
-            redraw_window( hwnd, NULL, rgn, RDW_INVALIDATE | RDW_FRAME | RDW_ERASE | RDW_ALLCHILDREN );
+            NtUserRedrawWindow( hwnd, NULL, rgn, RDW_INVALIDATE | RDW_FRAME | RDW_ERASE | RDW_ALLCHILDREN );
         }
-        else redraw_window( hwnd, NULL, rgn, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN );
+        else NtUserRedrawWindow( hwnd, NULL, rgn, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN );
         NtGdiDeleteObjectApp( rgn );
     }
 }
@@ -1551,7 +1541,7 @@ void detach_client_window( struct x11drv_win_data *data, Window client_window )
 /**********************************************************************
  *             attach_client_window
  */
-static void attach_client_window( struct x11drv_win_data *data, Window client_window )
+void attach_client_window( struct x11drv_win_data *data, Window client_window )
 {
     if (data->client_window == client_window || !client_window) return;
 
@@ -1603,6 +1593,7 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
     XSetWindowAttributes attr;
     Window ret;
     int x, y, cx, cy;
+    RECT client_rect;
 
     if (!data)
     {
@@ -1610,7 +1601,7 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
         if (parent == NtUserGetDesktopWindow() || NtUserGetAncestor( parent, GA_PARENT )) return 0;
         if (!(data = alloc_win_data( thread_init_display(), hwnd ))) return 0;
-        NtUserGetClientRect( hwnd, &data->rects.client, get_win_monitor_dpi( hwnd ) );
+        NtUserGetClientRect( hwnd, &data->rects.client, NtUserGetWinMonitorDpi( hwnd, MDT_DEFAULT ) );
         data->rects.window = data->rects.visible = data->rects.client;
     }
 
@@ -1624,8 +1615,10 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
 
     x = data->rects.client.left - data->rects.visible.left;
     y = data->rects.client.top - data->rects.visible.top;
-    cx = min( max( 1, data->rects.client.right - data->rects.client.left ), 65535 );
-    cy = min( max( 1, data->rects.client.bottom - data->rects.client.top ), 65535 );
+
+    NtUserGetClientRect( hwnd, &client_rect, NtUserGetDpiForWindow( hwnd ) );
+    cx = min( max( 1, client_rect.right - client_rect.left ), 65535 );
+    cy = min( max( 1, client_rect.bottom - client_rect.top ), 65535 );
 
     XSync( gdi_display, False ); /* make sure whole_window is known from gdi_display */
     ret = data->client_window = XCreateWindow( gdi_display,
@@ -1918,7 +1911,7 @@ void X11DRV_SetDesktopWindow( HWND hwnd )
 
     if (!width && !height)  /* not initialized yet */
     {
-        RECT rect = NtUserGetVirtualScreenRect();
+        RECT rect = NtUserGetVirtualScreenRect( MDT_DEFAULT );
 
         SERVER_START_REQ( set_window_pos )
         {
@@ -2377,7 +2370,7 @@ void X11DRV_ReleaseDC( HWND hwnd, HDC hdc )
     escape.code = X11DRV_SET_DRAWABLE;
     escape.drawable = root_window;
     escape.mode = IncludeInferiors;
-    escape.dc_rect = NtUserGetVirtualScreenRect();
+    escape.dc_rect = NtUserGetVirtualScreenRect( MDT_DEFAULT );
     OffsetRect( &escape.dc_rect, -2 * escape.dc_rect.left, -2 * escape.dc_rect.top );
     NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
 }
@@ -2522,30 +2515,28 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, UINT swp_flags, BOOL shaped, const str
 /***********************************************************************
  *      MoveWindowBits   (X11DRV.@)
  */
-void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *new_rects, const RECT *valid_rects )
+void X11DRV_MoveWindowBits( HWND hwnd, const struct window_rects *old_rects,
+                            const struct window_rects *new_rects, const RECT *valid_rects )
 {
-    RECT old_visible_rect, old_client_rect;
     struct x11drv_win_data *data;
     Window window;
 
     if (!(data = get_win_data( hwnd ))) return;
-    old_visible_rect = data->rects.visible;
-    old_client_rect = data->rects.client;
     window = data->whole_window;
     release_win_data( data );
 
     /* if all that happened is that the whole window moved, copy everything */
-    if (EqualRect( &valid_rects[0], &new_rects->visible ) && EqualRect( &valid_rects[1], &old_visible_rect ))
+    if (EqualRect( &valid_rects[0], &new_rects->visible ) && EqualRect( &valid_rects[1], &old_rects->visible ))
     {
         /* if we have an X window the bits will be moved by the X server */
         if (!window && (valid_rects[0].left - valid_rects[1].left || valid_rects[0].top - valid_rects[1].top))
-            move_window_bits( hwnd, 0, &old_visible_rect, &new_rects->visible,
-                              &old_client_rect, &new_rects->client, &new_rects->window );
+            move_window_bits( hwnd, 0, &old_rects->visible, &new_rects->visible,
+                              &old_rects->client, &new_rects->client, &new_rects->window );
     }
     else
     {
         move_window_bits( hwnd, window, &valid_rects[1], &valid_rects[0],
-                          &old_client_rect, &new_rects->client, &new_rects->window );
+                          &old_rects->client, &new_rects->client, &new_rects->window );
     }
 }
 
@@ -2578,13 +2569,14 @@ BOOL X11DRV_GetWindowStyleMasks( HWND hwnd, UINT style, UINT ex_style, UINT *sty
 /***********************************************************************
  *		WindowPosChanged   (X11DRV.@)
  */
-void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, const struct window_rects *new_rects,
-                              struct window_surface *surface )
+void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, BOOL fullscreen,
+                              const struct window_rects *new_rects, struct window_surface *surface )
 {
     struct x11drv_thread_data *thread_data;
     struct x11drv_win_data *data;
     UINT new_style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
     struct window_rects old_rects;
+    BOOL was_fullscreen;
     int event_type;
 
     if (!(data = get_win_data( hwnd ))) return;
@@ -2592,7 +2584,9 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
     thread_data = x11drv_thread_data();
 
     old_rects = data->rects;
+    was_fullscreen = data->is_fullscreen;
     data->rects = *new_rects;
+    data->is_fullscreen = fullscreen;
 
     TRACE( "win %p/%lx new_rects %s style %08x flags %08x\n", hwnd, data->whole_window,
            debugstr_window_rects(new_rects), new_style, swp_flags );
@@ -2601,15 +2595,13 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
 
     sync_client_position( data, &old_rects );
 
+    if (data->rects.client.right - data->rects.client.left != old_rects.client.right - old_rects.client.left ||
+        data->rects.client.bottom - data->rects.client.top != old_rects.client.bottom - old_rects.client.top)
+        sync_gl_drawable( hwnd, FALSE );
+
     if (!data->whole_window)
     {
-        BOOL needs_resize = (!data->client_window &&
-                             (data->rects.client.right - data->rects.client.left !=
-                              old_rects.client.right - old_rects.client.left ||
-                              data->rects.client.bottom - data->rects.client.top !=
-                              old_rects.client.bottom - old_rects.client.top));
         release_win_data( data );
-        if (needs_resize) sync_gl_drawable( hwnd, FALSE );
         return;
     }
 
@@ -2633,8 +2625,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags, cons
         {
             release_win_data( data );
             unmap_window( hwnd );
-            if (NtUserIsWindowRectFullScreen( &old_rects.window, get_win_monitor_dpi( hwnd ) ))
-                NtUserClipCursor( NULL );
+            if (was_fullscreen) NtUserClipCursor( NULL );
             if (!(data = get_win_data( hwnd ))) return;
         }
     }

@@ -982,7 +982,7 @@ static void dump_varargs_startup_info( const char *prefix, data_size_t size )
     pos = dump_inline_unicode_string( "\",title=L\"", pos, info.title_len, size );
     pos = dump_inline_unicode_string( "\",desktop=L\"", pos, info.desktop_len, size );
     pos = dump_inline_unicode_string( "\",shellinfo=L\"", pos, info.shellinfo_len, size );
-    pos = dump_inline_unicode_string( "\",runtime=L\"", pos, info.runtime_len, size );
+    dump_inline_unicode_string( "\",runtime=L\"", pos, info.runtime_len, size );
     fprintf( stderr, "\"}" );
     remove_data( size );
 }
@@ -1185,7 +1185,6 @@ static void dump_inline_security_descriptor( const char *prefix, const struct se
         if ((sd->dacl_len >= MAX_ACL_LEN) || (offset + sd->dacl_len > size))
             return;
         dump_inline_acl( ",dacl=", (const struct acl *)((const char *)sd + offset), sd->dacl_len );
-        offset += sd->dacl_len;
     }
     fputc( '}', stderr );
 }
@@ -2210,8 +2209,8 @@ static void dump_recv_socket_reply( const struct recv_socket_reply *req )
 
 static void dump_send_socket_request( const struct send_socket_request *req )
 {
-    dump_async_data( " async=", &req->async );
-    fprintf( stderr, ", force_async=%d", req->force_async );
+    fprintf( stderr, " flags=%08x", req->flags );
+    dump_async_data( ", async=", &req->async );
 }
 
 static void dump_send_socket_reply( const struct send_socket_reply *req )
@@ -4001,7 +4000,7 @@ static void dump_open_token_reply( const struct open_token_reply *req )
     fprintf( stderr, " token=%04x", req->token );
 }
 
-static void dump_set_global_windows_request( const struct set_global_windows_request *req )
+static void dump_set_desktop_shell_windows_request( const struct set_desktop_shell_windows_request *req )
 {
     fprintf( stderr, " flags=%08x", req->flags );
     fprintf( stderr, ", shell_window=%08x", req->shell_window );
@@ -4010,7 +4009,7 @@ static void dump_set_global_windows_request( const struct set_global_windows_req
     fprintf( stderr, ", taskman_window=%08x", req->taskman_window );
 }
 
-static void dump_set_global_windows_reply( const struct set_global_windows_reply *req )
+static void dump_set_desktop_shell_windows_reply( const struct set_desktop_shell_windows_reply *req )
 {
     fprintf( stderr, " old_shell_window=%08x", req->old_shell_window );
     fprintf( stderr, ", old_shell_listview=%08x", req->old_shell_listview );
@@ -4978,7 +4977,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_remove_clipboard_listener_request,
     (dump_func)dump_create_token_request,
     (dump_func)dump_open_token_request,
-    (dump_func)dump_set_global_windows_request,
+    (dump_func)dump_set_desktop_shell_windows_request,
     (dump_func)dump_adjust_token_privileges_request,
     (dump_func)dump_get_token_privileges_request,
     (dump_func)dump_check_token_privileges_request,
@@ -5269,7 +5268,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     (dump_func)dump_create_token_reply,
     (dump_func)dump_open_token_reply,
-    (dump_func)dump_set_global_windows_reply,
+    (dump_func)dump_set_desktop_shell_windows_reply,
     (dump_func)dump_adjust_token_privileges_reply,
     (dump_func)dump_get_token_privileges_reply,
     (dump_func)dump_check_token_privileges_reply,
@@ -5560,7 +5559,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "remove_clipboard_listener",
     "create_token",
     "open_token",
-    "set_global_windows",
+    "set_desktop_shell_windows",
     "adjust_token_privileges",
     "get_token_privileges",
     "check_token_privileges",

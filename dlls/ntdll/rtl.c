@@ -779,6 +779,180 @@ void WINAPI RtlGetCurrentProcessorNumberEx(PROCESSOR_NUMBER *processor)
     processor->Reserved = 0;
 }
 
+static RTL_BALANCED_NODE *rtl_node_parent( RTL_BALANCED_NODE *node )
+{
+    return (RTL_BALANCED_NODE *)(node->ParentValue & ~(ULONG_PTR)RTL_BALANCED_NODE_RESERVED_PARENT_MASK);
+}
+
+static void rtl_set_node_parent( RTL_BALANCED_NODE *node, RTL_BALANCED_NODE *parent )
+{
+    node->ParentValue = (ULONG_PTR)parent | (node->ParentValue & RTL_BALANCED_NODE_RESERVED_PARENT_MASK);
+}
+
+static void rtl_rotate( RTL_RB_TREE *tree, RTL_BALANCED_NODE *n, int right )
+{
+    RTL_BALANCED_NODE *child = n->Children[!right];
+    RTL_BALANCED_NODE *parent = rtl_node_parent( n );
+
+    if (!parent)                tree->root = child;
+    else if (parent->Left == n) parent->Left = child;
+    else                        parent->Right = child;
+
+    n->Children[!right] = child->Children[right];
+    if (n->Children[!right]) rtl_set_node_parent( n->Children[!right], n );
+    child->Children[right] = n;
+    rtl_set_node_parent( child, parent );
+    rtl_set_node_parent( n, child );
+}
+
+static void rtl_flip_color( RTL_BALANCED_NODE *node )
+{
+    node->Red = !node->Red;
+    node->Left->Red = !node->Left->Red;
+    node->Right->Red = !node->Right->Red;
+}
+
+/*********************************************************************
+ *           RtlRbInsertNodeEx [NTDLL.@]
+ */
+void WINAPI RtlRbInsertNodeEx( RTL_RB_TREE *tree, RTL_BALANCED_NODE *parent, BOOLEAN right, RTL_BALANCED_NODE *node )
+{
+    RTL_BALANCED_NODE *grandparent;
+
+    TRACE( "tree %p, parent %p, right %d, node %p.\n", tree, parent, right, node );
+
+    node->ParentValue = (ULONG_PTR)parent;
+    node->Left = NULL;
+    node->Right = NULL;
+
+    if (!parent)
+    {
+        tree->root = tree->min = node;
+        return;
+    }
+    if (right > 1)
+    {
+        ERR( "right %d.\n", right );
+        return;
+    }
+    if (parent->Children[right])
+    {
+        ERR( "parent %p, right %d, child %p.\n", parent, right, parent->Children[right] );
+        return;
+    }
+
+    node->Red = 1;
+    parent->Children[right] = node;
+    if (tree->min == parent && parent->Left == node) tree->min = node;
+    grandparent = rtl_node_parent( parent );
+    while (parent->Red)
+    {
+        right = (parent == grandparent->Right);
+        if (grandparent->Children[!right] && grandparent->Children[!right]->Red)
+        {
+            node = grandparent;
+            rtl_flip_color( node );
+            if (!(parent = rtl_node_parent( node ))) break;
+            grandparent = rtl_node_parent( parent );
+            continue;
+        }
+        if (node == parent->Children[!right])
+        {
+            node = parent;
+            rtl_rotate( tree, node, right );
+            parent = rtl_node_parent( node );
+            grandparent = rtl_node_parent( parent );
+        }
+        parent->Red = 0;
+        grandparent->Red = 1;
+        rtl_rotate( tree, grandparent, !right );
+    }
+    tree->root->Red = 0;
+}
+
+/*********************************************************************
+ *           RtlRbRemoveNode [NTDLL.@]
+ */
+void WINAPI RtlRbRemoveNode( RTL_RB_TREE *tree, RTL_BALANCED_NODE *node )
+{
+    RTL_BALANCED_NODE *iter = NULL, *child, *parent, *w;
+    BOOL need_fixup;
+    int right;
+
+    TRACE( "tree %p, node %p.\n", tree, node );
+
+    if (node->Right && (node->Left || tree->min == node))
+    {
+        for (iter = node->Right; iter->Left; iter = iter->Left)
+            ;
+        if (tree->min == node) tree->min = iter;
+    }
+    else if (tree->min == node) tree->min = rtl_node_parent( node );
+    if (!iter || !node->Left) iter = node;
+
+    child = iter->Left ? iter->Left : iter->Right;
+
+    if (!(parent = rtl_node_parent( iter ))) tree->root = child;
+    else if (iter == parent->Left)           parent->Left = child;
+    else                                     parent->Right = child;
+
+    if (child) rtl_set_node_parent( child, parent );
+
+    need_fixup = !iter->Red;
+
+    if (node != iter)
+    {
+        *iter = *node;
+        if (!(w = rtl_node_parent( iter ))) tree->root = iter;
+        else if (node == w->Left)           w->Left = iter;
+        else                                w->Right = iter;
+
+        if (iter->Right) rtl_set_node_parent( iter->Right, iter );
+        if (iter->Left)  rtl_set_node_parent( iter->Left, iter );
+        if (parent == node) parent = iter;
+    }
+
+    if (!need_fixup)
+    {
+        if (tree->root) tree->root->Red = 0;
+        return;
+    }
+
+    while (parent && !(child && child->Red))
+    {
+        right = (child == parent->Right);
+        w = parent->Children[!right];
+        if (w->Red)
+        {
+            w->Red = 0;
+            parent->Red = 1;
+            rtl_rotate( tree, parent, right );
+            w = parent->Children[!right];
+        }
+        if ((w->Left && w->Left->Red) || (w->Right && w->Right->Red))
+        {
+            if (!(w->Children[!right] && w->Children[!right]->Red))
+            {
+                w->Children[right]->Red = 0;
+                w->Red = 1;
+                rtl_rotate( tree, w, !right );
+                w = parent->Children[!right];
+            }
+            w->Red = parent->Red;
+            parent->Red = 0;
+            if (w->Children[!right]) w->Children[!right]->Red = 0;
+            rtl_rotate( tree, parent, right );
+            child = NULL;
+            break;
+        }
+        w->Red = 1;
+        child = parent;
+        parent = rtl_node_parent( child );
+    }
+    if (child) child->Red = 0;
+    if (tree->root) tree->root->Red = 0;
+}
+
 /***********************************************************************
  *           RtlInitializeGenericTableAvl  (NTDLL.@)
  */
@@ -855,4 +1029,31 @@ void WINAPI RtlGetDeviceFamilyInfoEnum(ULONGLONG *version, DWORD *family, DWORD 
     if (version) *version = 0;
     if (family) *family = DEVICEFAMILYINFOENUM_DESKTOP;
     if (form) *form = DEVICEFAMILYDEVICEFORM_UNKNOWN;
+}
+
+/*********************************************************************
+ *           RtlConvertDeviceFamilyInfoToString [NTDLL.@]
+ */
+DWORD WINAPI RtlConvertDeviceFamilyInfoToString(DWORD *device_family_size, DWORD *device_form_size,
+                                                WCHAR *device_family, WCHAR *device_form)
+{
+    static const WCHAR *windows_desktop = L"Windows.Desktop";
+    static const WCHAR *unknown_form = L"Unknown";
+    DWORD family_length, form_length;
+
+    TRACE("%p %p %p %p\n", device_family_size, device_form_size, device_family, device_form);
+
+    family_length = (wcslen(windows_desktop) + 1) * sizeof(WCHAR);
+    form_length = (wcslen(unknown_form) + 1) * sizeof(WCHAR);
+
+    if (*device_family_size < family_length || *device_form_size < form_length)
+    {
+        *device_family_size = family_length;
+        *device_form_size = form_length;
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+
+    memcpy(device_family, windows_desktop, family_length);
+    memcpy(device_form, unknown_form, form_length);
+    return STATUS_SUCCESS;
 }

@@ -66,6 +66,7 @@ struct wined3d_saved_states
     uint32_t point_scale : 1;
     uint32_t ffp_vs_settings : 1;
     uint32_t ffp_ps_settings : 1;
+    uint32_t rasterizer_state : 1;
 };
 
 struct stage_state
@@ -1541,18 +1542,42 @@ HRESULT CDECL wined3d_stateblock_get_ps_consts_b(struct wined3d_stateblock *stat
 void CDECL wined3d_stateblock_set_vertex_declaration(struct wined3d_stateblock *stateblock,
         struct wined3d_vertex_declaration *declaration)
 {
+    struct wined3d_vertex_declaration *prev = stateblock->stateblock_state.vertex_declaration;
+
     TRACE("stateblock %p, declaration %p.\n", stateblock, declaration);
 
     if (declaration)
         wined3d_vertex_declaration_incref(declaration);
-    if (stateblock->stateblock_state.vertex_declaration)
-        wined3d_vertex_declaration_decref(stateblock->stateblock_state.vertex_declaration);
+    if (prev)
+        wined3d_vertex_declaration_decref(prev);
     stateblock->stateblock_state.vertex_declaration = declaration;
     stateblock->changed.vertexDecl = TRUE;
     /* Texture matrices depend on the format of the TEXCOORD attributes. */
     /* FIXME: They also depend on whether the draw is pretransformed,
      * but that should go away. */
     stateblock->changed.texture_matrices = TRUE;
+
+    if (declaration && prev)
+    {
+        if (!stateblock->stateblock_state.vs)
+        {
+            /* Because of settings->texcoords, we have to regenerate the vertex
+             * shader on a vdecl change if there aren't enough varyings to just
+             * always output all the texture coordinates.
+             *
+             * Likewise, we have to invalidate the shader when using per-vertex
+             * colours and diffuse/specular attribute presence changes, or when
+             * normal presence changes. */
+            if (!stateblock->device->adapter->d3d_info.full_ffp_varyings || declaration->diffuse != prev->diffuse
+                    || (stateblock->stateblock_state.rs[WINED3D_RS_COLORVERTEX] && declaration->specular != prev->specular)
+                    || declaration->normal != prev->normal || declaration->point_size != prev->point_size)
+                stateblock->changed.ffp_vs_settings = 1;
+        }
+    }
+    else
+    {
+        stateblock->changed.ffp_vs_settings = 1;
+    }
 }
 
 void CDECL wined3d_stateblock_set_render_state(struct wined3d_stateblock *stateblock,
@@ -1579,13 +1604,13 @@ void CDECL wined3d_stateblock_set_render_state(struct wined3d_stateblock *stateb
             }
             break;
 
-        case WINED3D_RS_SPECULARENABLE:
         case WINED3D_RS_TEXTUREFACTOR:
             stateblock->changed.ffp_ps_constants = 1;
             break;
 
         case WINED3D_RS_VERTEXBLEND:
             stateblock->changed.modelview_matrices = 1;
+            stateblock->changed.ffp_vs_settings = 1;
             break;
 
         case WINED3D_RS_POINTSCALEENABLE:
@@ -1595,12 +1620,37 @@ void CDECL wined3d_stateblock_set_render_state(struct wined3d_stateblock *stateb
             stateblock->changed.point_scale = 1;
             break;
 
+        case WINED3D_RS_AMBIENTMATERIALSOURCE:
+        case WINED3D_RS_COLORVERTEX:
+        case WINED3D_RS_DIFFUSEMATERIALSOURCE:
+        case WINED3D_RS_EMISSIVEMATERIALSOURCE:
+        case WINED3D_RS_FOGENABLE:
+        case WINED3D_RS_FOGTABLEMODE:
+        case WINED3D_RS_FOGVERTEXMODE:
+        case WINED3D_RS_LIGHTING:
+        case WINED3D_RS_LOCALVIEWER:
         case WINED3D_RS_NORMALIZENORMALS:
+        case WINED3D_RS_RANGEFOGENABLE:
+        case WINED3D_RS_SPECULARMATERIALSOURCE:
             stateblock->changed.ffp_vs_settings = 1;
             break;
 
         case WINED3D_RS_COLORKEYENABLE:
             stateblock->changed.ffp_ps_settings = 1;
+            break;
+
+        case WINED3D_RS_SPECULARENABLE:
+            stateblock->changed.ffp_vs_settings = 1;
+            stateblock->changed.ffp_ps_constants = 1;
+            break;
+
+        case WINED3D_RS_FILLMODE:
+        case WINED3D_RS_CULLMODE:
+        case WINED3D_RS_SLOPESCALEDEPTHBIAS:
+        case WINED3D_RS_DEPTHBIAS:
+        case WINED3D_RS_SCISSORTESTENABLE:
+        case WINED3D_RS_ANTIALIASEDLINEENABLE:
+            stateblock->changed.rasterizer_state = 1;
             break;
 
         default:
@@ -1653,6 +1703,8 @@ void CDECL wined3d_stateblock_set_texture_stage_state(struct wined3d_stateblock 
             break;
 
         case WINED3D_TSS_TEXCOORD_INDEX:
+            stateblock->changed.ffp_vs_settings = 1;
+            /* fall through */
         case WINED3D_TSS_TEXTURE_TRANSFORM_FLAGS:
             stateblock->changed.texture_matrices = 1;
             stateblock->changed.ffp_ps_settings = 1;
@@ -1928,6 +1980,10 @@ HRESULT CDECL wined3d_stateblock_set_light(struct wined3d_stateblock *stateblock
             return WINED3DERR_INVALIDCALL;
     }
 
+    if (!(object = wined3d_light_state_get_light(stateblock->stateblock_state.light_state, light_idx))
+            || light->type != object->OriginalParms.type)
+        stateblock->changed.ffp_vs_settings = 1;
+
     if (SUCCEEDED(hr = wined3d_light_state_set_light(stateblock->stateblock_state.light_state, light_idx, light, &object)))
         set_light_changed(stateblock, object);
     return hr;
@@ -1951,6 +2007,7 @@ HRESULT CDECL wined3d_stateblock_set_light_enable(struct wined3d_stateblock *sta
     if (wined3d_light_state_enable_light(light_state, &stateblock->device->adapter->d3d_info, light_info, enable))
         set_light_changed(stateblock, light_info);
 
+    stateblock->changed.ffp_vs_settings = 1;
     return S_OK;
 }
 
@@ -2804,10 +2861,58 @@ static void sampler_desc_from_sampler_states(struct wined3d_sampler_desc *desc,
     }
 }
 
+void CDECL wined3d_stateblock_apply_clear_state(struct wined3d_stateblock *stateblock, struct wined3d_device *device)
+{
+    const struct wined3d_stateblock_state *state = &stateblock->stateblock_state;
+    struct wined3d_device_context *context = &device->cs->c;
+
+    /* Clear state depends on the viewport, scissor rect, and scissor enable. */
+
+    if (stateblock->changed.viewport)
+        wined3d_device_context_set_viewports(context, 1, &state->viewport);
+    if (stateblock->changed.scissorRect)
+        wined3d_device_context_set_scissor_rects(context, 1, &state->scissor_rect);
+
+    if (stateblock->changed.rasterizer_state)
+    {
+        struct wined3d_rasterizer_state *rasterizer_state;
+        struct wined3d_rasterizer_state_desc desc;
+        struct wine_rb_entry *entry;
+
+        memset(&desc, 0, sizeof(desc));
+        desc.fill_mode = state->rs[WINED3D_RS_FILLMODE];
+        desc.cull_mode = state->rs[WINED3D_RS_CULLMODE];
+        desc.depth_bias = int_to_float(state->rs[WINED3D_RS_DEPTHBIAS]);
+        desc.scale_bias = int_to_float(state->rs[WINED3D_RS_SLOPESCALEDEPTHBIAS]);
+        desc.depth_clip = TRUE;
+        desc.scissor = state->rs[WINED3D_RS_SCISSORTESTENABLE];
+        desc.line_antialias = state->rs[WINED3D_RS_ANTIALIASEDLINEENABLE];
+
+        if ((entry = wine_rb_get(&device->rasterizer_states, &desc)))
+        {
+            rasterizer_state = WINE_RB_ENTRY_VALUE(entry, struct wined3d_rasterizer_state, entry);
+            wined3d_device_context_set_rasterizer_state(context, rasterizer_state);
+        }
+        else if (SUCCEEDED(wined3d_rasterizer_state_create(device, &desc, NULL,
+                &wined3d_null_parent_ops, &rasterizer_state)))
+        {
+            wined3d_device_context_set_rasterizer_state(context, rasterizer_state);
+            if (wine_rb_put(&device->rasterizer_states, &desc, &rasterizer_state->entry) == -1)
+            {
+                ERR("Failed to insert rasterizer state.\n");
+                wined3d_rasterizer_state_decref(rasterizer_state);
+            }
+        }
+    }
+
+    if (wined3d_bitmap_is_set(stateblock->changed.renderState, WINED3D_RS_SRGBWRITEENABLE))
+        wined3d_device_set_render_state(device, WINED3D_RS_SRGBWRITEENABLE, state->rs[WINED3D_RS_SRGBWRITEENABLE]);
+}
+
 void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
         struct wined3d_stateblock *stateblock)
 {
-    bool set_blend_state = false, set_depth_stencil_state = false, set_rasterizer_state = false;
+    bool set_blend_state = false, set_depth_stencil_state = false;
 
     const struct wined3d_stateblock_state *state = &stateblock->stateblock_state;
     const unsigned int word_bit_count = sizeof(DWORD) * CHAR_BIT;
@@ -2819,6 +2924,8 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
     uint32_t map;
 
     TRACE("device %p, stateblock %p.\n", device, stateblock);
+
+    wined3d_stateblock_apply_clear_state(stateblock, device);
 
     if (changed->vertexShader)
     {
@@ -2928,15 +3035,6 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
                     set_depth_stencil_state = true;
                     break;
 
-                case WINED3D_RS_FILLMODE:
-                case WINED3D_RS_CULLMODE:
-                case WINED3D_RS_SLOPESCALEDEPTHBIAS:
-                case WINED3D_RS_DEPTHBIAS:
-                case WINED3D_RS_SCISSORTESTENABLE:
-                case WINED3D_RS_ANTIALIASEDLINEENABLE:
-                    set_rasterizer_state = true;
-                    break;
-
                 case WINED3D_RS_ADAPTIVETESS_X:
                 case WINED3D_RS_ADAPTIVETESS_Z:
                 case WINED3D_RS_ADAPTIVETESS_W:
@@ -2947,6 +3045,12 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
                     changed->lights = 1;
                     break;
 
+                case WINED3D_RS_FILLMODE:
+                case WINED3D_RS_CULLMODE:
+                case WINED3D_RS_SLOPESCALEDEPTHBIAS:
+                case WINED3D_RS_DEPTHBIAS:
+                case WINED3D_RS_SCISSORTESTENABLE:
+                case WINED3D_RS_ANTIALIASEDLINEENABLE:
                 case WINED3D_RS_ADAPTIVETESS_Y:
                 case WINED3D_RS_POINTSCALEENABLE:
                 case WINED3D_RS_POINTSCALE_A:
@@ -3153,45 +3257,6 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
                 default:
                     wined3d_device_set_render_state(device, idx, state->rs[idx]);
                     break;
-            }
-        }
-    }
-
-    if (set_rasterizer_state)
-    {
-        struct wined3d_rasterizer_state *rasterizer_state;
-        struct wined3d_rasterizer_state_desc desc;
-        struct wine_rb_entry *entry;
-        union
-        {
-            DWORD d;
-            float f;
-        } bias;
-
-        memset(&desc, 0, sizeof(desc));
-        desc.fill_mode = state->rs[WINED3D_RS_FILLMODE];
-        desc.cull_mode = state->rs[WINED3D_RS_CULLMODE];
-        bias.d = state->rs[WINED3D_RS_DEPTHBIAS];
-        desc.depth_bias = bias.f;
-        bias.d = state->rs[WINED3D_RS_SLOPESCALEDEPTHBIAS];
-        desc.scale_bias = bias.f;
-        desc.depth_clip = TRUE;
-        desc.scissor = state->rs[WINED3D_RS_SCISSORTESTENABLE];
-        desc.line_antialias = state->rs[WINED3D_RS_ANTIALIASEDLINEENABLE];
-
-        if ((entry = wine_rb_get(&device->rasterizer_states, &desc)))
-        {
-            rasterizer_state = WINE_RB_ENTRY_VALUE(entry, struct wined3d_rasterizer_state, entry);
-            wined3d_device_context_set_rasterizer_state(context, rasterizer_state);
-        }
-        else if (SUCCEEDED(wined3d_rasterizer_state_create(device, &desc, NULL,
-                &wined3d_null_parent_ops, &rasterizer_state)))
-        {
-            wined3d_device_context_set_rasterizer_state(context, rasterizer_state);
-            if (wine_rb_put(&device->rasterizer_states, &desc, &rasterizer_state->entry) == -1)
-            {
-                ERR("Failed to insert rasterizer state.\n");
-                wined3d_rasterizer_state_decref(rasterizer_state);
             }
         }
     }
@@ -3428,8 +3493,8 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
                             WINED3D_PUSH_CONSTANTS_VS_FFP, WINED3D_SHADER_CONST_FFP_PROJ,
                             offsetof(struct wined3d_ffp_vs_constants, projection_matrix),
                             sizeof(state->transforms[idx]), &state->transforms[idx]);
-                    /* wined3d_ffp_vs_settings.ortho_fog still needs the
-                     * device state to be set. */
+                    /* wined3d_ffp_vs_settings.ortho_fog and vs_compile_args.ortho_fog
+                     * still need the device state to be set. */
                     wined3d_device_set_transform(device, idx, &state->transforms[idx]);
                 }
             }
@@ -3444,10 +3509,6 @@ void CDECL wined3d_device_apply_stateblock(struct wined3d_device *device,
     wined3d_device_set_base_vertex_index(device, state->base_vertex_index);
     if (changed->vertexDecl)
         wined3d_device_context_set_vertex_declaration(context, state->vertex_declaration);
-    if (changed->viewport)
-        wined3d_device_context_set_viewports(context, 1, &state->viewport);
-    if (changed->scissorRect)
-        wined3d_device_context_set_scissor_rects(context, 1, &state->scissor_rect);
 
     map = changed->streamSource | changed->streamFreq;
     while (map)

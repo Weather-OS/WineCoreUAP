@@ -63,8 +63,8 @@ static void wine_vk_surface_destroy(struct wayland_client_surface *client)
     HWND hwnd = wl_surface_get_user_data(client->wl_surface);
     struct wayland_win_data *data = wayland_win_data_get(hwnd);
 
-    if (wayland_client_surface_release(client) && data && data->wayland_surface)
-        data->wayland_surface->client = NULL;
+    if (wayland_client_surface_release(client) && data)
+        data->client_surface = NULL;
 
     if (data) wayland_win_data_release(data);
 }
@@ -73,25 +73,11 @@ static VkResult wayland_vulkan_surface_create(HWND hwnd, VkInstance instance, Vk
 {
     VkResult res;
     VkWaylandSurfaceCreateInfoKHR create_info_host;
-    struct wayland_surface *wayland_surface;
     struct wayland_client_surface *client;
-    struct wayland_win_data *data;
 
     TRACE("%p %p %p %p\n", hwnd, instance, surface, private);
 
-    if (!(data = wayland_win_data_get(hwnd)))
-    {
-        ERR("Failed to find wayland surface for hwnd=%p\n", hwnd);
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-    }
-
-    if ((wayland_surface = data->wayland_surface))
-        client = wayland_surface_get_client(wayland_surface);
-    else
-        client = wayland_client_surface_create(hwnd);
-    wayland_win_data_release(data);
-
-    if (!client)
+    if (!(client = get_client_surface(hwnd)))
     {
         ERR("Failed to create client surface for hwnd=%p\n", hwnd);
         return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -132,9 +118,14 @@ static void wayland_vulkan_surface_detach(HWND hwnd, void *private)
 {
 }
 
-static void wayland_vulkan_surface_presented(HWND hwnd, VkResult result)
+static void wayland_vulkan_surface_update(HWND hwnd, void *private)
 {
-    ensure_window_surface_contents(hwnd);
+}
+
+static void wayland_vulkan_surface_presented(HWND hwnd, void *private, VkResult result)
+{
+    HWND toplevel = NtUserGetAncestor(hwnd, GA_ROOT);
+    ensure_window_surface_contents(toplevel);
 }
 
 static VkBool32 wayland_vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice phys_dev,
@@ -156,6 +147,7 @@ static const struct vulkan_driver_funcs wayland_vulkan_driver_funcs =
     .p_vulkan_surface_create = wayland_vulkan_surface_create,
     .p_vulkan_surface_destroy = wayland_vulkan_surface_destroy,
     .p_vulkan_surface_detach = wayland_vulkan_surface_detach,
+    .p_vulkan_surface_update = wayland_vulkan_surface_update,
     .p_vulkan_surface_presented = wayland_vulkan_surface_presented,
 
     .p_vkGetPhysicalDeviceWin32PresentationSupportKHR = wayland_vkGetPhysicalDeviceWin32PresentationSupportKHR,

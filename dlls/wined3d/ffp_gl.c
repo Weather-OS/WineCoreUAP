@@ -1638,22 +1638,6 @@ static void prune_invalid_states(struct wined3d_state_entry *state_table, const 
         state_table[i].representative = 0;
         state_table[i].apply = state_undefined;
     }
-
-    start = STATE_TRANSFORM(WINED3D_TS_TEXTURE0 + d3d_info->ffp_fragment_caps.max_blend_stages);
-    last = STATE_TRANSFORM(WINED3D_TS_TEXTURE0 + WINED3D_MAX_FFP_TEXTURES - 1);
-    for (i = start; i <= last; ++i)
-    {
-        state_table[i].representative = 0;
-        state_table[i].apply = state_undefined;
-    }
-
-    start = STATE_TRANSFORM(WINED3D_TS_WORLD_MATRIX(d3d_info->limits.ffp_vertex_blend_matrices));
-    last = STATE_TRANSFORM(WINED3D_TS_WORLD_MATRIX(255));
-    for (i = start; i <= last; ++i)
-    {
-        state_table[i].representative = 0;
-        state_table[i].apply = state_undefined;
-    }
 }
 
 static void validate_state_table(struct wined3d_state_entry *state_table)
@@ -1669,12 +1653,10 @@ static void validate_state_table(struct wined3d_state_entry *state_table)
         { 11,  14},
         { 16,  23},
         { 27,  27},
-        { 30,  33},
-        { 39,  47},
-        { 49, 135},
-        {138, 139},
-        {143, 144},
-        {149, 150},
+        { 29,  33},
+        { 39, 135},
+        {137, 139},
+        {141, 151},
         {153, 153},
         {157, 160},
         {162, 165},
@@ -1704,7 +1686,6 @@ static void validate_state_table(struct wined3d_state_entry *state_table)
         STATE_COMPUTE_UNORDERED_ACCESS_VIEW_BINDING,
         STATE_GRAPHICS_UNORDERED_ACCESS_VIEW_BINDING,
         STATE_VIEWPORT,
-        STATE_LIGHT_TYPE,
         STATE_SCISSORRECT,
         STATE_RASTERIZER,
         STATE_BASEVERTEXINDEX,

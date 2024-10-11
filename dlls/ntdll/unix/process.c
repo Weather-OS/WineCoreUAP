@@ -1711,11 +1711,18 @@ NTSTATUS WINAPI NtSetInformationProcess( HANDLE handle, PROCESSINFOCLASS class, 
     case ProcessInstrumentationCallback:
     {
         PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION *instr = info;
+        void *callback;
 
-        FIXME( "ProcessInstrumentationCallback stub.\n" );
-
-        if (size < sizeof(*instr)) return STATUS_INFO_LENGTH_MISMATCH;
+        if (size < sizeof(callback)) return STATUS_INFO_LENGTH_MISMATCH;
+        if (size >= sizeof(PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION)) callback = instr->Callback;
+        else                                                              callback = *(void **)info;
         ret = STATUS_SUCCESS;
+        if (handle != GetCurrentProcess())
+        {
+            FIXME( "Setting ProcessInstrumentationCallback is not yet supported for other process.\n" );
+            break;
+        }
+        set_process_instrumentation_callback( callback );
         break;
     }
 
@@ -1767,6 +1774,10 @@ NTSTATUS WINAPI NtSetInformationProcess( HANDLE handle, PROCESSINFOCLASS class, 
         }
         SERVER_END_REQ;
         return ret;
+
+    case ProcessPowerThrottlingState:
+        FIXME( "ProcessPowerThrottlingState - stub\n" );
+        return STATUS_SUCCESS;
 
     default:
         FIXME( "(%p,0x%08x,%p,0x%08x) stub\n", handle, class, info, (int)size );

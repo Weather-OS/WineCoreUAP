@@ -473,7 +473,18 @@ sync_test("array_sort", function() {
 });
 
 sync_test("identifier_keywords", function() {
+    function get(let, set) { { get instanceof (Object); } return let + set; }
+    { get /* asdf */: 10 }
+    let /* block label */ : {
+        break let;
+        ok(false, "did not break out of 'let' labelled block statement");
+    }
+    set: var let = get(1, 2);
+    var set = 1234;
     var o = {
+        get: get,
+        set: set,
+        let /* comment */  :  let,
         if: 1,
         default: 2,
         function: 3,
@@ -486,8 +497,8 @@ sync_test("identifier_keywords", function() {
         else: true,
         finally: true,
         for: true,
-        in: true,
-        instanceof: true,
+        set in(x) { },
+        get instanceof() { return 3; },
         new: true,
         return: true,
         switch: true,
@@ -508,6 +519,21 @@ sync_test("identifier_keywords", function() {
     ok(o.if === 1, "o.if = " + o.if);
     ok(ro().default === 2, "ro().default = " + ro().default);
     ok(o.false === true, "o.false = " + o.false);
+    ok(o.get === get, "o.get = " + o.get);
+    ok(o.set === set, "o.set = " + o.set);
+    ok(o.let === let, "o.let = " + o.let);
+    ok(o.instanceof === 3, "o.instanceof = " + o.instanceof);
+    ok(let === 3, "let = " + let);
+    ok(set === 1234, "set = " + set);
+
+    var tmp = false;
+    try {
+        eval('function var() { }');
+    }
+    catch(set) {
+        tmp = true;
+    }
+    ok(tmp === true, "Expected exception for 'function var() { }'");
 });
 
 function test_own_data_prop_desc(obj, prop, expected_writable, expected_enumerable,
@@ -2661,6 +2687,20 @@ sync_test("screen", function() {
     ok(Object.isFrozen(o) === false, "Object.isFrozen(o) = " + Object.isFrozen(o));
     ok(Object.isSealed(o) === true, "Object.isSealed(o) = " + Object.isSealed(o));
 
+    ok(!o.hasOwnProperty("width"), 'o.hasOwnProperty("width") = ' + o.hasOwnProperty("width"));
+    ok(Screen.prototype.hasOwnProperty("width"),
+       'Screen.prototype.hasOwnProperty("width") = ' + Screen.prototype.hasOwnProperty("width"));
+
+    var desc = Object.getOwnPropertyDescriptor(Screen.prototype, "width");
+    ok(!("value" in desc), "width prop: value is in desc");
+    ok(!("writable" in desc), "width prop: writable is in desc");
+    ok(desc.enumerable === true, "width prop: enumerable = " + desc.enumerable);
+    ok(desc.configurable === true, "width prop: configurable = " + desc.configurable);
+    ok(Object.getPrototypeOf(desc.get) === Function.prototype, "width prop: get not a function: " + desc.get);
+    ok("set" in desc, "width prop: set is not in desc");
+    ok(desc.set === undefined, "width prop: set not undefined: " + desc.set);
+    ok(desc.get.call(o) === o.width, "width prop: get.call() not same as o.width: " + desc.get.call(o) + ", expected " + o.width);
+
     o.prop2 = 3;
     ok(!("prop2" in o), "o.prop2 = " + o.prop2);
 
@@ -2672,7 +2712,7 @@ sync_test("screen", function() {
 });
 
 sync_test("builtin_func", function() {
-    var o = document.implementation;
+    var o = document.implementation, r;
     var f = o.hasFeature;
 
     ok(f instanceof Function, "f is not an instance of Function");
@@ -2681,6 +2721,20 @@ sync_test("builtin_func", function() {
     ok(f.length === 0, "f.length = " + f.length);
     ok(f.call(o, "test", 1) === false, 'f.call(o, "test", 1) = ' + f.call(o, "test", 1));
     ok("" + f === "\nfunction hasFeature() {\n    [native code]\n}\n", "f = " + f);
+
+    o = document.body;
+    var desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Object.getPrototypeOf(o)), "innerHTML");
+    ok(!("value" in desc), "innerHTML prop: value is in desc");
+    ok(!("writable" in desc), "innerHTML prop: writable is in desc");
+    ok(desc.enumerable === true, "innerHTML prop: enumerable = " + desc.enumerable);
+    ok(desc.configurable === true, "innerHTML prop: configurable = " + desc.configurable);
+    ok(Object.getPrototypeOf(desc.get) === Function.prototype, "innerHTML prop: get not a function: " + desc.get);
+    ok(Object.getPrototypeOf(desc.set) === Function.prototype, "innerHTML prop: set not a function: " + desc.set);
+    r = desc.set.call(o, '<div id="winetest"></div>');
+    ok(r === undefined, "innerHTML prop: setter returned " + r);
+    r = desc.get.call(o);
+    ok(r === '<div id="winetest"></div>', "innerHTML prop: getter returned " + r);
+    ok(r === o.innerHTML, "innerHTML prop: getter not same as o.innerHTML: " + r + ", expected " + o.innerHTML);
 });
 
 async_test("script_global", function() {

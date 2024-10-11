@@ -204,22 +204,12 @@ void wayland_surface_destroy(struct wayland_surface *surface)
         process_wayland.keyboard.focused_hwnd = NULL;
     pthread_mutex_unlock(&process_wayland.keyboard.mutex);
 
+    wayland_surface_clear_role(surface);
+
     if (surface->wp_viewport)
     {
         wp_viewport_destroy(surface->wp_viewport);
         surface->wp_viewport = NULL;
-    }
-
-    if (surface->xdg_toplevel)
-    {
-        xdg_toplevel_destroy(surface->xdg_toplevel);
-        surface->xdg_toplevel = NULL;
-    }
-
-    if (surface->xdg_surface)
-    {
-        xdg_surface_destroy(surface->xdg_surface);
-        surface->xdg_surface = NULL;
     }
 
     if (surface->wl_surface)
@@ -240,7 +230,15 @@ void wayland_surface_destroy(struct wayland_surface *surface)
  */
 void wayland_surface_make_toplevel(struct wayland_surface *surface)
 {
+    WCHAR text[1024];
+
     TRACE("surface=%p\n", surface);
+
+    assert(!surface->role || surface->role == WAYLAND_SURFACE_ROLE_TOPLEVEL);
+    if (surface->xdg_surface && surface->xdg_toplevel) return;
+
+    wayland_surface_clear_role(surface);
+    surface->role = WAYLAND_SURFACE_ROLE_TOPLEVEL;
 
     surface->xdg_surface =
         xdg_wm_base_get_xdg_surface(process_wayland.xdg_wm_base, surface->wl_surface);
@@ -257,11 +255,56 @@ void wayland_surface_make_toplevel(struct wayland_surface *surface)
     wl_surface_commit(surface->wl_surface);
     wl_display_flush(process_wayland.wl_display);
 
+    if (!NtUserInternalGetWindowText(surface->hwnd, text, ARRAY_SIZE(text)))
+        text[0] = 0;
+    wayland_surface_set_title(surface, text);
+
     return;
 
 err:
     wayland_surface_clear_role(surface);
     ERR("Failed to assign toplevel role to wayland surface\n");
+}
+
+/**********************************************************************
+ *          wayland_surface_make_subsurface
+ *
+ * Gives the subsurface role to a plain wayland surface.
+ */
+void wayland_surface_make_subsurface(struct wayland_surface *surface,
+                                     struct wayland_surface *parent)
+{
+    assert(!surface->role || surface->role == WAYLAND_SURFACE_ROLE_SUBSURFACE);
+    if (surface->wl_subsurface && surface->toplevel_hwnd == parent->hwnd) return;
+
+    wayland_surface_clear_role(surface);
+    surface->role = WAYLAND_SURFACE_ROLE_SUBSURFACE;
+
+    TRACE("surface=%p parent=%p\n", surface, parent);
+
+    surface->wl_subsurface =
+        wl_subcompositor_get_subsurface(process_wayland.wl_subcompositor,
+                                        surface->wl_surface,
+                                        parent->wl_surface);
+    if (!surface->wl_subsurface)
+    {
+        ERR("Failed to create client wl_subsurface\n");
+        goto err;
+    }
+
+    surface->role = WAYLAND_SURFACE_ROLE_SUBSURFACE;
+    surface->toplevel_hwnd = parent->hwnd;
+
+    /* Present contents independently of the parent surface. */
+    wl_subsurface_set_desync(surface->wl_subsurface);
+
+    wl_display_flush(process_wayland.wl_display);
+
+    return;
+
+err:
+    wayland_surface_clear_role(surface);
+    ERR("Failed to assign subsurface role to wayland surface\n");
 }
 
 /**********************************************************************
@@ -275,22 +318,41 @@ void wayland_surface_clear_role(struct wayland_surface *surface)
 {
     TRACE("surface=%p\n", surface);
 
-    if (surface->xdg_toplevel)
+    switch (surface->role)
     {
-        xdg_toplevel_destroy(surface->xdg_toplevel);
-        surface->xdg_toplevel = NULL;
-    }
+    case WAYLAND_SURFACE_ROLE_NONE:
+        break;
 
-    if (surface->xdg_surface)
-    {
-        xdg_surface_destroy(surface->xdg_surface);
-        surface->xdg_surface = NULL;
+    case WAYLAND_SURFACE_ROLE_TOPLEVEL:
+        if (surface->xdg_toplevel)
+        {
+            xdg_toplevel_destroy(surface->xdg_toplevel);
+            surface->xdg_toplevel = NULL;
+        }
+
+        if (surface->xdg_surface)
+        {
+            xdg_surface_destroy(surface->xdg_surface);
+            surface->xdg_surface = NULL;
+        }
+        break;
+
+    case WAYLAND_SURFACE_ROLE_SUBSURFACE:
+        if (surface->wl_subsurface)
+        {
+            wl_subsurface_destroy(surface->wl_subsurface);
+            surface->wl_subsurface = NULL;
+        }
+
+        surface->toplevel_hwnd = 0;
+        break;
     }
 
     memset(&surface->pending, 0, sizeof(surface->pending));
     memset(&surface->requested, 0, sizeof(surface->requested));
     memset(&surface->processing, 0, sizeof(surface->processing));
     memset(&surface->current, 0, sizeof(surface->current));
+    surface->toplevel_hwnd = 0;
 
     /* Ensure no buffer is attached, otherwise future role assignments may fail. */
     wl_surface_attach(surface->wl_surface, NULL, 0, 0);
@@ -494,20 +556,20 @@ static void wayland_surface_reconfigure_size(struct wayland_surface *surface,
  *
  * Reconfigures the subsurface covering the client area.
  */
-static void wayland_surface_reconfigure_client(struct wayland_surface *surface)
+static void wayland_surface_reconfigure_client(struct wayland_surface *surface,
+                                               struct wayland_client_surface *client,
+                                               const RECT *client_rect)
 {
     struct wayland_window_config *window = &surface->window;
     int client_x, client_y, x, y;
     int client_width, client_height, width, height;
 
-    if (!surface->client) return;
-
     /* The offset of the client area origin relatively to the window origin. */
-    client_x = window->client_rect.left - window->rect.left;
-    client_y = window->client_rect.top - window->rect.top;
+    client_x = client_rect->left + window->client_rect.left - window->rect.left;
+    client_y = client_rect->top + window->client_rect.top - window->rect.top;
 
-    client_width = window->client_rect.right - window->client_rect.left;
-    client_height = window->client_rect.bottom - window->client_rect.top;
+    client_width = client_rect->right - client_rect->left;
+    client_height = client_rect->bottom - client_rect->top;
 
     wayland_surface_coords_from_window(surface, client_x, client_y, &x, &y);
     wayland_surface_coords_from_window(surface, client_width, client_height,
@@ -515,43 +577,30 @@ static void wayland_surface_reconfigure_client(struct wayland_surface *surface)
 
     TRACE("hwnd=%p subsurface=%d,%d+%dx%d\n", surface->hwnd, x, y, width, height);
 
-    wl_subsurface_set_position(surface->client->wl_subsurface, x, y);
+    if (client->wl_subsurface)
+    {
+        wl_subsurface_set_position(client->wl_subsurface, x, y);
+        wl_subsurface_place_above(client->wl_subsurface, surface->wl_surface);
+    }
 
     if (width != 0 && height != 0)
-        wp_viewport_set_destination(surface->client->wp_viewport,
-                                    width, height);
+        wp_viewport_set_destination(client->wp_viewport, width, height);
     else /* We can't have a 0x0 destination, use 1x1 instead. */
-        wp_viewport_set_destination(surface->client->wp_viewport, 1, 1);
+        wp_viewport_set_destination(client->wp_viewport, 1, 1);
 
-    wl_surface_commit(surface->client->wl_surface);
-
-    wayland_resize_gl_drawable(surface->hwnd);
+    wayland_resize_gl_drawable(client->hwnd);
 }
 
 /**********************************************************************
- *          wayland_surface_reconfigure
+ *          wayland_surface_reconfigure_xdg
  *
- * Reconfigures the wayland surface as needed to match the latest requested
+ * Reconfigures the xdg surface as needed to match the latest requested
  * state.
  */
-BOOL wayland_surface_reconfigure(struct wayland_surface *surface)
+static BOOL wayland_surface_reconfigure_xdg(struct wayland_surface *surface,
+                                            int width, int height)
 {
     struct wayland_window_config *window = &surface->window;
-    int win_width, win_height, width, height;
-
-    if (!surface->xdg_toplevel) return TRUE;
-
-    win_width = surface->window.rect.right - surface->window.rect.left;
-    win_height = surface->window.rect.bottom - surface->window.rect.top;
-
-    wayland_surface_coords_from_window(surface, win_width, win_height,
-                                       &width, &height);
-
-    TRACE("hwnd=%p window=%dx%d,%#x processing=%dx%d,%#x current=%dx%d,%#x\n",
-          surface->hwnd, win_width, win_height, window->state,
-          surface->processing.width, surface->processing.height,
-          surface->processing.state, surface->current.width,
-          surface->current.height, surface->current.state);
 
     /* Acknowledge any compatible processed config. */
     if (surface->processing.serial && surface->processing.processed &&
@@ -584,8 +633,82 @@ BOOL wayland_surface_reconfigure(struct wayland_surface *surface)
     }
 
     wayland_surface_reconfigure_geometry(surface, width, height);
+
+    return TRUE;
+}
+
+/**********************************************************************
+ *          wayland_surface_reconfigure_subsurface
+ *
+ * Reconfigures the subsurface as needed to match the latest requested
+ * state.
+ */
+static void wayland_surface_reconfigure_subsurface(struct wayland_surface *surface)
+{
+    struct wayland_win_data *toplevel_data;
+    struct wayland_surface *toplevel_surface;
+    int local_x, local_y, x, y;
+
+    if (surface->processing.serial && surface->processing.processed &&
+        (toplevel_data = wayland_win_data_get_nolock(surface->toplevel_hwnd)) &&
+        (toplevel_surface = toplevel_data->wayland_surface))
+    {
+        local_x = surface->window.rect.left - toplevel_surface->window.rect.left;
+        local_y = surface->window.rect.top - toplevel_surface->window.rect.top;
+
+        wayland_surface_coords_from_window(surface, local_x, local_y, &x, &y);
+
+        TRACE("hwnd=%p pos=%d,%d\n", surface->hwnd, x, y);
+
+        wl_subsurface_set_position(surface->wl_subsurface, x, y);
+        if (toplevel_data->client_surface)
+            wl_subsurface_place_above(surface->wl_subsurface, toplevel_data->client_surface->wl_surface);
+        else
+            wl_subsurface_place_above(surface->wl_subsurface, toplevel_surface->wl_surface);
+        wl_surface_commit(toplevel_surface->wl_surface);
+
+        memset(&surface->processing, 0, sizeof(surface->processing));
+    }
+}
+
+/**********************************************************************
+ *          wayland_surface_reconfigure
+ *
+ * Reconfigures the wayland surface as needed to match the latest requested
+ * state.
+ */
+BOOL wayland_surface_reconfigure(struct wayland_surface *surface)
+{
+    struct wayland_window_config *window = &surface->window;
+    int win_width, win_height, width, height;
+
+    win_width = surface->window.rect.right - surface->window.rect.left;
+    win_height = surface->window.rect.bottom - surface->window.rect.top;
+
+    wayland_surface_coords_from_window(surface, win_width, win_height,
+                                       &width, &height);
+
+    TRACE("hwnd=%p window=%dx%d,%#x processing=%dx%d,%#x current=%dx%d,%#x\n",
+          surface->hwnd, win_width, win_height, window->state,
+          surface->processing.width, surface->processing.height,
+          surface->processing.state, surface->current.width,
+          surface->current.height, surface->current.state);
+
+    switch (surface->role)
+    {
+    case WAYLAND_SURFACE_ROLE_NONE:
+        break;
+    case WAYLAND_SURFACE_ROLE_TOPLEVEL:
+        if (!surface->xdg_surface) break; /* surface role has been cleared */
+        if (!wayland_surface_reconfigure_xdg(surface, width, height)) return FALSE;
+        break;
+    case WAYLAND_SURFACE_ROLE_SUBSURFACE:
+        if (!surface->wl_subsurface) break; /* surface role has been cleared */
+        wayland_surface_reconfigure_subsurface(surface);
+        break;
+    }
+
     wayland_surface_reconfigure_size(surface, width, height);
-    wayland_surface_reconfigure_client(surface);
 
     return TRUE;
 }
@@ -779,6 +902,7 @@ struct wayland_client_surface *wayland_client_surface_create(HWND hwnd)
         return NULL;
     }
     client->ref = 1;
+    client->hwnd = hwnd;
 
     client->wl_surface =
         wl_compositor_create_surface(process_wayland.wl_compositor);
@@ -815,44 +939,54 @@ err:
     return NULL;
 }
 
-/**********************************************************************
- *          wayland_surface_get_client
- */
-struct wayland_client_surface *wayland_surface_get_client(struct wayland_surface *surface)
+void wayland_client_surface_attach(struct wayland_client_surface *client, HWND toplevel)
 {
-    struct wayland_client_surface *client;
+    struct wayland_win_data *toplevel_data = wayland_win_data_get_nolock(toplevel);
+    struct wayland_surface *surface;
+    RECT client_rect;
 
-    if ((client = surface->client))
+    if (!toplevel_data || !(surface = toplevel_data->wayland_surface))
     {
-        InterlockedIncrement(&client->ref);
-        return client;
+        wayland_client_surface_detach(client);
+        return;
     }
 
-    if (!(client = wayland_client_surface_create(surface->hwnd)))
-        return NULL;
-
-    client->wl_subsurface =
-        wl_subcompositor_get_subsurface(process_wayland.wl_subcompositor,
-                                        client->wl_surface,
-                                        surface->wl_surface);
-    if (!client->wl_subsurface)
+    if (client->toplevel != toplevel)
     {
-        ERR("Failed to create client wl_subsurface\n");
-        goto err;
-    }
-    /* Present contents independently of the parent surface. */
-    wl_subsurface_set_desync(client->wl_subsurface);
+        wayland_client_surface_detach(client);
 
-    wayland_surface_reconfigure_client(surface);
+        client->wl_subsurface =
+            wl_subcompositor_get_subsurface(process_wayland.wl_subcompositor,
+                                            client->wl_surface,
+                                            surface->wl_surface);
+        if (!client->wl_subsurface)
+        {
+            ERR("Failed to create client wl_subsurface\n");
+            return;
+        }
+        /* Present contents independently of the parent surface. */
+        wl_subsurface_set_desync(client->wl_subsurface);
+
+        client->toplevel = toplevel;
+    }
+
+    NtUserGetClientRect(client->hwnd, &client_rect, NtUserGetWinMonitorDpi(client->hwnd, MDT_DEFAULT));
+    NtUserMapWindowPoints(client->hwnd, toplevel, (POINT *)&client_rect, 2, NtUserGetWinMonitorDpi(client->hwnd, MDT_DEFAULT));
+
+    wayland_surface_reconfigure_client(surface, client, &client_rect);
     /* Commit to apply subsurface positioning. */
     wl_surface_commit(surface->wl_surface);
+}
 
-    surface->client = client;
-    return client;
+void wayland_client_surface_detach(struct wayland_client_surface *client)
+{
+    if (client->wl_subsurface)
+    {
+        wl_subsurface_destroy(client->wl_subsurface);
+        client->wl_subsurface = NULL;
+    }
 
-err:
-    wayland_client_surface_release(client);
-    return NULL;
+    client->toplevel = 0;
 }
 
 static void dummy_buffer_release(void *data, struct wl_buffer *buffer)

@@ -670,7 +670,6 @@ static void sys_command_size_move( HWND hwnd, WPARAM wparam )
     UINT style = get_window_long( hwnd, GWL_STYLE );
     POINT capture_point, pt;
     MINMAXINFO minmax;
-    HMONITOR mon = 0;
     HWND parent;
     UINT dpi;
     HDC hdc;
@@ -723,8 +722,7 @@ static void sys_command_size_move( HWND hwnd, WPARAM wparam )
     else
     {
         parent = 0;
-        mouse_rect = get_virtual_screen_rect( get_thread_dpi() );
-        mon = monitor_from_point( pt, MONITOR_DEFAULTTONEAREST, dpi );
+        mouse_rect = get_virtual_screen_rect( get_thread_dpi(), MDT_DEFAULT );
     }
 
     if (on_left_border( hittest ))
@@ -819,20 +817,15 @@ static void sys_command_size_move( HWND hwnd, WPARAM wparam )
 
         if (!parent)
         {
-            HMONITOR newmon;
             MONITORINFO info;
+            RECT rect;
 
-            if ((newmon = monitor_from_point( pt, MONITOR_DEFAULTTONULL, get_thread_dpi() )))
-                mon = newmon;
-
-            info.cbSize = sizeof(info);
-            if (mon && get_monitor_info( mon, &info, get_thread_dpi() ))
-            {
-                pt.x = max( pt.x, info.rcWork.left );
-                pt.x = min( pt.x, info.rcWork.right - 1 );
-                pt.y = max( pt.y, info.rcWork.top );
-                pt.y = min( pt.y, info.rcWork.bottom - 1 );
-            }
+            SetRect( &rect, pt.x, pt.y, pt.x, pt.y );
+            info = monitor_info_from_rect( rect, get_thread_dpi() );
+            pt.x = max( pt.x, info.rcWork.left );
+            pt.x = min( pt.x, info.rcWork.right - 1 );
+            pt.y = max( pt.y, info.rcWork.top );
+            pt.y = min( pt.y, info.rcWork.bottom - 1 );
         }
 
         dx = pt.x - capture_point.x;
@@ -2943,6 +2936,16 @@ LRESULT default_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, 
     return result;
 }
 
+static void update_children_window_state( HWND hwnd )
+{
+    HWND *children;
+    int i;
+
+    if (!(children = list_window_children( 0, hwnd, NULL, 0 ))) return;
+    for (i = 0; children[i]; i++) update_window_state( children[i] );
+    free( children );
+}
+
 LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
 {
     static const WCHAR wine_display_device_guidW[] =
@@ -2979,7 +2982,7 @@ LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
     {
         static RECT virtual_rect = {INT_MIN,INT_MIN,INT_MAX,INT_MAX};
 
-        RECT new_rect = NtUserGetVirtualScreenRect(), old_rect = virtual_rect;
+        RECT new_rect = get_virtual_screen_rect( 0, MDT_DEFAULT ), old_rect = virtual_rect;
         UINT context, flags = 0;
 
         if (EqualRect( &new_rect, &old_rect )) return TRUE;
@@ -2998,6 +3001,8 @@ LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
                             new_rect.right - new_rect.left, new_rect.bottom - new_rect.top,
                             flags | SWP_NOZORDER | SWP_NOACTIVATE | SWP_DEFERERASE );
         NtUserSetThreadDpiAwarenessContext( context );
+
+        update_children_window_state( hwnd );
 
         return send_message_timeout( HWND_BROADCAST, WM_WINE_DESKTOP_RESIZED, old_rect.left,
                                      old_rect.top, SMTO_ABORTIFHUNG, 2000, FALSE );

@@ -92,7 +92,7 @@ typedef struct _CMD_FOR_CONTROL
     enum for_control_operator {CMD_FOR_FILETREE, CMD_FOR_FILE_SET /* /F */,
                                CMD_FOR_NUMBERS /* /L */} operator;
     unsigned flags;               /* |-ed CMD_FOR_FLAG_* */
-    int variable_index;
+    unsigned variable_index;
     const WCHAR *set;
     union
     {
@@ -133,9 +133,6 @@ typedef struct _CMD_NODE
         };
     };
 } CMD_NODE;
-int WCMD_for_nexttoken(int lasttoken, const WCHAR *tokenstr,
-                       int *totalfound, BOOL *doall,
-                       BOOL *duplicates);
 
 struct _DIRECTORY_STACK;
 void WCMD_add_dirstowalk(struct _DIRECTORY_STACK *dirsToWalk);
@@ -185,7 +182,6 @@ void WCMD_print_error (void);
 RETURN_CODE WCMD_pushd(const WCHAR *args);
 RETURN_CODE WCMD_remove_dir(WCHAR *command);
 RETURN_CODE WCMD_rename(void);
-RETURN_CODE WCMD_run_program (WCHAR *command, BOOL called);
 RETURN_CODE WCMD_setlocal(WCHAR *args);
 RETURN_CODE WCMD_setshow_date(void);
 RETURN_CODE WCMD_setshow_default(const WCHAR *args);
@@ -201,6 +197,7 @@ RETURN_CODE WCMD_verify(void);
 RETURN_CODE WCMD_version(void);
 RETURN_CODE WCMD_volume(void);
 RETURN_CODE WCMD_mklink(WCHAR *args);
+RETURN_CODE WCMD_change_drive(WCHAR drive);
 
 WCHAR *WCMD_fgets (WCHAR *buf, DWORD n, HANDLE stream);
 WCHAR *WCMD_parameter (WCHAR *s, int n, WCHAR **start, BOOL raw, BOOL wholecmdline);
@@ -221,6 +218,9 @@ void      node_dispose_tree(CMD_NODE *cmds);
 RETURN_CODE node_execute(CMD_NODE *node);
 
 RETURN_CODE WCMD_call_batch(const WCHAR *, WCHAR *);
+RETURN_CODE WCMD_call_command(WCHAR *command);
+RETURN_CODE WCMD_run_builtin_command(int cmd_index, WCHAR *cmd);
+
 BOOL WCMD_find_label(HANDLE h, const WCHAR*, LARGE_INTEGER *pos);
 void WCMD_set_label_end(WCHAR *string);
 
@@ -290,41 +290,28 @@ typedef struct _DIRECTORY_STACK
   WCHAR  *fileName;
 } DIRECTORY_STACK;
 
-/* Data structure to for loop variables during for body execution, bearing
-   in mind that for loops can be nested                                    */
-#define MAX_FOR_VARIABLES (2*26+10)
-
-static inline int for_var_char_to_index(WCHAR c)
+static inline const char *debugstr_for_var(WCHAR ch)
 {
-    if (c >= L'a' && c <= L'z') return c - L'a';
-    if (c >= L'A' && c <= L'Z') return c - L'A' + 26;
-    if (c >= L'0' && c <= L'9') return c - L'0' + 2 * 26;
-    return -1;
-}
-
-static inline WCHAR for_var_index_to_char(int var_idx)
-{
-    if (var_idx < 0 || var_idx >= MAX_FOR_VARIABLES) return L'?';
-    if (var_idx < 26) return L'a' + var_idx;
-    if (var_idx < 52) return L'A' + var_idx - 26;
-    return L'0' + var_idx - 52;
-}
-
-/* check that the range [var_idx, var_idx + var_offset] is a contiguous range */
-static inline BOOL for_var_index_in_range(int var_idx, int var_offset)
-{
-    return for_var_char_to_index(for_var_index_to_char(var_idx) + var_offset) == var_idx + var_offset;
+    static char tmp[16];
+    if (iswprint(ch))
+        sprintf(tmp, "%%%lc", ch);
+    else
+        sprintf(tmp, "%%[%x]", ch);
+    return tmp;
 }
 
 typedef struct _FOR_CONTEXT
 {
     struct _FOR_CONTEXT *previous;
-    WCHAR *variable[MAX_FOR_VARIABLES];	/* a-z then A-Z */
+    WCHAR *variable[128];
 } FOR_CONTEXT;
+
+extern FOR_CONTEXT *forloopcontext;
+static inline BOOL for_var_is_valid(WCHAR ch) {return ch && ch < ARRAY_SIZE(forloopcontext->variable);}
 
 void WCMD_save_for_loop_context(BOOL reset);
 void WCMD_restore_for_loop_context(void);
-void WCMD_set_for_loop_variable(int var_idx, const WCHAR *value);
+void WCMD_set_for_loop_variable(unsigned varidx, const WCHAR *value);
 
 /*
  * Global variables quals, param1, param2 contain the current qualifiers
@@ -334,10 +321,19 @@ void WCMD_set_for_loop_variable(int var_idx, const WCHAR *value);
 extern WCHAR quals[MAXSTRING], param1[MAXSTRING], param2[MAXSTRING];
 extern int errorlevel;
 extern BATCH_CONTEXT *context;
-extern FOR_CONTEXT *forloopcontext;
 extern BOOL delayedsubst;
 
-#endif /* !RC_INVOKED */
+static inline BOOL WCMD_is_in_context(const WCHAR *ext)
+{
+    size_t c_len, e_len;
+    if (!context) return FALSE;
+    if (!ext) return TRUE;
+    c_len = wcslen(context->batchfileW);
+    e_len = wcslen(ext);
+    return (c_len > e_len) && !wcsicmp(&context->batchfileW[c_len - e_len], ext);
+}
+
+ #endif /* !RC_INVOKED */
 
 /*
  *	Serial nos of builtin commands. These constants must be in step with
@@ -395,9 +391,10 @@ extern BOOL delayedsubst;
 #define WCMD_MORE     43
 #define WCMD_CHOICE   44
 #define WCMD_MKLINK   45
+#define WCMD_CHGDRIVE 46
 
 /* Must be last in list */
-#define WCMD_EXIT     46
+#define WCMD_EXIT     47
 
 /* Some standard messages */
 extern WCHAR anykey[];

@@ -364,6 +364,8 @@ sync_test("builtin_obj", function() {
     if(v < 9) {
         ok(!(window instanceof Object), "window instance of Object");
         ok(!(document instanceof Object), "document instance of Object");
+        ok(!(f.apply instanceof Function), "f.apply instance of Function");
+        ok(!(f.call instanceof Function), "f.call instance of Function");
         ok(!("arguments" in f), "arguments in f");
         ok(!("length" in f), "length in f");
         e = 0;
@@ -377,6 +379,12 @@ sync_test("builtin_obj", function() {
             window.toString.call(null);
             ok(false, "expected exception calling window.toString with null context");
         }catch(ex) {}
+    }else {
+        ok(Object.getPrototypeOf(f) === Function.prototype, "unexpected document.createElement prototype");
+        e = window.toString.call(null);
+        ok(e === "[object Window]", "window.toString with null context = " + e);
+        e = window.toString.call(external.nullDisp);
+        ok(e === "[object Window]", "window.toString with nullDisp context = " + e);
     }
 
     e = 0;
@@ -419,6 +427,70 @@ sync_test("builtin_obj", function() {
         elem1.click.apply(elem2, { length: -1 });
         ok(false, "exception expected");
     }catch(ex) {}
+
+    e = 0;
+    try {
+        new f();
+    }catch(ex) {
+        e = ex.number;
+    }
+    ok(e === (v < 9 ? 0xa01b6 : 0x0ffff) - 0x80000000, "[new f()] e = " + e);
+
+    if(v < 9) {
+        ok(!("call" in f.call), "call in f.call");
+        ok(!("apply" in f.call), "apply in f.call");
+        ok(!("call" in f.apply), "call in f.apply");
+        ok(!("apply" in f.apply), "apply in f.apply");
+        ok(f.call+"" === "\nfunction call() {\n    [native code]\n}\n", "f.call = " + f.call);
+        ok(f.apply+"" === "\nfunction apply() {\n    [native code]\n}\n", "f.apply = " + f.apply);
+        ok(external.getVT(f.call) === "VT_DISPATCH", "f.call not VT_DISPATCH");
+        ok(external.getVT(f.apply) === "VT_DISPATCH", "f.apply not VT_DISPATCH");
+
+        ok(f.apply !== f.apply, "f.apply == f.apply");
+        f = f.apply;
+        ok(!("arguments" in f), "arguments in f.apply");
+        ok(!("length" in f), "length in f.apply");
+        ok(!("call" in f), "call in f.apply");
+        ok(!("apply" in f), "apply in f.apply");
+        e = 0;
+        try {
+            f.toString();
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.apply.toString] e = " + e);
+        e = 0;
+        try {
+            f(document, ["style"]);
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.apply() indirect] e = " + e);
+
+        var enumerator = new Enumerator(document.getElementsByTagName("br"));
+        enumerator.moveNext();
+        var enum_elem = enumerator.item();
+        ok(enum_elem === elem2, "enum_elem = " + enum_elem);
+        enumerator.moveNext();
+        ok(enumerator.atEnd(), "enumerator not at end");
+    }else {
+        elem = f.call.call(f, document, "div");
+        f = f.bind(document);
+        elem = f.apply(null, ["style"]);
+        document.body.appendChild(elem);
+
+        try {
+            var enumerator = new Enumerator(document.getElementsByTagName("style"));
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01c3 - 0x80000000, "[style Enumerator] e = " + e);
+
+        f.apply = 0;
+        f.call = function() { };
+        ok(f.apply === 0, "changed f.apply = ", f.apply);
+        ok(f.call instanceof Function, "changed f.call not instance of Function");
+    }
 });
 
 sync_test("elem_props", function() {
@@ -2134,11 +2206,10 @@ sync_test("elem_attr", function() {
     var func = elem.setAttribute;
     try {
         func("testattr", arr);
-        todo_wine_if(v >= 9).
         ok(v < 9, "expected exception setting testattr via func");
     }catch(ex) {
         ok(v >= 9, "did not expect exception setting testattr via func");
-        elem.setAttribute("testattr", arr);
+        func.call(elem, "testattr", arr);
     }
     r = elem.getAttribute("testattr");
     ok(r === (v < 8 ? arr : (v < 10 ? "arrval" : "42")), "testattr after setAttribute (as func) = " + r);
@@ -2522,6 +2593,36 @@ sync_test("builtins_diffs", function() {
         ok(false, "\"a\".length(): expected exception");
     }catch(e) {
         ok(e.number === 0xa138a - 0x80000000, "\"a\".length(): exception = " + e.number);
+    }
+});
+
+sync_test("style attribute", function() {
+    var r, v = document.documentMode, s = document.createElement("div").style;
+
+    s.setAttribute("background-color", "black");
+    s.foobar = "white";
+
+    r = s.getAttribute("background-color");
+    ok(r === "black", "background-color = " + r);
+    r = s.foobar;
+    ok(r === "white", "foobar prop = " + r);
+
+    r = s.removeAttribute("background-color");
+    ok(r === true, "removeAttribute(background-color) returned " + r);
+    r = s.removeAttribute("border");
+    ok(r === false, "removeAttribute(border) returned " + r);
+    r = s.removeAttribute("foobar");
+    ok(r === (v < 9 ? true : false), "removeAttribute(foobar) returned " + r);
+    r = s.removeAttribute("barfoo");
+    ok(r === false, "removeAttribute(barfoo) returned " + r);
+
+    r = s.getAttribute("background-color");
+    ok(r === "", "background-color after remove = " + r);
+    if(v < 9)
+        ok(!("foobar" in s), "foobar in style after remove");
+    else {
+        r = s.foobar;
+        ok(r === "white", "foobar prop after remove = " + r);
     }
 });
 

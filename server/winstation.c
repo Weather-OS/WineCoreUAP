@@ -285,6 +285,10 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->winstation = (struct winstation *)grab_object( winstation );
             desktop->top_window = NULL;
             desktop->msg_window = NULL;
+            desktop->shell_window = NULL;
+            desktop->shell_listview = NULL;
+            desktop->progman_window = NULL;
+            desktop->taskman_window = NULL;
             desktop->global_hooks = NULL;
             desktop->close_timeout = NULL;
             desktop->foreground_input = NULL;
@@ -879,9 +883,9 @@ DECL_HANDLER(set_user_object_info)
         len = winstation_len + desktop_len + sizeof(WCHAR);
         if ((full_name = mem_alloc( len )))
         {
-            memcpy( full_name, winstation_name, winstation_len );
-            full_name[winstation_len / sizeof(WCHAR)] = '\\';
-            memcpy( full_name + winstation_len / sizeof(WCHAR) + 1, desktop_name, desktop_len );
+            WCHAR *ptr = mem_append( full_name, winstation_name, winstation_len );
+            *ptr++ = '\\';
+            mem_append( ptr, desktop_name, desktop_len );
             set_reply_data_ptr( full_name, min( len, get_reply_max_size() ));
         }
     }
