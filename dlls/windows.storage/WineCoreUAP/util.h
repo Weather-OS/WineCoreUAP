@@ -28,9 +28,6 @@
 #define WINDOWS_TICK 10000000
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 
-#define IS_INHERITED(ptr, alignment) \
-    (((uintptr_t)(ptr) % (alignment)) == 0)
-
 INT64 FileTimeToUnixTime( const FILETIME *ft );
 VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize );
 VOID DeleteDirectoryRecursively(LPCWSTR directoryPath);

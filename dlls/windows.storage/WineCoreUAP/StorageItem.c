@@ -50,12 +50,12 @@ static HRESULT WINAPI storage_item_QueryInterface( IStorageItem *iface, REFIID i
         return S_OK;
     }
 
-    if (IS_INHERITED(inheritedFile, sizeof(struct storage_file)))
+    if ( inheritedFile->IStorageFile_iface.lpVtbl == &storage_file_vtbl )
     {
         return IStorageFile_QueryInterface( &inheritedFile->IStorageFile_iface, iid, out );
     }
 
-    if (IS_INHERITED(inheritedFolder, sizeof(struct storage_folder)))
+    if ( inheritedFolder->IStorageFolder_iface.lpVtbl == &storage_folder_vtbl )
     {
         return IStorageFolder_QueryInterface( &inheritedFolder->IStorageFolder_iface, iid, out );
     }
