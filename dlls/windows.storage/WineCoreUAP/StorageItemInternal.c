@@ -47,9 +47,9 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
     item = impl_from_IStorageItem( result );
-
-    item->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
     itemProperties = impl_from_IStorageItemProperties( &item->IStorageItemProperties_iface );
+
+    itemProperties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
 
     WindowsDuplicateString( itemPath, &item->Path );
 
@@ -109,7 +109,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
         WindowsDuplicateString( tempName, &item->Name );
 
         //Display Name is the same as File Name under *NIX
-        WindowsDuplicateString( item->Name, &itemProperties->DisplayName );
+        WindowsDuplicateString( tempName, &itemProperties->DisplayName );
 
         if ( SHGetFileInfoW( WindowsGetStringRawBuffer( itemPath, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
             WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &itemProperties->DisplayType );
@@ -119,7 +119,6 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
         status = S_OK;
     }
-
 
     return status;
 }

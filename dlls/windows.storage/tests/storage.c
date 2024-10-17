@@ -1015,6 +1015,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageFolder2 *storageFolder2Results;
     IBasicProperties *basicPropertiesResults;
     IStorageFolderStatics *storage_folder_statics;
+    IStorageItemProperties *storageItemProperties;
     IVectorView_IStorageItem *storageItemVectorResults;
     IVectorView_StorageFolder *storageFolderVectorResults;
     IVectorView_StorageFile *storageFileVectorResults;
@@ -1055,6 +1056,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     HSTRING EightthName;
     HSTRING NinethPath;
     HSTRING NinethName;
+    HSTRING DisplayType;
     HRESULT hr;
     DWORD ret;
     CHAR pathtest[MAX_PATH];
@@ -1164,6 +1166,11 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageItem_get_DateCreated( storageItem, &createdDate );
     IBasicProperties_get_DateModified( basicPropertiesResults, &modifiedDate );
     ok( createdDate.UniversalTime == modifiedDate.UniversalTime, "File Creation date %lli, and Modification date %lli do not match!\n", createdDate.UniversalTime, modifiedDate.UniversalTime );
+
+    IStorageItem_QueryInterface( storageItem, &IID_IStorageItemProperties, (void **)&storageItemProperties );
+    
+    IStorageItemProperties_get_DisplayType( storageItemProperties, &DisplayType );
+    ok( !wcscmp( WindowsGetStringRawBuffer( DisplayType, NULL), L"Folder" ), "Error: DisplayType is not Folder. DisplayType %s\n", HStringToLPCSTR(DisplayType));
 
     /**
      * IStorageFolder_CreateFolderAsync

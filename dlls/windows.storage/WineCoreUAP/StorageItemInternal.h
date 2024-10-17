@@ -43,11 +43,11 @@ struct storage_item
 {
     IStorageItem IStorageItem_iface;
 
-    IStorageItemProperties IStorageItemProperties_iface; //This sort of counts as padding as well.
+    FileAttributes Attributes;
     HSTRING Path;
     HSTRING Name;    
-    FileAttributes Attributes;
     DateTime DateCreated;
+    IStorageItemProperties IStorageItemProperties_iface; //This sort of counts as padding as well.
 
     LONG ref;
 };
@@ -57,8 +57,8 @@ struct storage_item_properties
     IStorageItemProperties IStorageItemProperties_iface;
     IStorageItemContentProperties Properties;
 
-    HSTRING DisplayName;
     HSTRING DisplayType;
+    HSTRING DisplayName;
     HSTRING FolderRelativeId;
 
     LONG ref;
