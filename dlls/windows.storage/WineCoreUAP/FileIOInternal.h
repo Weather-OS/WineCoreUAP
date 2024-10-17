@@ -25,6 +25,8 @@
 #include "StorageFileInternal.h"
 #include "Vector/HSTRINGVector.h"
 
+#include "Streams/BufferInternal.h"
+
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -55,9 +57,26 @@ struct file_io_write_text_options
     UnicodeEncoding encoding;
 };
 
+struct file_io_write_buffer_options
+{    
+    IStorageFile *file;
+    IBuffer *buffer;
+};
+
+struct file_io_write_bytes_options
+{
+    IStorageFile *file;
+    BYTE *buffer;
+    UINT32 bufferSize;
+};
+
+
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

@@ -33,6 +33,8 @@
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
+#define WIDL_using_Windows_Storage_Streams
+#include "windows.storage.streams.h"
 #define WIDL_using_Windows_System
 #include "windows.system.h"
 #define WIDL_using_Windows_Storage_FileProperties
@@ -268,6 +270,78 @@ static IAsyncOperationCompletedHandler_IVector_HSTRINGVtbl hstring_vector_async_
 };
 
 static struct hstring_vector_async_handler default_hstring_vector_async_handler = {{&hstring_vector_async_handler_vtbl}};
+
+/**
+ * IAsyncOperationCompletedHandler_IBuffer
+ */
+
+struct buffer_async_handler
+{
+    IAsyncOperationCompletedHandler_IBuffer IAsyncOperationCompletedHandler_IBuffer_iface;
+    IAsyncOperation_IBuffer *async;
+    AsyncStatus status;
+    BOOL invoked;
+    HANDLE event;
+};
+
+static inline struct buffer_async_handler *impl_from_IAsyncOperationCompletedHandler_IBuffer( IAsyncOperationCompletedHandler_IBuffer *iface )
+{
+    return CONTAINING_RECORD( iface, struct buffer_async_handler, IAsyncOperationCompletedHandler_IBuffer_iface );
+}
+
+static HRESULT WINAPI buffer_async_handler_QueryInterface( IAsyncOperationCompletedHandler_IBuffer *iface, REFIID iid, void **out )
+{
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_IBuffer ))
+    {
+        IUnknown_AddRef( iface );
+        *out = iface;
+        return S_OK;
+    }
+
+    trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI buffer_async_handler_AddRef( IAsyncOperationCompletedHandler_IBuffer *iface )
+{
+    return 2;
+}
+
+static ULONG WINAPI buffer_async_handler_Release( IAsyncOperationCompletedHandler_IBuffer *iface )
+{
+    return 1;
+}
+
+static HRESULT WINAPI buffer_async_handler_Invoke( IAsyncOperationCompletedHandler_IBuffer *iface,
+                                                 IAsyncOperation_IBuffer *async, AsyncStatus status )
+{
+    struct buffer_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_IBuffer( iface );
+
+    trace( "iface %p, async %p, status %u\n", iface, async, status );
+
+    ok( !impl->invoked, "invoked twice\n" );
+    impl->invoked = TRUE;
+    impl->async = async;
+    impl->status = status;
+    if (impl->event) SetEvent( impl->event );
+
+    return S_OK;
+}
+
+static IAsyncOperationCompletedHandler_IBufferVtbl buffer_async_handler_vtbl =
+{
+    /*** IUnknown methods ***/
+    buffer_async_handler_QueryInterface,
+    buffer_async_handler_AddRef,
+    buffer_async_handler_Release,
+    /*** IAsyncOperationCompletedHandler<IBuffer> methods ***/
+    buffer_async_handler_Invoke,
+};
+
+static struct buffer_async_handler default_buffer_async_handler = {{&buffer_async_handler_vtbl}};
 
 /**
  * IAsyncOperationCompletedHandler_KnownFoldersAccessStatus
@@ -1723,7 +1797,70 @@ static void test_KnownFolders( void )
     printf("User requested %#x\n", accessStatus);
 }
 
-static void test_FileIO( IStorageFile *file, HSTRING *returedPath )
+static void test_Buffer( IBuffer **outBuffer )
+{
+    HRESULT hr = S_OK;
+    static const WCHAR *buffer_statics_name = L"Windows.Storage.Streams.Buffer";
+    IActivationFactory *factory;
+    IBufferByteAccess *bufferByteAccess;
+    IBufferFactory *bufferFactory;
+    IBuffer *buffer;
+    HSTRING str;
+    UINT32 receivedCapacity;    
+    LPCSTR testChar = "This is a test.";
+    BYTE *bufferByte;
+    BYTE *tmpBuffer;
+
+    hr = WindowsCreateString( buffer_statics_name, wcslen( buffer_statics_name ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = RoGetActivationFactory( str, &IID_IActivationFactory, (void **)&factory );
+    WindowsDeleteString( str );
+    ok( hr == S_OK || broken( hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", hr );
+    if (hr == REGDB_E_CLASSNOTREG)
+    {
+        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( buffer_statics_name ) );
+    }
+
+    check_interface( factory, &IID_IUnknown );
+    check_interface( factory, &IID_IInspectable );
+    check_interface( factory, &IID_IAgileObject );
+
+    hr = IActivationFactory_QueryInterface( factory, &IID_IBufferFactory, (void **)&bufferFactory );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IBufferFactory_Create
+    */
+    hr = IBufferFactory_Create( bufferFactory, 32u, &buffer );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    /**
+     * IBuffer_get_Capacity
+    */
+    hr = IBuffer_get_Capacity( buffer, &receivedCapacity );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+    ok( receivedCapacity == 32u, "got receivedCapacity %d.\n", receivedCapacity );
+
+    /**
+     * IBufferByteAccess_get_Buffer
+    */
+    hr = IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IBufferByteAccess_get_Buffer( bufferByteAccess, &bufferByte );
+
+    memcpy( bufferByte, testChar, 16 );
+
+    IBufferByteAccess_get_Buffer( bufferByteAccess, &tmpBuffer );
+    ok ( !strcmp( (LPCSTR)tmpBuffer, testChar ), "tmpBuffer not original! tmpBuffer %s\n", (LPCSTR)tmpBuffer );
+
+    IBuffer_put_Length( buffer, 16 );
+
+    *outBuffer = buffer;
+}
+
+static void test_FileIO( IStorageFile *file, HSTRING *returedPath, IBuffer *buffer )
 {
     HRESULT hr = S_OK;
     static const WCHAR *file_io_statics_name = L"Windows.Storage.FileIO";
@@ -1731,28 +1868,35 @@ static void test_FileIO( IStorageFile *file, HSTRING *returedPath )
     static const WCHAR *text_to_write_2 = L"test.";
     static const WCHAR *text_to_conclude = L"This is a test.";
     IFileIOStatics *fileIOStatics;
+    IBuffer *fileBuffer;
     IAsyncAction *action;
     IStorageItem *fileItem;
+    IBufferByteAccess *fileBufferByteAccess;
     IVector_HSTRING *linesToRead;
     IVectorView_HSTRING *linesToReadView;
     IIterable_HSTRING *linesToReadIterable;
     IIterator_HSTRING *linesToReadIterator;
     IAsyncOperation_HSTRING *hstringOperation;
+    IAsyncOperation_IBuffer *bufferOperation;
     IAsyncOperation_IVector_HSTRING *hstringVectorOperation;
     IAsyncActionCompletedHandler *actionHandler;
     IAsyncOperationCompletedHandler_HSTRING *hstringHandler;
     IAsyncOperationCompletedHandler_IVector_HSTRING *hstringVectorHandler;
+    IAsyncOperationCompletedHandler_IBuffer *bufferHandler;
     IActivationFactory *factory; 
     HSTRING str;
     HSTRING textToWrite1;
     HSTRING textToWrite2;
     HSTRING textToConclude;
     HSTRING textToRead;
+    UINT32 bufferLen;
+    BYTE *fileBytes;
     DWORD ret;
     boolean next;
     INT comparisonResult;
 
     struct async_action_handler async_action_handler;
+    struct buffer_async_handler buffer_async_handler;
     struct hstring_async_handler hstring_async_handler;
     struct hstring_vector_async_handler hstring_vector_async_handler;
 
@@ -1976,6 +2120,114 @@ static void test_FileIO( IStorageFile *file, HSTRING *returedPath )
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     ok ( !comparisonResult, "textToRead (%s) is not equal to textToConclude (%s)!\n", HStringToLPCSTR( textToRead ), HStringToLPCSTR( textToConclude ) );
+
+    /**
+     * IFileIOStatics_WriteBufferAsync
+    */
+
+    hr = IFileIOStatics_WriteBufferAsync( fileIOStatics, file, buffer, &action );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( action, &IID_IUnknown );
+    check_interface( action, &IID_IInspectable );
+    check_interface( action, &IID_IAgileObject );
+    check_interface( action, &IID_IAsyncInfo );
+    check_interface( action, &IID_IAsyncAction );
+
+    hr = IAsyncAction_get_Completed( action, &actionHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( actionHandler == NULL, "got handler %p\n", actionHandler );
+
+    async_action_handler = default_async_action_handler;
+    async_action_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncAction_put_Completed( action, &async_action_handler.IAsyncActionCompletedHandler_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( async_action_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( async_action_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( async_action_handler.invoked, "handler not invoked\n" );
+    ok( async_action_handler.async == action, "got async %p\n", async_action_handler.async );
+    ok( async_action_handler.status == Completed || broken( async_action_handler.status == Error ), "got status %u\n", async_action_handler.status );
+
+    IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&fileBufferByteAccess );
+    IBufferByteAccess_get_Buffer( fileBufferByteAccess, &fileBytes );
+    IBuffer_get_Length( buffer, &bufferLen );
+
+    /**
+     * IFileIOStatics_WriteBufferAsync
+    */
+
+    hr = IFileIOStatics_WriteBytesAsync( fileIOStatics, file, bufferLen, fileBytes, &action );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( action, &IID_IUnknown );
+    check_interface( action, &IID_IInspectable );
+    check_interface( action, &IID_IAgileObject );
+    check_interface( action, &IID_IAsyncInfo );
+    check_interface( action, &IID_IAsyncAction );
+
+    hr = IAsyncAction_get_Completed( action, &actionHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( actionHandler == NULL, "got handler %p\n", actionHandler );
+
+    async_action_handler = default_async_action_handler;
+    async_action_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncAction_put_Completed( action, &async_action_handler.IAsyncActionCompletedHandler_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( async_action_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( async_action_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( async_action_handler.invoked, "handler not invoked\n" );
+    ok( async_action_handler.async == action, "got async %p\n", async_action_handler.async );
+    ok( async_action_handler.status == Completed || broken( async_action_handler.status == Error ), "got status %u\n", async_action_handler.status );
+
+    /**
+     * IFileIOStatics_ReadBufferAsync
+     */
+
+    hr = IFileIOStatics_ReadBufferAsync( fileIOStatics, file, &bufferOperation );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    check_interface( bufferOperation, &IID_IUnknown );
+    check_interface( bufferOperation, &IID_IInspectable );
+    check_interface( bufferOperation, &IID_IAgileObject );
+    check_interface( bufferOperation, &IID_IAsyncInfo );
+    check_interface( bufferOperation, &IID_IAsyncOperation_IBuffer );
+
+    hr = IAsyncOperation_IBuffer_get_Completed( bufferOperation, &bufferHandler );
+    ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
+    ok( bufferHandler == NULL, "got handler %p\n", bufferHandler );
+
+    buffer_async_handler = default_buffer_async_handler;
+    buffer_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    hr = IAsyncOperation_IBuffer_put_Completed( bufferOperation, &buffer_async_handler.IAsyncOperationCompletedHandler_IBuffer_iface );
+    ok( hr == S_OK, "put_Completed returned %#lx\n", hr );
+
+    ret = WaitForSingleObject( buffer_async_handler.event, 1000 );
+    ok( !ret, "WaitForSingleObject returned %#lx\n", ret );
+
+    ret = CloseHandle( buffer_async_handler.event );
+    ok( ret, "CloseHandle failed, error %lu\n", GetLastError() );
+    ok( buffer_async_handler.invoked, "handler not invoked\n" );
+    ok( buffer_async_handler.async == bufferOperation, "got async %p\n", buffer_async_handler.async );
+    ok( buffer_async_handler.status == Completed || broken( buffer_async_handler.status == Error ), "got status %u\n", buffer_async_handler.status );
+
+    hr = IAsyncOperation_IBuffer_GetResults( bufferOperation, &fileBuffer );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IBuffer_QueryInterface( fileBuffer, &IID_IBufferByteAccess, (void **)&fileBufferByteAccess );
+    IBufferByteAccess_get_Buffer( fileBufferByteAccess, &fileBytes );
+
+    ok ( !strcmp( (LPCSTR)fileBytes, "This is a test." ), "fileBytes not original! fileBytes %s\n", (LPCSTR)fileBytes );
 
     IStorageFile_QueryInterface( file, &IID_IStorageItem, (void **)&fileItem );
     IStorageItem_get_Path( fileItem, returedPath );
@@ -2325,6 +2577,7 @@ START_TEST(storage)
     const wchar_t* apppath;
     IStorageItem *returnedItem = NULL;
     IStorageFile *returnedFile = NULL;
+    IBuffer *buffer = NULL;
     HSTRING returnedFilePath = NULL;
 
     hr = RoInitialize( RO_INIT_MULTITHREADED );
@@ -2335,7 +2588,8 @@ START_TEST(storage)
 
     test_AppDataPathsStatics(&apppath);
     test_StorageFolder(apppath, &returnedItem, &returnedFile);
-    test_FileIO(returnedFile, &returnedFilePath);
+    test_Buffer(&buffer);
+    test_FileIO(returnedFile, &returnedFilePath, buffer);
     test_PathIO(returnedFilePath);
     test_StorageItem(returnedItem);
     test_KnownFolders();

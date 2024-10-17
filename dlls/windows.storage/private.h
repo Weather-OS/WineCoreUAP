@@ -82,6 +82,8 @@ extern HRESULT async_operation_storage_folder_create( IUnknown *invoker, IUnknow
                                               IAsyncOperation_StorageFolder **out );
 extern HRESULT async_operation_storage_item_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IStorageItem **out );
+extern HRESULT async_operation_buffer_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+                                              IAsyncOperation_IBuffer **out );
 extern HRESULT async_operation_storage_file_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_IVectorView_StorageFile **out );
 extern HRESULT async_operation_storage_item_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,

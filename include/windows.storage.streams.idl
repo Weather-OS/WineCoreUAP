@@ -34,6 +34,7 @@ namespace Windows.Storage.Streams {
     interface IBuffer;
     interface IBufferFactory;
     interface IBufferStatics;
+    interface IBufferByteAccess;
     interface IContentTypeProvider;
     interface IDataWriter;
     interface IDataWriterFactory;
@@ -126,6 +127,15 @@ namespace Windows.Storage.Streams {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(905a0fef-bc53-11df-8c49-001e4fc686da)
+    ]
+    interface IBufferByteAccess : IUnknown
+    {
+        [propget] HRESULT Buffer([out, retval] BYTE **value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
         uuid(64b89265-d341-4922-b38a-dd4af8808c4e)
     ]
     interface IDataWriter : IInspectable
@@ -178,6 +188,7 @@ namespace Windows.Storage.Streams {
     interface IOutputStream : IInspectable
         requires Windows.Foundation.IClosable
     {
+        HRESULT Dispose();
         HRESULT WriteAsync(
             [in] Windows.Storage.Streams.IBuffer *buffer,
             [out, retval] Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32> **operation);

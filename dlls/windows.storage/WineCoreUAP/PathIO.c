@@ -480,20 +480,37 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
 
 static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    hr = async_operation_buffer_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, operation );
+    TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IBuffer* buffer, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    struct path_io_write_buffer_options *write_buffer_options;
+    if (!(write_buffer_options = calloc( 1, sizeof(*write_buffer_options) ))) return E_OUTOFMEMORY;
+
+    write_buffer_options->buffer = buffer;
+    write_buffer_options->absolutePath = absolutePath;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_buffer_options, path_io_statics_WriteBuffer, operation );
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HSTRING absolutePath, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    struct path_io_write_bytes_options *write_bytes_options;
+    if (!(write_bytes_options = calloc( 1, sizeof(*write_bytes_options) ))) return E_OUTOFMEMORY;
+
+    write_bytes_options->buffer = buffer;
+    write_bytes_options->absolutePath = absolutePath;
+    write_bytes_options->bufferSize = __bufferSize;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_bytes_options, path_io_statics_WriteBytes, operation );
+    return hr;
 }
 
 static const struct IPathIOStaticsVtbl path_io_statics_vtbl =

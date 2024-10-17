@@ -525,3 +525,150 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
     return status;
 }
+
+HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    IBuffer *buffer;
+    HRESULT status = S_OK;
+    HSTRING filePath;
+    HANDLE fileHandle;
+    BYTE *outputBuffer;
+    DWORD fileSize;
+    DWORD bytesRead;
+    BOOL readResult;
+
+    struct storage_item *fileItem;
+
+    //Parameters
+    struct storage_file *file = impl_from_IStorageFile( (IStorageFile *)param );
+
+    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
+    WindowsDuplicateString( fileItem->Path, &filePath );
+
+    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+
+    fileSize = GetFileSize( fileHandle, NULL );
+
+    if ( fileSize == INVALID_FILE_SIZE )
+    {
+        CloseHandle( fileHandle );
+        return E_INVALIDARG;
+    }
+
+    status = buffer_Create( fileSize, &buffer );
+
+    if ( FAILED( status ) )
+        return status;
+    
+    outputBuffer = impl_from_IBuffer( buffer )->Buffer;
+    
+    readResult = ReadFile( fileHandle, (LPVOID)outputBuffer, fileSize, &bytesRead, NULL );
+
+    if ( !readResult || bytesRead != fileSize )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( SUCCEEDED ( status ) )
+    {
+        result->vt = VT_UNKNOWN;
+        result->ppunkVal = (IUnknown **)buffer;
+    }
+
+    CloseHandle( fileHandle );
+
+    return status;
+}
+
+HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HSTRING filePath;
+    BYTE *contents;
+    HANDLE fileHandle;
+    DWORD bytesWritten;
+
+    struct storage_item *fileItem;
+
+    struct file_io_write_buffer_options *write_buffer_options = (struct file_io_write_buffer_options *)param;
+
+    //Parameters
+    struct storage_file *file = impl_from_IStorageFile( write_buffer_options->file );    
+    contents = impl_from_IBuffer( write_buffer_options->buffer )->Buffer;
+
+    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
+    WindowsDuplicateString( fileItem->Path, &filePath );
+
+    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
+    //Clear the file
+    if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( !SetEndOfFile( fileHandle ) ) 
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( FAILED( status ) )
+        return status;
+
+    if ( !WriteFile( fileHandle, (LPCVOID)contents, impl_from_IBuffer( write_buffer_options->buffer )->Length, &bytesWritten, NULL ) )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+    
+    CloseHandle( fileHandle );
+    return status;
+}
+
+HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+    HSTRING filePath;
+    BYTE *contents;
+    HANDLE fileHandle;
+    DWORD bytesWritten;
+
+    struct storage_item *fileItem;
+
+    struct file_io_write_bytes_options *write_bytes_options = (struct file_io_write_bytes_options *)param;
+
+    //Parameters
+    struct storage_file *file = impl_from_IStorageFile( write_bytes_options->file );    
+    contents = write_bytes_options->buffer;
+
+    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
+    WindowsDuplicateString( fileItem->Path, &filePath );
+
+    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
+    //Clear the file
+    if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( !SetEndOfFile( fileHandle ) ) 
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+
+    if ( FAILED( status ) )
+        return status;
+
+    if ( !WriteFile( fileHandle, (LPCVOID)contents, write_bytes_options->bufferSize, &bytesWritten, NULL ) )
+    {
+        CloseHandle( fileHandle );
+        status = E_UNEXPECTED;
+    }
+    
+    CloseHandle( fileHandle );
+    return status;
+}

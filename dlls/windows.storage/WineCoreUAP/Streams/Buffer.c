@@ -140,6 +140,13 @@ static HRESULT WINAPI buffer_QueryInterface( IBuffer *iface, REFIID iid, void **
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IBufferByteAccess ))
+    {
+        *out = &impl->IBufferByteAccess_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
@@ -202,7 +209,8 @@ static HRESULT WINAPI buffer_put_Length( IBuffer *iface, UINT32 value )
     impl->Length = value;
     return S_OK;
 }
-const struct IBufferVtbl buffer_vtbl =
+
+struct IBufferVtbl buffer_vtbl =
 {
     buffer_QueryInterface,
     buffer_AddRef,
@@ -245,12 +253,83 @@ const struct IBufferStaticsVtbl buffer_statics_vtbl =
     buffer_statics_CreateMemoryBufferOverIBuffer
 };
 
-DEFINE_IINSPECTABLE( buffer_factory, IBufferFactory, struct buffer_statics, IBufferFactory_iface )
+struct buffer_statics *impl_from_IBufferFactory( IBufferFactory *iface )
+{
+    return CONTAINING_RECORD( iface, struct buffer_statics, IBufferFactory_iface );
+}
+
+static HRESULT WINAPI buffer_factory_QueryInterface( IBufferFactory *iface, REFIID iid, void **out )
+{
+    struct buffer_statics *impl = impl_from_IBufferFactory( iface );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IActivationFactory ))
+    {
+        *out = &impl->IActivationFactory_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IBufferFactory))
+    {
+        *out = &impl->IBufferFactory_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IBufferStatics ))
+    {
+        *out = &impl->IBufferStatics_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI buffer_factory_AddRef( IBufferFactory *iface )
+{
+    struct buffer_statics *impl = impl_from_IBufferFactory( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI buffer_factory_Release( IBufferFactory *iface )
+{
+    struct buffer_statics *impl = impl_from_IBufferFactory( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static HRESULT WINAPI buffer_factory_GetIids( IBufferFactory *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI buffer_factory_GetRuntimeClassName( IBufferFactory *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI buffer_factory_GetTrustLevel( IBufferFactory *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
 
 static HRESULT WINAPI buffer_factory_Create( IBufferFactory *iface, UINT32 capacity, IBuffer **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    return buffer_Create( capacity, value );
 }
 
 const struct IBufferFactoryVtbl buffer_factory_vtbl =
@@ -262,15 +341,15 @@ const struct IBufferFactoryVtbl buffer_factory_vtbl =
     buffer_factory_GetIids,
     buffer_factory_GetRuntimeClassName,
     buffer_factory_GetTrustLevel,
-    /* IBufferStatics methods */
+    /* IBufferFactory methods */
     buffer_factory_Create
 };
 
 static struct buffer_statics buffer_statics =
 {
     {&factory_vtbl},
-    {&buffer_statics_vtbl},
     {&buffer_factory_vtbl},
+    {&buffer_statics_vtbl},
     1,
 };
 

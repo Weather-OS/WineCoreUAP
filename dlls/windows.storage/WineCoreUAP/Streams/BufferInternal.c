@@ -19,36 +19,25 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef STORAGE_PROVIDER_INTERNAL_H
-#define STORAGE_PROVIDER_INTERNAL_H
+#include "BufferInternal.h"
 
-#include "../../private.h"
-#include "wine/debug.h"
-
-extern struct IBufferVtbl buffer_vtbl;
-extern struct IBufferByteAccessVtbl bufferaccess_vtbl;
-
-struct buffer
+HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value )
 {
-    IBuffer IBuffer_iface;    
-    IBufferByteAccess IBufferByteAccess_iface;
-    BYTE *Buffer;    
-    UINT Capacity;
-    UINT Length;    
-    LONG ref;
-};
+    HRESULT hr = S_OK;
+    struct buffer *newBuffer;
+    if (!(newBuffer = calloc( 1, sizeof(*newBuffer) ))) return E_OUTOFMEMORY;
 
-struct buffer_statics
-{
-    //Derivatives
-    IActivationFactory IActivationFactory_iface;    
-    IBufferFactory IBufferFactory_iface;
-    IBufferStatics IBufferStatics_iface;
-    LONG ref;
-};
+    newBuffer->IBuffer_iface.lpVtbl = &buffer_vtbl;
+    newBuffer->IBufferByteAccess_iface.lpVtbl = &bufferaccess_vtbl;
 
-struct buffer *impl_from_IBuffer( IBuffer *iface );
+    newBuffer->Buffer = (BYTE *)malloc( capacity );
 
-HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value );
+    if ( capacity > 0x7fffffffu )
+        hr = E_INVALIDARG;
+    else
+        newBuffer->Capacity = capacity;
 
-#endif
+    *value = &newBuffer->IBuffer_iface;
+
+    return hr;
+}

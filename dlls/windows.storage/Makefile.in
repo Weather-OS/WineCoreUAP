@@ -48,6 +48,10 @@ SOURCES = \
 	WineCoreUAP/FileProperties/AsyncOperation/BasicPropertiesAsync.c \
 	\
 	WineCoreUAP/Streams/Buffer.c \
+	WineCoreUAP/Streams/BufferByteAccess.c \
+	WineCoreUAP/Streams/BufferInternal.c \
+	\
+	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	provider.idl \
 	classes.idl \
 	classes.streams.idl \
