@@ -37,7 +37,11 @@
 #include "../private.h"
 #include "wine/debug.h"
 
+#include "StorageProviderInternal.h"
+
 extern struct IStorageItemPropertiesVtbl storage_item_properties_vtbl;
+extern struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl;
+extern struct IStorageProviderVtbl storage_provider_vtbl;
 
 struct storage_item
 {
@@ -46,20 +50,22 @@ struct storage_item
     FileAttributes Attributes;
     HSTRING Path;
     HSTRING Name;    
-    DateTime DateCreated;
+    DateTime DateCreated;    
     IStorageItemProperties IStorageItemProperties_iface; //This sort of counts as padding as well.
 
-    LONG ref;
+    LONG ref;    
 };
 
 struct storage_item_properties
-{
-    IStorageItemProperties IStorageItemProperties_iface;
-    IStorageItemContentProperties Properties;
+{    
+    IStorageItemProperties IStorageItemProperties_iface;    
+    IStorageItemContentProperties Properties;    
+    IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;
 
     HSTRING DisplayType;
     HSTRING DisplayName;
     HSTRING FolderRelativeId;
+    IStorageProvider Provider;
 
     LONG ref;
 };

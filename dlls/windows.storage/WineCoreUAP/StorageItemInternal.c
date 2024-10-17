@@ -31,6 +31,7 @@ extern struct IActivationFactoryVtbl factory_vtbl;
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
 {
+    static LPCWSTR itemId = L"Local";
     WCHAR itemName[MAX_PATH];
     DWORD attributes;
     HANDLE itemFile;
@@ -41,15 +42,19 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
     struct storage_item *item;
     struct storage_item_properties *itemProperties;
+    struct storage_provider *itemProvider;
 
     TRACE( "iface %p, value %p\n", itemPath, result );
     if (!result) return E_INVALIDARG;
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
+    if (!(itemProvider = calloc( 1, sizeof(*itemProvider) ))) return E_OUTOFMEMORY;
 
     item = impl_from_IStorageItem( result );
     itemProperties = impl_from_IStorageItemProperties( &item->IStorageItemProperties_iface );
 
     itemProperties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
+    itemProperties->IStorageItemPropertiesWithProvider_iface.lpVtbl = &storage_item_properties_with_provider_vtbl;
+    itemProvider->IStorageProvider_iface.lpVtbl = &storage_provider_vtbl;
 
     WindowsDuplicateString( itemPath, &item->Path );
 
@@ -110,10 +115,16 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
         //Display Name is the same as File Name under *NIX
         WindowsDuplicateString( tempName, &itemProperties->DisplayName );
+        WindowsDuplicateString( tempName, &itemProvider->DisplayName );
+
+        //OneDrive, Network drives and online devices aren't handled yet
+        WindowsCreateString( itemId, wcslen( itemId ), &itemProvider->Id );
 
         if ( SHGetFileInfoW( WindowsGetStringRawBuffer( itemPath, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
             WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &itemProperties->DisplayType );
         }
+
+        itemProperties->Provider = itemProvider->IStorageProvider_iface;
 
         CloseHandle( itemFile );
 

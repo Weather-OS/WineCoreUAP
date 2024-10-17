@@ -154,6 +154,20 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageItemProperties ))
+    {
+        *out = &impl_from_IStorageItem( &impl->IStorageItem_iface )->IStorageItemProperties_iface;
+        IInspectable_AddRef( *out );        
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageItemPropertiesWithProvider ))
+    {
+        *out = &impl_from_IStorageItemProperties( &impl_from_IStorageItem( &impl->IStorageItem_iface )->IStorageItemProperties_iface )->IStorageItemPropertiesWithProvider_iface;
+        IInspectable_AddRef( *out );        
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;

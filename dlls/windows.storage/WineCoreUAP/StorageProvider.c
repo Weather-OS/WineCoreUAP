@@ -205,11 +205,11 @@ const struct IStorageProviderVtbl storage_provider_vtbl =
 
 static struct storage_provider storage_provider =
 {
-    {&factory_vtbl},
+    {&factory_vtbl},    
     {&storage_provider_vtbl},
     NULL,
     NULL,    
-    1,   
+    1,    
 };
 
 IActivationFactory *storage_provider_factory = &storage_provider.IActivationFactory_iface;

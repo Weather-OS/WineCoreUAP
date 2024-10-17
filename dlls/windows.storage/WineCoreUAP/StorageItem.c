@@ -233,7 +233,7 @@ static HRESULT WINAPI storage_item_properties_QueryInterface( IStorageItemProper
     
     if ( inheritedItem->IStorageItem_iface.lpVtbl != &storage_item_vtbl )
     {
-        printf("IStorageItemProperties is lone in IStorageItem inheritence! Please check for any memory leaks.\n");
+        TRACE("IStorageItemProperties is lone in IStorageItem inheritence! Please check for any memory leaks.\n");
         return E_UNEXPECTED;
     }
 
@@ -336,3 +336,98 @@ struct IStorageItemPropertiesVtbl storage_item_properties_vtbl =
     storage_item_properties_get_FolderRelativeId,
     storage_item_properties_get_Properties
 };
+
+struct storage_item_properties *impl_from_IStorageItemPropertiesWithProvider( IStorageItemPropertiesWithProvider *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_item_properties, IStorageItemPropertiesWithProvider_iface );
+}
+
+static HRESULT WINAPI storage_item_properties_with_provider_QueryInterface( IStorageItemPropertiesWithProvider *iface, REFIID iid, void **out )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
+
+    // Inheritence 
+    struct storage_item *inheritedItem = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_item, IStorageItemProperties_iface );
+    
+    if ( inheritedItem->IStorageItem_iface.lpVtbl != &storage_item_vtbl )
+    {
+        TRACE("IStorageItemPropertiesWithProvider is lone in IStorageItem inheritence! Please check for any memory leaks.\n");
+        return E_UNEXPECTED;
+    }
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IStorageItemPropertiesWithProvider ))
+    {
+        *out = &impl->IStorageItemPropertiesWithProvider_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    return IStorageItem_QueryInterface( &inheritedItem->IStorageItem_iface, iid, out );
+}
+
+static ULONG WINAPI storage_item_properties_with_provider_AddRef( IStorageItemPropertiesWithProvider *iface )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI storage_item_properties_with_provider_Release( IStorageItemPropertiesWithProvider *iface )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref) free( impl );
+    return ref;
+}
+
+static HRESULT WINAPI storage_item_properties_with_provider_GetIids( IStorageItemPropertiesWithProvider *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_with_provider_GetRuntimeClassName( IStorageItemPropertiesWithProvider *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_with_provider_GetTrustLevel( IStorageItemPropertiesWithProvider *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::StorageItemProperties
+*/
+
+static HRESULT WINAPI storage_item_properties_with_provider_get_Provider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
+    *value = &impl->Provider;
+    return S_OK;    
+}
+
+struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl =
+{
+    storage_item_properties_with_provider_QueryInterface,
+    storage_item_properties_with_provider_AddRef,
+    storage_item_properties_with_provider_Release,
+    /* IInspectable methods */
+    storage_item_properties_with_provider_GetIids,
+    storage_item_properties_with_provider_GetRuntimeClassName,
+    storage_item_properties_with_provider_GetTrustLevel,
+    /* IStorageItemPropertiesWithProvider methods */
+    storage_item_properties_with_provider_get_Provider
+};
+

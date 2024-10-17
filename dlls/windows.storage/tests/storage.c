@@ -1013,9 +1013,11 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageFolder *storageFolderResults3;
     IStorageFolder *storageFolderResults4;
     IStorageFolder2 *storageFolder2Results;
+    IStorageProvider *storageProvider;
     IBasicProperties *basicPropertiesResults;
     IStorageFolderStatics *storage_folder_statics;
     IStorageItemProperties *storageItemProperties;
+    IStorageItemPropertiesWithProvider *storageItemPropertiesWithProvider;
     IVectorView_IStorageItem *storageItemVectorResults;
     IVectorView_StorageFolder *storageFolderVectorResults;
     IVectorView_StorageFile *storageFileVectorResults;
@@ -1057,6 +1059,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     HSTRING NinethPath;
     HSTRING NinethName;
     HSTRING DisplayType;
+    HSTRING itemId;
     HRESULT hr;
     DWORD ret;
     CHAR pathtest[MAX_PATH];
@@ -1172,6 +1175,13 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     IStorageItemProperties_get_DisplayType( storageItemProperties, &DisplayType );
     ok( !wcscmp( WindowsGetStringRawBuffer( DisplayType, NULL), L"Folder" ), "Error: DisplayType is not Folder. DisplayType %s\n", HStringToLPCSTR(DisplayType));
 
+    IStorageItemProperties_QueryInterface( storageItemProperties, &IID_IStorageItemPropertiesWithProvider, (void **)&storageItemPropertiesWithProvider );
+
+    IStorageItemPropertiesWithProvider_get_Provider( storageItemPropertiesWithProvider, &storageProvider );
+
+    IStorageProvider_get_DisplayName( storageProvider, &itemId );
+    ok( !wcscmp( WindowsGetStringRawBuffer( itemId, NULL), L"Local" ), "Error: itemId is not Local. itemId %s\n", HStringToLPCSTR(itemId));
+    
     /**
      * IStorageFolder_CreateFolderAsync
     */
