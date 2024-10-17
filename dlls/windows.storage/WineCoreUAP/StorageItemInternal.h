@@ -37,14 +37,29 @@
 #include "../private.h"
 #include "wine/debug.h"
 
+extern struct IStorageItemPropertiesVtbl storage_item_properties_vtbl;
+
 struct storage_item
 {
     IStorageItem IStorageItem_iface;
 
-    FileAttributes Attributes;
+    IStorageItemProperties IStorageItemProperties_iface; //This sort of counts as padding as well.
     HSTRING Path;
     HSTRING Name;    
+    FileAttributes Attributes;
     DateTime DateCreated;
+
+    LONG ref;
+};
+
+struct storage_item_properties
+{
+    IStorageItemProperties IStorageItemProperties_iface;
+    IStorageItemContentProperties Properties;
+
+    HSTRING DisplayName;
+    HSTRING DisplayType;
+    HSTRING FolderRelativeId;
 
     LONG ref;
 };
@@ -60,6 +75,7 @@ struct storage_item_rename_options
 };
 
 struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
+struct storage_item_properties *impl_from_IStorageItemProperties( IStorageItemProperties *iface );
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
 HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );

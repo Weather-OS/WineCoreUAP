@@ -30,14 +30,29 @@ import "windows.devices.geolocation.idl";
 import "windows.storage.streams.idl";
 
 namespace Windows.Storage.FileProperties {
+    typedef enum ThumbnailMode ThumbnailMode;
+
     interface IBasicProperties;
+    interface IStorageItemContentProperties;
 
     runtimeclass BasicProperties;
+    runtimeclass StorageItemContentProperties;
 
     declare {
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.BasicProperties *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.BasicProperties *>;
     }
+
+    [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+    enum ThumbnailMode
+    {
+        PicturesView  = 0,
+        VideosView    = 1,
+        MusicView     = 2,
+        DocumentsView = 3,
+        ListView      = 4,
+        SingleItem    = 5
+    };
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
@@ -52,11 +67,28 @@ namespace Windows.Storage.FileProperties {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.FileProperties.StorageItemContentProperties),
+        uuid(05294BAD-BC38-48BF-85D7-770E0E2AE0BA)
+    ]
+    interface IStorageItemContentProperties : IInspectable
+    {
+    }
+
+    [
         contract(Windows.Foundation.UniversalApiContract, 1.0)
     ]
     runtimeclass BasicProperties
     {
         [default] interface Windows.Storage.FileProperties.IBasicProperties;
         interface Windows.Storage.FileProperties.IStorageItemExtraProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    runtimeclass StorageItemContentProperties
+    {
+        [default] interface Windows.Storage.FileProperties.IStorageItemContentProperties;
     }
 }

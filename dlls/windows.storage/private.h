@@ -28,6 +28,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
+#include "shellapi.h"
 
 #include "activation.h"
 

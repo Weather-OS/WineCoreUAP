@@ -218,3 +218,121 @@ struct IStorageItemVtbl storage_item_vtbl =
     storage_item_get_DateCreated,
     storage_item_IsOfType
 };
+
+struct storage_item_properties *impl_from_IStorageItemProperties( IStorageItemProperties *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_item_properties, IStorageItemProperties_iface );
+}
+
+static HRESULT WINAPI storage_item_properties_QueryInterface( IStorageItemProperties *iface, REFIID iid, void **out )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+
+    // Inheritence 
+    struct storage_item *inheritedItem = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_item, IStorageItemProperties_iface );
+    
+    if ( inheritedItem->IStorageItem_iface.lpVtbl != &storage_item_vtbl )
+    {
+        printf("IStorageItemProperties is lone in IStorageItem inheritence! Please check for any memory leaks.\n");
+        return E_UNEXPECTED;
+    }
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IStorageItemProperties ))
+    {
+        *out = &impl->IStorageItemProperties_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    return IStorageItem_QueryInterface( &inheritedItem->IStorageItem_iface, iid, out );
+}
+
+static ULONG WINAPI storage_item_properties_AddRef( IStorageItemProperties *iface )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI storage_item_properties_Release( IStorageItemProperties *iface )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref) free( impl );
+    return ref;
+}
+
+static HRESULT WINAPI storage_item_properties_GetIids( IStorageItemProperties *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_GetRuntimeClassName( IStorageItemProperties *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_GetTrustLevel( IStorageItemProperties *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::StorageItemProperties
+*/
+
+static HRESULT WINAPI storage_item_properties_get_DisplayName( IStorageItemProperties *iface, HSTRING *value )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    WindowsDuplicateString( impl->DisplayName, value );
+    return S_OK;    
+}
+
+static HRESULT WINAPI storage_item_properties_get_DisplayType( IStorageItemProperties *iface, HSTRING *value )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    WindowsDuplicateString( impl->DisplayType, value );
+    return S_OK;    
+}
+
+static HRESULT WINAPI storage_item_properties_get_FolderRelativeId( IStorageItemProperties *iface, HSTRING *value )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    WindowsDuplicateString( impl->FolderRelativeId, value );
+    return S_OK;    
+}
+
+static HRESULT WINAPI storage_item_properties_get_Properties( IStorageItemProperties *iface, IStorageItemContentProperties **value )
+{
+    struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    *value = &impl->Properties;
+    return S_OK;    
+}
+
+struct IStorageItemPropertiesVtbl storage_item_properties_vtbl =
+{
+    storage_item_properties_QueryInterface,
+    storage_item_properties_AddRef,
+    storage_item_properties_Release,
+    /* IInspectable methods */
+    storage_item_properties_GetIids,
+    storage_item_properties_GetRuntimeClassName,
+    storage_item_properties_GetTrustLevel,
+    /* IStorageItemProperties methods */
+    storage_item_properties_get_DisplayName,
+    storage_item_properties_get_DisplayType,
+    storage_item_properties_get_FolderRelativeId,
+    storage_item_properties_get_Properties
+};

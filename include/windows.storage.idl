@@ -807,6 +807,18 @@ namespace Windows.Storage {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(86664478-8029-46FE-A789-1C2F3E2FFB5C)
+    ]
+    interface IStorageItemProperties : IInspectable
+    {
+        [propget] HRESULT DisplayName([out] [retval] HSTRING* value);
+        [propget] HRESULT DisplayType([out] [retval] HSTRING* value);
+        [propget] HRESULT FolderRelativeId([out] [retval] HSTRING* value);
+        [propget] HRESULT Properties([out] [retval] Windows.Storage.FileProperties.StorageItemContentProperties** value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
         uuid(861BF39B-6368-4DEE-B40E-74684A5CE714)
     ]
     interface IStorageItemPropertiesWithProvider : IInspectable

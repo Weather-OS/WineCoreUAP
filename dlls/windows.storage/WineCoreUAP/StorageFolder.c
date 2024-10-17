@@ -31,7 +31,6 @@ static struct storage_folder_statics *impl_from_IActivationFactory( IActivationF
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
-
     struct storage_folder_statics *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
@@ -149,6 +148,13 @@ static HRESULT WINAPI storage_folder_QueryInterface( IStorageFolder *iface, REFI
     if (IsEqualGUID( iid, &IID_IStorageItem ))
     {
         *out = &impl->IStorageItem_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IStorageItemProperties ))
+    {
+        *out = &impl_from_IStorageItem( &impl->IStorageItem_iface )->IStorageItemProperties_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
