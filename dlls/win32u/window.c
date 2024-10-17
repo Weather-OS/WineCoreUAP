@@ -1941,9 +1941,8 @@ static struct window_surface *get_window_surface( HWND hwnd, UINT swp_flags, BOO
 
     if ((create_opaque && is_layered) || (create_layered && !is_layered))
     {
-        window_surface_release( new_surface );
-        new_surface = &dummy_surface;
-        window_surface_add_ref( new_surface );
+        if (new_surface) window_surface_release( new_surface );
+        window_surface_add_ref( (new_surface = &dummy_surface) );
     }
     else if (!create_opaque && is_layered) create_layered = TRUE;
 
@@ -2013,13 +2012,10 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
     if (is_child) monitor_dpi = get_win_monitor_dpi( parent, &raw_dpi );
     else monitor_dpi = monitor_dpi_from_rect( new_rects->window, get_thread_dpi(), &raw_dpi );
 
-    get_window_rects( hwnd, COORDS_SCREEN, &old_rects, get_thread_dpi() );
+    get_window_rects( hwnd, COORDS_PARENT, &old_rects, get_thread_dpi() );
     if (IsRectEmpty( &valid_rects[0] ) || is_layered) valid_rects = NULL;
 
     if (!(win = get_win_ptr( hwnd )) || win == WND_DESKTOP || win == WND_OTHER_PROCESS) return FALSE;
-
-    old_rects.visible = win->rects.visible;
-    old_rects.client = win->rects.client;
     old_surface = win->surface;
     if (old_surface != new_surface) swp_flags |= SWP_FRAMECHANGED;  /* force refreshing non-client area */
     if (new_surface == &dummy_surface) swp_flags |= SWP_NOREDRAW;
@@ -2098,18 +2094,25 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
         {
             if (valid_rects)
             {
+                RECT rects[2] = {valid_rects[0], valid_rects[1]};
+                valid_rects = rects;
+
                 if (old_surface != new_surface)
                     move_window_bits_surface( hwnd, &new_rects->window, old_surface, &old_rects.visible, valid_rects );
                 else
-                    move_window_bits( hwnd, &new_rects->visible, &old_rects.visible, &new_rects->window, valid_rects );
+                {
+                    OffsetRect( &rects[1], new_rects->visible.left - old_rects.visible.left, new_rects->visible.top - old_rects.visible.top );
+                    move_window_bits( hwnd, new_rects, valid_rects );
+                }
             }
             window_surface_release( old_surface );
         }
         else if (valid_rects)
         {
-            RECT rects[2];
+            RECT rects[2] = {valid_rects[0], valid_rects[1]};
             int x_offset = old_rects.visible.left - new_rects->visible.left;
             int y_offset = old_rects.visible.top - new_rects->visible.top;
+            valid_rects = rects;
 
             /* if all that happened is that the whole window moved, copy everything */
             if (!(swp_flags & SWP_FRAMECHANGED) &&
@@ -2121,15 +2124,17 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
                 old_rects.client.bottom  - new_rects->client.bottom == y_offset &&
                 EqualRect( &valid_rects[0], &new_rects->client ))
             {
-                rects[0] = new_rects->visible;
-                rects[1] = old_rects.visible;
-                valid_rects = rects;
+                rects[0] = new_rects->window;
+                rects[1] = old_rects.window;
             }
 
-            if (surface_win && surface_win != hwnd)
-                move_window_bits( hwnd, &new_rects->visible, &new_rects->visible, &new_rects->window, valid_rects );
-            else
+            if (!surface_win || surface_win == hwnd)
                 user_driver->pMoveWindowBits( hwnd, &old_rects, new_rects, valid_rects );
+            else
+            {
+                OffsetRect( &rects[1], new_rects->visible.left - old_rects.visible.left, new_rects->visible.top - old_rects.visible.top );
+                move_window_bits( hwnd, new_rects, valid_rects );
+            }
         }
 
         user_driver->pWindowPosChanged( hwnd, insert_after, swp_flags, is_fullscreen, &monitor_rects, get_driver_window_surface( new_surface, monitor_dpi ) );
@@ -5170,7 +5175,7 @@ void destroy_thread_windows(void)
         if (win->tid != GetCurrentThreadId()) continue;
         free_dce( win->dce, win->obj.handle );
         set_user_handle_ptr( handle, NULL );
-        win->obj.handle = free_list;
+        win->userdata = (UINT_PTR)free_list;
         free_list = win;
     }
     if (free_list)
@@ -5186,9 +5191,10 @@ void destroy_thread_windows(void)
 
     while ((win = free_list))
     {
-        free_list = win->obj.handle;
+        free_list = (WND *)win->userdata;
         TRACE( "destroying %p\n", win );
 
+        user_driver->pDestroyWindow( win->obj.handle );
         vulkan_detach_surfaces( &win->vulkan_surfaces );
 
         if ((win->dwStyle & (WS_CHILD | WS_POPUP)) != WS_CHILD && win->wIDmenu)

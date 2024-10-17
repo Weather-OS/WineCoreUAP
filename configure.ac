@@ -1173,6 +1173,7 @@ then
     fi
 fi
 
+WINE_EXTLIB_FLAGS(CAPSTONE, capstone, capstone, "-I\$(top_srcdir)/libs/capstone/include")
 WINE_EXTLIB_FLAGS(FAUDIO, faudio, "faudio mfplat mfreadwrite mfuuid propsys", "-I\$(top_srcdir)/libs/faudio/include")
 WINE_EXTLIB_FLAGS(FLUIDSYNTH, fluidsynth, "fluidsynth", "-I\$(top_srcdir)/libs/fluidsynth/include")
 WINE_EXTLIB_FLAGS(GSM, gsm, gsm, "-I\$(top_srcdir)/libs/gsm/inc")
@@ -1189,7 +1190,6 @@ WINE_EXTLIB_FLAGS(XML2, xml2, xml2, "-I\$(top_srcdir)/libs/xml2/include -DLIBXML
 WINE_EXTLIB_FLAGS(APPX, appx, appx, "-I\$(top_srcdir)/libs/appx/include")
 WINE_EXTLIB_FLAGS(XSLT, xslt, xslt, "-I\$(top_srcdir)/libs/xslt/libxslt -I\$(top_srcdir)/libs/xslt -DLIBXSLT_STATIC")
 WINE_EXTLIB_FLAGS(ZLIB, zlib, z, "-I\$(top_srcdir)/libs/zlib -DFAR= -DZ_SOLO")
-WINE_EXTLIB_FLAGS(ZYDIS, zydis, zydis, "-I\$(top_srcdir)/libs/zydis/include")
 
 dnl **** Check for pthread ****
 
@@ -1643,7 +1643,7 @@ dnl **** Check for FFmpeg ****
 if test "x$with_ffmpeg" != "xno";
 then
     WINE_PACKAGE_FLAGS(FFMPEG,[libavutil libavformat libavcodec],,,,
-        [AC_CHECK_HEADERS([libavutil/avutil.h libavformat/avformat.h libavcodec/avcodec.h])
+        [AC_CHECK_HEADERS([libavutil/avutil.h libavformat/avformat.h libavcodec/avcodec.h libavcodec/bsf.h])
          if test "$ac_cv_header_libavutil_avutil_h" = "yes" -a "$ac_cv_header_libavformat_avformat_h" = "yes" -a "$ac_cv_header_libavcodec_avcodec_h" = "yes"
          then
             AC_CHECK_LIB(avutil,av_log_set_callback,
@@ -3401,6 +3401,7 @@ WINE_CONFIG_MAKEFILE(dlls/xtajit64)
 WINE_CONFIG_MAKEFILE(fonts)
 WINE_CONFIG_MAKEFILE(include)
 WINE_CONFIG_MAKEFILE(libs/adsiid)
+WINE_CONFIG_MAKEFILE(libs/capstone)
 WINE_CONFIG_MAKEFILE(libs/appx)
 WINE_CONFIG_MAKEFILE(libs/dmoguids)
 WINE_CONFIG_MAKEFILE(libs/dxerr8)
@@ -3427,7 +3428,6 @@ WINE_CONFIG_MAKEFILE(libs/wmcodecdspuuid)
 WINE_CONFIG_MAKEFILE(libs/xml2)
 WINE_CONFIG_MAKEFILE(libs/xslt)
 WINE_CONFIG_MAKEFILE(libs/zlib)
-WINE_CONFIG_MAKEFILE(libs/zydis)
 WINE_CONFIG_MAKEFILE(loader)
 WINE_CONFIG_MAKEFILE(nls)
 WINE_CONFIG_MAKEFILE(po)

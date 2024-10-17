@@ -31,9 +31,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(xdnd);
 
-static struct format_entry *xdnd_formats, *xdnd_formats_end;
 static POINT XDNDxy = { 0, 0 };
-static IDataObject XDNDDataObject;
+static IDataObject *xdnd_data_object;
 static BOOL XDNDAccepted = FALSE;
 static DWORD XDNDDropEffect = DROPEFFECT_NONE;
 /* the last window the mouse was over */
@@ -41,8 +40,6 @@ static HWND XDNDLastTargetWnd;
 /* might be an ancestor of XDNDLastTargetWnd */
 static HWND XDNDLastDropTargetWnd;
 
-static BOOL X11DRV_XDND_HasHDROP(void);
-static HRESULT X11DRV_XDND_SendDropFiles(HWND hwnd);
 static void X11DRV_XDND_FreeDragDropOp(void);
 
 static CRITICAL_SECTION xdnd_cs;
@@ -60,6 +57,387 @@ static struct format_entry *next_format( struct format_entry *entry )
     return (struct format_entry *)&entry->data[(entry->size + 7) & ~7];
 }
 
+static const char *debugstr_format( int format )
+{
+    WCHAR buffer[256];
+    switch (format)
+    {
+#define X(x) case x: return #x;
+    X(CF_TEXT)
+    X(CF_BITMAP)
+    X(CF_METAFILEPICT)
+    X(CF_SYLK)
+    X(CF_DIF)
+    X(CF_TIFF)
+    X(CF_OEMTEXT)
+    X(CF_DIB)
+    X(CF_PALETTE)
+    X(CF_PENDATA)
+    X(CF_RIFF)
+    X(CF_WAVE)
+    X(CF_UNICODETEXT)
+    X(CF_ENHMETAFILE)
+    X(CF_HDROP)
+    X(CF_LOCALE)
+    X(CF_DIBV5)
+#undef X
+    }
+
+    if (CF_PRIVATEFIRST <= format && format <= CF_PRIVATELAST) return "some private object";
+    if (CF_GDIOBJFIRST <= format && format <= CF_GDIOBJLAST) return "some GDI object";
+    GetClipboardFormatNameW( format, buffer, sizeof(buffer) );
+    return debugstr_w( buffer );
+}
+
+struct data_object
+{
+    IDataObject IDataObject_iface;
+    LONG refcount;
+
+    struct format_entry *entries_end;
+    struct format_entry entries[];
+};
+
+static struct data_object *data_object_from_IDataObject( IDataObject *iface )
+{
+    return CONTAINING_RECORD( iface, struct data_object, IDataObject_iface );
+}
+
+struct format_iterator
+{
+    IEnumFORMATETC IEnumFORMATETC_iface;
+    LONG refcount;
+
+    struct format_entry *entry;
+    IDataObject *object;
+};
+
+static inline struct format_iterator *format_iterator_from_IEnumFORMATETC( IEnumFORMATETC *iface )
+{
+    return CONTAINING_RECORD(iface, struct format_iterator, IEnumFORMATETC_iface);
+}
+
+static HRESULT WINAPI format_iterator_QueryInterface( IEnumFORMATETC *iface, REFIID iid, void **obj )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+
+    TRACE( "iterator %p, iid %s, obj %p\n", iterator, debugstr_guid(iid), obj );
+
+    if (IsEqualIID( iid, &IID_IUnknown ) || IsEqualIID( iid, &IID_IEnumFORMATETC ))
+    {
+        IEnumFORMATETC_AddRef( &iterator->IEnumFORMATETC_iface );
+        *obj = &iterator->IEnumFORMATETC_iface;
+        return S_OK;
+    }
+
+    *obj = NULL;
+    WARN( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid) );
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI format_iterator_AddRef( IEnumFORMATETC *iface )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    ULONG ref = InterlockedIncrement( &iterator->refcount );
+    TRACE( "iterator %p increasing refcount to %lu.\n", iterator, ref );
+    return ref;
+}
+
+static ULONG WINAPI format_iterator_Release(IEnumFORMATETC *iface)
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    ULONG ref = InterlockedDecrement( &iterator->refcount );
+
+    TRACE( "iterator %p increasing refcount to %lu.\n", iterator, ref );
+
+    if (!ref)
+    {
+        IDataObject_Release( iterator->object );
+        free( iterator );
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI format_iterator_Next( IEnumFORMATETC *iface, ULONG count, FORMATETC *formats, ULONG *ret )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    struct data_object *object = data_object_from_IDataObject( iterator->object );
+    struct format_entry *entry;
+    UINT i;
+
+    TRACE( "iterator %p, count %lu, formats %p, ret %p\n", iterator, count, formats, ret );
+
+    for (entry = iterator->entry, i = 0; entry < object->entries_end && i < count; entry = next_format( entry ), i++)
+    {
+        formats[i].cfFormat = entry->format;
+        formats[i].ptd = NULL;
+        formats[i].dwAspect = DVASPECT_CONTENT;
+        formats[i].lindex = -1;
+        formats[i].tymed = TYMED_HGLOBAL;
+    }
+
+    iterator->entry = entry;
+    if (ret) *ret = i;
+    return (i == count) ? S_OK : S_FALSE;
+}
+
+static HRESULT WINAPI format_iterator_Skip( IEnumFORMATETC *iface, ULONG count )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    struct data_object *object = data_object_from_IDataObject( iterator->object );
+    struct format_entry *entry;
+
+    TRACE( "iterator %p, count %lu\n", iterator, count );
+
+    for (entry = iterator->entry; entry < object->entries_end; entry = next_format( entry ))
+        if (!count--) break;
+
+    iterator->entry = entry;
+    return count ? S_FALSE : S_OK;
+}
+
+static HRESULT WINAPI format_iterator_Reset( IEnumFORMATETC *iface )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    struct data_object *object = data_object_from_IDataObject( iterator->object );
+
+    TRACE( "iterator %p\n", iterator );
+    iterator->entry = object->entries;
+    return S_OK;
+}
+
+static HRESULT format_iterator_create( IDataObject *object, IEnumFORMATETC **out );
+
+static HRESULT WINAPI format_iterator_Clone( IEnumFORMATETC *iface, IEnumFORMATETC **out )
+{
+    struct format_iterator *iterator = format_iterator_from_IEnumFORMATETC( iface );
+    TRACE( "iterator %p, out %p\n", iterator, out );
+    return format_iterator_create( iterator->object, out );
+}
+
+static const IEnumFORMATETCVtbl format_iterator_vtbl =
+{
+    format_iterator_QueryInterface,
+    format_iterator_AddRef,
+    format_iterator_Release,
+    format_iterator_Next,
+    format_iterator_Skip,
+    format_iterator_Reset,
+    format_iterator_Clone,
+};
+
+static HRESULT format_iterator_create( IDataObject *object, IEnumFORMATETC **out )
+{
+    struct format_iterator *iterator;
+
+    if (!(iterator = calloc( 1, sizeof(*iterator) ))) return E_OUTOFMEMORY;
+    iterator->IEnumFORMATETC_iface.lpVtbl = &format_iterator_vtbl;
+    iterator->refcount = 1;
+    IDataObject_AddRef( (iterator->object = object) );
+    iterator->entry = data_object_from_IDataObject(object)->entries;
+
+    *out = &iterator->IEnumFORMATETC_iface;
+    TRACE( "created object %p iterator %p\n", object, iterator );
+    return S_OK;
+}
+
+static HRESULT WINAPI data_object_QueryInterface( IDataObject *iface, REFIID iid, void **obj )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+
+    TRACE( "object %p, iid %s, obj %p\n", object, debugstr_guid(iid), obj );
+
+    if (IsEqualIID( iid, &IID_IUnknown ) || IsEqualIID( iid, &IID_IDataObject ))
+    {
+        IDataObject_AddRef( &object->IDataObject_iface );
+        *obj = &object->IDataObject_iface;
+        return S_OK;
+    }
+
+    *obj = NULL;
+    WARN( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid) );
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI data_object_AddRef( IDataObject *iface )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    ULONG ref = InterlockedIncrement( &object->refcount );
+    TRACE( "object %p increasing refcount to %lu.\n", object, ref );
+    return ref;
+}
+
+static ULONG WINAPI data_object_Release( IDataObject *iface )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    ULONG ref = InterlockedDecrement( &object->refcount );
+    TRACE( "object %p decreasing refcount to %lu.\n", object, ref );
+    if (!ref) free( object );
+    return ref;
+}
+
+static HRESULT WINAPI data_object_GetData( IDataObject *iface, FORMATETC *format, STGMEDIUM *medium )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    struct format_entry *iter;
+    HRESULT hr;
+
+    TRACE( "object %p, format %p (%s), medium %p\n", object, format, debugstr_format(format->cfFormat), medium );
+
+    if (FAILED(hr = IDataObject_QueryGetData( iface, format ))) return hr;
+
+    for (iter = object->entries; iter < object->entries_end; iter = next_format( iter ))
+    {
+        if (iter->format == format->cfFormat)
+        {
+            medium->tymed = TYMED_HGLOBAL;
+            medium->hGlobal = GlobalAlloc( GMEM_FIXED | GMEM_ZEROINIT, iter->size );
+            if (medium->hGlobal == NULL) return E_OUTOFMEMORY;
+            memcpy( GlobalLock( medium->hGlobal ), iter->data, iter->size );
+            GlobalUnlock( medium->hGlobal );
+            medium->pUnkForRelease = 0;
+            return S_OK;
+        }
+    }
+
+    return DATA_E_FORMATETC;
+}
+
+static HRESULT WINAPI data_object_GetDataHere( IDataObject *iface, FORMATETC *format, STGMEDIUM *medium )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, format %p, medium %p stub!\n", object, format, medium );
+    return DATA_E_FORMATETC;
+}
+
+static HRESULT WINAPI data_object_QueryGetData( IDataObject *iface, FORMATETC *format )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    struct format_entry *iter;
+
+    TRACE( "object %p, format %p (%s)\n", object, format, debugstr_format(format->cfFormat) );
+
+    if (format->tymed && !(format->tymed & TYMED_HGLOBAL))
+    {
+        FIXME("only HGLOBAL medium types supported right now\n");
+        return DV_E_TYMED;
+    }
+    /* Windows Explorer ignores .dwAspect and .lindex for CF_HDROP,
+     * and we have no way to implement them on XDnD anyway, so ignore them too.
+     */
+
+    for (iter = object->entries; iter < object->entries_end; iter = next_format( iter ))
+    {
+        if (iter->format == format->cfFormat)
+        {
+            TRACE("application found %s\n", debugstr_format(format->cfFormat));
+            return S_OK;
+        }
+    }
+    TRACE("application didn't find %s\n", debugstr_format(format->cfFormat));
+    return DV_E_FORMATETC;
+}
+
+static HRESULT WINAPI data_object_GetCanonicalFormatEtc( IDataObject *iface, FORMATETC *format, FORMATETC *out )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, format %p, out %p stub!\n", object, format, out );
+    out->ptd = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI data_object_SetData( IDataObject *iface, FORMATETC *format, STGMEDIUM *medium, BOOL release )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, format %p, medium %p, release %u stub!\n", object, format, medium, release );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI data_object_EnumFormatEtc( IDataObject *iface, DWORD direction, IEnumFORMATETC **out )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+
+    TRACE( "object %p, direction %lu, out %p\n", object, direction, out );
+
+    if (direction != DATADIR_GET)
+    {
+        FIXME("only the get direction is implemented\n");
+        return E_NOTIMPL;
+    }
+
+    return format_iterator_create( iface, out );
+}
+
+static HRESULT WINAPI data_object_DAdvise( IDataObject *iface, FORMATETC *format, DWORD flags,
+                                           IAdviseSink *sink, DWORD *connection )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, format %p, flags %#lx, sink %p, connection %p stub!\n",
+           object, format, flags, sink, connection );
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static HRESULT WINAPI data_object_DUnadvise( IDataObject *iface, DWORD connection )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, connection %lu stub!\n", object, connection );
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static HRESULT WINAPI data_object_EnumDAdvise( IDataObject *iface, IEnumSTATDATA **advise )
+{
+    struct data_object *object = data_object_from_IDataObject( iface );
+    FIXME( "object %p, advise %p stub!\n", object, advise );
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static IDataObjectVtbl data_object_vtbl =
+{
+    data_object_QueryInterface,
+    data_object_AddRef,
+    data_object_Release,
+    data_object_GetData,
+    data_object_GetDataHere,
+    data_object_QueryGetData,
+    data_object_GetCanonicalFormatEtc,
+    data_object_SetData,
+    data_object_EnumFormatEtc,
+    data_object_DAdvise,
+    data_object_DUnadvise,
+    data_object_EnumDAdvise,
+};
+
+static HRESULT data_object_create( UINT entries_size, const struct format_entry *entries, IDataObject **out )
+{
+    struct data_object *object;
+
+    if (!(object = calloc( 1, sizeof(*object) + entries_size ))) return E_OUTOFMEMORY;
+    object->IDataObject_iface.lpVtbl = &data_object_vtbl;
+    object->refcount = 1;
+
+    object->entries_end = (struct format_entry *)((char *)object->entries + entries_size);
+    memcpy( object->entries, entries, entries_size );
+    *out = &object->IDataObject_iface;
+
+    return S_OK;
+}
+
+static struct data_object *get_data_object( BOOL clear )
+{
+    IDataObject *iface;
+
+    EnterCriticalSection( &xdnd_cs );
+    if ((iface = xdnd_data_object))
+    {
+        if (clear) xdnd_data_object = NULL;
+        else IDataObject_AddRef( iface );
+    }
+    LeaveCriticalSection( &xdnd_cs );
+
+    if (!iface) return NULL;
+    return data_object_from_IDataObject( iface );
+}
 
 /* Based on functions in dlls/ole32/ole2.c */
 static HANDLE get_droptarget_local_handle(HWND hwnd)
@@ -173,8 +551,11 @@ NTSTATUS WINAPI x11drv_dnd_position_event( void *arg, ULONG size )
     IDropTarget *dropTarget = NULL;
     DWORD effect = params->effect;
     POINTL pointl = { .x = params->point.x, .y = params->point.y };
+    struct data_object *object;
     HWND targetWindow;
     HRESULT hr;
+
+    if (!(object = get_data_object( FALSE ))) return STATUS_INVALID_PARAMETER;
 
     XDNDxy = params->point;
     targetWindow = window_from_point_dnd( UlongToHandle( params->hwnd ), XDNDxy );
@@ -205,7 +586,7 @@ NTSTATUS WINAPI x11drv_dnd_position_event( void *arg, ULONG size )
         if (dropTarget)
         {
             DWORD effect_ignore = effect;
-            hr = IDropTarget_DragEnter(dropTarget, &XDNDDataObject,
+            hr = IDropTarget_DragEnter(dropTarget, &object->IDataObject_iface,
                                        MK_LBUTTON, pointl, &effect_ignore);
             if (hr == S_OK)
             {
@@ -240,8 +621,9 @@ NTSTATUS WINAPI x11drv_dnd_position_event( void *arg, ULONG size )
     else
     {
         /* fallback search for window able to accept these files. */
+        FORMATETC format = {.cfFormat = CF_HDROP};
 
-        if (window_accepting_files(targetWindow) && X11DRV_XDND_HasHDROP())
+        if (window_accepting_files(targetWindow) && SUCCEEDED(IDataObject_QueryGetData( &object->IDataObject_iface, &format )))
         {
             accept = 1;
             effect = DROPEFFECT_COPY;
@@ -249,6 +631,8 @@ NTSTATUS WINAPI x11drv_dnd_position_event( void *arg, ULONG size )
     }
 
     if (!accept) effect = DROPEFFECT_NONE;
+    IDataObject_Release( &object->IDataObject_iface );
+
     return NtCallbackReturn( &effect, sizeof(effect), STATUS_SUCCESS );
 }
 
@@ -259,7 +643,10 @@ NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
     IDropTarget *dropTarget;
     DWORD effect = XDNDDropEffect;
     int accept = 0; /* Assume we're not accepting */
+    struct data_object *object;
     BOOL drop_file = TRUE;
+
+    if (!(object = get_data_object( TRUE ))) return STATUS_INVALID_PARAMETER;
 
     /* Notify OLE of Drop */
     if (XDNDAccepted)
@@ -272,7 +659,7 @@ NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
 
             pointl.x = XDNDxy.x;
             pointl.y = XDNDxy.y;
-            hr = IDropTarget_Drop(dropTarget, &XDNDDataObject, MK_LBUTTON,
+            hr = IDropTarget_Drop(dropTarget, &object->IDataObject_iface, MK_LBUTTON,
                                   pointl, &effect);
             if (hr == S_OK)
             {
@@ -307,17 +694,27 @@ NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
     {
         /* Only send WM_DROPFILES if Drop didn't succeed or DROPEFFECT_NONE was set.
          * Doing both causes winamp to duplicate the dropped files (#29081) */
-
         HWND hwnd_drop = window_accepting_files(window_from_point_dnd( hwnd, XDNDxy ));
+        FORMATETC format = {.cfFormat = CF_HDROP};
+        STGMEDIUM medium;
 
-        if (hwnd_drop && X11DRV_XDND_HasHDROP())
+        if (hwnd_drop && SUCCEEDED(IDataObject_GetData( &object->IDataObject_iface, &format, &medium )))
         {
-            HRESULT hr = X11DRV_XDND_SendDropFiles(hwnd_drop);
-            if (SUCCEEDED(hr))
-            {
-                accept = 1;
-                effect = DROPEFFECT_COPY;
-            }
+            DROPFILES *drop = GlobalLock( medium.hGlobal );
+            void *files = (char *)drop + drop->pFiles;
+            RECT rect;
+
+            drop->pt.x = XDNDxy.x;
+            drop->pt.y = XDNDxy.y;
+            drop->fNC  = !ScreenToClient( hwnd, &drop->pt ) || !GetClientRect( hwnd, &rect ) || !PtInRect( &rect, drop->pt );
+
+            TRACE( "Sending WM_DROPFILES: hwnd %p, pt %s, fNC %u, files %p (%s)\n", hwnd,
+                   wine_dbgstr_point( &drop->pt), drop->fNC, files, debugstr_w(files) );
+            GlobalUnlock( medium.hGlobal );
+
+            PostMessageW( hwnd, WM_DROPFILES, (WPARAM)medium.hGlobal, 0 );
+            accept = 1;
+            effect = DROPEFFECT_COPY;
         }
     }
 
@@ -325,6 +722,8 @@ NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
           XDNDDropEffect, accept, effect, XDNDxy.x, XDNDxy.y);
 
     if (!accept) effect = DROPEFFECT_NONE;
+    IDataObject_Release( &object->IDataObject_iface );
+
     return NtCallbackReturn( &effect, sizeof(effect), STATUS_SUCCESS );
 }
 
@@ -336,6 +735,7 @@ NTSTATUS WINAPI x11drv_dnd_drop_event( void *args, ULONG size )
 NTSTATUS WINAPI x11drv_dnd_leave_event( void *params, ULONG size )
 {
     IDropTarget *dropTarget;
+    struct data_object *object;
 
     TRACE("DND Operation canceled\n");
 
@@ -352,6 +752,8 @@ NTSTATUS WINAPI x11drv_dnd_leave_event( void *params, ULONG size )
         }
     }
 
+    if ((object = get_data_object( TRUE ))) IDataObject_Release( &object->IDataObject_iface );
+
     X11DRV_XDND_FreeDragDropOp();
     return STATUS_SUCCESS;
 }
@@ -364,96 +766,20 @@ NTSTATUS WINAPI x11drv_dnd_enter_event( void *args, ULONG size )
 {
     UINT formats_size = size - offsetof(struct dnd_enter_event_params, entries);
     struct dnd_enter_event_params *params = args;
+    IDataObject *object, *previous;
+
     XDNDAccepted = FALSE;
     X11DRV_XDND_FreeDragDropOp(); /* Clear previously cached data */
 
-    if ((xdnd_formats = HeapAlloc( GetProcessHeap(), 0, formats_size )))
-    {
-        memcpy( xdnd_formats, params->entries, formats_size );
-        xdnd_formats_end = (struct format_entry *)((char *)xdnd_formats + formats_size);
-    }
+    if (FAILED(data_object_create( formats_size, params->entries, &object ))) return STATUS_NO_MEMORY;
+
+    EnterCriticalSection( &xdnd_cs );
+    previous = xdnd_data_object;
+    xdnd_data_object = object;
+    LeaveCriticalSection( &xdnd_cs );
+
+    if (previous) IDataObject_Release( previous );
     return STATUS_SUCCESS;
-}
-
-
-/**************************************************************************
- * X11DRV_XDND_HasHDROP
- */
-static BOOL X11DRV_XDND_HasHDROP(void)
-{
-    struct format_entry *iter;
-    BOOL found = FALSE;
-
-    EnterCriticalSection(&xdnd_cs);
-
-    /* Find CF_HDROP type if any */
-    for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter ))
-    {
-        if (iter->format == CF_HDROP)
-        {
-            found = TRUE;
-            break;
-        }
-    }
-
-    LeaveCriticalSection(&xdnd_cs);
-
-    return found;
-}
-
-/**************************************************************************
- * X11DRV_XDND_SendDropFiles
- */
-static HRESULT X11DRV_XDND_SendDropFiles(HWND hwnd)
-{
-    struct format_entry *iter;
-    HRESULT hr;
-    BOOL found = FALSE;
-
-    EnterCriticalSection(&xdnd_cs);
-
-    for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter ))
-    {
-         if (iter->format == CF_HDROP)
-         {
-             found = TRUE;
-             break;
-         }
-    }
-    if (found)
-    {
-        HGLOBAL dropHandle = GlobalAlloc(GMEM_FIXED, iter->size);
-        if (dropHandle)
-        {
-            RECT rect;
-            DROPFILES *lpDrop = GlobalLock(dropHandle);
-            memcpy(lpDrop, iter->data, iter->size);
-            lpDrop->pt.x = XDNDxy.x;
-            lpDrop->pt.y = XDNDxy.y;
-            lpDrop->fNC  = !(ScreenToClient(hwnd, &lpDrop->pt) &&
-                             GetClientRect(hwnd, &rect) &&
-                             PtInRect(&rect, lpDrop->pt));
-            TRACE("Sending WM_DROPFILES: hWnd=0x%p, fNC=%d, x=%ld, y=%ld, files=%p(%s)\n", hwnd,
-                    lpDrop->fNC, lpDrop->pt.x, lpDrop->pt.y, ((char*)lpDrop) + lpDrop->pFiles,
-                    debugstr_w((WCHAR*)(((char*)lpDrop) + lpDrop->pFiles)));
-            GlobalUnlock(dropHandle);
-            if (PostMessageW(hwnd, WM_DROPFILES, (WPARAM)dropHandle, 0))
-                hr = S_OK;
-            else
-            {
-                hr = HRESULT_FROM_WIN32(GetLastError());
-                GlobalFree(dropHandle);
-            }
-        }
-        else
-            hr = HRESULT_FROM_WIN32(GetLastError());
-    }
-    else
-        hr = E_FAIL;
-
-    LeaveCriticalSection(&xdnd_cs);
-
-    return hr;
 }
 
 
@@ -466,9 +792,6 @@ static void X11DRV_XDND_FreeDragDropOp(void)
 
     EnterCriticalSection(&xdnd_cs);
 
-    HeapFree( GetProcessHeap(), 0, xdnd_formats );
-    xdnd_formats = xdnd_formats_end = NULL;
-
     XDNDxy.x = XDNDxy.y = 0;
     XDNDLastTargetWnd = NULL;
     XDNDLastDropTargetWnd = NULL;
@@ -476,252 +799,6 @@ static void X11DRV_XDND_FreeDragDropOp(void)
 
     LeaveCriticalSection(&xdnd_cs);
 }
-
-
-/**************************************************************************
- * X11DRV_XDND_DescribeClipboardFormat
- */
-static void X11DRV_XDND_DescribeClipboardFormat(int cfFormat, char *buffer, int size)
-{
-#define D(x) case x: lstrcpynA(buffer, #x, size); return;
-    switch (cfFormat)
-    {
-        D(CF_TEXT)
-        D(CF_BITMAP)
-        D(CF_METAFILEPICT)
-        D(CF_SYLK)
-        D(CF_DIF)
-        D(CF_TIFF)
-        D(CF_OEMTEXT)
-        D(CF_DIB)
-        D(CF_PALETTE)
-        D(CF_PENDATA)
-        D(CF_RIFF)
-        D(CF_WAVE)
-        D(CF_UNICODETEXT)
-        D(CF_ENHMETAFILE)
-        D(CF_HDROP)
-        D(CF_LOCALE)
-        D(CF_DIBV5)
-    }
-#undef D
-
-    if (CF_PRIVATEFIRST <= cfFormat && cfFormat <= CF_PRIVATELAST)
-    {
-        lstrcpynA(buffer, "some private object", size);
-        return;
-    }
-    if (CF_GDIOBJFIRST <= cfFormat && cfFormat <= CF_GDIOBJLAST)
-    {
-        lstrcpynA(buffer, "some GDI object", size);
-        return;
-    }
-
-    GetClipboardFormatNameA(cfFormat, buffer, size);
-}
-
-
-/* The IDataObject singleton we feed to OLE follows */
-
-static HRESULT WINAPI XDNDDATAOBJECT_QueryInterface(IDataObject *dataObject,
-                                                    REFIID riid, void **ppvObject)
-{
-    TRACE("(%p, %s, %p)\n", dataObject, debugstr_guid(riid), ppvObject);
-    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IDataObject))
-    {
-        *ppvObject = dataObject;
-        IDataObject_AddRef(dataObject);
-        return S_OK;
-    }
-    *ppvObject = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI XDNDDATAOBJECT_AddRef(IDataObject *dataObject)
-{
-    TRACE("(%p)\n", dataObject);
-    return 2;
-}
-
-static ULONG WINAPI XDNDDATAOBJECT_Release(IDataObject *dataObject)
-{
-    TRACE("(%p)\n", dataObject);
-    return 1;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_GetData(IDataObject *dataObject,
-                                             FORMATETC *formatEtc,
-                                             STGMEDIUM *pMedium)
-{
-    HRESULT hr;
-    char formatDesc[1024];
-
-    TRACE("(%p, %p, %p)\n", dataObject, formatEtc, pMedium);
-    X11DRV_XDND_DescribeClipboardFormat(formatEtc->cfFormat,
-        formatDesc, sizeof(formatDesc));
-    TRACE("application is looking for %s\n", formatDesc);
-
-    hr = IDataObject_QueryGetData(dataObject, formatEtc);
-    if (SUCCEEDED(hr))
-    {
-        struct format_entry *iter;
-
-        for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter ))
-        {
-            if (iter->format == formatEtc->cfFormat)
-            {
-                pMedium->tymed = TYMED_HGLOBAL;
-                pMedium->hGlobal = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, iter->size);
-                if (pMedium->hGlobal == NULL)
-                    return E_OUTOFMEMORY;
-                memcpy(GlobalLock(pMedium->hGlobal), iter->data, iter->size);
-                GlobalUnlock(pMedium->hGlobal);
-                pMedium->pUnkForRelease = 0;
-                return S_OK;
-            }
-        }
-    }
-    return hr;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_GetDataHere(IDataObject *dataObject,
-                                                 FORMATETC *formatEtc,
-                                                 STGMEDIUM *pMedium)
-{
-    FIXME("(%p, %p, %p): stub\n", dataObject, formatEtc, pMedium);
-    return DATA_E_FORMATETC;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_QueryGetData(IDataObject *dataObject,
-                                                  FORMATETC *formatEtc)
-{
-    struct format_entry *iter;
-    char formatDesc[1024];
-
-    TRACE("(%p, %p={.tymed=0x%lx, .dwAspect=%ld, .cfFormat=%d}\n",
-        dataObject, formatEtc, formatEtc->tymed, formatEtc->dwAspect, formatEtc->cfFormat);
-    X11DRV_XDND_DescribeClipboardFormat(formatEtc->cfFormat, formatDesc, sizeof(formatDesc));
-
-    if (formatEtc->tymed && !(formatEtc->tymed & TYMED_HGLOBAL))
-    {
-        FIXME("only HGLOBAL medium types supported right now\n");
-        return DV_E_TYMED;
-    }
-    /* Windows Explorer ignores .dwAspect and .lindex for CF_HDROP,
-     * and we have no way to implement them on XDnD anyway, so ignore them too.
-     */
-
-    for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter ))
-    {
-        if (iter->format == formatEtc->cfFormat)
-        {
-            TRACE("application found %s\n", formatDesc);
-            return S_OK;
-        }
-    }
-    TRACE("application didn't find %s\n", formatDesc);
-    return DV_E_FORMATETC;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_GetCanonicalFormatEtc(IDataObject *dataObject,
-                                                           FORMATETC *formatEtc,
-                                                           FORMATETC *formatEtcOut)
-{
-    FIXME("(%p, %p, %p): stub\n", dataObject, formatEtc, formatEtcOut);
-    formatEtcOut->ptd = NULL;
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_SetData(IDataObject *dataObject,
-                                             FORMATETC *formatEtc,
-                                             STGMEDIUM *pMedium, BOOL fRelease)
-{
-    FIXME("(%p, %p, %p, %s): stub\n", dataObject, formatEtc,
-        pMedium, fRelease?"TRUE":"FALSE");
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_EnumFormatEtc(IDataObject *dataObject,
-                                                   DWORD dwDirection,
-                                                   IEnumFORMATETC **ppEnumFormatEtc)
-{
-    struct format_entry *iter;
-    DWORD count = 0;
-    FORMATETC *formats;
-
-    TRACE("(%p, %lu, %p)\n", dataObject, dwDirection, ppEnumFormatEtc);
-
-    if (dwDirection != DATADIR_GET)
-    {
-        FIXME("only the get direction is implemented\n");
-        return E_NOTIMPL;
-    }
-
-    for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter )) count++;
-
-    formats = HeapAlloc(GetProcessHeap(), 0, count * sizeof(FORMATETC));
-    if (formats)
-    {
-        DWORD i = 0;
-        HRESULT hr;
-        for (iter = xdnd_formats; iter < xdnd_formats_end; iter = next_format( iter ))
-        {
-            formats[i].cfFormat = iter->format;
-            formats[i].ptd = NULL;
-            formats[i].dwAspect = DVASPECT_CONTENT;
-            formats[i].lindex = -1;
-            formats[i].tymed = TYMED_HGLOBAL;
-            i++;
-        }
-        hr = SHCreateStdEnumFmtEtc(count, formats, ppEnumFormatEtc);
-        HeapFree(GetProcessHeap(), 0, formats);
-        return hr;
-    }
-    else
-        return E_OUTOFMEMORY;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_DAdvise(IDataObject *dataObject,
-                                             FORMATETC *formatEtc, DWORD advf,
-                                             IAdviseSink *adviseSink,
-                                             DWORD *pdwConnection)
-{
-    FIXME("(%p, %p, %lu, %p, %p): stub\n", dataObject, formatEtc, advf,
-        adviseSink, pdwConnection);
-    return OLE_E_ADVISENOTSUPPORTED;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_DUnadvise(IDataObject *dataObject,
-                                               DWORD dwConnection)
-{
-    FIXME("(%p, %lu): stub\n", dataObject, dwConnection);
-    return OLE_E_ADVISENOTSUPPORTED;
-}
-
-static HRESULT WINAPI XDNDDATAOBJECT_EnumDAdvise(IDataObject *dataObject,
-                                                 IEnumSTATDATA **pEnumAdvise)
-{
-    FIXME("(%p, %p): stub\n", dataObject, pEnumAdvise);
-    return OLE_E_ADVISENOTSUPPORTED;
-}
-
-static IDataObjectVtbl xdndDataObjectVtbl =
-{
-    XDNDDATAOBJECT_QueryInterface,
-    XDNDDATAOBJECT_AddRef,
-    XDNDDATAOBJECT_Release,
-    XDNDDATAOBJECT_GetData,
-    XDNDDATAOBJECT_GetDataHere,
-    XDNDDATAOBJECT_QueryGetData,
-    XDNDDATAOBJECT_GetCanonicalFormatEtc,
-    XDNDDATAOBJECT_SetData,
-    XDNDDATAOBJECT_EnumFormatEtc,
-    XDNDDATAOBJECT_DAdvise,
-    XDNDDATAOBJECT_DUnadvise,
-    XDNDDATAOBJECT_EnumDAdvise
-};
-
-static IDataObject XDNDDataObject = { &xdndDataObjectVtbl };
 
 NTSTATUS WINAPI x11drv_dnd_post_drop( void *args, ULONG size )
 {

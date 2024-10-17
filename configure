@@ -713,8 +713,6 @@ X_CFLAGS
 CPP
 XMKMF
 PTHREAD_LIBS
-ZYDIS_PE_LIBS
-ZYDIS_PE_CFLAGS
 ZLIB_PE_LIBS
 ZLIB_PE_CFLAGS
 XSLT_PE_LIBS
@@ -747,6 +745,8 @@ FLUIDSYNTH_PE_LIBS
 FLUIDSYNTH_PE_CFLAGS
 FAUDIO_PE_LIBS
 FAUDIO_PE_CFLAGS
+CAPSTONE_PE_LIBS
+CAPSTONE_PE_CFLAGS
 MINGW_PKG_CONFIG
 PE_ARCHS
 WINELOADER_DEPENDS
@@ -1613,6 +1613,7 @@ enable_xtajit64
 enable_fonts
 enable_include
 enable_adsiid
+enable_capstone
 enable_appx
 enable_dmoguids
 enable_dxerr8
@@ -1639,7 +1640,6 @@ enable_wmcodecdspuuid
 enable_xml2
 enable_xslt
 enable_zlib
-enable_zydis
 enable_loader
 enable_nls
 enable_po
@@ -1774,6 +1774,8 @@ CXXFLAGS
 CCC
 OBJC
 OBJCFLAGS
+CAPSTONE_PE_CFLAGS
+CAPSTONE_PE_LIBS
 FAUDIO_PE_CFLAGS
 FAUDIO_PE_LIBS
 FLUIDSYNTH_PE_CFLAGS
@@ -1806,8 +1808,6 @@ XSLT_PE_CFLAGS
 XSLT_PE_LIBS
 ZLIB_PE_CFLAGS
 ZLIB_PE_LIBS
-ZYDIS_PE_CFLAGS
-ZYDIS_PE_LIBS
 XMKMF
 CPP
 WAYLAND_CLIENT_CFLAGS
@@ -2570,6 +2570,11 @@ Some influential environment variables:
   CXXFLAGS    C++ compiler flags
   OBJC        Objective C compiler command
   OBJCFLAGS   Objective C compiler flags
+  CAPSTONE_PE_CFLAGS
+              C compiler flags for the PE capstone, overriding the bundled
+              version
+  CAPSTONE_PE_LIBS
+              Linker flags for the PE capstone, overriding the bundled version
   FAUDIO_PE_CFLAGS
               C compiler flags for the PE faudio, overriding the bundled
               version
@@ -2637,11 +2642,6 @@ Some influential environment variables:
               C compiler flags for the PE zlib, overriding the bundled version
   ZLIB_PE_LIBS
               Linker flags for the PE zlib, overriding the bundled version
-  ZYDIS_PE_CFLAGS
-              C compiler flags for the PE zydis, overriding the bundled
-              version
-  ZYDIS_PE_LIBS
-              Linker flags for the PE zydis, overriding the bundled version
   XMKMF       Path to xmkmf, Makefile generator for X Window System
   CPP         C preprocessor
   WAYLAND_CLIENT_CFLAGS
@@ -13658,6 +13658,23 @@ CPPFLAGS=$ac_save_CPPFLAGS
     fi
 fi
 
+if ${CAPSTONE_PE_LIBS:+false} :
+then :
+  CAPSTONE_PE_LIBS=capstone
+   if ${CAPSTONE_PE_CFLAGS:+false} :
+then :
+  CAPSTONE_PE_CFLAGS="-I\$(top_srcdir)/libs/capstone/include"
+else case e in #(
+  e) enable_capstone=no ;;
+esac
+fi
+else case e in #(
+  e) enable_capstone=no ;;
+esac
+fi
+printf "%s\n" "$as_me:${as_lineno-$LINENO}: capstone cflags: $CAPSTONE_PE_CFLAGS" >&5
+printf "%s\n" "$as_me:${as_lineno-$LINENO}: capstone libs: $CAPSTONE_PE_LIBS" >&5
+
 if ${FAUDIO_PE_LIBS:+false} :
 then :
   FAUDIO_PE_LIBS="faudio mfplat mfreadwrite mfuuid propsys"
@@ -13929,23 +13946,6 @@ esac
 fi
 printf "%s\n" "$as_me:${as_lineno-$LINENO}: zlib cflags: $ZLIB_PE_CFLAGS" >&5
 printf "%s\n" "$as_me:${as_lineno-$LINENO}: zlib libs: $ZLIB_PE_LIBS" >&5
-
-if ${ZYDIS_PE_LIBS:+false} :
-then :
-  ZYDIS_PE_LIBS=zydis
-   if ${ZYDIS_PE_CFLAGS:+false} :
-then :
-  ZYDIS_PE_CFLAGS="-I\$(top_srcdir)/libs/zydis/include"
-else case e in #(
-  e) enable_zydis=no ;;
-esac
-fi
-else case e in #(
-  e) enable_zydis=no ;;
-esac
-fi
-printf "%s\n" "$as_me:${as_lineno-$LINENO}: zydis cflags: $ZYDIS_PE_CFLAGS" >&5
-printf "%s\n" "$as_me:${as_lineno-$LINENO}: zydis libs: $ZYDIS_PE_LIBS" >&5
 
 
 
@@ -17833,6 +17833,12 @@ ac_fn_c_check_header_compile "$LINENO" "libavcodec/avcodec.h" "ac_cv_header_liba
 if test "x$ac_cv_header_libavcodec_avcodec_h" = xyes
 then :
   printf "%s\n" "#define HAVE_LIBAVCODEC_AVCODEC_H 1" >>confdefs.h
+
+fi
+ac_fn_c_check_header_compile "$LINENO" "libavcodec/bsf.h" "ac_cv_header_libavcodec_bsf_h" "$ac_includes_default"
+if test "x$ac_cv_header_libavcodec_bsf_h" = xyes
+then :
+  printf "%s\n" "#define HAVE_LIBAVCODEC_BSF_H 1" >>confdefs.h
 
 fi
 
@@ -22947,7 +22953,6 @@ wine_fn_config_makefile dlls/xtajit64 enable_xtajit64
 wine_fn_config_makefile fonts enable_fonts
 wine_fn_config_makefile include enable_include
 wine_fn_config_makefile libs/adsiid enable_adsiid
-wine_fn_config_makefile libs/appx enable_appx
 wine_fn_config_makefile libs/dmoguids enable_dmoguids
 wine_fn_config_makefile libs/dxerr8 enable_dxerr8
 wine_fn_config_makefile libs/dxerr9 enable_dxerr9
@@ -22973,7 +22978,6 @@ wine_fn_config_makefile libs/wmcodecdspuuid enable_wmcodecdspuuid
 wine_fn_config_makefile libs/xml2 enable_xml2
 wine_fn_config_makefile libs/xslt enable_xslt
 wine_fn_config_makefile libs/zlib enable_zlib
-wine_fn_config_makefile libs/zydis enable_zydis
 wine_fn_config_makefile loader enable_loader
 wine_fn_config_makefile nls enable_nls
 wine_fn_config_makefile po enable_po
@@ -24095,6 +24099,8 @@ ac_ct_OBJC = $ac_ct_OBJC
 WINELOADER_DEPENDS = $WINELOADER_DEPENDS
 PE_ARCHS = $PE_ARCHS
 MINGW_PKG_CONFIG = $MINGW_PKG_CONFIG
+CAPSTONE_PE_CFLAGS = $CAPSTONE_PE_CFLAGS
+CAPSTONE_PE_LIBS = $CAPSTONE_PE_LIBS
 FAUDIO_PE_CFLAGS = $FAUDIO_PE_CFLAGS
 FAUDIO_PE_LIBS = $FAUDIO_PE_LIBS
 FLUIDSYNTH_PE_CFLAGS = $FLUIDSYNTH_PE_CFLAGS
@@ -24127,8 +24133,6 @@ XSLT_PE_CFLAGS = $XSLT_PE_CFLAGS
 XSLT_PE_LIBS = $XSLT_PE_LIBS
 ZLIB_PE_CFLAGS = $ZLIB_PE_CFLAGS
 ZLIB_PE_LIBS = $ZLIB_PE_LIBS
-ZYDIS_PE_CFLAGS = $ZYDIS_PE_CFLAGS
-ZYDIS_PE_LIBS = $ZYDIS_PE_LIBS
 PTHREAD_LIBS = $PTHREAD_LIBS
 XMKMF = $XMKMF
 CPP = $CPP
