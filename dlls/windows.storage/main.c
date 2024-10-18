@@ -46,6 +46,9 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_AppDataPaths ))
         IActivationFactory_QueryInterface( app_data_paths_factory, &IID_IActivationFactory, (void **)factory );
 
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_UserDataPaths ))
+        IActivationFactory_QueryInterface( user_data_paths_factory, &IID_IActivationFactory, (void **)factory );
+
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_StorageFolder ))
         IActivationFactory_QueryInterface( storage_folder_factory, &IID_IActivationFactory, (void **)factory );
 

@@ -57,6 +57,7 @@ struct vector_iids
 };
 
 extern IActivationFactory *app_data_paths_factory;
+extern IActivationFactory *user_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
 extern IActivationFactory *storage_file_factory;
 extern IActivationFactory *known_folders_factory;
