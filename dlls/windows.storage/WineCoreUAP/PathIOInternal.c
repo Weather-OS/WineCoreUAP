@@ -559,6 +559,7 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI path_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IBufferByteAccess *bufferByteAccess;
     HRESULT status = S_OK;
     HSTRING filePath;
     BYTE *contents;
@@ -568,7 +569,8 @@ HRESULT WINAPI path_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
     struct path_io_write_buffer_options *write_buffer_options = (struct path_io_write_buffer_options *)param;
 
     //Parameters
-    contents = impl_from_IBuffer( write_buffer_options->buffer )->Buffer;
+    IBuffer_QueryInterface( write_buffer_options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
+    IBufferByteAccess_get_Buffer( bufferByteAccess, &contents );
     WindowsDuplicateString( write_buffer_options->absolutePath, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    

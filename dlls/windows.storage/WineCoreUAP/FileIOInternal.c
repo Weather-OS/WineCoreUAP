@@ -23,6 +23,7 @@
 
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HANDLE fileHandle;
@@ -34,16 +35,12 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
     ULONG i;
     BOOL readResult;
 
-    struct storage_item *fileItem;
-
     struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
 
-    //Parameters
-    struct storage_file *file = impl_from_IStorageFile( read_text_options->file );
+    //Parameters    
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
-
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
+    IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -145,6 +142,7 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
 
 HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING contents;
@@ -156,17 +154,13 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
     BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
     BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
 
-    struct storage_item *fileItem;
-
     struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
 
-    //Parameters
-    struct storage_file *file = impl_from_IStorageFile( write_text_options->file );
+    //Parameters    
     UnicodeEncoding unicodeEncoding = write_text_options->encoding;
+    IStorageFile_QueryInterface( write_text_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
-
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
@@ -259,6 +253,7 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
 
 HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING contents;
@@ -270,17 +265,13 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
     BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
     BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
 
-    struct storage_item *fileItem;
-
     struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
 
-    //Parameters
-    struct storage_file *file = impl_from_IStorageFile( write_text_options->file );
+    //Parameters   
     UnicodeEncoding unicodeEncoding = write_text_options->encoding;
+    IStorageFile_QueryInterface( write_text_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
-
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), FILE_APPEND_DATA, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );    
 
@@ -360,6 +351,7 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HANDLE fileHandle;
@@ -374,21 +366,18 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     BOOL readResult;
     size_t INITIAL_BUFFER_SIZE = 100;
 
-    struct storage_item *fileItem;
     struct hstring_vector *HSTRINGVector;
 
     struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
 
-    //Parameters
-    struct storage_file *file = impl_from_IStorageFile( read_text_options->file );
+    //Parameters    
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
+    IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
 
     if (!(HSTRINGVector = calloc( 1, sizeof(*HSTRINGVector) ))) return E_OUTOFMEMORY;
     HSTRINGVector->IVector_HSTRING_iface.lpVtbl = &hstring_vector_vtbl;
     HSTRINGVector->size = 0;
-
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -528,6 +517,7 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
 HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     IBuffer *buffer;
     HRESULT status = S_OK;
     HSTRING filePath;
@@ -537,13 +527,9 @@ HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     DWORD bytesRead;
     BOOL readResult;
 
-    struct storage_item *fileItem;
-
     //Parameters
-    struct storage_file *file = impl_from_IStorageFile( (IStorageFile *)param );
-
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
+    IStorageFile_QueryInterface( (IStorageFile *)param, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -583,22 +569,22 @@ HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IBufferByteAccess *bufferByteAccess = NULL;
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     BYTE *contents;
     HANDLE fileHandle;
     DWORD bytesWritten;
 
-    struct storage_item *fileItem;
-
     struct file_io_write_buffer_options *write_buffer_options = (struct file_io_write_buffer_options *)param;
 
     //Parameters
-    struct storage_file *file = impl_from_IStorageFile( write_buffer_options->file );    
-    contents = impl_from_IBuffer( write_buffer_options->buffer )->Buffer;
+    IStorageFile_QueryInterface( write_buffer_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
 
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
+    IBuffer_QueryInterface( write_buffer_options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
+    IBufferByteAccess_get_Buffer( bufferByteAccess, &contents );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
@@ -629,22 +615,20 @@ HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
 
 HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     BYTE *contents;
     HANDLE fileHandle;
     DWORD bytesWritten;
 
-    struct storage_item *fileItem;
-
     struct file_io_write_bytes_options *write_bytes_options = (struct file_io_write_bytes_options *)param;
 
     //Parameters
-    struct storage_file *file = impl_from_IStorageFile( write_bytes_options->file );    
-    contents = write_bytes_options->buffer;
+    IStorageFile_QueryInterface( write_bytes_options->file, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &filePath );
 
-    fileItem = impl_from_IStorageItem( &file->IStorageItem_iface );
-    WindowsDuplicateString( fileItem->Path, &filePath );
+    contents = write_bytes_options->buffer;
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
