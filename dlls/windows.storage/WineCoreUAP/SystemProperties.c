@@ -29,6 +29,14 @@ struct system_properties
 {
     IActivationFactory IActivationFactory_iface;
     ISystemProperties ISystemProperties_iface;
+    ISystemAudioProperties ISystemAudioProperties_iface;
+    ISystemGPSProperties ISystemGPSProperties_iface;
+    ISystemMediaProperties ISystemMediaProperties_iface;
+    ISystemMusicProperties ISystemMusicProperties_iface;
+    ISystemPhotoProperties ISystemPhotoProperties_iface;
+    ISystemVideoProperties ISystemVideoProperties_iface;
+    ISystemImageProperties ISystemImageProperties_iface;
+
     LONG ref;
 };
 
@@ -119,6 +127,308 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
+DEFINE_IINSPECTABLE( system_audio_properties, ISystemAudioProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_audio_properties_get_EncodingBitrate( ISystemAudioProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Audio.EncodingBitrate";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemAudioPropertiesVtbl system_audio_properties_vtbl =
+{
+    system_audio_properties_QueryInterface,
+    system_audio_properties_AddRef,
+    system_audio_properties_Release,
+    /* IInspectable methods */
+    system_audio_properties_GetIids,
+    system_audio_properties_GetRuntimeClassName,
+    system_audio_properties_GetTrustLevel,
+    /* ISystemAudioProperties methods */
+    system_audio_properties_get_EncodingBitrate
+};
+
+DEFINE_IINSPECTABLE( system_gps_properties, ISystemGPSProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_gps_properties_get_LatitudeDecimal( ISystemGPSProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.GPS.LatitudeDecimal";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_gps_properties_get_LongitudeDecimal( ISystemGPSProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.GPS.LongitudeDecimal";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+
+static const struct ISystemGPSPropertiesVtbl system_gps_properties_vtbl =
+{
+    system_gps_properties_QueryInterface,
+    system_gps_properties_AddRef,
+    system_gps_properties_Release,
+    /* IInspectable methods */
+    system_gps_properties_GetIids,
+    system_gps_properties_GetRuntimeClassName,
+    system_gps_properties_GetTrustLevel,
+    /* ISystemGPSProperties methods */
+    system_gps_properties_get_LatitudeDecimal,
+    system_gps_properties_get_LongitudeDecimal
+};
+
+DEFINE_IINSPECTABLE( system_media_properties, ISystemMediaProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_media_properties_get_Duration( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.Duration";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_media_properties_get_Producer( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.Producer";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_media_properties_get_Publisher( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.Publisher";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_media_properties_get_SubTitle( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.SubTitle";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_media_properties_get_Writer( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.Writer";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_media_properties_get_Year( ISystemMediaProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Media.Year";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemMediaPropertiesVtbl system_media_properties_vtbl =
+{
+    system_media_properties_QueryInterface,
+    system_media_properties_AddRef,
+    system_media_properties_Release,
+    /* IInspectable methods */
+    system_media_properties_GetIids,
+    system_media_properties_GetRuntimeClassName,
+    system_media_properties_GetTrustLevel,
+    /* ISystemMediaProperties methods */
+    system_media_properties_get_Duration,
+    system_media_properties_get_Producer,
+    system_media_properties_get_Publisher,
+    system_media_properties_get_SubTitle,
+    system_media_properties_get_Writer,
+    system_media_properties_get_Year
+};
+
+DEFINE_IINSPECTABLE( system_music_properties, ISystemMusicProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_music_properties_get_AlbumArtist( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.AlbumArtist";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_AlbumTitle( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.AlbumTitle";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_Artist( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.Artist";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_Composer( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.Composer";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_Conductor( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.Conductor";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_DisplayArtist( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.DisplayArtist";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_Genre( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.Genre";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_music_properties_get_TrackNumber( ISystemMusicProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Music.TrackNumber";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemMusicPropertiesVtbl system_music_properties_vtbl =
+{
+    system_music_properties_QueryInterface,
+    system_music_properties_AddRef,
+    system_music_properties_Release,
+    /* IInspectable methods */
+    system_music_properties_GetIids,
+    system_music_properties_GetRuntimeClassName,
+    system_music_properties_GetTrustLevel,
+    /* ISystemMusicProperties methods */
+    system_music_properties_get_AlbumArtist,
+    system_music_properties_get_AlbumTitle,
+    system_music_properties_get_Artist,
+    system_music_properties_get_Composer,
+    system_music_properties_get_Conductor,
+    system_music_properties_get_DisplayArtist,
+    system_music_properties_get_Genre,
+    system_music_properties_get_TrackNumber
+};
+
+DEFINE_IINSPECTABLE( system_photo_properties, ISystemPhotoProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_photo_properties_get_CameraManufacturer( ISystemPhotoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Photo.CameraManufacturer";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_photo_properties_get_CameraModel( ISystemPhotoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Photo.CameraModel";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_photo_properties_get_DateTaken( ISystemPhotoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Photo.DateTaken";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_photo_properties_get_Orientation( ISystemPhotoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Photo.Orientation";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_photo_properties_get_PeopleNames( ISystemPhotoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Photo.PeopleNames";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemPhotoPropertiesVtbl system_photo_properties_vtbl =
+{
+    system_photo_properties_QueryInterface,
+    system_photo_properties_AddRef,
+    system_photo_properties_Release,
+    /* IInspectable methods */
+    system_photo_properties_GetIids,
+    system_photo_properties_GetRuntimeClassName,
+    system_photo_properties_GetTrustLevel,
+    /* ISystemPhotoProperties methods */
+    system_photo_properties_get_CameraManufacturer,
+    system_photo_properties_get_CameraModel,
+    system_photo_properties_get_DateTaken,
+    system_photo_properties_get_Orientation,
+    system_photo_properties_get_PeopleNames
+};
+
+DEFINE_IINSPECTABLE( system_video_properties, ISystemVideoProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_video_properties_get_Director( ISystemVideoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Video.Director";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_video_properties_get_FrameHeight( ISystemVideoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Video.FrameHeight";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_video_properties_get_FrameWidth( ISystemVideoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Video.FrameWidth";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_video_properties_get_Orientation( ISystemVideoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Video.Orientation";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_video_properties_get_TotalBitrate( ISystemVideoProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Video.TotalBitrate";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemVideoPropertiesVtbl system_video_properties_vtbl =
+{
+    system_video_properties_QueryInterface,
+    system_video_properties_AddRef,
+    system_video_properties_Release,
+    /* IInspectable methods */
+    system_video_properties_GetIids,
+    system_video_properties_GetRuntimeClassName,
+    system_video_properties_GetTrustLevel,
+    /* ISystemVideoProperties methods */
+    system_video_properties_get_Director,
+    system_video_properties_get_FrameHeight,
+    system_video_properties_get_FrameWidth,
+    system_video_properties_get_Orientation,
+    system_video_properties_get_TotalBitrate
+};
+
+DEFINE_IINSPECTABLE( system_image_properties, ISystemImageProperties, struct system_properties, IActivationFactory_iface )
+
+static HRESULT WINAPI system_image_properties_get_HorizontalSize( ISystemImageProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Image.HorizontalSize";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static HRESULT WINAPI system_image_properties_get_VerticalSize( ISystemImageProperties *iface, HSTRING *value )
+{
+    LPCWSTR propertyStr = L"System.Image.VerticalSize";
+    return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
+}
+
+static const struct ISystemImagePropertiesVtbl system_image_properties_vtbl =
+{
+    system_image_properties_QueryInterface,
+    system_image_properties_AddRef,
+    system_image_properties_Release,
+    /* IInspectable methods */
+    system_image_properties_GetIids,
+    system_image_properties_GetRuntimeClassName,
+    system_image_properties_GetTrustLevel,
+    /* ISystemImageProperties methods */
+    system_image_properties_get_HorizontalSize,
+    system_image_properties_get_VerticalSize
+};
+
 DEFINE_IINSPECTABLE( system_properties, ISystemProperties, struct system_properties, IActivationFactory_iface )
 
 static HRESULT WINAPI system_properties_get_Author( ISystemProperties *iface, HSTRING *value )
@@ -159,44 +469,51 @@ static HRESULT WINAPI system_properties_get_Title( ISystemProperties *iface, HST
 
 static HRESULT WINAPI system_properties_get_Audio( ISystemProperties *iface, ISystemAudioProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemAudioProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_GPS( ISystemProperties *iface, ISystemGPSProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemGPSProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_Media( ISystemProperties *iface, ISystemMediaProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemMediaProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_Music( ISystemProperties *iface, ISystemMusicProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemMusicProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_Photo( ISystemProperties *iface, ISystemPhotoProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemPhotoProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_Video( ISystemProperties *iface, ISystemVideoProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemVideoProperties_iface;
+    return S_OK;
 }
 
 static HRESULT WINAPI system_properties_get_Image( ISystemProperties *iface, ISystemImageProperties **value )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct system_properties *impl = impl_from_ISystemProperties( iface );
+    *value = &impl->ISystemImageProperties_iface;
+    return S_OK;
 }
 
 static const struct ISystemPropertiesVtbl system_properties_vtbl =
@@ -228,6 +545,13 @@ static struct system_properties system_properties =
 {
     {&factory_vtbl},
     {&system_properties_vtbl},
+    {&system_audio_properties_vtbl},
+    {&system_gps_properties_vtbl},
+    {&system_media_properties_vtbl},
+    {&system_music_properties_vtbl},
+    {&system_photo_properties_vtbl},
+    {&system_video_properties_vtbl},
+    {&system_image_properties_vtbl},
     1,
 };
 
