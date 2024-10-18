@@ -25,6 +25,8 @@ SOURCES = \
 	WineCoreUAP/StorageFileInternal.c \
 	WineCoreUAP/StorageProvider.c \
 	WineCoreUAP/SystemProperties.c \
+	WineCoreUAP/SystemDataPaths.c \
+	WineCoreUAP/SystemInternalPaths.c \
 	\
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	\

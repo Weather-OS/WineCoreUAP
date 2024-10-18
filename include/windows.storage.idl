@@ -84,6 +84,8 @@ namespace Windows.Storage {
     interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
     interface ISystemAudioProperties;
+    interface ISystemDataPaths;
+    interface ISystemDataPathsStatics;
     interface ISystemGPSProperties;
     interface ISystemImageProperties;
     interface ISystemMediaProperties;
@@ -109,6 +111,7 @@ namespace Windows.Storage {
     runtimeclass StorageStreamTransaction;
     runtimeclass StreamedFileDataRequest;
     runtimeclass SystemAudioProperties;
+    runtimeclass SystemDataPaths;
     runtimeclass SystemGPSProperties;
     runtimeclass SystemImageProperties;
     runtimeclass SystemMediaProperties;
@@ -890,6 +893,41 @@ namespace Windows.Storage {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        exclusiveto(Windows.Storage.SystemDataPaths),
+        uuid(E32ABF70-D8FA-45EC-A942-D2E26FB60BA5)
+    ]
+    interface ISystemDataPaths : IInspectable
+    {
+        [propget] HRESULT Fonts([out] [retval] HSTRING* value);
+        [propget] HRESULT ProgramData([out] [retval] HSTRING* value);
+        [propget] HRESULT Public([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicDesktop([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicDocuments([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicDownloads([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicMusic([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicPictures([out] [retval] HSTRING* value);
+        [propget] HRESULT PublicVideos([out] [retval] HSTRING* value);
+        [propget] HRESULT System([out] [retval] HSTRING* value);
+        [propget] HRESULT SystemHost([out] [retval] HSTRING* value);
+        [propget] HRESULT SystemX86([out] [retval] HSTRING* value);
+        [propget] HRESULT SystemX64([out] [retval] HSTRING* value);
+        [propget] HRESULT SystemArm([out] [retval] HSTRING* value);
+        [propget] HRESULT UserProfiles([out] [retval] HSTRING* value);
+        [propget] HRESULT Windows([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        exclusiveto(Windows.Storage.SystemDataPaths),
+        uuid(E0F96FD0-9920-4BCA-B379-F96FDF7CAAD8)
+    ]
+    interface ISystemDataPathsStatics : IInspectable
+    {
+        HRESULT GetDefault([out] [retval] Windows.Storage.SystemDataPaths** result);
+    }
+
+    [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Storage.SystemGPSProperties),
         uuid(C0F46EB4-C174-481A-BC25-921986F6A6F3)
@@ -1202,6 +1240,17 @@ namespace Windows.Storage {
     runtimeclass SystemAudioProperties
     {
         [default] interface Windows.Storage.ISystemAudioProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.ISystemDataPathsStatics, Windows.Foundation.UniversalApiContract, 5.0),
+        threading(both)
+    ]
+    runtimeclass SystemDataPaths
+    {
+        [default] interface Windows.Storage.ISystemDataPaths;
     }
 
     [
