@@ -413,9 +413,8 @@ static HRESULT WINAPI storage_item_properties_with_provider_GetTrustLevel( IStor
 
 static HRESULT WINAPI storage_item_properties_with_provider_get_Provider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
 {
-    struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
-    *value = &impl->Provider;
-    return S_OK;    
+    storage_item_properties_with_provider_GetProvider( iface, value );
+    return S_OK;
 }
 
 struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl =

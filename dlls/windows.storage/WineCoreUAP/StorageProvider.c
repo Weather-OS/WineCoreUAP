@@ -176,7 +176,7 @@ static HRESULT WINAPI storage_provider_GetTrustLevel( IStorageProvider *iface, T
 }
 
 static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
-{
+{    
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
     WindowsDuplicateString( impl->DisplayName, value );
     return S_OK;
@@ -198,17 +198,17 @@ const struct IStorageProviderVtbl storage_provider_vtbl =
     storage_provider_GetIids,
     storage_provider_GetRuntimeClassName,
     storage_provider_GetTrustLevel,
-    /* IStorageProvider methods */
-    storage_provider_get_DisplayName,
-    storage_provider_get_Id
+    /* IStorageProvider methods */    
+    storage_provider_get_Id,
+    storage_provider_get_DisplayName
 };
 
 static struct storage_provider storage_provider =
-{
+{    
     {&factory_vtbl},    
-    {&storage_provider_vtbl},
+    {&storage_provider_vtbl},    
     NULL,
-    NULL,    
+    NULL,     
     1,    
 };
 

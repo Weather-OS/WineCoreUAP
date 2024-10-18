@@ -1179,7 +1179,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     IStorageItemPropertiesWithProvider_get_Provider( storageItemPropertiesWithProvider, &storageProvider );
 
-    IStorageProvider_get_DisplayName( storageProvider, &itemId );
+    IStorageProvider_get_Id( storageProvider, &itemId );
     ok( !wcscmp( WindowsGetStringRawBuffer( itemId, NULL), L"Local" ), "Error: itemId is not Local. itemId %s\n", HStringToLPCSTR(itemId));
     
     /**

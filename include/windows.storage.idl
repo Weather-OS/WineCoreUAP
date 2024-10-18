@@ -83,6 +83,8 @@ namespace Windows.Storage {
     interface IStorageProvider;
     interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
+    interface IUserDataPaths;
+    interface IUserDataPathsStatics;
 
     runtimeclass AppDataPaths;
     runtimeclass ApplicationData;
@@ -98,6 +100,7 @@ namespace Windows.Storage {
     runtimeclass StorageProvider;
     runtimeclass StorageStreamTransaction;
     runtimeclass StreamedFileDataRequest;
+    runtimeclass UserDataPaths;
 
     declare {
         interface Windows.Foundation.Collections.IKeyValuePair<HSTRING, Windows.Storage.ApplicationDataContainer *>;
@@ -862,6 +865,44 @@ namespace Windows.Storage {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 5.0),
+        exclusiveto(Windows.Storage.UserDataPaths),
+        uuid(F9C53912-ABC4-46FF-8A2B-DC9D7FA6E52F)
+    ]
+    interface IUserDataPaths : IInspectable
+    {
+        [propget] HRESULT CameraRoll([out] [retval] HSTRING* value);
+        [propget] HRESULT Cookies([out] [retval] HSTRING* value);
+        [propget] HRESULT Desktop([out] [retval] HSTRING* value);
+        [propget] HRESULT Documents([out] [retval] HSTRING* value);
+        [propget] HRESULT Downloads([out] [retval] HSTRING* value);
+        [propget] HRESULT Favorites([out] [retval] HSTRING* value);
+        [propget] HRESULT History([out] [retval] HSTRING* value);
+        [propget] HRESULT InternetCache([out] [retval] HSTRING* value);
+        [propget] HRESULT LocalAppData([out] [retval] HSTRING* value);
+        [propget] HRESULT LocalAppDataLow([out] [retval] HSTRING* value);
+        [propget] HRESULT Music([out] [retval] HSTRING* value);
+        [propget] HRESULT Pictures([out] [retval] HSTRING* value);
+        [propget] HRESULT Profile([out] [retval] HSTRING* value);
+        [propget] HRESULT Recent([out] [retval] HSTRING* value);
+        [propget] HRESULT RoamingAppData([out] [retval] HSTRING* value);
+        [propget] HRESULT SavedPictures([out] [retval] HSTRING* value);
+        [propget] HRESULT Screenshots([out] [retval] HSTRING* value);
+        [propget] HRESULT Templates([out] [retval] HSTRING* value);
+        [propget] HRESULT Videos([out] [retval] HSTRING* value);
+    }
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        exclusiveto(Windows.Storage.UserDataPaths),
+        uuid(01B29DEF-E062-48A1-8B0C-F2C7A9CA56C0)
+    ]
+    interface IUserDataPathsStatics : IInspectable
+    {
+        HRESULT GetForUser([in] Windows.System.User* user, [out] [retval] Windows.Storage.UserDataPaths** result);
+        HRESULT GetDefault([out] [retval] Windows.Storage.UserDataPaths** result);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
         marshaling_behavior(agile),
         static(Windows.Storage.IAppDataPathsStatics, Windows.Foundation.UniversalApiContract, 5.0),
         threading(both)
@@ -1022,5 +1063,16 @@ namespace Windows.Storage {
         [default] interface Windows.Storage.Streams.IOutputStream;
         interface Windows.Foundation.IClosable;
         interface Windows.Storage.IStreamedFileDataRequest;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.IUserDataPathsStatics, Windows.Foundation.UniversalApiContract, 5.0),
+        threading(both)
+    ]
+    runtimeclass UserDataPaths
+    {
+        [default] interface Windows.Storage.IUserDataPaths;
     }
 }

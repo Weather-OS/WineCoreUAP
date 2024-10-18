@@ -65,9 +65,8 @@ struct storage_item_properties
     HSTRING DisplayType;
     HSTRING DisplayName;
     HSTRING FolderRelativeId;
-    IStorageProvider Provider;
 
-    LONG ref;
+    LONG ref;    
 };
 
 /**
@@ -82,11 +81,13 @@ struct storage_item_rename_options
 
 struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
 struct storage_item_properties *impl_from_IStorageItemProperties( IStorageItemProperties *iface );
+struct storage_item_properties *impl_from_IStorageItemPropertiesWithProvider( IStorageItemPropertiesWithProvider *iface );
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
 HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type );
 HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value );
 
 #endif
