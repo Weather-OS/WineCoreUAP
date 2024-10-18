@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.UserDataPaths  Implementation
+/* WinRT Windows.Storage.UserDataPaths Implementation
  *
  * Written by Weather
  *

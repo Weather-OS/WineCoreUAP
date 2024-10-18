@@ -83,6 +83,14 @@ namespace Windows.Storage {
     interface IStorageProvider;
     interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
+    interface ISystemAudioProperties;
+    interface ISystemGPSProperties;
+    interface ISystemImageProperties;
+    interface ISystemMediaProperties;
+    interface ISystemMusicProperties;
+    interface ISystemPhotoProperties;
+    interface ISystemProperties;
+    interface ISystemVideoProperties;
     interface IUserDataPaths;
     interface IUserDataPathsStatics;
 
@@ -100,6 +108,14 @@ namespace Windows.Storage {
     runtimeclass StorageProvider;
     runtimeclass StorageStreamTransaction;
     runtimeclass StreamedFileDataRequest;
+    runtimeclass SystemAudioProperties;
+    runtimeclass SystemGPSProperties;
+    runtimeclass SystemImageProperties;
+    runtimeclass SystemMediaProperties;
+    runtimeclass SystemMusicProperties;
+    runtimeclass SystemPhotoProperties;
+    runtimeclass SystemProperties;
+    runtimeclass SystemVideoProperties;
     runtimeclass UserDataPaths;
 
     declare {
@@ -864,6 +880,120 @@ namespace Windows.Storage {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemAudioProperties),
+        uuid(3F8F38B7-308C-47E1-924D-8645348E5DB7)
+    ]
+    interface ISystemAudioProperties : IInspectable
+    {
+        [propget] HRESULT EncodingBitrate([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemGPSProperties),
+        uuid(C0F46EB4-C174-481A-BC25-921986F6A6F3)
+    ]
+    interface ISystemGPSProperties : IInspectable
+    {
+        [propget] HRESULT LatitudeDecimal([out] [retval] HSTRING* value);
+        [propget] HRESULT LongitudeDecimal([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemImageProperties),
+        uuid(011B2E30-8B39-4308-BEA1-E8AA61E47826)
+    ]
+    interface ISystemImageProperties : IInspectable
+    {
+        [propget] HRESULT HorizontalSize([out] [retval] HSTRING* value);
+        [propget] HRESULT VerticalSize([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemMediaProperties),
+        uuid(A42B3316-8415-40DC-8C44-98361D235430)
+    ]
+    interface ISystemMediaProperties : IInspectable
+    {
+        [propget] HRESULT Duration([out] [retval] HSTRING* value);
+        [propget] HRESULT Producer([out] [retval] HSTRING* value);
+        [propget] HRESULT Publisher([out] [retval] HSTRING* value);
+        [propget] HRESULT SubTitle([out] [retval] HSTRING* value);
+        [propget] HRESULT Writer([out] [retval] HSTRING* value);
+        [propget] HRESULT Year([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemMusicProperties),
+        uuid(B47988D5-67AF-4BC3-8D39-5B89022026A1)
+    ]
+    interface ISystemMusicProperties : IInspectable
+    {
+        [propget] HRESULT AlbumArtist([out] [retval] HSTRING* value);
+        [propget] HRESULT AlbumTitle([out] [retval] HSTRING* value);
+        [propget] HRESULT Artist([out] [retval] HSTRING* value);
+        [propget] HRESULT Composer([out] [retval] HSTRING* value);
+        [propget] HRESULT Conductor([out] [retval] HSTRING* value);
+        [propget] HRESULT DisplayArtist([out] [retval] HSTRING* value);
+        [propget] HRESULT Genre([out] [retval] HSTRING* value);
+        [propget] HRESULT TrackNumber([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemPhotoProperties),
+        uuid(4734FC3D-AB21-4424-B735-F4353A56C8FC)
+    ]
+    interface ISystemPhotoProperties : IInspectable
+    {
+        [propget] HRESULT CameraManufacturer([out] [retval] HSTRING* value);
+        [propget] HRESULT CameraModel([out] [retval] HSTRING* value);
+        [propget] HRESULT DateTaken([out] [retval] HSTRING* value);
+        [propget] HRESULT Orientation([out] [retval] HSTRING* value);
+        [propget] HRESULT PeopleNames([out] [retval] HSTRING* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemProperties),
+        uuid(917A71C1-85F3-4DD1-B001-A50BFD21C8D2)
+    ]
+    interface ISystemProperties : IInspectable
+    {
+        [propget] HRESULT Author([out] [retval] HSTRING* value);
+        [propget] HRESULT Comment([out] [retval] HSTRING* value);
+        [propget] HRESULT ItemNameDisplay([out] [retval] HSTRING* value);
+        [propget] HRESULT Keywords([out] [retval] HSTRING* value);
+        [propget] HRESULT Rating([out] [retval] HSTRING* value);
+        [propget] HRESULT Title([out] [retval] HSTRING* value);
+        [propget] HRESULT Audio([out] [retval] Windows.Storage.SystemAudioProperties** value);
+        [propget] HRESULT GPS([out] [retval] Windows.Storage.SystemGPSProperties** value);
+        [propget] HRESULT Media([out] [retval] Windows.Storage.SystemMediaProperties** value);
+        [propget] HRESULT Music([out] [retval] Windows.Storage.SystemMusicProperties** value);
+        [propget] HRESULT Photo([out] [retval] Windows.Storage.SystemPhotoProperties** value);
+        [propget] HRESULT Video([out] [retval] Windows.Storage.SystemVideoProperties** value);
+        [propget] HRESULT Image([out] [retval] Windows.Storage.SystemImageProperties** value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.SystemVideoProperties),
+        uuid(2040F715-67F8-4322-9B80-4FA9FEFB83E8)
+    ]
+    interface ISystemVideoProperties : IInspectable
+    {
+        [propget] HRESULT Director([out] [retval] HSTRING* value);
+        [propget] HRESULT FrameHeight([out] [retval] HSTRING* value);
+        [propget] HRESULT FrameWidth([out] [retval] HSTRING* value);
+        [propget] HRESULT Orientation([out] [retval] HSTRING* value);
+        [propget] HRESULT TotalBitrate([out] [retval] HSTRING* value);
+    }
+
+    [
         contract(Windows.Foundation.UniversalApiContract, 5.0),
         exclusiveto(Windows.Storage.UserDataPaths),
         uuid(F9C53912-ABC4-46FF-8A2B-DC9D7FA6E52F)
@@ -1063,6 +1193,78 @@ namespace Windows.Storage {
         [default] interface Windows.Storage.Streams.IOutputStream;
         interface Windows.Foundation.IClosable;
         interface Windows.Storage.IStreamedFileDataRequest;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemAudioProperties
+    {
+        [default] interface Windows.Storage.ISystemAudioProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemGPSProperties
+    {
+        [default] interface Windows.Storage.ISystemGPSProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemImageProperties
+    {
+        [default] interface Windows.Storage.ISystemImageProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemMediaProperties
+    {
+        [default] interface Windows.Storage.ISystemMediaProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemMusicProperties
+    {
+        [default] interface Windows.Storage.ISystemMusicProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemPhotoProperties
+    {
+        [default] interface Windows.Storage.ISystemPhotoProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.ISystemProperties, Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    runtimeclass SystemProperties
+    {
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass SystemVideoProperties
+    {
+        [default] interface Windows.Storage.ISystemVideoProperties;
     }
 
     [

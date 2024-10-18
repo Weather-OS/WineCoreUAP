@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.UserDataPaths Implementation
+/* WinRT Windows.Storage.AppDataPaths Implementation
  *
  * Written by Weather
  *
@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef USER_INTERNAL_PATHS_H
-#define USER_INTERNAL_PATHS_H
+#ifndef SYSTEM_PROPERTIES_INTERNAL_H
+#define SYSTEM_PROPERTIES_INTERNAL_H
 
 #include <appx.h>
 #include <windows.h>
@@ -29,7 +29,5 @@
 #include "../private.h"
 
 #include "wine/debug.h"
-
-HRESULT WINAPI user_data_paths_GetKnownFolder( IUserDataPaths *iface, const char * FOLDERID, HSTRING *value );
 
 #endif

@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.AppDataPaths Internal Implementation
+/* WinRT Windows.Storage.UserDataPaths Internal Implementation
  *
  * Written by Weather
  *
