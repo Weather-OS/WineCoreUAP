@@ -191,10 +191,6 @@ static HRESULT WINAPI app_data_paths_GetTrustLevel( IAppDataPaths *iface, TrustL
 /**
  * COM Oriented, WinRT Implementation: winrt::Windows::Storage::AppDataPaths
  * 
- * We're assuimg the user already used GetDefault();
- * 
- * TODO: Need to fix FOLDERID's for a fully conformant implementation.
- * 
  * ISSUES: This assumes AppxManifest.xml is present.
 */
 

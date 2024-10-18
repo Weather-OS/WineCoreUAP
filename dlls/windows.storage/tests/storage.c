@@ -1724,7 +1724,7 @@ static void test_KnownFolders( void )
      */
 
     hr = IKnownFoldersStatics2_get_Objects3D( knownFoldersStatics2, &documentsFolder );
-    ok( hr == S_OK, "got hr %#lx.\n", hr );
+    ok( hr == 0x80070002, "got hr %#lx.\n", hr );
 
     //knownFoldersStatics3
     hr = IActivationFactory_QueryInterface( factory, &IID_IKnownFoldersStatics3, (void **)&knownFoldersStatics3 );

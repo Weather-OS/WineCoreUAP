@@ -23,6 +23,12 @@
 
 #include "KnownFoldersInternal.h"
 
+#include <initguid.h>
+#include <knownfolders.h>
+
+#include <shlobj.h>
+#include <shlwapi.h>
+
 HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HSTRING *value ) 
 {    
     HRESULT status = S_OK;
@@ -33,20 +39,16 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     BOOLEAN homeGroupAllowed = TRUE;
     BOOLEAN removableDevicesAllowed = FALSE;
     BOOLEAN mediaServerAllowed = FALSE;
-    WCHAR username[256];
-    WCHAR path[MAX_PATH] = L"C:\\users\\";
+    PWSTR path;
     WCHAR manifestPath[MAX_PATH];
-    DWORD username_len = sizeof(username);
 
     struct appx_package package;
+
+    path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
     GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
     PathRemoveFileSpecW(manifestPath);
     PathAppendW(manifestPath, L"AppxManifest.xml");
-
-    if (!GetUserNameW(username, &username_len)) {
-        return E_UNEXPECTED;
-    }
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
@@ -78,7 +80,6 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
         }
     }
 
-    PathAppendW(path, username);
 
     if ( SUCCEEDED( status ) )
     {
@@ -88,28 +89,28 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendW( path, L"Music" );
+                    status = SHGetKnownFolderPath(&FOLDERID_Music, 0, NULL, &path);
                 break;
 
             case KnownFolderId_PicturesLibrary:
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendW( path, L"Pictures" );
+                    status = SHGetKnownFolderPath(&FOLDERID_Pictures, 0, NULL, &path);
                 break;
             
             case KnownFolderId_VideosLibrary:
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendW( path, L"Videos" );
+                    status = SHGetKnownFolderPath(&FOLDERID_Videos, 0, NULL, &path);
                 break;
 
             case KnownFolderId_DocumentsLibrary:
                 if ( !documentsLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendW( path, L"Documents" );
+                    status = SHGetKnownFolderPath(&FOLDERID_Documents, 0, NULL, &path);
                 break;
 
             case KnownFolderId_RemovableDevices:
@@ -123,7 +124,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !homeGroupAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = E_NOTIMPL;
+                    status = SHGetKnownFolderPath(&FOLDERID_HomeGroup, 0, NULL, &path);
                 break;
 
             case KnownFolderId_MediaServerDevices:
@@ -134,7 +135,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 break;
 
             case KnownFolderId_Objects3D:
-                PathAppendW( path, L"Objects3D" );
+                status = SHGetKnownFolderPath(&FOLDERID_Objects3D, 0, NULL, &path);
                 CreateDirectoryW( path, NULL );
                 break;
 
@@ -142,10 +143,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                {
-                    PathAppendW( path, L"Videos" );
-                    PathAppendW( path, L"Captures" );
-                }
+                    status = SHGetKnownFolderPath(&FOLDERID_AppCaptures, 0, NULL, &path);
                 break;
 
             case KnownFolderId_RecordedCalls:
@@ -156,40 +154,32 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                {
-                    PathAppendW( path, L"Pictures" );
-                    PathAppendW( path, L"Camera Roll" );
-                }
+                    status = SHGetKnownFolderPath(&FOLDERID_CameraRoll, 0, NULL, &path);
                 break;
 
             case KnownFolderId_Playlists:
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    PathAppendW( path, L"Music" );
-                    PathAppendW( path, L"Playlists" );
-                    CreateDirectoryW( path, NULL );
+                    status = SHGetKnownFolderPath(&FOLDERID_Playlists, 0, NULL, &path);
                 break;
 
             case KnownFolderId_SavedPictures:
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                {
-                    PathAppendW( path, L"Pictures" );
-                    PathAppendW( path, L"Saved Pictures" );
-                }
+                    status = SHGetKnownFolderPath(&FOLDERID_SavedPictures, 0, NULL, &path);
                 break;
 
             case KnownFolderId_DownloadsFolder:
-                PathAppendW( path, L"Downloads" );
+                status = SHGetKnownFolderPath(&FOLDERID_Downloads, 0, NULL, &path);
                 break;
 
             default:
                 status = E_NOTIMPL;
         }
     }
-    
+
     if ( SUCCEEDED( status ) )
     {
         status = WindowsCreateString( path, wcslen( path ), value );

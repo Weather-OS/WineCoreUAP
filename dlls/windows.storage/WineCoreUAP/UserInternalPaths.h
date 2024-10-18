@@ -23,11 +23,12 @@
 #define USER_INTERNAL_PATHS_H
 
 #include <appx.h>
-#include <shlwapi.h>
+#include <windows.h>
 
-#include "../private.h"
-#include "wine/debug.h"
 #include "util.h"
+#include "../private.h"
+
+#include "wine/debug.h"
 
 HRESULT WINAPI user_data_paths_GetKnownFolder( IUserDataPaths *iface, const char * FOLDERID, HSTRING *value );
 

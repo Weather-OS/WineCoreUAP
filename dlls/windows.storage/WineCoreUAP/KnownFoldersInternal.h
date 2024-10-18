@@ -30,7 +30,6 @@
 #include "StorageFolderInternal.h"
 
 #include <appx.h>
-#include <shlwapi.h>
 
 #define MAX_BUFFER 1024
 

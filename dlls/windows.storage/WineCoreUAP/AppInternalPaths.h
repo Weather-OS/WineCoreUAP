@@ -23,7 +23,6 @@
 #define APP_INTERNAL_PATHS_H
 
 #include <appx.h>
-#include <shlwapi.h>
 
 #include "../private.h"
 #include "wine/debug.h"

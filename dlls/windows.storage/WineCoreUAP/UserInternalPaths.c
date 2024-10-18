@@ -21,56 +21,62 @@
 
 #include "UserInternalPaths.h"
 
+#include <initguid.h>
+#include <knownfolders.h>
+
+#include <shlobj.h>
+#include <shlwapi.h>
+
 HRESULT WINAPI user_data_paths_GetKnownFolder( IUserDataPaths *iface, const char * FOLDERID, HSTRING *value ) 
 {
     //This only returns the path. No permissions system is required.
-    WCHAR path[MAX_PATH] = L"C:\\users\\";
-    WCHAR username[256];
-    DWORD username_len = sizeof(username);
+    HRESULT status = S_OK;
+    PWSTR path;
 
-    if (!GetUserNameW(username, &username_len)) {
-        return E_UNEXPECTED;
-    }
-
-    PathAppendW(path, username);
+    path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
     if (!strcmp(FOLDERID, "cameraroll")) {
-        PathAppendW(path, L"Pictures");
+        status = SHGetKnownFolderPath(&FOLDERID_CameraRoll, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "cookies")) {
-        PathAppendW(path, L"Cookies"); //Doesn't exist...
+        status = SHGetKnownFolderPath(&FOLDERID_Cookies, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "desktop")) {
-        PathAppendW(path, L"Desktop");
+        status = SHGetKnownFolderPath(&FOLDERID_Desktop, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "documents")) {
-        PathAppendW(path, L"Documents");
+        status = SHGetKnownFolderPath(&FOLDERID_Documents, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "favorites")) {
-        PathAppendW(path, L"Favorites");
+        status = SHGetKnownFolderPath(&FOLDERID_Favorites, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "history")) {
-        PathAppendW(path, L"INetHistory");
+        status = SHGetKnownFolderPath(&FOLDERID_History, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "internetcache")) {
-        PathAppendW(path, L"INetCache");
+        status = SHGetKnownFolderPath(&FOLDERID_InternetCache, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "localappdata")) {
-        PathAppendW(path, L"AppData\\Local");
+        status = SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "localappdatalow")) {
-        PathAppendW(path, L"AppData\\LocalLow");
+        status = SHGetKnownFolderPath(&FOLDERID_LocalAppDataLow, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "music")) {
-        PathAppendW(path, L"Music");
+        status = SHGetKnownFolderPath(&FOLDERID_Music, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "pictures")) {
-        PathAppendW(path, L"Pictures");
+        status = SHGetKnownFolderPath(&FOLDERID_Pictures, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "profile")) {
-        PathAppendW(path, L"");
+        status = SHGetKnownFolderPath(&FOLDERID_Profile, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "recent")) {
-        PathAppendW(path, L"Recent");
+        status = SHGetKnownFolderPath(&FOLDERID_Recent, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "roamingappdata")) {
-        PathAppendW(path, L"AppData\\Roaming");
+        status = SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "savedpictures")) {
-        PathAppendW(path, L"Pictures");
+        status = SHGetKnownFolderPath(&FOLDERID_SavedPictures, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "screenshots")) {
-        PathAppendW(path, L"Pictures\\Screenshots");
+        status = SHGetKnownFolderPath(&FOLDERID_Screenshots, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "templates")) {
-        PathAppendW(path, L"Templates");
+        status = SHGetKnownFolderPath(&FOLDERID_Templates, 0, NULL, &path);
     } else if (!strcmp(FOLDERID, "videos")) {
-        PathAppendW(path, L"Videos");
+        status = SHGetKnownFolderPath(&FOLDERID_Videos, 0, NULL, &path);
+    } else {
+        status = E_NOTIMPL;
     }
+
+    if (FAILED(status))
+        return status;
 
     if (WindowsCreateString( path, wcslen(path), value ) != S_OK) {
         return E_UNEXPECTED;
