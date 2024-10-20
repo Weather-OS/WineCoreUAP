@@ -42,8 +42,10 @@ namespace Windows.Storage {
     typedef enum FileAccessMode FileAccessMode;
     typedef enum FileAttributes FileAttributes;
     typedef enum KnownFolderId KnownFolderId;
+    typedef enum KnownLibraryId KnownLibraryId;
     typedef enum KnownFoldersAccessStatus KnownFoldersAccessStatus;
     typedef enum NameCollisionOption NameCollisionOption;
+    typedef enum StorageLibraryChangeType StorageLibraryChangeType;
     typedef enum StorageDeleteOption StorageDeleteOption;
     typedef enum StorageItemTypes StorageItemTypes;
     typedef enum StreamedFileFailureMode StreamedFileFailureMode;
@@ -81,6 +83,19 @@ namespace Windows.Storage {
     interface IStorageItem2;
     interface IStorageItemProperties;
     interface IStorageItemPropertiesWithProvider;
+    interface IStorageLibrary;
+    interface IStorageLibrary2;
+    interface IStorageLibrary3;
+    interface IStorageLibraryChange;
+    interface IStorageLibraryChangeReader;
+    interface IStorageLibraryChangeReader2;
+    interface IStorageLibraryChangeTracker;
+    interface IStorageLibraryChangeTracker2;
+    interface IStorageLibraryChangeTrackerOptions;
+    interface IStorageLibraryLastChangeId;
+    interface IStorageLibraryLastChangeIdStatics;
+    interface IStorageLibraryStatics;
+    interface IStorageLibraryStatics2;
     interface IStorageProvider;
     interface IStorageStreamTransaction;
     interface IStreamedFileDataRequest;
@@ -107,6 +122,12 @@ namespace Windows.Storage {
     runtimeclass SetVersionDeferral;
     runtimeclass SetVersionRequest;
     runtimeclass StorageFolder;
+    runtimeclass StorageLibrary;
+    runtimeclass StorageLibraryChange;
+    runtimeclass StorageLibraryChangeReader;
+    runtimeclass StorageLibraryChangeTracker;
+    runtimeclass StorageLibraryChangeTrackerOptions;
+    runtimeclass StorageLibraryLastChangeId;
     runtimeclass StorageFile;
     runtimeclass StorageProvider;
     runtimeclass StorageStreamTransaction;
@@ -130,6 +151,8 @@ namespace Windows.Storage {
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.IStorageItem *>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile *>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *>;
+        interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageLibraryChange*>;
+        interface Windows.Foundation.Collections.IObservableVector<Windows.Storage.StorageFolder*>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.IStorageItem *> *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile *> *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *> *>;
@@ -139,6 +162,8 @@ namespace Windows.Storage {
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.StorageFile *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.StorageFolder *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.StorageStreamTransaction *>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.StorageLibrary*>;
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageLibraryChange*>*>;
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVectorView<Windows.Storage.IStorageItem *> *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile *> *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *> *>;
@@ -147,8 +172,13 @@ namespace Windows.Storage {
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.IStorageItem *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFile *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder *>;
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageLibrary*>;
+        interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageLibraryChange*>*>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.StorageStreamTransaction *>;
         interface Windows.Foundation.TypedEventHandler<Windows.Storage.ApplicationData *, IInspectable *>;
+        interface Windows.Foundation.TypedEventHandler<Windows.Storage.StorageLibrary*, IInspectable*>;        
+        interface Windows.Foundation.Collections.VectorChangedEventHandler<Windows.Storage.StorageFolder*>;
+
     }
 
     [
@@ -252,6 +282,17 @@ namespace Windows.Storage {
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0)
     ]
+    enum KnownLibraryId
+    {
+        Music     = 0,
+        Pictures  = 1,
+        Videos    = 2,
+        Documents = 3
+    };
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
     enum NameCollisionOption
     {
         GenerateUniqueName = 0,
@@ -277,6 +318,23 @@ namespace Windows.Storage {
         None   = 0x0,
         File   = 0x1,
         Folder = 0x2,
+    };
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0)
+    ]
+    enum StorageLibraryChangeType
+    {
+        Created               = 0,
+        Deleted               = 1,
+        MovedOrRenamed        = 2,
+        ContentsChanged       = 3,
+        MovedOutOfLibrary     = 4,
+        MovedIntoLibrary      = 5,
+        ContentsReplaced      = 6,
+        IndexingStatusChanged = 7,
+        EncryptionChanged     = 8,
+        ChangeTrackingLost    = 9
     };
 
     [
@@ -865,6 +923,149 @@ namespace Windows.Storage {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.StorageLibrary),
+        uuid(1EDD7103-0E5E-4D6C-B5E8-9318983D6A03)
+    ]
+    interface IStorageLibrary : IInspectable
+    {
+        HRESULT RequestAddFolderAsync([out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+        HRESULT RequestRemoveFolderAsync([in] Windows.Storage.StorageFolder* folder, [out] [retval] Windows.Foundation.IAsyncOperation<boolean>** operation);
+        [propget] HRESULT Folders([out] [retval] Windows.Foundation.Collections.IObservableVector<Windows.Storage.StorageFolder*>** value);
+        [propget] HRESULT SaveFolder([out] [retval] Windows.Storage.StorageFolder** value);
+        [eventadd] HRESULT DefinitionChanged([in] Windows.Foundation.TypedEventHandler<Windows.Storage.StorageLibrary*, IInspectable*>* handler, [out] [retval] EventRegistrationToken* eventCookie);
+        [eventremove] HRESULT DefinitionChanged([in] EventRegistrationToken eventCookie);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        exclusiveto(Windows.Storage.StorageLibrary),
+        uuid(5B0CE348-FCB3-4031-AFB0-A68D7BD44534)
+    ]
+    interface IStorageLibrary2 : IInspectable
+    {
+        [propget] HRESULT ChangeTracker([out] [retval] Windows.Storage.StorageLibraryChangeTracker** value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 5.0),
+        exclusiveto(Windows.Storage.StorageLibrary),
+        uuid(8A281291-2154-4201-8113-D2C05CE1AD23)
+    ]
+    interface IStorageLibrary3 : IInspectable
+    {
+        HRESULT AreFolderSuggestionsAvailableAsync([out] [retval] Windows.Foundation.IAsyncOperation<boolean>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        exclusiveto(Windows.Storage.StorageLibraryChange),
+        uuid(00980B23-2BE2-4909-AA48-159F5203A51E)
+    ]
+    interface IStorageLibraryChange : IInspectable
+    {
+        [propget] HRESULT ChangeType([out] [retval] Windows.Storage.StorageLibraryChangeType* value);
+        [propget] HRESULT Path([out] [retval] HSTRING* value);
+        [propget] HRESULT PreviousPath([out] [retval] HSTRING* value);
+        HRESULT IsOfType([in] Windows.Storage.StorageItemTypes type, [out] [retval] boolean* value);
+        HRESULT GetStorageItemAsync([out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.IStorageItem*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        exclusiveto(Windows.Storage.StorageLibraryChangeReader),
+        uuid(F205BC83-FCA2-41F9-8954-EE2E991EB96F)
+    ]
+    interface IStorageLibraryChangeReader : IInspectable
+    {
+        HRESULT ReadBatchAsync([out] [retval] Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageLibraryChange*>*>** operation);
+        HRESULT AcceptChangesAsync([out] [retval] Windows.Foundation.IAsyncAction** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        exclusiveto(Windows.Storage.StorageLibraryChangeReader),
+        uuid(ABF4868B-FBCC-4A4F-999E-E7AB7C646DBE)
+    ]
+    interface IStorageLibraryChangeReader2 : IInspectable
+    {
+        HRESULT GetLastChangeId([out] [retval] UINT64* result);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        exclusiveto(Windows.Storage.StorageLibraryChangeTracker),
+        uuid(9E157316-6073-44F6-9681-7492D1286C90)
+    ]
+    interface IStorageLibraryChangeTracker : IInspectable
+    {
+        HRESULT GetChangeReader([out] [retval] Windows.Storage.StorageLibraryChangeReader** value);
+        HRESULT Enable();
+        HRESULT Reset();
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        exclusiveto(Windows.Storage.StorageLibraryChangeTracker),
+        uuid(CD051C3B-0F9F-42F9-8FB3-158D82E13821)
+    ]
+    interface IStorageLibraryChangeTracker2 : IInspectable
+    {
+        [overload("Enable")] HRESULT EnableWithOptions([in] Windows.Storage.StorageLibraryChangeTrackerOptions* options);
+        HRESULT Disable();
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        exclusiveto(Windows.Storage.StorageLibraryChangeTrackerOptions),
+        uuid(BB52BCD4-1A6D-59C0-AD2A-823A20532483)
+    ]
+    interface IStorageLibraryChangeTrackerOptions : IInspectable
+    {
+        [propget] HRESULT TrackChangeDetails([out] [retval] boolean* value);
+        [propput] HRESULT TrackChangeDetails([in] boolean value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        exclusiveto(Windows.Storage.StorageLibraryLastChangeId),
+        uuid(5281826A-BBE1-53BC-82CA-81CC7F039329)
+    ]
+    interface IStorageLibraryLastChangeId : IInspectable
+    {
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        exclusiveto(Windows.Storage.StorageLibraryLastChangeId),
+        uuid(81A49128-2CA3-5309-B0D1-CF0788E40762)
+    ]
+    interface IStorageLibraryLastChangeIdStatics : IInspectable
+    {
+        [propget] HRESULT Unknown([out] [retval] UINT64* value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.StorageLibrary),
+        uuid(4208A6DB-684A-49C6-9E59-90121EE050D6)
+    ]
+    interface IStorageLibraryStatics : IInspectable
+    {
+        HRESULT GetLibraryAsync([in] Windows.Storage.KnownLibraryId libraryId, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageLibrary*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 2.0),
+        exclusiveto(Windows.Storage.StorageLibrary),
+        uuid(FFB08DDC-FA75-4695-B9D1-7F81F97832E3)
+    ]
+    interface IStorageLibraryStatics2 : IInspectable
+    {
+        HRESULT GetLibraryForUserAsync([in] Windows.System.User* user, [in] Windows.Storage.KnownLibraryId libraryId, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageLibrary*>** operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Storage.StorageProvider),
         uuid(E705EED4-D478-47D6-BA46-1A8EBE114A20)
     ]
@@ -1215,6 +1416,72 @@ namespace Windows.Storage {
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IStorageFolder2;
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IStorageItemPropertiesWithProvider;
         [contract(Windows.Foundation.UniversalApiContract, 6.0)] interface Windows.Storage.IStorageFolder3;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        static(Windows.Storage.IStorageLibraryStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        static(Windows.Storage.IStorageLibraryStatics2, Windows.Foundation.UniversalApiContract, 2.0)
+    ]
+    runtimeclass StorageLibrary
+    {
+        [default] interface Windows.Storage.IStorageLibrary;
+        [contract(Windows.Foundation.UniversalApiContract, 3.0)] interface Windows.Storage.IStorageLibrary2;
+        [contract(Windows.Foundation.UniversalApiContract, 5.0)] interface Windows.Storage.IStorageLibrary3;
+    }
+    
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass StorageLibraryChange
+    {
+        [default] interface Windows.Storage.IStorageLibraryChange;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass StorageLibraryChangeReader
+    {
+        [default] interface Windows.Storage.IStorageLibraryChangeReader;
+        [contract(Windows.Foundation.UniversalApiContract, 11.0)] interface Windows.Storage.IStorageLibraryChangeReader2;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass StorageLibraryChangeTracker
+    {
+        [default] interface Windows.Storage.IStorageLibraryChangeTracker;
+        [contract(Windows.Foundation.UniversalApiContract, 11.0)] interface Windows.Storage.IStorageLibraryChangeTracker2;
+    }
+
+    [
+        activatable(Windows.Foundation.UniversalApiContract, 11.0),
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass StorageLibraryChangeTrackerOptions
+    {
+        [default] interface Windows.Storage.IStorageLibraryChangeTrackerOptions;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 11.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.IStorageLibraryLastChangeIdStatics, Windows.Foundation.UniversalApiContract, 11.0),
+        threading(both)
+    ]
+    runtimeclass StorageLibraryLastChangeId
+    {
+        [default] interface Windows.Storage.IStorageLibraryLastChangeId;
     }
 
     [
