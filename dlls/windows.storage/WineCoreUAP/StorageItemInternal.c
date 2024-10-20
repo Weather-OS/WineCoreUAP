@@ -37,20 +37,14 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
     HSTRING tempName;
     HRESULT status;
     FILETIME itemFileCreatedTime;
-    SHFILEINFOW shFileInfo = { 0 };
 
     struct storage_item *item;
-    struct storage_item_properties *itemProperties;
 
     TRACE( "iface %p, value %p\n", itemPath, result );
     if (!result) return E_INVALIDARG;
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
     item = impl_from_IStorageItem( result );
-    itemProperties = impl_from_IStorageItemProperties( &item->IStorageItemProperties_iface );
-
-    itemProperties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
-    itemProperties->IStorageItemPropertiesWithProvider_iface.lpVtbl = &storage_item_properties_with_provider_vtbl;
 
     WindowsDuplicateString( itemPath, &item->Path );
 
@@ -108,13 +102,6 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
         wcscpy( itemName, wcsrchr( WindowsGetStringRawBuffer( itemPath, NULL ), '\\' ) );
         WindowsCreateString( itemName + 1, wcslen( itemName ), &tempName );
         WindowsDuplicateString( tempName, &item->Name );
-
-        //Display Name is the same as File Name under *NIX
-        WindowsDuplicateString( tempName, &itemProperties->DisplayName );
-
-        if ( SHGetFileInfoW( WindowsGetStringRawBuffer( itemPath, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
-            WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &itemProperties->DisplayType );
-        }
 
         CloseHandle( itemFile );
 
@@ -317,6 +304,25 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
         {
             *type = StorageItemTypes_File;
         }
+    }
+
+    return status;
+}
+
+HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties *result )
+{
+    HRESULT status = S_OK;
+    SHFILEINFOW shFileInfo = { 0 };
+
+    struct storage_item_properties *properties = impl_from_IStorageItemProperties( result );
+
+    properties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
+    properties->IStorageItemPropertiesWithProvider_iface.lpVtbl = &storage_item_properties_with_provider_vtbl;
+
+    WindowsDuplicateString( impl_from_IStorageItem( iface )->Name, &properties->DisplayName );
+
+    if ( SHGetFileInfoW( WindowsGetStringRawBuffer( impl_from_IStorageItem( iface )->Path, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
+        WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &properties->DisplayType );
     }
 
     return status;

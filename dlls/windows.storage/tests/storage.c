@@ -1171,9 +1171,10 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
     ok( createdDate.UniversalTime == modifiedDate.UniversalTime, "File Creation date %lli, and Modification date %lli do not match!\n", createdDate.UniversalTime, modifiedDate.UniversalTime );
 
     IStorageItem_QueryInterface( storageItem, &IID_IStorageItemProperties, (void **)&storageItemProperties );
-    
+
     IStorageItemProperties_get_DisplayType( storageItemProperties, &DisplayType );
     ok( !wcscmp( WindowsGetStringRawBuffer( DisplayType, NULL), L"Folder" ), "Error: DisplayType is not Folder. DisplayType %s\n", HStringToLPCSTR(DisplayType));
+    printf("hi!\n");
 
     IStorageItemProperties_QueryInterface( storageItemProperties, &IID_IStorageItemPropertiesWithProvider, (void **)&storageItemPropertiesWithProvider );
 
@@ -1181,7 +1182,7 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     IStorageProvider_get_Id( storageProvider, &itemId );
     ok( !wcscmp( WindowsGetStringRawBuffer( itemId, NULL), L"Local" ), "Error: itemId is not Local. itemId %s\n", HStringToLPCSTR(itemId));
-    
+
     /**
      * IStorageFolder_CreateFolderAsync
     */

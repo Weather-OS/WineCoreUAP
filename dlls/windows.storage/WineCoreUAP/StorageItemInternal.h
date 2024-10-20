@@ -47,26 +47,24 @@ struct storage_item
 {
     IStorageItem IStorageItem_iface;
 
-    FileAttributes Attributes;
-    HSTRING Path;
-    HSTRING Name;    
     DateTime DateCreated;    
-    IStorageItemProperties IStorageItemProperties_iface; //This sort of counts as padding as well.
-
-    LONG ref;    
+    HSTRING Path;
+    HSTRING Name;
+    FileAttributes Attributes;
+    LONG IStorageItemRef;
 };
 
 struct storage_item_properties
 {    
     IStorageItemProperties IStorageItemProperties_iface;    
-    IStorageItemContentProperties Properties;    
     IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;
+    IStorageItemContentProperties Properties;    
 
     HSTRING DisplayType;
     HSTRING DisplayName;
     HSTRING FolderRelativeId;
 
-    LONG ref;    
+    LONG IStorageItemPropertiesRef;    
 };
 
 /**
@@ -88,6 +86,7 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
 HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type );
 HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties *result );
 HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value );
 
 #endif

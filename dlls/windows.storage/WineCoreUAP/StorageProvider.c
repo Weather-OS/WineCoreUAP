@@ -178,14 +178,14 @@ static HRESULT WINAPI storage_provider_GetTrustLevel( IStorageProvider *iface, T
 static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
 {    
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
-    WindowsDuplicateString( impl->DisplayName, value );
+    *value = impl->DisplayName;
     return S_OK;
 }
 
 static HRESULT WINAPI storage_provider_get_Id( IStorageProvider *iface, HSTRING *value )
 {
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
-    WindowsDuplicateString( impl->Id, value );
+    *value = impl->Id;
     return S_OK;
 }
 

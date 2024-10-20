@@ -154,14 +154,14 @@ static HRESULT WINAPI storage_folder_QueryInterface( IStorageFolder *iface, REFI
 
     if (IsEqualGUID( iid, &IID_IStorageItemProperties ))
     {
-        *out = &impl_from_IStorageItem( &impl->IStorageItem_iface )->IStorageItemProperties_iface;
+        *out = &impl->IStorageItemProperties_iface;
         IInspectable_AddRef( *out );        
         return S_OK;
     }
 
     if (IsEqualGUID( iid, &IID_IStorageItemPropertiesWithProvider ))
     {
-        *out = &impl_from_IStorageItemProperties( &impl_from_IStorageItem( &impl->IStorageItem_iface )->IStorageItemProperties_iface )->IStorageItemPropertiesWithProvider_iface;
+        *out = &impl->IStorageItemPropertiesWithProvider_iface;
         IInspectable_AddRef( *out );        
         return S_OK;
     }

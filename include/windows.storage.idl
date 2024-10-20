@@ -78,6 +78,7 @@ namespace Windows.Storage {
     interface IStorageFileStatics;
     interface IStorageFileStatics2;
     interface IStorageItem;
+    interface IStorageItem2;
     interface IStorageItemProperties;
     interface IStorageItemPropertiesWithProvider;
     interface IStorageProvider;
@@ -825,6 +826,18 @@ namespace Windows.Storage {
         [propget] HRESULT Attributes([out, retval] Windows.Storage.FileAttributes *value);
         [propget] HRESULT DateCreated([out, retval] Windows.Foundation.DateTime *value);
         HRESULT IsOfType([in] Windows.Storage.StorageItemTypes type, [out, retval] boolean *value);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(53F926D2-083C-4283-B45B-81C007237E44)
+    ]
+    interface IStorageItem2 : IInspectable
+        requires
+            Windows.Storage.IStorageItem
+    {
+        HRESULT GetParentAsync([out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.StorageFolder*>** operation);
+        HRESULT IsEqual([in] Windows.Storage.IStorageItem* item, [out] [retval] boolean* value);
     }
 
     [

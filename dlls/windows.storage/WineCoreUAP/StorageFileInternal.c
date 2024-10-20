@@ -54,7 +54,8 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
     file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
 
-    if ( FAILED( status ) ) return status;
+    if ( SUCCEEDED(status) )
+        status = storage_item_properties_AssignProperties( &file->IStorageItem_iface, &file->IStorageItemProperties_iface );
 
     IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
     if ( !isFile )

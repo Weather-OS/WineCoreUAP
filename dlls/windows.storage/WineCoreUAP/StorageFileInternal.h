@@ -40,13 +40,28 @@ extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties
 
 struct storage_file
 {
-    //Derivatives 
-    IStorageFile IStorageFile_iface;  
+    //IStorageFile Derivatives 
+    IStorageFile IStorageFile_iface;    
+        IStorageFilePropertiesWithAvailability IStorageFilePropertiesWithAvailability_iface;
+        HSTRING FileType;
+        HSTRING ContentType;
 
-    IStorageItem IStorageItem_iface;
-    IStorageFilePropertiesWithAvailability IStorageFilePropertiesWithAvailability_iface;
-    HSTRING FileType;
-    HSTRING ContentType;
+    //IStorageItem Derivatives    
+    IStorageItem IStorageItem_iface;    
+        DateTime DateCreated;    
+        HSTRING Path;
+        HSTRING Name;
+        FileAttributes Attributes;
+        LONG IStorageItemRef;
+
+    //IStorageItemProperties Derivatives
+    IStorageItemProperties IStorageItemProperties_iface;
+        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;    
+        IStorageItemContentPropertiesVtbl Properties;
+        HSTRING DisplayType;
+        HSTRING DisplayName;
+        HSTRING FolderRelativeId;
+        LONG IStorageItemPropertiesRef;
 
     LONG ref;
 };

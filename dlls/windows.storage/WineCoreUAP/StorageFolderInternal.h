@@ -46,10 +46,26 @@ extern struct IVectorView_StorageFileVtbl storage_file_vector_view_vtbl;
 
 struct storage_folder
 {
-    //Derivatives
+    //IStorageFolder Derivatives
     IStorageFolder IStorageFolder_iface;
-    IStorageFolder2 IStorageFolder2_iface;
-    IStorageItem IStorageItem_iface;
+        IStorageFolder2 IStorageFolder2_iface;
+        
+    //IStorageItem Derivatives    
+    IStorageItem IStorageItem_iface;    
+        DateTime DateCreated;    
+        HSTRING Path;
+        HSTRING Name;
+        FileAttributes Attributes;
+        LONG IStorageItemRef;
+
+    //IStorageItemProperties Derivatives
+    IStorageItemProperties IStorageItemProperties_iface;
+        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;    
+        IStorageItemContentPropertiesVtbl Properties;
+        HSTRING DisplayType;
+        HSTRING DisplayName;
+        HSTRING FolderRelativeId;
+        LONG IStorageItemPropertiesRef;
 
     LONG ref;
 };

@@ -4,7 +4,6 @@ EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
 
 SOURCES = \
 	main.c \
-	WineCoreUAP/util.c \
 	WineCoreUAP/KnownFolders.c \
 	WineCoreUAP/KnownFoldersInternal.c \
 	WineCoreUAP/DownloadsFolder.c \
@@ -49,6 +48,7 @@ SOURCES = \
 	WineCoreUAP/VectorView/StorageFileVectorView.c \
 	\
 	WineCoreUAP/FileProperties/BasicProperties.c \
+	WineCoreUAP/FileProperties/StorageItemContentProperties.c \
 	\
 	WineCoreUAP/FileProperties/AsyncOperation/BasicPropertiesAsync.c \
 	\
@@ -59,4 +59,5 @@ SOURCES = \
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	provider.idl \
 	classes.idl \
-	classes.streams.idl \
+	WineCoreUAP/util.c \
+	classes.streams.idl
