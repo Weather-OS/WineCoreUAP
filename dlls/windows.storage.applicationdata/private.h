@@ -35,7 +35,17 @@
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
 
+#include "provider.h"
+
 extern IActivationFactory *application_data_factory;
+
+typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+
+HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+                                              IInspectable *outer, IWineAsyncInfoImpl **out );
+
+extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+                                              IAsyncAction **ret);
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     static inline impl_type *impl_from( iface_type *iface )                                        \
@@ -74,5 +84,7 @@ extern IActivationFactory *application_data_factory;
     }
 #define DEFINE_IINSPECTABLE( pfx, iface_type, impl_type, base_iface )                              \
     DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
+#define DEFINE_IINSPECTABLE_OUTER( pfx, iface_type, impl_type, outer_iface )                       \
+    DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, impl->outer_iface )
 
 #endif

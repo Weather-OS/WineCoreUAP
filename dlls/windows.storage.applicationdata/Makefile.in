@@ -2,6 +2,12 @@ MODULE  = windows.storage.applicationdata.dll
 IMPORTS = combase
 
 SOURCES = \
-	applicationdata.c \
+	WineCoreUAP/AsyncAction/IAsyncAction.c \
+	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/ApplicationData.c \
+	WineCoreUAP/ApplicationDataInternal.c \
+	WineCoreUAP/SetVersion.c \
+	\
 	classes.idl \
+	provider.idl \
 	main.c

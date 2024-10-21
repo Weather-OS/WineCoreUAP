@@ -1174,7 +1174,6 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     IStorageItemProperties_get_DisplayType( storageItemProperties, &DisplayType );
     ok( !wcscmp( WindowsGetStringRawBuffer( DisplayType, NULL), L"Folder" ), "Error: DisplayType is not Folder. DisplayType %s\n", HStringToLPCSTR(DisplayType));
-    printf("hi!\n");
 
     IStorageItemProperties_QueryInterface( storageItemProperties, &IID_IStorageItemPropertiesWithProvider, (void **)&storageItemPropertiesWithProvider );
 
@@ -1397,11 +1396,13 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     IStorageItem_get_Path( storageItemResults3, &FifthPath );
     IStorageItem_get_Name( storageItemResults3, &FifthName );
-    
+
+
     ok( !strcmp(HStringToLPCSTR(FifthPath), pathtest), "Error: Original path not returned. FifthPath %s, pathtest %s\n", HStringToLPCSTR(FifthPath), pathtest);
     ok( !strcmp(HStringToLPCSTR(FifthName), "Temp"), "Error: Original name not returned. FifthName %s, name %s\n", HStringToLPCSTR(FifthName), "Test");
 
     *item = storageItemResults3;
+
 
     /**
      * IStorageFolder_GetFoldersAsyncOverloadDefaultOptionsStartAndCount

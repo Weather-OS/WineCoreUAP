@@ -1272,6 +1272,7 @@ namespace Windows.Storage {
         [propget] HRESULT Templates([out] [retval] HSTRING* value);
         [propget] HRESULT Videos([out] [retval] HSTRING* value);
     }
+    
     [
         contract(Windows.Foundation.UniversalApiContract, 5.0),
         exclusiveto(Windows.Storage.UserDataPaths),

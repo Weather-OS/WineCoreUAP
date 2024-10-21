@@ -17,17 +17,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "private.h"
-#include "wine/debug.h"
+#include "ApplicationDataInternal.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(data);
-
-struct application_data_statics
-{
-    IActivationFactory IActivationFactory_iface;
-    IApplicationDataStatics IApplicationDataStatics_iface;
-    LONG ref;
-};
 
 static inline struct application_data_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
@@ -115,12 +107,6 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-struct application_data
-{
-    IApplicationData IApplicationData_iface;
-    LONG ref;
-};
-
 static inline struct application_data *impl_from_IApplicationData( IApplicationData *iface )
 {
     return CONTAINING_RECORD( iface, struct application_data, IApplicationData_iface );
@@ -184,17 +170,42 @@ static HRESULT WINAPI application_data_GetTrustLevel( IApplicationData *iface, T
     return E_NOTIMPL;
 }
 
+/**
+ * COM Oriented, WinRT Implementation: winrt::Windows::Storage::ApplicationData
+*/
+
 static HRESULT WINAPI application_data_get_Version( IApplicationData *iface, UINT32 *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
+    struct application_data *impl = impl_from_IApplicationData( iface );
+    *value = impl->Version;
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI application_data_SetVersionAsync( IApplicationData *iface, UINT32 version, IApplicationDataSetVersionHandler *handler,
                                                         IAsyncAction **operation )
 {
-    FIXME( "iface %p, version %d, handler %p, operation %p stub!\n", iface, version, handler, operation );
-    return E_NOTIMPL;
+    HRESULT hr;
+    //Keep in mind, IApplicationDataSetVersionHandler is implemented by the client.
+    struct application_data *impl = impl_from_IApplicationData( iface );
+    struct set_version_options *set_version_options;
+    struct set_version *versionRequest;
+
+    if (!(set_version_options = calloc( 1, sizeof(*set_version_options) ))) return E_OUTOFMEMORY;
+
+    versionRequest = impl_from_ISetVersionRequest( &set_version_options->request );
+
+    versionRequest->ISetVersionRequest_iface.lpVtbl = &set_version_vtbl;
+    versionRequest->ISetVersionDeferral_iface.lpVtbl = &set_version_deferral_vtbl;
+    versionRequest->CurrentVersion = impl->Version;
+    versionRequest->DesiredVersion = version;
+    versionRequest->ref = 1;
+
+    set_version_options->handler = handler;
+
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)set_version_options, application_data_SetVersion, operation );
+    TRACE( "created IAsyncAction %p.\n", *operation );
+
+    return hr;
 }
 
 static HRESULT WINAPI application_data_ClearAllAsync( IApplicationData *iface, IAsyncAction **operation )

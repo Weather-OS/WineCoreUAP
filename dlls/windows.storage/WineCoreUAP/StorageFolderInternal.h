@@ -51,8 +51,8 @@ struct storage_folder
         IStorageFolder2 IStorageFolder2_iface;
         
     //IStorageItem Derivatives    
-    IStorageItem IStorageItem_iface;    
-        DateTime DateCreated;    
+    IStorageItem IStorageItem_iface;
+        DateTime DateCreated;
         HSTRING Path;
         HSTRING Name;
         FileAttributes Attributes;
@@ -60,7 +60,7 @@ struct storage_folder
 
     //IStorageItemProperties Derivatives
     IStorageItemProperties IStorageItemProperties_iface;
-        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;    
+        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;
         IStorageItemContentPropertiesVtbl Properties;
         HSTRING DisplayType;
         HSTRING DisplayName;

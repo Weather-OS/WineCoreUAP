@@ -47,7 +47,7 @@ struct storage_file
         HSTRING ContentType;
 
     //IStorageItem Derivatives    
-    IStorageItem IStorageItem_iface;    
+    IStorageItem IStorageItem_iface;
         DateTime DateCreated;    
         HSTRING Path;
         HSTRING Name;
@@ -56,7 +56,7 @@ struct storage_file
 
     //IStorageItemProperties Derivatives
     IStorageItemProperties IStorageItemProperties_iface;
-        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;    
+        IStorageItemPropertiesWithProvider IStorageItemPropertiesWithProvider_iface;
         IStorageItemContentPropertiesVtbl Properties;
         HSTRING DisplayType;
         HSTRING DisplayName;
