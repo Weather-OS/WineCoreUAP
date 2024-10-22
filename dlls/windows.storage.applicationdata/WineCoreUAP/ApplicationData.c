@@ -202,6 +202,8 @@ static HRESULT WINAPI application_data_SetVersionAsync( IApplicationData *iface,
 
     set_version_options->handler = handler;
 
+    impl->Version = version;
+
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)set_version_options, application_data_SetVersion, operation );
     TRACE( "created IAsyncAction %p.\n", *operation );
 
@@ -312,6 +314,7 @@ static HRESULT WINAPI application_data_statics_get_Current( IApplicationDataStat
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->IApplicationData_iface.lpVtbl = &application_data_vtbl;
+    impl->Version = 0u;
     impl->ref = 1;
 
     *value = &impl->IApplicationData_iface;
