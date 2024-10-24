@@ -217,6 +217,7 @@ static void test_ApplicationDataStatics(void)
     IActivationFactory *factory;
     HSTRING str;
     HRESULT hr;
+    UINT32 currentVersion;
     DWORD ret;
     LONG ref;
 
@@ -249,7 +250,8 @@ static void test_ApplicationDataStatics(void)
     /**
      * IApplicationData_SetVersionAsync
     */
-    hr = IApplicationData_SetVersionAsync( application_data, 1, &default_application_data_set_version_handler.IApplicationDataSetVersionHandler_iface, &asyncAction );
+    IApplicationData_get_Version( application_data, &currentVersion );
+    hr = IApplicationData_SetVersionAsync( application_data, currentVersion + 1, &default_application_data_set_version_handler.IApplicationDataSetVersionHandler_iface, &asyncAction );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     check_interface( asyncAction, &IID_IUnknown );

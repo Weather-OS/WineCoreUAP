@@ -22,13 +22,21 @@
 #ifndef APPLICATION_DATA_INTERNAL_H
 #define APPLICATION_DATA_INTERNAL_H
 
+#include <appx.h>
+
 #include "../private.h"
 #include "wine/debug.h"
+#include "shlwapi.h"
 
 #include "SetVersionInternal.h"
 
+#define SETTINGS_PATH L"Settings"
+#define SETTINGS_DATA_PATH L"settings.dat"
+#define ROAMING_DATA_PATH L"roaming.lock"
+
 extern const struct ISetVersionRequestVtbl set_version_vtbl;
 extern const struct ISetVersionDeferralVtbl set_version_deferral_vtbl;
+extern const struct IApplicationDataVtbl application_data_vtbl;
 
 struct application_data_statics
 {
@@ -40,6 +48,7 @@ struct application_data_statics
 struct application_data
 {
     IApplicationData IApplicationData_iface;
+    HSTRING appDataPath;
     UINT32 Version;
     LONG ref;
 };
@@ -50,6 +59,9 @@ struct set_version_options
     ISetVersionRequest request;
 };
 
+struct application_data *impl_from_IApplicationData( IApplicationData *iface );
+
+HRESULT WINAPI application_data_Init( IApplicationData **value );
 HRESULT WINAPI application_data_SetVersion( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

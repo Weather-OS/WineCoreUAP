@@ -107,7 +107,7 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-static inline struct application_data *impl_from_IApplicationData( IApplicationData *iface )
+struct application_data *impl_from_IApplicationData( IApplicationData *iface )
 {
     return CONTAINING_RECORD( iface, struct application_data, IApplicationData_iface );
 }
@@ -277,7 +277,7 @@ static HRESULT WINAPI application_data_get_RoamingStorageQuota( IApplicationData
     return E_NOTIMPL;
 }
 
-static const struct IApplicationDataVtbl application_data_vtbl =
+const struct IApplicationDataVtbl application_data_vtbl =
 {
     application_data_QueryInterface,
     application_data_AddRef,
@@ -306,20 +306,8 @@ DEFINE_IINSPECTABLE( application_data_statics, IApplicationDataStatics, struct a
 
 static HRESULT WINAPI application_data_statics_get_Current( IApplicationDataStatics *iface, IApplicationData **value )
 {
-    struct application_data *impl;
-
     TRACE( "iface %p, value %p\n", iface, value );
-
-    if (!value) return E_INVALIDARG;
-    if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
-
-    impl->IApplicationData_iface.lpVtbl = &application_data_vtbl;
-    impl->Version = 0u;
-    impl->ref = 1;
-
-    *value = &impl->IApplicationData_iface;
-    TRACE( "created IApplicationData %p.\n", *value );
-    return S_OK;
+    return application_data_Init( value );
 }
 
 static const struct IApplicationDataStaticsVtbl application_data_statics_vtbl =
