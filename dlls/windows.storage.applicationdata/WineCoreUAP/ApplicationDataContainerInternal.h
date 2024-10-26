@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.SetVersion* Implementation
+/* WinRT Windows.Storage.ApplicationData Implementation
  *
  * Written by Weather
  *
@@ -19,21 +19,24 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef SET_VERSION_INTERNAL_H
-#define SET_VERSION_INTERNAL_H
+#ifndef APPLICATION_DATA_CONTAINER_INTERNAL_H
+#define APPLICATION_DATA_CONTAINER_INTERNAL_H
 
 #include "../private.h"
 #include "wine/debug.h"
+#include "shlwapi.h"
 
-struct set_version
+
+struct application_data_container
 {
-    ISetVersionRequest ISetVersionRequest_iface;
-    ISetVersionDeferral ISetVersionDeferral_iface;
-    UINT32 CurrentVersion;
-    UINT32 DesiredVersion;
+    IApplicationDataContainer IApplicationDataContainer_iface;
+    HSTRING Name;
+    ApplicationDataLocality Locality;
+    IPropertySet *Values;
+    IMap_HSTRING_ApplicationDataContainer *Containers;
     LONG ref;
 };
 
-struct set_version *impl_from_ISetVersionRequest( ISetVersionRequest *iface );
+struct application_data *impl_from_IApplicationData( IApplicationData *iface );
 
 #endif

@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.KnownFolders Implementation
+/* WinRT Windows.Storage.ApplicationData Implementation
  *
  * Written by Weather
  *
@@ -37,6 +37,14 @@
 extern const struct ISetVersionRequestVtbl set_version_vtbl;
 extern const struct ISetVersionDeferralVtbl set_version_deferral_vtbl;
 extern const struct IApplicationDataVtbl application_data_vtbl;
+
+/**
+ * WINE DOES NOT SUPPORT REGISTRY HIVES!!!
+ * Attempting to make settings.dat confromant would 
+ * require adding regedit hive support to wine.
+ * 
+ * This implementation is custom.
+*/
 
 struct application_data_statics
 {

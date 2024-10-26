@@ -1,6 +1,6 @@
 /* WinRT Windows.Storage.ApplicationData ApplicationData Implementation
  *
- * Copyright (C) 2023 Mohamad Al-Jaf
+ * Written by Weather
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -39,6 +39,7 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
     struct application_data *data;
     struct appx_package package;
 
+
     GetModuleFileNameW( NULL, manifestPath, MAX_PATH );
     PathRemoveFileSpecW( manifestPath );
     PathAppendW( manifestPath, L"AppxManifest.xml" );
@@ -54,6 +55,13 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
     PathAppendW( path, username );
     PathAppendW( path, L"AppData\\Local\\Packages" );
     PathAppendW( path, AppName );
+
+    if ( GetFileAttributesW( path ) == INVALID_FILE_ATTRIBUTES || 
+         GetFileAttributesW( path ) != FILE_ATTRIBUTE_DIRECTORY )
+    {
+        if ( !CreateDirectoryW( path, NULL ) )
+            return E_ABORT;
+    }
 
     if (!(data = calloc( 1, sizeof(*data) ))) return E_OUTOFMEMORY;
     if (!value) return E_INVALIDARG;
