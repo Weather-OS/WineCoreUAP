@@ -30,6 +30,7 @@ SOURCES = \
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	\
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/UINT32Async.c \
 	WineCoreUAP/AsyncOperation/HSTRINGAsync.c \
 	WineCoreUAP/AsyncOperation/HSTRINGVectorAsync.c \
 	WineCoreUAP/AsyncOperation/KnownFoldersAccessStatusAsync.c \
@@ -55,6 +56,7 @@ SOURCES = \
 	WineCoreUAP/Streams/Buffer.c \
 	WineCoreUAP/Streams/BufferByteAccess.c \
 	WineCoreUAP/Streams/BufferInternal.c \
+	WineCoreUAP/Streams/DataReader.c \
 	\
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	provider.idl \

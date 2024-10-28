@@ -1,4 +1,4 @@
-/* WinRT IAsyncOperation<Windows.Storage.KnownFolderAccessStatus *> Implementation
+/* WinRT IAsyncOperation<Windows.Storage.HSTRING *> Implementation
  *
  * Written by Weather
  *

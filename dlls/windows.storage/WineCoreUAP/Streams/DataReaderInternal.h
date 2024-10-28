@@ -19,36 +19,38 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef BUFFER_INTERNAL_H
-#define BUFFER_INTERNAL_H
+#ifndef DATA_READER_INTERNAL_H
+#define DATA_READER_INTERNAL_H
 
 #include "../../private.h"
 #include "wine/debug.h"
 
-extern struct IBufferVtbl buffer_vtbl;
-extern struct IBufferByteAccessVtbl bufferaccess_vtbl;
+extern struct IDataReaderVtbl data_reader_vtbl;
 
-struct buffer
+struct data_reader
 {
-    IBuffer IBuffer_iface;    
-    IBufferByteAccess IBufferByteAccess_iface;
-    BYTE *Buffer;    
-    UINT Capacity;
-    UINT Length;    
+    IDataReader IDataReader_iface;    
+    UINT32 UnconsumedBufferLength;
+    UnicodeEncoding Encoding;
+    ByteOrder Order;
+    InputStreamOptions StreamOptions;
+    IInputStream *inputStream;
+    IBuffer *buffer;
     LONG ref;
 };
 
-struct buffer_statics
+struct data_reader_statics
 {
     //Derivatives
     IActivationFactory IActivationFactory_iface;    
-    IBufferFactory IBufferFactory_iface;
-    IBufferStatics IBufferStatics_iface;
+    IDataReaderFactory IDataReaderFactory_iface;
+    IDataReaderStatics IDataReaderStatics_iface;
     LONG ref;
 };
 
-struct buffer *impl_from_IBuffer( IBuffer *iface );
-
-HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value );
+struct load_arguments
+{
+    UINT32 count;
+};
 
 #endif
