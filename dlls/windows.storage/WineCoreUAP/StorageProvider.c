@@ -21,7 +21,7 @@
 
 #include "StorageProviderInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Storage Provider
 
@@ -94,7 +94,6 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    printf("why is this getting called?\n");
     FIXME( "iface %p, instance %p stub!\n", iface, instance );
     return E_NOTIMPL;
 }
@@ -178,6 +177,7 @@ static HRESULT WINAPI storage_provider_GetTrustLevel( IStorageProvider *iface, T
 static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
 {    
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->DisplayName;
     return S_OK;
 }
@@ -185,6 +185,7 @@ static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface,
 static HRESULT WINAPI storage_provider_get_Id( IStorageProvider *iface, HSTRING *value )
 {
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Id;
     return S_OK;
 }
@@ -209,7 +210,7 @@ static struct storage_provider storage_provider =
     {&storage_provider_vtbl},    
     NULL,
     NULL,     
-    1,    
+    2,    
 };
 
 IActivationFactory *storage_provider_factory = &storage_provider.IActivationFactory_iface;

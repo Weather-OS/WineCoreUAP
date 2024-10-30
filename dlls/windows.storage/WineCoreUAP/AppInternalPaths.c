@@ -24,6 +24,8 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    
     WCHAR path[MAX_PATH] = L"C:\\users\\";
@@ -33,6 +35,8 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * 
     DWORD username_len = sizeof(username);
 
     struct appx_package package;
+
+    TRACE( "iface %p, folderid %s, value %p\n", iface, FOLDERID, value );
 
     GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
     PathRemoveFileSpecW(manifestPath);

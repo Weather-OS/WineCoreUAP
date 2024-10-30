@@ -21,6 +21,8 @@
 
 #include "FileIOInternal.h"
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     IStorageItem *item = NULL;
@@ -41,6 +43,8 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
     IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
     IStorageItem_get_Path( item, &filePath );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -162,6 +166,8 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
     IStorageItem_get_Path( item, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
@@ -273,6 +279,8 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
     IStorageItem_get_Path( item, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), FILE_APPEND_DATA, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );    
 
     switch ( unicodeEncoding )
@@ -374,6 +382,8 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
     IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
     IStorageItem_get_Path( item, &filePath );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     if (!(HSTRINGVector = calloc( 1, sizeof(*HSTRINGVector) ))) return E_OUTOFMEMORY;
     HSTRINGVector->IVector_HSTRING_iface.lpVtbl = &hstring_vector_vtbl;
@@ -531,6 +541,8 @@ HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     IStorageFile_QueryInterface( (IStorageFile *)param, &IID_IStorageItem, (void **)&item );
     IStorageItem_get_Path( item, &filePath );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
     fileSize = GetFileSize( fileHandle, NULL );
@@ -583,6 +595,8 @@ HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
     IStorageFile_QueryInterface( write_buffer_options->file, &IID_IStorageItem, (void **)&item );
     IStorageItem_get_Path( item, &filePath );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     IBuffer_QueryInterface( write_buffer_options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
     IBufferByteAccess_get_Buffer( bufferByteAccess, &contents );
 
@@ -627,6 +641,8 @@ HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, P
     //Parameters
     IStorageFile_QueryInterface( write_bytes_options->file, &IID_IStorageItem, (void **)&item );
     IStorageItem_get_Path( item, &filePath );
+    
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     contents = write_bytes_options->buffer;
 

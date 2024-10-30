@@ -21,7 +21,7 @@
 
 #include "UserInternalPaths.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // User Data Paths
 
@@ -194,96 +194,115 @@ static HRESULT WINAPI user_data_paths_GetTrustLevel( IUserDataPaths *iface, Trus
 
 static HRESULT WINAPI user_data_paths_get_CameraRoll( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "cameraroll", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Cookies( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Desktop( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "desktop", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Documents( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "documents", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Downloads( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "downloads", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Favorites( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "favorites", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_History( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "history", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_InternetCache( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "internetcache", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_LocalAppData( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "localappdata", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_LocalAppDataLow( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "localappdatalow", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Music( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "music", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Pictures( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "pictures", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Profile( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "profile", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Recent( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "recent", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_RoamingAppData( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "roamingappdata", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_SavedPictures( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "savedpictures", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Screenshots( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "screenshots", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Templates( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "templates", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Videos( IUserDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return user_data_paths_GetKnownFolder(iface, "videos", value);
 }
 
@@ -322,7 +341,6 @@ DEFINE_IINSPECTABLE( user_data_paths_statics, IUserDataPathsStatics, struct user
 
 static HRESULT WINAPI user_data_paths_statics_GetForUser( IUserDataPathsStatics *iface, IUser *user, IUserDataPaths **result )
 {
-    //I couldn't find a difference between GetForUser and GetDefault.
     struct user_data_paths *impl;
 
     TRACE( "iface %p, value %p\n", iface, result );
@@ -374,7 +392,7 @@ static struct user_data_paths_statics user_data_paths_statics =
 {
     {&factory_vtbl},
     {&user_data_paths_statics_vtbl},
-    1,
+    2,
 };
 
 IActivationFactory *user_data_paths_factory = &user_data_paths_statics.IActivationFactory_iface;

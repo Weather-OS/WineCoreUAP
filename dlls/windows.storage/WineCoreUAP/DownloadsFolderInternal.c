@@ -21,12 +21,16 @@
 
 #include "DownloadsFolderInternal.h"
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, CreationCollisionOption creationOption, IStorageFolder *outFolder )
 {
     HRESULT status = S_OK;
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "folderName %p, outFolder %p\n", folderName, outFolder );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 

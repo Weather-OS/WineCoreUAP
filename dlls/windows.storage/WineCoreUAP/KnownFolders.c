@@ -21,7 +21,7 @@
 
 #include "KnownFoldersInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Known Folders
 
@@ -161,6 +161,8 @@ static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStati
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -184,6 +186,8 @@ static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersSt
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -207,6 +211,8 @@ static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStat
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -230,6 +236,8 @@ static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersS
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -253,6 +261,8 @@ static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics 
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -276,6 +286,8 @@ static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersS
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -299,8 +311,11 @@ static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFolder
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_MediaServerDevices, &path );
     if ( SUCCEEDED( hr ) )
     {
@@ -342,6 +357,8 @@ static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -365,6 +382,8 @@ static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStati
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -388,6 +407,8 @@ static HRESULT WINAPI known_folders_statics2_get_RecordedCalls( IKnownFoldersSta
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -429,6 +450,8 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -460,6 +483,7 @@ DEFINE_IINSPECTABLE( known_folders_statics4, IKnownFoldersStatics4, struct known
 static HRESULT WINAPI known_folders_statics4_RequestAccessAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
     return hr;
@@ -469,6 +493,7 @@ static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFo
 {
     //User is not used. 
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
     return hr;
@@ -480,6 +505,8 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -516,6 +543,8 @@ static HRESULT WINAPI known_folders_camera_roll_statics_get_CameraRoll( IKnownFo
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -557,6 +586,8 @@ static HRESULT WINAPI known_folders_playlists_statics_get_Playlists( IKnownFolde
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
+    TRACE( "iface %p, value %p\n", iface, value );
+
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_Playlists, &path );
     if ( SUCCEEDED( hr ) )
     {
@@ -592,8 +623,11 @@ static HRESULT WINAPI known_folders_saved_pictures_statics_get_SavedPictures( IK
     HSTRING path;
 
     struct storage_folder *folder;
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_SavedPictures, &path );
     if ( SUCCEEDED( hr ) )
     {
@@ -631,7 +665,7 @@ static struct known_folders_statics known_folders_statics =
     {&known_folders_camera_roll_statics_vtbl},
     {&known_folders_playlists_statics_vtbl},
     {&known_folders_saved_pictures_statics_vtbl},
-    1,
+    8,
 };
 
 IActivationFactory *known_folders_factory = &known_folders_statics.IActivationFactory_iface;

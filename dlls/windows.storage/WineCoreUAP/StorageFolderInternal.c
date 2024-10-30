@@ -21,7 +21,7 @@
 
 #include "StorageFolderInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value )
 {
@@ -30,6 +30,8 @@ HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value
     BOOLEAN isFolder;
 
     struct storage_folder *folder;
+
+    TRACE( "path %p, value %p\n", path, value );
 
     if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
@@ -91,6 +93,8 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     //Parameters
     CreationCollisionOption collisionOption = creation_options->option;
     HSTRING Name = creation_options->name;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     if (!(resultFolder = calloc( 1, sizeof(*resultFolder) ))) return E_OUTOFMEMORY;
 
@@ -179,7 +183,9 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     //Parameters
     CreationCollisionOption collisionOption = creation_options->option;
     HSTRING Name = creation_options->name;
-    
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     if (!(resultFile = calloc( 1, sizeof(*resultFile) ))) return E_OUTOFMEMORY;
 
     WindowsDuplicateString( impl_from_IStorageFolder( (IStorageFolder *)invoker )->Path, &Path );

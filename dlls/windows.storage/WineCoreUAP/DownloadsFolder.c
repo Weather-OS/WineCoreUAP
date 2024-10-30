@@ -20,7 +20,7 @@
  */
 #include "DownloadsFolderInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Downloads Folder
 
@@ -31,7 +31,6 @@ static struct downloads_folder_statics *impl_from_IActivationFactory( IActivatio
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
-
     struct downloads_folder_statics *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
@@ -127,6 +126,8 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileAsync( IDownloadsFolder
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
 
+    TRACE( "iface %p, value %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
 
@@ -148,6 +149,8 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderAsync( IDownloadsFold
 
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
+
+    TRACE( "iface %p, value %p\n", iface, operation );
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
@@ -171,6 +174,8 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsyn
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
 
+    TRACE( "iface %p, value %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
 
@@ -192,6 +197,8 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderWithCollisionOptionAs
 
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
+
+    TRACE( "iface %p, value %p\n", iface, operation );
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
@@ -234,6 +241,8 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserAsync( IDownloa
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
 
+    TRACE( "iface %p, value %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
 
@@ -256,6 +265,8 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserAsync( IDownl
 
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
+
+    TRACE( "iface %p, value %p\n", iface, operation );
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
@@ -280,6 +291,8 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserWithCollisionOp
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
 
+    TRACE( "iface %p, value %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
 
@@ -302,6 +315,8 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserWithCollision
 
     struct storage_folder_creation_options *creation_options;
     struct storage_folder *downloadsFolder;
+
+    TRACE( "iface %p, value %p\n", iface, operation );
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
     if (!(downloadsFolder = calloc( 1, sizeof(*downloadsFolder) ))) return E_OUTOFMEMORY;
@@ -339,7 +354,7 @@ static struct downloads_folder_statics downloads_folder_statics =
     {&factory_vtbl},
     {&downloads_folder_statics_vtbl},
     {&downloads_folder_statics2_vtbl},
-    1,
+    3,
 };
 
 IActivationFactory *downloads_folder_factory = &downloads_folder_statics.IActivationFactory_iface;

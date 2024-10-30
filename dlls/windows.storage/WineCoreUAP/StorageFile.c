@@ -21,7 +21,7 @@
 
 #include "StorageFileInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Storage File
 
@@ -217,6 +217,7 @@ static HRESULT WINAPI storage_file_GetTrustLevel( IStorageFile *iface, TrustLeve
 static HRESULT WINAPI storage_file_get_FileType( IStorageFile *iface, HSTRING *value )
 {
     struct storage_file *impl = impl_from_IStorageFile( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->FileType;
     return S_OK;
 }
@@ -224,6 +225,7 @@ static HRESULT WINAPI storage_file_get_FileType( IStorageFile *iface, HSTRING *v
 static HRESULT WINAPI storage_file_get_ContentType( IStorageFile *iface, HSTRING *value )
 {
     struct storage_file *impl = impl_from_IStorageFile( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->ContentType;
     return S_OK;
 }
@@ -250,6 +252,8 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
     struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
     WindowsDuplicateString( implItem->Name, &name );
 
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
+
     if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
 
     copy_options->folder = folder;
@@ -266,6 +270,8 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *ifa
     HRESULT hr;
 
     struct storage_file_copy_options *copy_options;
+
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
 
     if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
 
@@ -284,6 +290,8 @@ static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFo
 
     struct storage_file_move_options *copy_options;
 
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
+
     if (!(copy_options = calloc( 1, sizeof(*copy_options) ))) return E_OUTOFMEMORY;
 
     copy_options->folder = folder;
@@ -298,6 +306,7 @@ static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFo
 static HRESULT WINAPI storage_file_CopyAndReplaceAsync( IStorageFile *iface, IStorageFile *file, IAsyncAction **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, folder %p, value %p\n", iface, file, operation );
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)file, storage_file_CopyAndReplace, operation );
     return hr;
 }
@@ -310,6 +319,9 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultNameAndOptions( IStorageFi
 
     struct storage_file *impl = impl_from_IStorageFile( iface );
     struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
+
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
+
     WindowsDuplicateString( implItem->Name, &name );
 
     if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
@@ -328,6 +340,8 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultOptions( IStorageFile *ifa
     HRESULT hr;
     struct storage_file_move_options *move_options;
 
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
+
     if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
 
     move_options->folder = folder;
@@ -344,6 +358,8 @@ static HRESULT WINAPI storage_file_MoveOverload( IStorageFile *iface, IStorageFo
     HRESULT hr;
     struct storage_file_move_options *move_options;
 
+    TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
+
     if (!(move_options = calloc( 1, sizeof(*move_options) ))) return E_OUTOFMEMORY;
 
     move_options->folder = folder;
@@ -358,6 +374,7 @@ static HRESULT WINAPI storage_file_MoveOverload( IStorageFile *iface, IStorageFo
 static HRESULT WINAPI storage_file_MoveAndReplaceAsync( IStorageFile *iface, IStorageFile *file,  IAsyncAction **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, file %p, value %p\n", iface, file, operation );
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)file, storage_file_MoveAndReplace, operation );
     return hr;
 }
@@ -444,6 +461,7 @@ static HRESULT WINAPI storage_file_properties_with_availability_GetTrustLevel( I
 static HRESULT WINAPI storage_file_properties_with_availability_get_IsAvailable( IStorageFilePropertiesWithAvailability *iface, boolean *value )
 {
     struct storage_file *impl = impl_from_IStorageFilePropertiesWithAvailability( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     storage_file_properties_with_availability_IsAvailable( &impl->IStorageItem_iface, value );
     return S_OK;
 }
@@ -466,6 +484,7 @@ DEFINE_IINSPECTABLE( storage_file_statics, IStorageFileStatics, struct storage_f
 static HRESULT WINAPI storage_file_statics_GetFileFromPathAsync( IStorageFileStatics *iface, HSTRING path, IAsyncOperation_StorageFile **result )
 {
     HRESULT hr;
+    TRACE( "iface %p, path %p, result %p\n", iface, path, result );
     hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;
@@ -482,6 +501,8 @@ static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStor
     LPCWSTR uriPathStr;
     LPCWSTR appDataPathStr;
     WCHAR pathStr[MAX_PATH];
+
+    TRACE( "iface %p, path %p, result %p\n", iface, uri, result );
 
     app_data_paths_GetKnownFolder( NULL, "localappdata", &appDataPath );
     IUriRuntimeClass_get_SchemeName( uri, &uriScheme );
@@ -517,7 +538,6 @@ static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStor
 // Storage.Stream needs to be implemented.
 static HRESULT WINAPI storage_file_statics_CreateStreamedFileAsync( IStorageFileStatics *iface, HSTRING displayNameWithExtension, IStreamedFileDataRequestedHandler *dataRequested, IRandomAccessStreamReference *thumbnail, IAsyncOperation_StorageFile **result )
 {
-
     FIXME( "iface %p, result %p stub!\n", iface, result );
     return E_NOTIMPL;
 }
@@ -564,6 +584,7 @@ static HRESULT WINAPI storage_file_statics2_GetFileFromPathForUserAsync( IStorag
 {
     //User is not used.
     HRESULT hr;
+    TRACE( "iface %p, path %p, result %p\n", iface, path, result );
     hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;
@@ -587,7 +608,7 @@ static struct storage_file_statics storage_file_statics =
     {&factory_vtbl},
     {&storage_file_statics_vtbl},
     {&storage_file_statics2_vtbl},
-    1,
+    3,
 };
 
 IActivationFactory *storage_file_factory = &storage_file_statics.IActivationFactory_iface;

@@ -24,7 +24,7 @@
 
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 HRESULT WINAPI DllGetClassObject( REFCLSID clsid, REFIID riid, void **out )
 {
@@ -44,42 +44,54 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
      * Windows.Storage
      */
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_AppDataPaths ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( app_data_paths_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_UserDataPaths ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( user_data_paths_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_StorageFolder ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( storage_folder_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_StorageFile ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( storage_file_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_KnownFolders ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( known_folders_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_DownloadsFolder ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( downloads_folder_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_FileIO ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( file_io_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_PathIO ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( path_io_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_SystemProperties ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( system_properties_factory, &IID_IActivationFactory, (void **)factory );
 
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_SystemDataPaths ))
+        //(@windows.storage.dll)
         IActivationFactory_QueryInterface( system_data_paths_factory, &IID_IActivationFactory, (void **)factory );
 
     /**
      * Windows.Storage.Streams
     */
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_Buffer ))
+        //(@WinTypes.dll)
         IActivationFactory_QueryInterface( buffer_factory, &IID_IActivationFactory, (void **)factory );
     
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_DataReader ))
+        //(@WinTypes.dll)
         IActivationFactory_QueryInterface( data_reader_factory, &IID_IActivationFactory, (void **)factory );
 
     /**
@@ -87,6 +99,7 @@ HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **fa
      */
     //Runtime class not meant to be registered. Please refrain from registring it.
     //if (!wcscmp( buffer, RuntimeClass_Windows_Storage_FileProperties_BasicProperties ))
+    //    //(@null)
     //    IActivationFactory_QueryInterface( basic_properties_factory, &IID_IActivationFactory, (void **)factory );
     
     if (*factory) return S_OK;

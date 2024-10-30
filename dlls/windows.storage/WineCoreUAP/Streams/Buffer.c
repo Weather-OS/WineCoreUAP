@@ -21,7 +21,7 @@
 
 #include "BufferInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Buffer
 

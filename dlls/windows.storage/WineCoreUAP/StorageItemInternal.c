@@ -21,7 +21,7 @@
 
 #include "StorageItemInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageFolderVtbl storage_folder_vtbl;
@@ -285,6 +285,8 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
     WCHAR path[MAX_PATH];
 
     struct storage_item *item;
+
+    TRACE( "iface %p, type %p\n", iface, type );
     
     item = impl_from_IStorageItem( iface );
     WindowsDuplicateString( item->Path, &itemPath );
@@ -316,6 +318,8 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
 
     struct storage_item_properties *properties = impl_from_IStorageItemProperties( result );
 
+    TRACE( "iface %p, result %p\n", iface, result );
+
     properties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
     properties->IStorageItemPropertiesWithProvider_iface.lpVtbl = &storage_item_properties_with_provider_vtbl;
 
@@ -335,6 +339,9 @@ HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPr
 
     struct storage_item *item;
     struct storage_provider *provider;
+
+    TRACE( "iface %p, value %p\n", iface, value );
+
     if (!(provider = calloc( 1, sizeof(*provider) ))) return E_OUTOFMEMORY;
 
     IStorageItemPropertiesWithProvider_QueryInterface( iface, &IID_IStorageItem, (void **)&storageItem );

@@ -21,7 +21,7 @@
 
 #include "StorageItemInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Storage Item
 
@@ -111,6 +111,8 @@ static HRESULT WINAPI storage_item_RenameAsyncOverloadDefaultOptions( IStorageIt
     HRESULT hr;
     struct storage_item_rename_options *rename_options;
 
+    TRACE( "iface %p, name %p, operation %p\n", iface, name, operation );
+
     if (!(rename_options = calloc( 1, sizeof(*rename_options) ))) return E_OUTOFMEMORY;
     rename_options->name = name;
     rename_options->option = NameCollisionOption_FailIfExists;
@@ -123,6 +125,8 @@ static HRESULT WINAPI storage_item_RenameAsync( IStorageItem *iface, HSTRING nam
 {
     HRESULT hr;
     struct storage_item_rename_options *rename_options;
+
+    TRACE( "iface %p, name %p, operation %p\n", iface, name, operation );
     
     if (!(rename_options = calloc( 1, sizeof(*rename_options) ))) return E_OUTOFMEMORY;
     rename_options->name = name;
@@ -135,6 +139,7 @@ static HRESULT WINAPI storage_item_RenameAsync( IStorageItem *iface, HSTRING nam
 static HRESULT WINAPI storage_item_DeleteAsyncOverloadDefaultOptions( IStorageItem *iface, IAsyncAction **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)StorageDeleteOption_Default, storage_item_Delete, operation );
     return hr;
 }
@@ -142,6 +147,7 @@ static HRESULT WINAPI storage_item_DeleteAsyncOverloadDefaultOptions( IStorageIt
 static HRESULT WINAPI storage_item_DeleteAsync( IStorageItem *iface, StorageDeleteOption option, IAsyncAction **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)option, storage_item_Delete, operation );
     return hr;
 }
@@ -149,6 +155,7 @@ static HRESULT WINAPI storage_item_DeleteAsync( IStorageItem *iface, StorageDele
 static HRESULT WINAPI storage_item_GetBasicPropertiesAsync( IStorageItem *iface, IAsyncOperation_BasicProperties **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_basic_properties_create( (IUnknown *)iface, (IUnknown *)NULL, storage_item_GetProperties, operation );
     TRACE( "created IAsyncOperation_BasicProperties %p.\n", *operation );
     return hr;
@@ -157,6 +164,7 @@ static HRESULT WINAPI storage_item_GetBasicPropertiesAsync( IStorageItem *iface,
 static HRESULT WINAPI storage_item_get_Name( IStorageItem *iface, HSTRING *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Name;
     return S_OK;
 }
@@ -164,6 +172,7 @@ static HRESULT WINAPI storage_item_get_Name( IStorageItem *iface, HSTRING *value
 static HRESULT WINAPI storage_item_get_Path( IStorageItem *iface, HSTRING *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Path;
     return S_OK;
 }
@@ -171,6 +180,7 @@ static HRESULT WINAPI storage_item_get_Path( IStorageItem *iface, HSTRING *value
 static HRESULT WINAPI storage_item_get_Attributes( IStorageItem *iface, FileAttributes *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Attributes;
     return S_OK;
 }
@@ -178,6 +188,7 @@ static HRESULT WINAPI storage_item_get_Attributes( IStorageItem *iface, FileAttr
 static HRESULT WINAPI storage_item_get_DateCreated( IStorageItem *iface, DateTime *value )
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->DateCreated;
     return S_OK;
 }
@@ -186,6 +197,9 @@ static HRESULT WINAPI storage_item_IsOfType( IStorageItem *iface, StorageItemTyp
 {    
     HRESULT hr;
     StorageItemTypes fileType;
+
+    TRACE( "iface %p, type %d, value %p\n", iface, type, value );
+
     hr = storage_item_GetType( iface, &fileType );
     if ( SUCCEEDED( hr ) )
     {
@@ -303,6 +317,7 @@ static HRESULT WINAPI storage_item_properties_GetTrustLevel( IStorageItemPropert
 static HRESULT WINAPI storage_item_properties_get_DisplayName( IStorageItemProperties *iface, HSTRING *value )
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->DisplayName;
     return S_OK;    
 }
@@ -310,6 +325,7 @@ static HRESULT WINAPI storage_item_properties_get_DisplayName( IStorageItemPrope
 static HRESULT WINAPI storage_item_properties_get_DisplayType( IStorageItemProperties *iface, HSTRING *value )
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->DisplayType;
     return S_OK;    
 }
@@ -317,6 +333,7 @@ static HRESULT WINAPI storage_item_properties_get_DisplayType( IStorageItemPrope
 static HRESULT WINAPI storage_item_properties_get_FolderRelativeId( IStorageItemProperties *iface, HSTRING *value )
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->FolderRelativeId;
     return S_OK;    
 }
@@ -324,6 +341,7 @@ static HRESULT WINAPI storage_item_properties_get_FolderRelativeId( IStorageItem
 static HRESULT WINAPI storage_item_properties_get_Properties( IStorageItemProperties *iface, IStorageItemContentProperties **value )
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->Properties;
     return S_OK;    
 }
@@ -428,6 +446,7 @@ static HRESULT WINAPI storage_item_properties_with_provider_GetTrustLevel( IStor
 static HRESULT WINAPI storage_item_properties_with_provider_get_Provider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
 {
     storage_item_properties_with_provider_GetProvider( iface, value );
+    TRACE( "iface %p, value %p\n", iface, value );
     return S_OK;
 }
 

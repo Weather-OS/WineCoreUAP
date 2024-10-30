@@ -22,7 +22,7 @@
 #include "DataReaderInternal.h"
 #include "BufferInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 DEFINE_ASYNC_COMPLETED_HANDLER( async_buffer_uint_handler, IAsyncOperationWithProgressCompletedHandler_IBuffer_UINT32, IAsyncOperationWithProgress_IBuffer_UINT32 )
 

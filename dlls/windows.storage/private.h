@@ -48,6 +48,8 @@
 
 #include "provider.h"
 
+#define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_storage);
+
 struct vector_iids
 {
     const GUID *vector;

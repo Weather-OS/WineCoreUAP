@@ -21,7 +21,7 @@
 
 #include "FileIOInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // File Input Output Operations
 
@@ -118,6 +118,9 @@ static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, ISto
 {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
@@ -131,6 +134,9 @@ static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics 
 {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = encoding;
@@ -144,6 +150,9 @@ static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, ISt
 {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
@@ -158,6 +167,9 @@ static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics
 {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
@@ -172,6 +184,9 @@ static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IS
 {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
@@ -186,6 +201,9 @@ static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatic
 {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, textOperation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
@@ -200,6 +218,9 @@ static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, ISt
 {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
@@ -213,6 +234,9 @@ static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics
 {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = encoding;
@@ -236,6 +260,9 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -300,6 +327,9 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -364,6 +394,9 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -428,6 +461,9 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -481,6 +517,7 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
 static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_buffer_create( (IUnknown *)iface, (IUnknown *)file, file_io_statics_ReadBuffer, operation );
     TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
     return hr;
@@ -490,6 +527,9 @@ static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, I
 {
     HRESULT hr;
     struct file_io_write_buffer_options *write_buffer_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_buffer_options = calloc( 1, sizeof(*write_buffer_options) ))) return E_OUTOFMEMORY;
 
     write_buffer_options->buffer = buffer;
@@ -503,6 +543,9 @@ static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IS
 {
     HRESULT hr;
     struct file_io_write_bytes_options *write_bytes_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(write_bytes_options = calloc( 1, sizeof(*write_bytes_options) ))) return E_OUTOFMEMORY;
 
     write_bytes_options->buffer = buffer;
@@ -544,7 +587,7 @@ static struct file_io_statics file_io_statics =
 {
     {&factory_vtbl},
     {&file_io_statics_vtbl},
-    1,
+    2,
 };
 
 IActivationFactory *file_io_factory = &file_io_statics.IActivationFactory_iface;

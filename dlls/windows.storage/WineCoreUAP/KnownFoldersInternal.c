@@ -29,6 +29,8 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HSTRING *value ) 
 {    
     HRESULT status = S_OK;
@@ -43,6 +45,8 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     WCHAR manifestPath[MAX_PATH];
 
     struct appx_package package;
+
+    TRACE( "folderid %d, value %p\n", folderId, value );
 
     path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
@@ -199,6 +203,8 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     DWORD attributes;
 
     struct appx_package package;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
     PathRemoveFileSpecW(manifestPath);

@@ -21,7 +21,7 @@
 
 #include "StorageItemContentPropertiesInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Storage Item Content Properties
 

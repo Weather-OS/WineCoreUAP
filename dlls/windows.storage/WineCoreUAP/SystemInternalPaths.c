@@ -24,11 +24,15 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI system_data_paths_GetKnownFolder( ISystemDataPaths *iface, const char * FOLDERID, HSTRING *value )
 {
     //This only returns the path. No permissions system is required.
     HRESULT status = S_OK;
     PWSTR path;
+
+    TRACE( "iface %p, folderid %s, value %p\n", iface, FOLDERID, value );
 
     path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 

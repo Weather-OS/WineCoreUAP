@@ -21,7 +21,7 @@
 
 #include "StorageFileInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result )
 {
@@ -35,6 +35,8 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     LPWSTR fileExtension;
 
     struct storage_file *file;
+
+    TRACE( "filePath %p, value %p\n", filePath, result );
 
     bytesRead = 0;
     pwsMimeOut = NULL;
@@ -88,6 +90,8 @@ HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param
 
     struct storage_file *file;
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     if (!(file = calloc( 1, sizeof(*file) ))) return E_OUTOFMEMORY;
 
     file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
@@ -118,7 +122,6 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
     WCHAR uuidName[MAX_PATH];
 
     struct storage_file * newFile;
-
     struct storage_file_copy_options *copy_options = (struct storage_file_copy_options *)param;
 
     //Parameters
@@ -130,6 +133,8 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
     struct storage_item *destFolderItem;
     struct storage_item *invokerFileItem;
     struct storage_file *invokerFile;
+    
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     if (!(newFile = calloc( 1, sizeof(*newFile) ))) return E_OUTOFMEMORY;
 
@@ -200,6 +205,8 @@ HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param,
     struct storage_file *targetFile;
     struct storage_item *invokerFileItem;
     struct storage_item *targetFileItem;
+    
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );
@@ -241,6 +248,7 @@ HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIA
     struct storage_item *invokerFileItem;
     struct storage_file *invokerFile;
 
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     destFolder = impl_from_IStorageFolder( folder );
     destFolderItem = impl_from_IStorageItem( &destFolder->IStorageItem_iface );
@@ -300,6 +308,8 @@ HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param,
     struct storage_file *targetFile;
     struct storage_item *invokerFileItem;
     struct storage_item *targetFileItem;
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     invokerFile = impl_from_IStorageFile( (IStorageFile *)invoker );
     invokerFileItem = impl_from_IStorageItem( &invokerFile->IStorageItem_iface );

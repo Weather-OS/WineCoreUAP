@@ -21,7 +21,7 @@
 
 #include "HSTRINGVectorView.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+WINE_DEFAULT_DEBUG_CHANNEL(combase);
 
 struct hstring_iterator *impl_from_IIterator_HSTRING( IIterator_HSTRING *iface )
 {

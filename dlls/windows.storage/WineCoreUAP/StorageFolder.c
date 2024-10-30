@@ -20,7 +20,7 @@
  */
 #include "StorageFolderInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Storage Folder
 
@@ -217,6 +217,8 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
     HRESULT hr;
     struct storage_folder_creation_options *creation_options;
 
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
     creation_options->name = name;
@@ -231,6 +233,8 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
 {
     HRESULT hr;
     struct storage_folder_creation_options *creation_options;
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
@@ -247,6 +251,8 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
     HRESULT hr;
     struct storage_folder_creation_options *creation_options;
 
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
     creation_options->name = name;
@@ -262,6 +268,8 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
     HRESULT hr;
     struct storage_folder_creation_options *creation_options;
 
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
     creation_options->name = name;
@@ -275,6 +283,7 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
 static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFile, operation );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
     return hr;
@@ -283,6 +292,7 @@ static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRIN
 static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFolder, operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     return hr;
@@ -291,6 +301,7 @@ static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTR
 static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_item_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchItem, operation );
     TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
     return hr;
@@ -299,6 +310,7 @@ static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRIN
 static HRESULT WINAPI storage_folder_GetFilesAsyncOverloadDefaultOptionsStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_StorageFile **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_file_vector_view_create( (IUnknown *)iface, NULL, storage_folder_FetchFilesAndCount, operation );
     TRACE( "created IAsyncOperation_IVectorView_StorageFile %p.\n", *operation );
     return hr;
@@ -307,6 +319,7 @@ static HRESULT WINAPI storage_folder_GetFilesAsyncOverloadDefaultOptionsStartAnd
 static HRESULT WINAPI storage_folder_GetFoldersAsyncOverloadDefaultOptionsStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_StorageFolder **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_folder_vector_view_create( (IUnknown *)iface, NULL, storage_folder_FetchFoldersAndCount, operation );
     TRACE( "created IAsyncOperation_IVectorView_StorageFolder %p.\n", *operation );
     return hr;
@@ -315,6 +328,7 @@ static HRESULT WINAPI storage_folder_GetFoldersAsyncOverloadDefaultOptionsStartA
 static HRESULT WINAPI storage_folder_GetItemsAsyncOverloadDefaultStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_IStorageItem **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_item_vector_view_create( (IUnknown *)iface, NULL, storage_folder_FetchItemsAndCount, operation );
     TRACE( "created IAsyncOperation_IVectorView_IStorageItem %p.\n", *operation );
     return hr;
@@ -400,6 +414,7 @@ static HRESULT WINAPI storage_folder2_GetTrustLevel( IStorageFolder2 *iface, Tru
 static HRESULT WINAPI storage_folder2_TryGetItemAsync( IStorageFolder2 *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
     hr = async_operation_storage_item_create( (IUnknown *)iface, (IUnknown *)name, storage_folder2_TryFetchItem, operation );
     TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
     return hr;
@@ -423,6 +438,7 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, result );
     hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
     return hr;
@@ -447,6 +463,7 @@ static HRESULT WINAPI storage_folder_statics2_GetFolderFromPathForUserAsync( ISt
 {
     //IUser is not used
     HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, result );
     hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
     return hr;
@@ -470,7 +487,7 @@ static struct storage_folder_statics storage_folder_statics =
     {&factory_vtbl},
     {&storage_folder_statics_vtbl},
     {&storage_folder_statics2_vtbl},
-    1,
+    3,
 };
 
 IActivationFactory *storage_folder_factory = &storage_folder_statics.IActivationFactory_iface;

@@ -21,7 +21,7 @@
 
 #include "AppInternalPaths.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // App Data Paths
 
@@ -196,46 +196,55 @@ static HRESULT WINAPI app_data_paths_GetTrustLevel( IAppDataPaths *iface, TrustL
 
 static HRESULT WINAPI app_data_paths_get_Cookies( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Desktop( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "desktop", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Documents( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "documents", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Favorites( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "favorites", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_History( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "history", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_InternetCache( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "internet_cache", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_LocalAppData( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "localappdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_ProgramData( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "programdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_RoamingAppData( IAppDataPaths *iface, HSTRING *value )
 {
+    TRACE( "iface %p, value %p\n", iface, value );
     return app_data_paths_GetKnownFolder(iface, "roamingappdata", value);
 }
 
@@ -316,7 +325,7 @@ static struct app_data_paths_statics app_data_paths_statics =
 {
     {&factory_vtbl},
     {&app_data_paths_statics_vtbl},
-    1,
+    2,
 };
 
 IActivationFactory *app_data_paths_factory = &app_data_paths_statics.IActivationFactory_iface;

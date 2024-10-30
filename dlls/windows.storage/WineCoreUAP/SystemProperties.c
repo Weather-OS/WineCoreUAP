@@ -21,7 +21,7 @@
 
 #include "SystemPropertiesInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // System Properties
 
@@ -132,6 +132,7 @@ DEFINE_IINSPECTABLE( system_audio_properties, ISystemAudioProperties, struct sys
 static HRESULT WINAPI system_audio_properties_get_EncodingBitrate( ISystemAudioProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Audio.EncodingBitrate";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -153,12 +154,14 @@ DEFINE_IINSPECTABLE( system_gps_properties, ISystemGPSProperties, struct system_
 static HRESULT WINAPI system_gps_properties_get_LatitudeDecimal( ISystemGPSProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.GPS.LatitudeDecimal";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_gps_properties_get_LongitudeDecimal( ISystemGPSProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.GPS.LongitudeDecimal";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -182,36 +185,42 @@ DEFINE_IINSPECTABLE( system_media_properties, ISystemMediaProperties, struct sys
 static HRESULT WINAPI system_media_properties_get_Duration( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.Duration";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_media_properties_get_Producer( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.Producer";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_media_properties_get_Publisher( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.Publisher";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_media_properties_get_SubTitle( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.SubTitle";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_media_properties_get_Writer( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.Writer";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_media_properties_get_Year( ISystemMediaProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Media.Year";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -238,48 +247,56 @@ DEFINE_IINSPECTABLE( system_music_properties, ISystemMusicProperties, struct sys
 static HRESULT WINAPI system_music_properties_get_AlbumArtist( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.AlbumArtist";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_AlbumTitle( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.AlbumTitle";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_Artist( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.Artist";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_Composer( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.Composer";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_Conductor( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.Conductor";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_DisplayArtist( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.DisplayArtist";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_Genre( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.Genre";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_music_properties_get_TrackNumber( ISystemMusicProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Music.TrackNumber";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -308,30 +325,35 @@ DEFINE_IINSPECTABLE( system_photo_properties, ISystemPhotoProperties, struct sys
 static HRESULT WINAPI system_photo_properties_get_CameraManufacturer( ISystemPhotoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Photo.CameraManufacturer";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_photo_properties_get_CameraModel( ISystemPhotoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Photo.CameraModel";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_photo_properties_get_DateTaken( ISystemPhotoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Photo.DateTaken";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_photo_properties_get_Orientation( ISystemPhotoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Photo.Orientation";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_photo_properties_get_PeopleNames( ISystemPhotoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Photo.PeopleNames";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -357,30 +379,35 @@ DEFINE_IINSPECTABLE( system_video_properties, ISystemVideoProperties, struct sys
 static HRESULT WINAPI system_video_properties_get_Director( ISystemVideoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Video.Director";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_video_properties_get_FrameHeight( ISystemVideoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Video.FrameHeight";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_video_properties_get_FrameWidth( ISystemVideoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Video.FrameWidth";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_video_properties_get_Orientation( ISystemVideoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Video.Orientation";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_video_properties_get_TotalBitrate( ISystemVideoProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Video.TotalBitrate";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -406,12 +433,14 @@ DEFINE_IINSPECTABLE( system_image_properties, ISystemImageProperties, struct sys
 static HRESULT WINAPI system_image_properties_get_HorizontalSize( ISystemImageProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Image.HorizontalSize";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_image_properties_get_VerticalSize( ISystemImageProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Image.VerticalSize";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
@@ -434,42 +463,49 @@ DEFINE_IINSPECTABLE( system_properties, ISystemProperties, struct system_propert
 static HRESULT WINAPI system_properties_get_Author( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Author";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_Comment( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Comment";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_ItemNameDisplay( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.ItemNameDisplay";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_Keywords( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Keywords";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_Rating( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Rating";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_Title( ISystemProperties *iface, HSTRING *value )
 {
     LPCWSTR propertyStr = L"System.Title";
+    TRACE( "iface %p, value %p\n", iface, value );
     return WindowsCreateString( propertyStr, wcslen( propertyStr ), value );
 }
 
 static HRESULT WINAPI system_properties_get_Audio( ISystemProperties *iface, ISystemAudioProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemAudioProperties_iface;
     return S_OK;
 }
@@ -477,6 +513,7 @@ static HRESULT WINAPI system_properties_get_Audio( ISystemProperties *iface, ISy
 static HRESULT WINAPI system_properties_get_GPS( ISystemProperties *iface, ISystemGPSProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemGPSProperties_iface;
     return S_OK;
 }
@@ -484,6 +521,7 @@ static HRESULT WINAPI system_properties_get_GPS( ISystemProperties *iface, ISyst
 static HRESULT WINAPI system_properties_get_Media( ISystemProperties *iface, ISystemMediaProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemMediaProperties_iface;
     return S_OK;
 }
@@ -491,6 +529,7 @@ static HRESULT WINAPI system_properties_get_Media( ISystemProperties *iface, ISy
 static HRESULT WINAPI system_properties_get_Music( ISystemProperties *iface, ISystemMusicProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemMusicProperties_iface;
     return S_OK;
 }
@@ -498,6 +537,7 @@ static HRESULT WINAPI system_properties_get_Music( ISystemProperties *iface, ISy
 static HRESULT WINAPI system_properties_get_Photo( ISystemProperties *iface, ISystemPhotoProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemPhotoProperties_iface;
     return S_OK;
 }
@@ -505,6 +545,7 @@ static HRESULT WINAPI system_properties_get_Photo( ISystemProperties *iface, ISy
 static HRESULT WINAPI system_properties_get_Video( ISystemProperties *iface, ISystemVideoProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemVideoProperties_iface;
     return S_OK;
 }
@@ -512,6 +553,7 @@ static HRESULT WINAPI system_properties_get_Video( ISystemProperties *iface, ISy
 static HRESULT WINAPI system_properties_get_Image( ISystemProperties *iface, ISystemImageProperties **value )
 {
     struct system_properties *impl = impl_from_ISystemProperties( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = &impl->ISystemImageProperties_iface;
     return S_OK;
 }
@@ -552,7 +594,7 @@ static struct system_properties system_properties =
     {&system_photo_properties_vtbl},
     {&system_video_properties_vtbl},
     {&system_image_properties_vtbl},
-    1,
+    9,
 };
 
 IActivationFactory *system_properties_factory = &system_properties.IActivationFactory_iface;

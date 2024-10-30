@@ -21,7 +21,7 @@
 
 #include "BasicPropertiesInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(storage);
+_ENABLE_DEBUGGING_
 
 // Basic Properties
 

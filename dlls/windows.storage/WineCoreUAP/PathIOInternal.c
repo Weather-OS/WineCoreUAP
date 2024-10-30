@@ -21,6 +21,8 @@
 
 #include "PathIOInternal.h"
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI path_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
@@ -39,6 +41,8 @@ HRESULT WINAPI path_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
     //Parameters
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
     WindowsDuplicateString( read_text_options->absolutePath, &filePath );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -158,6 +162,8 @@ HRESULT WINAPI path_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
     WindowsDuplicateString( write_text_options->absolutePath, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
@@ -267,6 +273,8 @@ HRESULT WINAPI path_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
     WindowsDuplicateString( write_text_options->absolutePath, &filePath );
     WindowsDuplicateString( write_text_options->contents, &contents );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), FILE_APPEND_DATA, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );    
 
     switch ( unicodeEncoding )
@@ -366,6 +374,8 @@ HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     //Parameters
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
     WindowsDuplicateString( read_text_options->absolutePath, &filePath );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     if (!(HSTRINGVector = calloc( 1, sizeof(*HSTRINGVector) ))) return E_OUTOFMEMORY;
     HSTRINGVector->IVector_HSTRING_iface.lpVtbl = &hstring_vector_vtbl;
@@ -521,6 +531,8 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     //Parameters
     WindowsDuplicateString( (HSTRING)param, &filePath );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
     fileSize = GetFileSize( fileHandle, NULL );
@@ -573,6 +585,8 @@ HRESULT WINAPI path_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
     IBufferByteAccess_get_Buffer( bufferByteAccess, &contents );
     WindowsDuplicateString( write_buffer_options->absolutePath, &filePath );
 
+    TRACE( "iface %p, value %p\n", invoker, result );
+
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
@@ -613,6 +627,8 @@ HRESULT WINAPI path_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, P
     //Parameters
     contents = write_bytes_options->buffer;
     WindowsDuplicateString( write_bytes_options->absolutePath, &filePath );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file
