@@ -21,71 +21,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(data);
 
-
-struct storage_folder_async_handler
-{
-    IAsyncOperationCompletedHandler_StorageFolder IAsyncOperationCompletedHandler_StorageFolder_iface;
-    IAsyncOperation_StorageFolder *async;
-    AsyncStatus status;
-    BOOL invoked;
-    HANDLE event;
-};
-
-static inline struct storage_folder_async_handler *impl_from_IAsyncOperationCompletedHandler_StorageFolder( IAsyncOperationCompletedHandler_StorageFolder *iface )
-{
-    return CONTAINING_RECORD( iface, struct storage_folder_async_handler, IAsyncOperationCompletedHandler_StorageFolder_iface );
-}
-
-static HRESULT WINAPI storage_folder_async_handler_QueryInterface( IAsyncOperationCompletedHandler_StorageFolder *iface, REFIID iid, void **out )
-{
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IAsyncOperationCompletedHandler_StorageFolder ))
-    {
-        IUnknown_AddRef( iface );
-        *out = iface;
-        return S_OK;
-    }
-
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI storage_folder_async_handler_AddRef( IAsyncOperationCompletedHandler_StorageFolder *iface )
-{
-    return 2;
-}
-
-static ULONG WINAPI storage_folder_async_handler_Release( IAsyncOperationCompletedHandler_StorageFolder *iface )
-{
-    return 1;
-}
-
-static HRESULT WINAPI storage_folder_async_handler_Invoke( IAsyncOperationCompletedHandler_StorageFolder *iface,
-                                                 IAsyncOperation_StorageFolder *async, AsyncStatus status )
-{
-    struct storage_folder_async_handler *impl = impl_from_IAsyncOperationCompletedHandler_StorageFolder( iface );
-
-    impl->invoked = TRUE;
-    impl->async = async;
-    impl->status = status;
-    if (impl->event) SetEvent( impl->event );
-
-    return S_OK;
-}
-
-static IAsyncOperationCompletedHandler_StorageFolderVtbl storage_folder_async_handler_vtbl =
-{
-    /*** IUnknown methods ***/
-    storage_folder_async_handler_QueryInterface,
-    storage_folder_async_handler_AddRef,
-    storage_folder_async_handler_Release,
-    /*** IAsyncOperationCompletedHandler<StorageFolder> methods ***/
-    storage_folder_async_handler_Invoke,
-};
-
-static struct storage_folder_async_handler default_storage_folder_async_handler = {{&storage_folder_async_handler_vtbl}};
-
+DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
 
 static inline struct application_data_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
@@ -301,23 +237,21 @@ static HRESULT WINAPI application_data_get_RoamingSettings( IApplicationData *if
 }
 
 static HRESULT WINAPI application_data_get_LocalFolder( IApplicationData *iface, IStorageFolder **value )
-{
-    HRESULT hr;
-    struct application_data *impl = impl_from_IApplicationData( iface );
-    LPCWSTR windowsStorageFolderClassIdStr = L"Windows.Storage.StorageFolder";
+{ 
     IActivationFactory *storageActivationFactory;
     IStorageFolderStatics *storageFolderStatics;
-    IAsyncOperation_StorageFolder *storageFolderOperation;
-    IAsyncOperationCompletedHandler_StorageFolder *storageFolderHandler;
-    HSTRING windowsStorageFolderClassId;    
+    IAsyncOperation_StorageFolder *operation;
+
+    HRESULT hr;
+    HSTRING windowsStorageFolderClassId;
     HSTRING path;
     WCHAR pathStr[MAX_PATH];
     DWORD attributes;
+    DWORD res;
 
-    struct storage_folder_async_handler storage_folder_async_handler;
+    struct application_data *impl = impl_from_IApplicationData( iface );
 
     wcscpy( pathStr, WindowsGetStringRawBuffer(impl->appDataPath, NULL) );
-
     PathAppendW( pathStr, L"LocalState" );
 
     attributes = GetFileAttributesW( pathStr );
@@ -328,51 +262,42 @@ static HRESULT WINAPI application_data_get_LocalFolder( IApplicationData *iface,
     }
 
     WindowsCreateString( pathStr, wcslen( pathStr ), &path );
-    WindowsCreateString( windowsStorageFolderClassIdStr, wcslen( windowsStorageFolderClassIdStr ), &windowsStorageFolderClassId );
 
+    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &windowsStorageFolderClassId );
     hr = RoGetActivationFactory( windowsStorageFolderClassId, &IID_IActivationFactory, (void **)&storageActivationFactory );
     if ( FAILED( hr ) ) return hr;
 
     hr = IActivationFactory_QueryInterface( storageActivationFactory, &IID_IStorageFolderStatics, (void **)&storageFolderStatics );
     if ( FAILED( hr ) ) return hr;
 
-    hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &storageFolderOperation );
+    hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &operation );
     if ( FAILED( hr ) ) return hr;
 
-    IAsyncOperation_StorageFolder_get_Completed( storageFolderOperation, &storageFolderHandler );
-    storage_folder_async_handler = default_storage_folder_async_handler;
-    storage_folder_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    res = await_IAsyncOperation_StorageFolder( operation, INFINITE );
+    if ( res ) return E_ABORT;
 
-    hr = IAsyncOperation_StorageFolder_put_Completed( storageFolderOperation, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
-    if ( FAILED( hr ) ) return hr;
-
-    WaitForSingleObject( storage_folder_async_handler.event, 1000 );
-    CloseHandle( storage_folder_async_handler.event );
-
-    hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, value );
-
+    hr = IAsyncOperation_StorageFolder_GetResults( operation, value );
+    
     return hr;
 }
 
 static HRESULT WINAPI application_data_get_RoamingFolder( IApplicationData *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    struct application_data *impl = impl_from_IApplicationData( iface );
-    LPCWSTR windowsStorageFolderClassIdStr = L"Windows.Storage.StorageFolder";
     IActivationFactory *storageActivationFactory;
     IStorageFolderStatics *storageFolderStatics;
-    IAsyncOperation_StorageFolder *storageFolderOperation;
-    IAsyncOperationCompletedHandler_StorageFolder *storageFolderHandler;
-    HSTRING windowsStorageFolderClassId;    
+    IAsyncOperation_StorageFolder *operation;
+
+    HRESULT hr;
+    HSTRING windowsStorageFolderClassId;
     HSTRING path;
     WCHAR pathStr[MAX_PATH];
     DWORD attributes;
+    DWORD res;
 
-    struct storage_folder_async_handler storage_folder_async_handler;
+    struct application_data *impl = impl_from_IApplicationData( iface );
 
     wcscpy( pathStr, WindowsGetStringRawBuffer(impl->appDataPath, NULL) );
-
-    PathAppendW( pathStr, L"RoamingState" );
+    PathAppendW( pathStr, L"LocalState" );
 
     attributes = GetFileAttributesW( pathStr );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) {
@@ -382,36 +307,68 @@ static HRESULT WINAPI application_data_get_RoamingFolder( IApplicationData *ifac
     }
 
     WindowsCreateString( pathStr, wcslen( pathStr ), &path );
-    WindowsCreateString( windowsStorageFolderClassIdStr, wcslen( windowsStorageFolderClassIdStr ), &windowsStorageFolderClassId );
 
+    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &windowsStorageFolderClassId );
     hr = RoGetActivationFactory( windowsStorageFolderClassId, &IID_IActivationFactory, (void **)&storageActivationFactory );
     if ( FAILED( hr ) ) return hr;
 
     hr = IActivationFactory_QueryInterface( storageActivationFactory, &IID_IStorageFolderStatics, (void **)&storageFolderStatics );
     if ( FAILED( hr ) ) return hr;
 
-    hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &storageFolderOperation );
+    hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &operation );
     if ( FAILED( hr ) ) return hr;
 
-    IAsyncOperation_StorageFolder_get_Completed( storageFolderOperation, &storageFolderHandler );
-    storage_folder_async_handler = default_storage_folder_async_handler;
-    storage_folder_async_handler.event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    res = await_IAsyncOperation_StorageFolder( operation, INFINITE );
+    if ( res ) return E_ABORT;
 
-    hr = IAsyncOperation_StorageFolder_put_Completed( storageFolderOperation, &storage_folder_async_handler.IAsyncOperationCompletedHandler_StorageFolder_iface );
-    if ( FAILED( hr ) ) return hr;
-
-    WaitForSingleObject( storage_folder_async_handler.event, 1000 );
-    CloseHandle( storage_folder_async_handler.event );
-
-    hr = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, value );
-
+    hr = IAsyncOperation_StorageFolder_GetResults( operation, value );
+    
     return hr;
 }
 
 static HRESULT WINAPI application_data_get_TemporaryFolder( IApplicationData *iface, IStorageFolder **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    IActivationFactory *storageActivationFactory;
+    IStorageFolderStatics *storageFolderStatics;
+    IAsyncOperation_StorageFolder *operation;
+
+    HRESULT hr;
+    HSTRING windowsStorageFolderClassId;
+    HSTRING path;
+    WCHAR pathStr[MAX_PATH];
+    DWORD attributes;
+    DWORD res;
+
+    struct application_data *impl = impl_from_IApplicationData( iface );
+
+    wcscpy( pathStr, WindowsGetStringRawBuffer(impl->appDataPath, NULL) );
+    PathAppendW( pathStr, L"TempState" );
+
+    attributes = GetFileAttributesW( pathStr );
+    if ( attributes == INVALID_FILE_ATTRIBUTES ) {
+        if ( !CreateDirectoryW( pathStr, NULL ) ) {
+            return E_UNEXPECTED;
+        }
+    }
+
+    WindowsCreateString( pathStr, wcslen( pathStr ), &path );
+
+    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &windowsStorageFolderClassId );
+    hr = RoGetActivationFactory( windowsStorageFolderClassId, &IID_IActivationFactory, (void **)&storageActivationFactory );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IActivationFactory_QueryInterface( storageActivationFactory, &IID_IStorageFolderStatics, (void **)&storageFolderStatics );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &operation );
+    if ( FAILED( hr ) ) return hr;
+
+    res = await_IAsyncOperation_StorageFolder( operation, INFINITE );
+    if ( res ) return E_ABORT;
+
+    hr = IAsyncOperation_StorageFolder_GetResults( operation, value );
+    
+    return hr;
 }
 
 static HRESULT WINAPI application_data_add_DataChanged( IApplicationData *iface, ITypedEventHandler_ApplicationData_IInspectable *handler,
