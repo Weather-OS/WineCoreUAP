@@ -608,7 +608,7 @@ static struct storage_file_statics storage_file_statics =
     {&factory_vtbl},
     {&storage_file_statics_vtbl},
     {&storage_file_statics2_vtbl},
-    3,
+    1,
 };
 
 IActivationFactory *storage_file_factory = &storage_file_statics.IActivationFactory_iface;

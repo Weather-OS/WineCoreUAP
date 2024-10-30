@@ -354,7 +354,7 @@ static struct downloads_folder_statics downloads_folder_statics =
     {&factory_vtbl},
     {&downloads_folder_statics_vtbl},
     {&downloads_folder_statics2_vtbl},
-    3,
+    1,
 };
 
 IActivationFactory *downloads_folder_factory = &downloads_folder_statics.IActivationFactory_iface;

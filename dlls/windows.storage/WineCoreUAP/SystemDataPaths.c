@@ -125,68 +125,7 @@ struct system_data_paths
     LONG ref;
 };
 
-static inline struct system_data_paths *impl_from_ISystemDataPaths( ISystemDataPaths *iface )
-{
-    return CONTAINING_RECORD( iface, struct system_data_paths, ISystemDataPaths_iface );
-}
-
-static HRESULT WINAPI system_data_paths_QueryInterface( ISystemDataPaths *iface, REFIID iid, void **out )
-{
-    struct system_data_paths *impl = impl_from_ISystemDataPaths( iface );
-
-    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
-
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_ISystemDataPaths ))
-    {
-        *out = &impl->ISystemDataPaths_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI system_data_paths_AddRef( ISystemDataPaths *iface )
-{
-    struct system_data_paths *impl = impl_from_ISystemDataPaths( iface );
-    ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static ULONG WINAPI system_data_paths_Release( ISystemDataPaths *iface )
-{
-    struct system_data_paths *impl = impl_from_ISystemDataPaths( iface );
-    ULONG ref = InterlockedDecrement( &impl->ref );
-
-    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
-
-    if (!ref) free( impl );
-    return ref;
-}
-
-static HRESULT WINAPI system_data_paths_GetIids( ISystemDataPaths *iface, ULONG *iid_count, IID **iids )
-{
-    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI system_data_paths_GetRuntimeClassName( ISystemDataPaths *iface, HSTRING *class_name )
-{
-    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI system_data_paths_GetTrustLevel( ISystemDataPaths *iface, TrustLevel *trust_level )
-{
-    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
-    return E_NOTIMPL;
-}
+DEFINE_IINSPECTABLE( system_data_paths, ISystemDataPaths, struct system_data_paths, ISystemDataPaths_iface )
 
 /**
  * COM Oriented, WinRT Implementation: winrt::Windows::Storage::SystemDataPaths
@@ -353,7 +292,7 @@ static struct system_data_paths_statics system_data_paths_statics =
 {
     {&factory_vtbl},
     {&system_data_paths_statics_vtbl},
-    2,
+    1,
 };
 
 IActivationFactory *system_data_paths_factory = &system_data_paths_statics.IActivationFactory_iface;

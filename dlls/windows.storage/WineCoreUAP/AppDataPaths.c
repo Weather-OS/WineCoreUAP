@@ -325,7 +325,7 @@ static struct app_data_paths_statics app_data_paths_statics =
 {
     {&factory_vtbl},
     {&app_data_paths_statics_vtbl},
-    2,
+    1,
 };
 
 IActivationFactory *app_data_paths_factory = &app_data_paths_statics.IActivationFactory_iface;

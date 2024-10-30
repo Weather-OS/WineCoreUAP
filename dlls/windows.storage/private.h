@@ -108,7 +108,7 @@ extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnkn
 
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
-    static inline impl_type *impl_from( iface_type *iface )                                        \
+    impl_type *impl_from( iface_type *iface )                                        \
     {                                                                                              \
         return CONTAINING_RECORD( iface, impl_type, iface_mem );                                   \
     }                                                                                              \

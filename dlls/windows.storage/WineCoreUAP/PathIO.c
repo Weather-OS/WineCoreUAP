@@ -583,7 +583,7 @@ static struct path_io_statics path_io_statics =
 {
     {&factory_vtbl},
     {&path_io_statics_vtbl},
-    2,
+    1,
 };
 
 IActivationFactory *path_io_factory = &path_io_statics.IActivationFactory_iface;

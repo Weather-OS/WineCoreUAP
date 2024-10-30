@@ -125,68 +125,7 @@ struct user_data_paths
     LONG ref;
 };
 
-static inline struct user_data_paths *impl_from_IUserDataPaths( IUserDataPaths *iface )
-{
-    return CONTAINING_RECORD( iface, struct user_data_paths, IUserDataPaths_iface );
-}
-
-static HRESULT WINAPI user_data_paths_QueryInterface( IUserDataPaths *iface, REFIID iid, void **out )
-{
-    struct user_data_paths *impl = impl_from_IUserDataPaths( iface );
-
-    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
-
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IUserDataPaths ))
-    {
-        *out = &impl->IUserDataPaths_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI user_data_paths_AddRef( IUserDataPaths *iface )
-{
-    struct user_data_paths *impl = impl_from_IUserDataPaths( iface );
-    ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static ULONG WINAPI user_data_paths_Release( IUserDataPaths *iface )
-{
-    struct user_data_paths *impl = impl_from_IUserDataPaths( iface );
-    ULONG ref = InterlockedDecrement( &impl->ref );
-
-    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
-
-    if (!ref) free( impl );
-    return ref;
-}
-
-static HRESULT WINAPI user_data_paths_GetIids( IUserDataPaths *iface, ULONG *iid_count, IID **iids )
-{
-    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI user_data_paths_GetRuntimeClassName( IUserDataPaths *iface, HSTRING *class_name )
-{
-    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI user_data_paths_GetTrustLevel( IUserDataPaths *iface, TrustLevel *trust_level )
-{
-    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
-    return E_NOTIMPL;
-}
+DEFINE_IINSPECTABLE( user_data_paths, IUserDataPaths, struct user_data_paths, IUserDataPaths_iface )
 
 /**
  * COM Oriented, WinRT Implementation: winrt::Windows::Storage::UserDataPaths
@@ -392,7 +331,7 @@ static struct user_data_paths_statics user_data_paths_statics =
 {
     {&factory_vtbl},
     {&user_data_paths_statics_vtbl},
-    2,
+    1,
 };
 
 IActivationFactory *user_data_paths_factory = &user_data_paths_statics.IActivationFactory_iface;

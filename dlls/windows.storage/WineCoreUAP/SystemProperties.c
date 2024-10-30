@@ -594,7 +594,7 @@ static struct system_properties system_properties =
     {&system_photo_properties_vtbl},
     {&system_video_properties_vtbl},
     {&system_image_properties_vtbl},
-    9,
+    1,
 };
 
 IActivationFactory *system_properties_factory = &system_properties.IActivationFactory_iface;

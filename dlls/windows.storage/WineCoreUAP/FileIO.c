@@ -587,7 +587,7 @@ static struct file_io_statics file_io_statics =
 {
     {&factory_vtbl},
     {&file_io_statics_vtbl},
-    2,
+    1,
 };
 
 IActivationFactory *file_io_factory = &file_io_statics.IActivationFactory_iface;

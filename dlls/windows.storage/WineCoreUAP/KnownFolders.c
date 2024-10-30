@@ -665,7 +665,7 @@ static struct known_folders_statics known_folders_statics =
     {&known_folders_camera_roll_statics_vtbl},
     {&known_folders_playlists_statics_vtbl},
     {&known_folders_saved_pictures_statics_vtbl},
-    8,
+    1,
 };
 
 IActivationFactory *known_folders_factory = &known_folders_statics.IActivationFactory_iface;
