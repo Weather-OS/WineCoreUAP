@@ -41,13 +41,6 @@ SOURCES = \
 	WineCoreUAP/AsyncOperation/StorageFileAsync.c \
 	WineCoreUAP/AsyncOperation/StorageFileAsyncVectorView.c \
 	\
-	WineCoreUAP/Vector/HSTRINGVector.c \
-	\
-	WineCoreUAP/VectorView/HSTRINGVectorView.c \
-	WineCoreUAP/VectorView/StorageItemVectorView.c \
-	WineCoreUAP/VectorView/StorageFolderVectorView.c \
-	WineCoreUAP/VectorView/StorageFileVectorView.c \
-	\
 	WineCoreUAP/FileProperties/BasicProperties.c \
 	WineCoreUAP/FileProperties/StorageItemContentProperties.c \
 	\

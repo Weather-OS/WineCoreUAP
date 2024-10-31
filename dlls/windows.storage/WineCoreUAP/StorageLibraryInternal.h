@@ -1,4 +1,4 @@
-/* WinRT IVectorView<Windows.Storage.IStorageItem *> Implementation
+/* WinRT Windows.Storage.StorageProvider Implementation
  *
  * Written by Weather
  *
@@ -19,24 +19,23 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifndef STORAGE_LIBRARY_INTERNAL_H
+#define STORAGE_LIBRARY_INTERNAL_H
 
-
-#ifndef STORAGE_FOLDER_VECTOR_VIEW_H
-#define STORAGE_FOLDER_VECTOR_VIEW_H
-
-#include "../../private.h"
+#include "../private.h"
 #include "wine/debug.h"
 
-struct storage_folder_vector_view
+struct storage_library_statics
 {
-    IVectorView_StorageFolder IVectorView_StorageFolder_iface;
-    struct vector_iids iids;
-    LONG ref;
+    //Derivatives
+    IActivationFactory IActivationFactory_iface;
+    IStorageLibrary IStorageLibrary_iface;
 
-    UINT32 size;
-    IStorageFolder *elements[1];
+    IObservable
+
+    LONG ref;
 };
 
-struct storage_folder_vector_view *impl_from_IVectorView_StorageFolder( IVectorView_StorageFolder *iface );
+struct storage_provider *impl_from_IStorageProvider( IStorageProvider *iface );
 
 #endif

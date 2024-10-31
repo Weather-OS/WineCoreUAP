@@ -229,5 +229,4 @@ extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnkn
         return ret;                                                                                 \
     }
 
-
 #endif

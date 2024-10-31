@@ -23,6 +23,8 @@
 
 _ENABLE_DEBUGGING_
 
+#include "vector.h"
+
 HRESULT WINAPI path_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
@@ -353,8 +355,10 @@ HRESULT WINAPI path_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IVector_HSTRING *vector = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
+    HSTRING vectorElement;
     HANDLE fileHandle;
     LPCSTR fileBufferChar;
     LPWSTR fileBufferWChar;
@@ -367,19 +371,16 @@ HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     BOOL readResult;
     size_t INITIAL_BUFFER_SIZE = 100;
 
-    struct hstring_vector *HSTRINGVector;
-
     struct path_io_read_text_options *read_text_options = (struct path_io_read_text_options *)param;
 
     //Parameters
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
     WindowsDuplicateString( read_text_options->absolutePath, &filePath );
 
-    TRACE( "iface %p, value %p\n", invoker, result );
+    status = hstring_vector_create( &vector );
+    if ( FAILED( status ) ) return status;
 
-    if (!(HSTRINGVector = calloc( 1, sizeof(*HSTRINGVector) ))) return E_OUTOFMEMORY;
-    HSTRINGVector->IVector_HSTRING_iface.lpVtbl = &hstring_vector_vtbl;
-    HSTRINGVector->size = 0;
+    TRACE( "iface %p, value %p\n", invoker, result );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -483,9 +484,8 @@ HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     {
         if ( outputBuffer[ currChar ] == L'\n' )
         {
-            HSTRINGVector->size++;
-            HSTRINGVector->elements = (HSTRING*)realloc(HSTRINGVector->elements, (HSTRINGVector->size) * sizeof(HSTRING));
-            WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &HSTRINGVector->elements[ HSTRINGVector->size - 1 ] );
+            WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &vectorElement );
+            IVector_HSTRING_Append( vector, vectorElement );
             tmpBuffer = (LPWSTR)malloc(sizeof(wchar_t) * INITIAL_BUFFER_SIZE);
         } else
         {
@@ -503,15 +503,14 @@ HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
     if ( tmpBuffer )
     {
-        HSTRINGVector->size++;
-        HSTRINGVector->elements = (HSTRING*)realloc(HSTRINGVector->elements, (HSTRINGVector->size) * sizeof(HSTRING));
-        WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &HSTRINGVector->elements[ HSTRINGVector->size - 1] );
+        WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &vectorElement );
+        IVector_HSTRING_Append( vector, vectorElement );
     }
 
     if ( SUCCEEDED ( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&HSTRINGVector->IVector_HSTRING_iface;
+        result->ppunkVal = (IUnknown **)vector;
     }
 
     return status;

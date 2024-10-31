@@ -24,15 +24,12 @@
 
 #include "Streams/BufferInternal.h"
 #include "StorageFileInternal.h"
-#include "Vector/HSTRINGVector.h"
 
 
 #include "../private.h"
 #include "wine/debug.h"
 
 #define MAX_BUFFER 4096
-
-extern struct IVector_HSTRINGVtbl hstring_vector_vtbl;
 
 struct file_io_statics
 {

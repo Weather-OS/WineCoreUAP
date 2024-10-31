@@ -149,6 +149,18 @@ namespace Windows.Storage {
         interface Windows.Foundation.Collections.IIterator<Windows.Foundation.Collections.IKeyValuePair<HSTRING, Windows.Storage.ApplicationDataContainer *> *>;
         interface Windows.Foundation.Collections.IMap<HSTRING, Windows.Storage.ApplicationDataContainer *>;
         interface Windows.Foundation.Collections.IMapView<HSTRING, Windows.Storage.ApplicationDataContainer *>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Storage.IStorageItem *>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Storage.StorageFile *>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Storage.StorageFolder *>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Storage.StorageLibraryChange*>;
+        interface Windows.Foundation.Collections.IIterator<Windows.Storage.IStorageItem *>;
+        interface Windows.Foundation.Collections.IIterator<Windows.Storage.StorageFile *>;
+        interface Windows.Foundation.Collections.IIterator<Windows.Storage.StorageFolder *>;
+        interface Windows.Foundation.Collections.IIterator<Windows.Storage.StorageLibraryChange*>;
+        interface Windows.Foundation.Collections.IVector<Windows.Storage.IStorageItem *>;
+        interface Windows.Foundation.Collections.IVector<Windows.Storage.StorageFile *>;
+        interface Windows.Foundation.Collections.IVector<Windows.Storage.StorageFolder *>;
+        interface Windows.Foundation.Collections.IVector<Windows.Storage.StorageLibraryChange*>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.IStorageItem *>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile *>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *>;
