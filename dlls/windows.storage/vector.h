@@ -106,7 +106,7 @@
     static HRESULT WINAPI typename##_iterator_get_Current( IIterator_##interface_type *iface, element_type* value )              \
     {                                                                                                                            \
         struct typename##_iterator *impl = impl_from_IIterator_##interface_type(iface);                                          \
-        TRACE("iface %p, value %p, index %d.\n", iface, value, impl->index);                                                                            \
+        TRACE("iface %p, value %p, index %d.\n", iface, value, impl->index);                                                     \
                                                                                                                                  \
         *value = impl->elements[impl->index];                                                                                    \
         return S_OK;                                                                                                             \
@@ -519,8 +519,6 @@
                                                                                                                             \
         impl->index = index;                                                                                                \
         return IIterator_##interface_type##_get_Current( &impl->IIterator_##interface_type##_iface, value );                \
-                                                                                                                            \
-        return S_OK;                                                                                                        \
     }                                                                                                                       \
                                                                                                                             \
     static HRESULT WINAPI typename##_vector_get_Size( IVector_##interface_type *iface, UINT32 *value )                      \

@@ -1403,7 +1403,6 @@ static void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStora
 
     *item = storageItemResults3;
 
-
     /**
      * IStorageFolder_GetFoldersAsyncOverloadDefaultOptionsStartAndCount
     */

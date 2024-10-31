@@ -430,7 +430,6 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageFolder *folder = NULL;
     IVector_StorageFolder *vector = NULL;
     IVectorView_StorageFolder *vectorView = NULL;
 
@@ -441,6 +440,8 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
     HSTRING folderPath;
     WCHAR searchPath[MAX_PATH];
     WCHAR fullFolderPath[MAX_PATH];
+
+    struct storage_folder *folder;
 
     status = storage_folder_vector_create( &vector );
     if ( FAILED( status ) ) return status;
@@ -472,14 +473,14 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
                 PathAppendW( fullFolderPath, findFolderData.cFileName );
                 WindowsCreateString( fullFolderPath, wcslen( fullFolderPath ), &folderPath);
 
-                status = storage_folder_AssignFolder( folderPath, folder );
+                status = storage_folder_AssignFolder( folderPath, &folder->IStorageFolder_iface );
 
                 if ( FAILED( status ) )
                     break;
 
                 SecureZeroMemory( fullFolderPath, sizeof( fullFolderPath ) );
 
-                IVector_StorageFolder_Append( vector, folder );
+                IVector_StorageFolder_Append( vector, &folder->IStorageFolder_iface );
             }
         }
     }
