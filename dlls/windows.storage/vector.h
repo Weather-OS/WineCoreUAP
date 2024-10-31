@@ -593,6 +593,14 @@
         if (index > impl->size)                                                                                             \
             return E_BOUNDS;                                                                                                \
                                                                                                                             \
+        if (impl->elements) {                                                                                               \
+            element_type* new_elements = (element_type*)realloc(impl->elements, sizeof(element_type) * (impl->size + 1));   \
+            if (!new_elements) {                                                                                            \
+                return E_OUTOFMEMORY;                                                                                       \
+            }                                                                                                               \
+            impl->elements = new_elements;                                                                                  \
+        }                                                                                                                   \
+                                                                                                                            \
         for ( i = index; i < impl->size; i++ )                                                                              \
         {                                                                                                                   \
             impl->elements[i + 1] = impl->elements[i];                                                                      \
@@ -618,6 +626,14 @@
         for ( i = index; i < impl->size - 1; i++ )                                                                          \
         {                                                                                                                   \
             impl->elements[i] = impl->elements[i + 1];                                                                      \
+        }                                                                                                                   \
+                                                                                                                            \
+        if (impl->elements) {                                                                                               \
+            element_type* new_elements = (element_type*)realloc(impl->elements, sizeof(element_type) * (impl->size - 1));   \
+            if (!new_elements) {                                                                                            \
+                return E_OUTOFMEMORY;                                                                                       \
+            }                                                                                                               \
+            impl->elements = new_elements;                                                                                  \
         }                                                                                                                   \
                                                                                                                             \
         impl->size--;                                                                                                       \
@@ -659,6 +675,14 @@
         TRACE( "iface %p.\n", iface );                                                                                      \
                                                                                                                             \
         impl->elements[impl->size - 1] = NULL;                                                                              \
+        if (impl->elements) {                                                                                               \
+            element_type* new_elements = (element_type*)realloc(impl->elements, sizeof(element_type) * (impl->size - 1));   \
+            if (!new_elements) {                                                                                            \
+                return E_OUTOFMEMORY;                                                                                       \
+            }                                                                                                               \
+            impl->elements = new_elements;                                                                                  \
+        }                                                                                                                   \
+                                                                                                                            \
         impl->size--;                                                                                                       \
                                                                                                                             \
         return S_OK;                                                                                                        \
@@ -714,6 +738,7 @@
             impl->elements[i] = NULL;                                                                                       \
         }                                                                                                                   \
                                                                                                                             \
+        impl->elements = malloc(sizeof(element_type) * (count));                                                            \
         for (i = 0; i < count; i++)                                                                                         \
         {                                                                                                                   \
             impl->elements[i] = items[i];                                                                                   \
@@ -724,7 +749,7 @@
         return S_OK;                                                                                                        \
     }                                                                                                                       \
                                                                                                                             \
-    static struct IVector_##interface_type##Vtbl typename##_vector_vtbl =                                            \
+    static struct IVector_##interface_type##Vtbl typename##_vector_vtbl =                                                   \
     {                                                                                                                       \
         typename##_vector_QueryInterface,                                                                                   \
         typename##_vector_AddRef,                                                                                           \
@@ -778,6 +803,7 @@ DEFINE_VECTOR( hstring, HSTRING, HSTRING )
 DEFINE_VECTOR( storage_folder, StorageFolder, IStorageFolder* )
 DEFINE_VECTOR( storage_file, StorageFile, IStorageFile* )
 
+//non-runtime class require redefinition
 #undef IStorageItem
 DEFINE_VECTOR( storage_item, IStorageItem, __x_ABI_CWindows_CStorage_CIStorageItem* )
 #define IStorageItem __x_ABI_CWindows_CStorage_CIStorageItem
