@@ -215,6 +215,7 @@ static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatic
 static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
@@ -223,13 +224,14 @@ static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HST
     read_text_options->encoding = UnicodeEncoding_Utf8;
     read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, linesOperation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
     return hr;
 }
 
 static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct path_io_read_text_options *read_text_options;
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
@@ -238,7 +240,7 @@ static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics
     read_text_options->encoding = encoding;
     read_text_options->absolutePath = absolutePath;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, linesOperation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
     return hr;
 }
 
@@ -513,8 +515,9 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
 static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IBuffer };
     TRACE( "iface %p, operation %p\n", iface, operation );
-    hr = async_operation_buffer_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
     return hr;
 }

@@ -217,6 +217,8 @@ static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatic
 static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
+
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct file_io_read_text_options *read_text_options;
 
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
@@ -226,13 +228,14 @@ static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, ISt
     read_text_options->encoding = UnicodeEncoding_Utf8;
     read_text_options->file = file;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
     return hr;
 }
 
 static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct file_io_read_text_options *read_text_options;
 
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
@@ -242,7 +245,7 @@ static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics
     read_text_options->encoding = encoding;
     read_text_options->file = file;
 
-    hr = async_operation_hstring_vector_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, linesOperation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
     return hr;
 }
 
@@ -517,8 +520,9 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
 static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IBuffer };
     TRACE( "iface %p, operation %p\n", iface, operation );
-    hr = async_operation_buffer_create( (IUnknown *)iface, (IUnknown *)file, file_io_statics_ReadBuffer, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)file, file_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
     return hr;
 }

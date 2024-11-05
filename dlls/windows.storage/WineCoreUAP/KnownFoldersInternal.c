@@ -218,8 +218,8 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &KnownFolderPath );
     if ( status == E_ACCESSDENIED )
     {
-        result->vt = VT_INT;
-        result->lVal = (LONG)KnownFoldersAccessStatus_NotDeclaredByApp;
+        result->vt = VT_UI4;
+        result->ulVal = (ULONG)KnownFoldersAccessStatus_NotDeclaredByApp;
         return status;
     }
 
@@ -228,8 +228,8 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     {
         if ( GetLastError() == ERROR_ACCESS_DENIED )
         {
-            result->vt = VT_INT;
-            result->lVal = (LONG)KnownFoldersAccessStatus_DeniedBySystem;
+            result->vt = VT_UI4;
+            result->ulVal = (ULONG)KnownFoldersAccessStatus_DeniedBySystem;
         }
     }
 
@@ -252,20 +252,20 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
             MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2
         );
 
-        result->vt = VT_INT;
+        result->vt = VT_UI4;
 
         switch ( promptResult )
         {
             case IDYES:
-                result->lVal = (LONG)KnownFoldersAccessStatus_Allowed;
+                result->ulVal = (ULONG)KnownFoldersAccessStatus_Allowed;
                 break;
                 
             case IDNO:
-                result->lVal = (LONG)KnownFoldersAccessStatus_DeniedByUser;
+                result->ulVal = (ULONG)KnownFoldersAccessStatus_DeniedByUser;
                 break;
 
             default:
-                result->lVal = (LONG)KnownFoldersAccessStatus_AllowedPerAppFolder;
+                result->ulVal = (ULONG)KnownFoldersAccessStatus_AllowedPerAppFolder;
                 break;
         }
     }

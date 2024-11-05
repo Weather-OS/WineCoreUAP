@@ -247,6 +247,7 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
     HRESULT hr;
     HSTRING name;
     struct storage_file_copy_options *copy_options;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
 
     struct storage_file *impl = impl_from_IStorageFile( iface );
     struct storage_item *implItem = impl_from_IStorageItem( &impl->IStorageItem_iface );
@@ -260,7 +261,7 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
     copy_options->name = name;
     copy_options->option = NameCollisionOption_FailIfExists;
 
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
     
     return hr;
 }
@@ -270,6 +271,7 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *ifa
     HRESULT hr;
 
     struct storage_file_copy_options *copy_options;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
 
     TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
 
@@ -279,7 +281,7 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *ifa
     copy_options->name = name;
     copy_options->option = NameCollisionOption_FailIfExists;
 
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
     
     return hr;
 }
@@ -289,6 +291,7 @@ static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFo
     HRESULT hr;
 
     struct storage_file_move_options *copy_options;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
 
     TRACE( "iface %p, folder %p, value %p\n", iface, folder, operation );
 
@@ -298,7 +301,7 @@ static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFo
     copy_options->name = name;
     copy_options->option = option;
     
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
 
     return hr;
 }
@@ -484,8 +487,9 @@ DEFINE_IINSPECTABLE( storage_file_statics, IStorageFileStatics, struct storage_f
 static HRESULT WINAPI storage_file_statics_GetFileFromPathAsync( IStorageFileStatics *iface, HSTRING path, IAsyncOperation_StorageFile **result )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
     TRACE( "iface %p, path %p, result %p\n", iface, path, result );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;
 }
@@ -501,6 +505,8 @@ static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStor
     LPCWSTR uriPathStr;
     LPCWSTR appDataPathStr;
     WCHAR pathStr[MAX_PATH];
+
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
 
     TRACE( "iface %p, path %p, result %p\n", iface, uri, result );
 
@@ -529,7 +535,7 @@ static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStor
 
     WindowsCreateString( pathStr, wcslen( pathStr ), &path );
 
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;
 }
@@ -584,8 +590,9 @@ static HRESULT WINAPI storage_file_statics2_GetFileFromPathForUserAsync( IStorag
 {
     //User is not used.
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
     TRACE( "iface %p, path %p, result %p\n", iface, path, result );
-    hr = async_operation_storage_file_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, result );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;
 }

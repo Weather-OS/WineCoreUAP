@@ -271,7 +271,7 @@ HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, P
     properties->ref = 1;
 
     result->vt = VT_UNKNOWN;
-    result->ppunkVal = (IUnknown **)&properties->IBasicProperties_iface;
+    result->punkVal = (IUnknown *)&properties->IBasicProperties_iface;
     
     return status;
 

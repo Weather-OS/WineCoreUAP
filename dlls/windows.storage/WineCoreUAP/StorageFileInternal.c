@@ -106,7 +106,7 @@ HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&file->IStorageFile_iface;
+        result->punkVal = (IUnknown *)&file->IStorageFile_iface;
     }
 
     return status;
@@ -190,7 +190,7 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&newFile->IStorageFile_iface;
+        result->punkVal = (IUnknown *)&newFile->IStorageFile_iface;
     }
 
     return status;

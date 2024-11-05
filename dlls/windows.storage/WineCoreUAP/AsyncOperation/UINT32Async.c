@@ -30,6 +30,7 @@ struct uint32_async
 {
     IAsyncOperation_UINT32 IAsyncOperation_UINT32_iface;
     IWineAsyncInfoImpl *IWineAsyncInfoImpl_inner;
+    struct async_operation_iids iids;
     LONG ref;
 };
 
@@ -48,6 +49,12 @@ static HRESULT WINAPI uint32_async_QueryInterface( IAsyncOperation_UINT32 *iface
         IsEqualGUID( iid, &IID_IInspectable ) ||
         IsEqualGUID( iid, &IID_IAgileObject ) ||
         IsEqualGUID( iid, &IID_IAsyncOperation_UINT32 ))
+    {
+        IInspectable_AddRef( (*out = &impl->IAsyncOperation_UINT32_iface) );
+        return S_OK;
+    }
+
+    if ( IsEqualGUID( iid, impl->iids.operation ))
     {
         IInspectable_AddRef( (*out = &impl->IAsyncOperation_UINT32_iface) );
         return S_OK;
@@ -145,7 +152,7 @@ static const struct IAsyncOperation_UINT32Vtbl uint32_async_vtbl =
     uint32_async_GetResults,
 };
 
-HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperation_UINT32 **out )
 {
     struct uint32_async *impl;
@@ -154,6 +161,7 @@ HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async
     *out = NULL;
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
     impl->IAsyncOperation_UINT32_iface.lpVtbl = &uint32_async_vtbl;
+    impl->iids = iids;
     impl->ref = 1;
     if (FAILED(hr = async_info_create( invoker, param, callback, (IInspectable *)&impl->IAsyncOperation_UINT32_iface, &impl->IWineAsyncInfoImpl_inner )) ||
         FAILED(hr = IWineAsyncInfoImpl_Start( impl->IWineAsyncInfoImpl_inner )))

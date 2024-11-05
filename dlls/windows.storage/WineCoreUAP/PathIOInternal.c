@@ -23,8 +23,6 @@
 
 _ENABLE_DEBUGGING_
 
-#include "vector.h"
-
 HRESULT WINAPI path_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
@@ -510,7 +508,7 @@ HRESULT WINAPI path_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     if ( SUCCEEDED ( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)vector;
+        result->punkVal = (IUnknown *)vector;
     }
 
     return status;
@@ -560,7 +558,7 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     if ( SUCCEEDED ( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)buffer;
+        result->punkVal = (IUnknown *)buffer;
     }
 
     CloseHandle( fileHandle );

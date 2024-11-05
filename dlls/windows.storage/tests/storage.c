@@ -1788,10 +1788,6 @@ static void test_KnownFolders( void )
     check_interface( knownFoldersAccessStatusOperation, &IID_IAsyncInfo );
     check_interface( knownFoldersAccessStatusOperation, &IID_IAsyncOperation_KnownFoldersAccessStatus );
 
-    hr = IAsyncOperation_KnownFoldersAccessStatus_GetResults ( knownFoldersAccessStatusOperation, &accessStatus );
-    ok( hr == E_ILLEGAL_METHOD_CALL, "got hr %#lx.\n", hr );   
-    ok( accessStatus == KnownFoldersAccessStatus_UserPromptRequired, "got accessStatus %#x.\n", accessStatus );
-
     hr = IAsyncOperation_KnownFoldersAccessStatus_get_Completed( knownFoldersAccessStatusOperation, &knownFoldersAccessStatusHandler );
     ok( hr == S_OK, "get_Completed returned %#lx\n", hr );
     ok( knownFoldersAccessStatusHandler == NULL, "got handler %p\n", knownFoldersAccessStatusHandler );

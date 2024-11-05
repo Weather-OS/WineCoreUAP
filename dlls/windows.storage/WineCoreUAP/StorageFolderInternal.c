@@ -23,8 +23,6 @@
 
 _ENABLE_DEBUGGING_
 
-#include "../vector.h"
-
 HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value )
 {
     //MUST BE CALLED FROM AN ASYNCHRONOUS CONTEXT!
@@ -73,7 +71,7 @@ HRESULT WINAPI storage_folder_AssignFolderAsync ( IUnknown *invoker, IUnknown *p
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&folder->IStorageFolder_iface;
+        result->punkVal = (IUnknown *)&folder->IStorageFolder_iface;
     }
 
     return status;
@@ -163,7 +161,7 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&resultFolder->IStorageFolder_iface;
+        result->punkVal = (IUnknown *)&resultFolder->IStorageFolder_iface;
     }
 
     return status;
@@ -252,7 +250,7 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&resultFile->IStorageFile_iface;
+        result->punkVal = (IUnknown *)&resultFile->IStorageFile_iface;
     }
 
     return status;
@@ -293,13 +291,13 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
             if (!(newFolder = calloc( 1, sizeof(*newFolder) ))) return E_OUTOFMEMORY;
             storage_folder_AssignFolder( itemPath, &newFolder->IStorageFolder_iface );
             result->vt = VT_UNKNOWN;
-            result->ppunkVal = (IUnknown **)&newFolder->IStorageItem_iface;
+            result->punkVal = (IUnknown *)&newFolder->IStorageItem_iface;
         } else
         {
             if (!(newFile = calloc( 1, sizeof(*newFile) ))) return E_OUTOFMEMORY;
             storage_file_AssignFile( itemPath, &newFile->IStorageFile_iface );
             result->vt = VT_UNKNOWN;
-            result->ppunkVal = (IUnknown **)&newFile->IStorageItem_iface;
+            result->punkVal = (IUnknown *)&newFile->IStorageItem_iface;
         }
     }
 
@@ -325,11 +323,16 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     struct storage_folder *newFolder;
     struct storage_file *newFile;
 
+    //non-runtime class require redefinition
+    #undef IStorageItem
+    DEFINE_VECTOR_IIDS( IStorageItem );
+    #define IStorageItem __x_ABI_CWindows_CStorage_CIStorageItem
+
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
 
-    status = storage_item_vector_create( &vector );
+    status = vector_create( &IStorageItem_iids, (void **)&vector );
     if ( FAILED( status ) ) return status;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -385,7 +388,7 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)vectorView;
+        result->punkVal = (IUnknown *)vectorView;
     }
 
     return status;
@@ -421,7 +424,7 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&folderToFetch->IStorageFolder_iface;
+        result->punkVal = (IUnknown *)&folderToFetch->IStorageFolder_iface;
     }
 
 
@@ -443,7 +446,8 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
 
     struct storage_folder *folder;
 
-    status = storage_folder_vector_create( &vector );
+    DEFINE_VECTOR_IIDS( StorageFolder );
+    status = vector_create( &StorageFolder_iids, (void **)&vector );
     if ( FAILED( status ) ) return status;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -490,7 +494,7 @@ HRESULT WINAPI storage_folder_FetchFoldersAndCount( IUnknown *invoker, IUnknown 
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)vectorView;
+        result->punkVal = (IUnknown *)vectorView;
     }
 
     return status;
@@ -526,7 +530,7 @@ HRESULT WINAPI storage_folder_FetchFile( IUnknown *invoker, IUnknown *param, PRO
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)&fileToFetch->IStorageFile_iface;
+        result->punkVal = (IUnknown *)&fileToFetch->IStorageFile_iface;
     }
 
 
@@ -545,10 +549,11 @@ HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *p
     HSTRING filePath;
     WCHAR searchPath[MAX_PATH]; 
     WCHAR fullFilePath[MAX_PATH];
-
+    
     struct storage_file *file;
 
-    status = storage_file_vector_create( &vector );
+    DEFINE_VECTOR_IIDS( StorageFile );
+    status = vector_create( &StorageFile_iids, (void **)&vector );
     if ( FAILED( status ) ) return status;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -595,7 +600,7 @@ HRESULT WINAPI storage_folder_FetchFilesAndCount( IUnknown *invoker, IUnknown *p
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
-        result->ppunkVal = (IUnknown **)vectorView;
+        result->punkVal = (IUnknown *)vectorView;
     }
 
     return status;
@@ -636,18 +641,18 @@ HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param,
             if (!(newFolder = calloc( 1, sizeof(*newFolder) ))) return E_OUTOFMEMORY;
             storage_folder_AssignFolder( itemPath, &newFolder->IStorageFolder_iface );
             result->vt = VT_UNKNOWN;
-            result->ppunkVal = (IUnknown **)&newFolder->IStorageItem_iface;
+            result->punkVal = (IUnknown *)&newFolder->IStorageItem_iface;
         } else
         {
             if (!(newFile = calloc( 1, sizeof(*newFile) ))) return E_OUTOFMEMORY;
             storage_file_AssignFile( itemPath, &newFile->IStorageFile_iface );
             result->vt = VT_UNKNOWN;
-            result->ppunkVal = (IUnknown **)&newFile->IStorageItem_iface;
+            result->punkVal = (IUnknown *)&newFile->IStorageItem_iface;
         }
     } else 
     {
         result->vt = VT_NULL;
-        result->ppunkVal = (IUnknown **)NULL;
+        result->punkVal = (IUnknown *)NULL;
     }
 
     return S_OK;

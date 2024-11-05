@@ -694,12 +694,13 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
 static HRESULT WINAPI data_reader_LoadAsync( IDataReader *iface, UINT32 count, IAsyncOperation_UINT32 **operation)
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_UINT32 };
     struct load_arguments *arguments;
     if (!(arguments = calloc( 1, sizeof(*arguments) ))) return E_OUTOFMEMORY;
 
     arguments->count = count;
 
-    hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)arguments, data_reader_Load, operation );
+    hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)arguments, data_reader_Load, iids, operation );
     return hr;
 }
 

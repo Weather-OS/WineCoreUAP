@@ -58,6 +58,11 @@ struct vector_iids
     const GUID *iterator;
 };
 
+struct async_operation_iids
+{
+    const GUID *operation;
+};
+
 extern IActivationFactory *app_data_paths_factory;
 extern IActivationFactory *user_data_paths_factory;
 extern IActivationFactory *storage_folder_factory;
@@ -75,37 +80,24 @@ extern IActivationFactory *data_reader_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
-HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
-
+extern HRESULT async_operation_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
+                                        IAsyncOperation_IInspectable **out );
 extern HRESULT async_operation_hstring_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_HSTRING **out );
-extern HRESULT async_operation_hstring_vector_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IVector_HSTRING **out );                                              
-extern HRESULT async_operation_known_folders_access_status_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_KnownFoldersAccessStatus **out );
-extern HRESULT async_operation_storage_file_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_StorageFile **out );
-extern HRESULT async_operation_storage_folder_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_StorageFolder **out );
-extern HRESULT async_operation_storage_item_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IStorageItem **out );
-extern HRESULT async_operation_buffer_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IBuffer **out );
-extern HRESULT async_operation_storage_file_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IVectorView_StorageFile **out );
-extern HRESULT async_operation_storage_item_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IVectorView_IStorageItem **out );
-extern HRESULT async_operation_storage_folder_vector_view_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IVectorView_StorageFolder **out );
 extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IAsyncAction **ret);
-extern HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+extern HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperation_UINT32 **out );
+extern HRESULT vector_create( const struct vector_iids *iids, void **out );
+extern HRESULT hstring_vector_create( IVector_HSTRING **out );
 
 extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_BasicProperties **out );
 
+#define DEFINE_VECTOR_IIDS( interface ) \
+    struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface };
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     impl_type *impl_from( iface_type *iface )                                        \

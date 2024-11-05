@@ -449,6 +449,7 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
     HRESULT hr;
     HSTRING path;
 
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
     struct storage_folder *folder;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
@@ -458,7 +459,7 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
     hr = known_folders_statics_GetKnownFolder( folder_id, &path );
     if ( SUCCEEDED( hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
         TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     }
 
@@ -483,8 +484,9 @@ DEFINE_IINSPECTABLE( known_folders_statics4, IKnownFoldersStatics4, struct known
 static HRESULT WINAPI known_folders_statics4_RequestAccessAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
 {
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_KnownFoldersAccessStatus };
     TRACE( "iface %p, operation %p\n", iface, operation );
-    hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
+    hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, iids, (IAsyncOperation_UINT32 **)operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
     return hr;
 }
@@ -493,8 +495,9 @@ static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFo
 {
     //User is not used. 
     HRESULT hr;
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_KnownFoldersAccessStatus };
     TRACE( "iface %p, operation %p\n", iface, operation );
-    hr = async_operation_known_folders_access_status_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, operation );
+    hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, iids, (IAsyncOperation_UINT32 **)operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
     return hr;
 }
@@ -504,6 +507,7 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     HRESULT hr;
     HSTRING path;
 
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
     struct storage_folder *folder;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
@@ -513,7 +517,7 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     hr = known_folders_statics_GetKnownFolder( folder_id, &path );
     if ( SUCCEEDED( hr ) )
     {
-        hr = async_operation_storage_folder_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, operation );
+        hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
         TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
     }
 
