@@ -46,9 +46,9 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
         return S_OK;
     }
 
-    if (IsEqualGUID( iid, &IID_IStorageLibrary ))
+    if (IsEqualGUID( iid, &IID_IStorageLibraryStatics ))
     {
-        *out = &impl->IStorageLibrary_iface;
+        *out = &impl->IStorageLibraryStatics_iface;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -111,25 +111,15 @@ static const struct IActivationFactoryVtbl factory_vtbl =
     factory_ActivateInstance,
 };
 
-DEFINE_IINSPECTABLE( storage_library_statics, IStorageLibrary, struct storage_library_statics, IStorageLibrary_iface )
+DEFINE_IINSPECTABLE( storage_library_statics, IStorageLibraryStatics, struct storage_library_statics, IStorageLibraryStatics_iface )
 
-static HRESULT WINAPI storage_library_statics_get_DisplayName( IStorageLibrary *iface, HSTRING *value )
-{    
-    struct storage_library_statics *impl = impl_from_IStorageLibrary( iface );
-    TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->DisplayName;
-    return S_OK;
-}
-
-static HRESULT WINAPI storage_library_statics_get_Id( IStorageLibrary *iface, HSTRING *value )
+static HRESULT WINAPI storage_library_statics_GetLibraryAsync( IStorageLibraryStatics *iface, KnownLibraryId libraryId, IAsyncOperation_StorageLibrary **operation )
 {
-    struct storage_library_statics *impl = impl_from_IStorageLibrary( iface );
-    TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->Id;
-    return S_OK;
+    FIXME("iface %p, libraryId %d, operation %p stub!\n", iface, libraryId, operation);
+    return E_NOTIMPL;
 }
 
-const struct IStorageLibraryVtbl storage_library_statics_vtbl =
+const struct IStorageLibraryStaticsVtbl storage_library_statics_vtbl =
 {
     storage_library_statics_QueryInterface,
     storage_library_statics_AddRef,
@@ -138,17 +128,14 @@ const struct IStorageLibraryVtbl storage_library_statics_vtbl =
     storage_library_statics_GetIids,
     storage_library_statics_GetRuntimeClassName,
     storage_library_statics_GetTrustLevel,
-    /* IStorageLibrary methods */    
-    storage_library_statics_get_Id,
-    storage_library_statics_get_DisplayName
+    /* IStorageLibraryStatics methods */    
+    storage_library_statics_GetLibraryAsync
 };
 
 static struct storage_library_statics storage_library_statics =
 {    
     {&factory_vtbl},    
-    {&storage_library_statics_vtbl},    
-    NULL,
-    NULL,     
+    {&storage_library_statics_vtbl},
     1,    
 };
 

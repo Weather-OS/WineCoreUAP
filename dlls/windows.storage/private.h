@@ -81,6 +81,7 @@ extern IActivationFactory *buffer_factory;
 extern IActivationFactory *system_properties_factory;
 extern IActivationFactory *system_data_paths_factory;
 extern IActivationFactory *data_reader_factory;
+extern IActivationFactory *storage_library_statics_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 

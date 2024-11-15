@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.StorageProvider Implementation
+/* WinRT Windows.Storage.StorageLibrary Implementation
  *
  * Written by Weather
  *
@@ -29,9 +29,7 @@ struct storage_library_statics
 {
     //Derivatives
     IActivationFactory IActivationFactory_iface;
-    IStorageLibrary IStorageLibrary_iface;
-
-    IObservable
+    IStorageLibraryStatics IStorageLibraryStatics_iface;
 
     LONG ref;
 };

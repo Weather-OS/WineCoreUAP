@@ -23,6 +23,7 @@ SOURCES = \
 	WineCoreUAP/StorageFile.c \
 	WineCoreUAP/StorageFileInternal.c \
 	WineCoreUAP/StorageProvider.c \
+	WineCoreUAP/StorageLibrary.c \
 	WineCoreUAP/SystemProperties.c \
 	WineCoreUAP/SystemDataPaths.c \
 	WineCoreUAP/SystemInternalPaths.c \
