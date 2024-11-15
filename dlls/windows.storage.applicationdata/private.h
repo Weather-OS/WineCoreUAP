@@ -41,13 +41,60 @@
 
 extern IActivationFactory *application_data_factory;
 
+struct vector_iids
+{
+    const GUID *observableVector;
+    const GUID *vector;
+    const GUID *view;
+    const GUID *iterable;
+    const GUID *iterator;
+};
+
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
-HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+typedef HRESULT (WINAPI *observable_vector_callback)( IObservableVector_IInspectable *invoker, IVectorChangedEventArgs *args );
+
+typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );
+
+extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
 
 extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IAsyncAction **ret);
+
+extern HRESULT vector_create( const struct vector_iids *iids, void **out );
+
+extern HRESULT observable_vector_create( const struct vector_iids *iids, void **out );
+
+extern HRESULT hstring_map_create( const struct vector_iids *iids, void **out );
+
+extern HRESULT observable_hstring_map_create( const struct vector_iids *iids, void **out );
+
+extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
+
+#define DEFINE_VECTOR_IIDS( interface ) \
+    struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };
+
+#define DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )                 \
+    static inline impl_type *impl_from( iface_type *iface )                                        \
+    {                                                                                              \
+        return CONTAINING_RECORD( iface, impl_type, iface_mem );                                   \
+    }                                                                                              \
+    static HRESULT WINAPI pfx##_QueryInterface( iface_type *iface, REFIID iid, void **out )        \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_QueryInterface( (IInspectable *)(expr), iid, out );                    \
+    }                                                                                              \
+    static ULONG WINAPI pfx##_AddRef( iface_type *iface )                                          \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_AddRef( (IInspectable *)(expr) );                                      \
+    }                                                                                              \
+    static ULONG WINAPI pfx##_Release( iface_type *iface )                                         \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_Release( (IInspectable *)(expr) );                                     \
+    }
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     static inline impl_type *impl_from( iface_type *iface )                                        \
@@ -166,6 +213,8 @@ extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_op
         return ret;                                                                                 \
     }
 
+#define DEFINE_IUNKNOWN( pfx, iface_type, impl_type, base_iface )                                  \
+    DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
 #define DEFINE_IINSPECTABLE( pfx, iface_type, impl_type, base_iface )                              \
     DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
 #define DEFINE_IINSPECTABLE_OUTER( pfx, iface_type, impl_type, outer_iface )                       \

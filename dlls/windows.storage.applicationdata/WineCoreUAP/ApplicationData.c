@@ -239,36 +239,35 @@ static HRESULT WINAPI application_data_get_RoamingSettings( IApplicationData *if
 static HRESULT WINAPI application_data_get_LocalFolder( IApplicationData *iface, IStorageFolder **value )
 { 
     IActivationFactory *storageActivationFactory;
+    IActivationFactory *appdataPathsActivationFactory;
     IStorageFolderStatics *storageFolderStatics;
     IAsyncOperation_StorageFolder *operation;
+    IAppDataPathsStatics *appDataStatics;
+    IAppDataPaths *appData;
 
     HRESULT hr;
-    HSTRING windowsStorageFolderClassId;
+    HSTRING classIds;
     HSTRING path;
-    WCHAR pathStr[MAX_PATH];
-    DWORD attributes;
     DWORD res;
 
-    struct application_data *impl = impl_from_IApplicationData( iface );
+    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &classIds );
+    hr = RoGetActivationFactory( classIds, &IID_IActivationFactory, (void **)&storageActivationFactory );
+    if ( FAILED( hr ) ) return hr;
 
-    wcscpy( pathStr, WindowsGetStringRawBuffer(impl->appDataPath, NULL) );
-    PathAppendW( pathStr, L"LocalState" );
-
-    attributes = GetFileAttributesW( pathStr );
-    if ( attributes == INVALID_FILE_ATTRIBUTES ) {
-        if ( !CreateDirectoryW( pathStr, NULL ) ) {
-            return E_UNEXPECTED;
-        }
-    }
-
-    WindowsCreateString( pathStr, wcslen( pathStr ), &path );
-
-    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &windowsStorageFolderClassId );
-    hr = RoGetActivationFactory( windowsStorageFolderClassId, &IID_IActivationFactory, (void **)&storageActivationFactory );
+    WindowsCreateString( L"Windows.Storage.AppDataPaths", wcslen( L"Windows.Storage.AppDataPaths" ), &classIds );
+    hr = RoGetActivationFactory( classIds, &IID_IActivationFactory, (void **)&appdataPathsActivationFactory );
     if ( FAILED( hr ) ) return hr;
 
     hr = IActivationFactory_QueryInterface( storageActivationFactory, &IID_IStorageFolderStatics, (void **)&storageFolderStatics );
     if ( FAILED( hr ) ) return hr;
+
+    hr = IActivationFactory_QueryInterface( appdataPathsActivationFactory, &IID_IAppDataPathsStatics, (void **)&appDataStatics );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IAppDataPathsStatics_GetDefault( appDataStatics, &appData );
+    if ( FAILED( hr ) ) return hr;
+
+    IAppDataPaths_get_LocalAppData( appData, &path );
 
     hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &operation );
     if ( FAILED( hr ) ) return hr;
@@ -284,36 +283,35 @@ static HRESULT WINAPI application_data_get_LocalFolder( IApplicationData *iface,
 static HRESULT WINAPI application_data_get_RoamingFolder( IApplicationData *iface, IStorageFolder **value )
 {
     IActivationFactory *storageActivationFactory;
+    IActivationFactory *appdataPathsActivationFactory;
     IStorageFolderStatics *storageFolderStatics;
     IAsyncOperation_StorageFolder *operation;
+    IAppDataPathsStatics *appDataStatics;
+    IAppDataPaths *appData;
 
     HRESULT hr;
-    HSTRING windowsStorageFolderClassId;
+    HSTRING classIds;
     HSTRING path;
-    WCHAR pathStr[MAX_PATH];
-    DWORD attributes;
     DWORD res;
 
-    struct application_data *impl = impl_from_IApplicationData( iface );
+    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &classIds );
+    hr = RoGetActivationFactory( classIds, &IID_IActivationFactory, (void **)&storageActivationFactory );
+    if ( FAILED( hr ) ) return hr;
 
-    wcscpy( pathStr, WindowsGetStringRawBuffer(impl->appDataPath, NULL) );
-    PathAppendW( pathStr, L"LocalState" );
-
-    attributes = GetFileAttributesW( pathStr );
-    if ( attributes == INVALID_FILE_ATTRIBUTES ) {
-        if ( !CreateDirectoryW( pathStr, NULL ) ) {
-            return E_UNEXPECTED;
-        }
-    }
-
-    WindowsCreateString( pathStr, wcslen( pathStr ), &path );
-
-    WindowsCreateString( L"Windows.Storage.StorageFolder", wcslen( L"Windows.Storage.StorageFolder" ), &windowsStorageFolderClassId );
-    hr = RoGetActivationFactory( windowsStorageFolderClassId, &IID_IActivationFactory, (void **)&storageActivationFactory );
+    WindowsCreateString( L"Windows.Storage.AppDataPaths", wcslen( L"Windows.Storage.AppDataPaths" ), &classIds );
+    hr = RoGetActivationFactory( classIds, &IID_IActivationFactory, (void **)&appdataPathsActivationFactory );
     if ( FAILED( hr ) ) return hr;
 
     hr = IActivationFactory_QueryInterface( storageActivationFactory, &IID_IStorageFolderStatics, (void **)&storageFolderStatics );
     if ( FAILED( hr ) ) return hr;
+
+    hr = IActivationFactory_QueryInterface( appdataPathsActivationFactory, &IID_IAppDataPathsStatics, (void **)&appDataStatics );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IAppDataPathsStatics_GetDefault( appDataStatics, &appData );
+    if ( FAILED( hr ) ) return hr;
+
+    IAppDataPaths_get_RoamingAppData( appData, &path );
 
     hr = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &operation );
     if ( FAILED( hr ) ) return hr;

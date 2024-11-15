@@ -48,10 +48,14 @@
 
 #include "provider.h"
 
+#define WINDOWS_TICK 10000000
+#define SEC_TO_UNIX_EPOCH 11644473600LL
+
 #define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_storage);
 
 struct vector_iids
 {
+    const GUID *observableVector;
     const GUID *vector;
     const GUID *view;
     const GUID *iterable;
@@ -91,13 +95,16 @@ extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_op
 extern HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperation_UINT32 **out );
 extern HRESULT vector_create( const struct vector_iids *iids, void **out );
+
+extern HRESULT observable_vector_create( const struct vector_iids *iids, void **out );
+
 extern HRESULT hstring_vector_create( IVector_HSTRING **out );
 
 extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_BasicProperties **out );
 
 #define DEFINE_VECTOR_IIDS( interface ) \
-    struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface };
+    struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     impl_type *impl_from( iface_type *iface )                                        \

@@ -26,7 +26,7 @@
 
 #include "../private.h"
 #include "wine/debug.h"
-#include "util.h"
+
 
 HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, const char * FOLDERID, HSTRING *value );
 

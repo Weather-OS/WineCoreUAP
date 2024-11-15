@@ -23,11 +23,73 @@
 
 _ENABLE_DEBUGGING_
 
-extern struct IStorageItemVtbl storage_item_vtbl;
-extern struct IStorageFolderVtbl storage_folder_vtbl;
-extern struct IBasicPropertiesVtbl basic_properties_vtbl;
-
 extern struct IActivationFactoryVtbl factory_vtbl;
+
+static VOID DeleteDirectoryRecursively( LPCWSTR directoryPath )
+{
+    WIN32_FIND_DATAW findFileData;
+    HANDLE hFind;
+    WCHAR searchPath[MAX_PATH];
+    WCHAR fullPath[MAX_PATH];
+
+    swprintf( searchPath, sizeof(searchPath), L"%s\\*.*", directoryPath );
+
+    hFind = FindFirstFileW( searchPath, &findFileData );
+    if (hFind == INVALID_HANDLE_VALUE) 
+    {
+        return;
+    }
+
+    do 
+    {
+        if ( wcscmp( findFileData.cFileName, L"." ) != 0 && wcscmp( findFileData.cFileName, L".." ) != 0 ) 
+        {
+            swprintf( fullPath, sizeof(fullPath), L"%s\\%s", directoryPath, findFileData.cFileName );
+
+            if ( findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) 
+            {
+                DeleteDirectoryRecursively( fullPath );
+
+                RemoveDirectoryW( fullPath );
+            } 
+            else 
+            {
+                if ( !DeleteFileW( fullPath ) ) 
+                {
+                    return;
+                }
+            }
+        }
+    } 
+    while ( FindNextFileW( hFind, &findFileData ) != 0 );
+
+    FindClose( hFind );
+
+    if ( !RemoveDirectoryW( directoryPath ) ) 
+    {
+        return;
+    }
+}
+
+static VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize ) {
+    UUID uuid;
+    LPWSTR str;
+
+    UuidCreate( &uuid );
+    UuidToStringW( &uuid, (RPC_WSTR*)&str );
+    swprintf( buffer, bufferSize, L"%s", str );
+
+    RpcStringFreeW( (RPC_WSTR*)&str );
+}
+
+static INT64 FileTimeToUnixTime( const FILETIME *ft ) {
+    ULARGE_INTEGER ull;
+
+    ull.LowPart = ft->dwLowDateTime;
+    ull.HighPart = ft->dwHighDateTime;
+
+    return ( ull.QuadPart / WINDOWS_TICK ) - SEC_TO_UNIX_EPOCH;
+}
 
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
 {

@@ -386,7 +386,7 @@ static const struct IVectorChangedEventArgsVtbl vector_changed_event_args_vtbl =
     vector_changed_event_args_GetIids,
     vector_changed_event_args_GetRuntimeClassName,
     vector_changed_event_args_GetTrustLevel,
-    /* IIterable<T> methods */
+    /* IVectorChangedEventArgs methods */
     vector_changed_event_args_get_Index,
     vector_changed_event_args_get_CollectionChange
 };

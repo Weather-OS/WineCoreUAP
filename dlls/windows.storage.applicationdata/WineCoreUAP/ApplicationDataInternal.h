@@ -57,6 +57,8 @@ struct application_data
 {
     IApplicationData IApplicationData_iface;
     HSTRING appDataPath;
+    IApplicationDataContainer *LocalSettings;
+    IApplicationDataContainer *RoamingSettings;
     UINT32 Version;
     LONG ref;
 };

@@ -49,5 +49,4 @@ SOURCES = \
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	provider.idl \
 	classes.idl \
-	WineCoreUAP/util.c \
 	classes.streams.idl

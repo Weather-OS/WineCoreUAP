@@ -8,6 +8,8 @@ SOURCES = \
 	WineCoreUAP/ApplicationData.c \
 	WineCoreUAP/ApplicationDataInternal.c \
 	WineCoreUAP/SetVersion.c \
+	WineCoreUAP/Vector/IWineVector.c \
+	WineCoreUAP/Map/IWineMap.c \
 	\
 	classes.idl \
 	provider.idl \

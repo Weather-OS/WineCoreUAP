@@ -33,7 +33,7 @@
 #include "StorageFolderInternal.h"
 #include "FileProperties/BasicPropertiesInternal.h"
 
-#include "util.h"
+
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -42,6 +42,9 @@
 extern struct IStorageItemPropertiesVtbl storage_item_properties_vtbl;
 extern struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl;
 extern struct IStorageProviderVtbl storage_provider_vtbl;
+extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IStorageFolderVtbl storage_folder_vtbl;
+extern struct IBasicPropertiesVtbl basic_properties_vtbl;
 
 struct storage_item
 {

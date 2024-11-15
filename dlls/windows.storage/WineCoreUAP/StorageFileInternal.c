@@ -23,6 +23,17 @@
 
 _ENABLE_DEBUGGING_
 
+static VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize ) {
+    UUID uuid;
+    LPWSTR str;
+
+    UuidCreate( &uuid );
+    UuidToStringW( &uuid, (RPC_WSTR*)&str );
+    swprintf( buffer, bufferSize, L"%s", str );
+
+    RpcStringFreeW( (RPC_WSTR*)&str );
+}
+
 HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result )
 {
     HRESULT status;

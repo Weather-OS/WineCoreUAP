@@ -25,7 +25,7 @@
 #include <appx.h>
 #include <windows.h>
 
-#include "util.h"
+
 #include "../private.h"
 
 #include "wine/debug.h"

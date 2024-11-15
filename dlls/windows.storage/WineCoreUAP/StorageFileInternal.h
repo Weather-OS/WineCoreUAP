@@ -28,7 +28,7 @@
 
 #include "AppInternalPaths.h"
 
-#include "util.h"
+
 #include "../private.h"
 #include "wine/debug.h"
 

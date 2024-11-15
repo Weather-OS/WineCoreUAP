@@ -168,6 +168,8 @@ namespace Windows.Storage {
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *>;
         interface Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageLibraryChange*>;
         interface Windows.Foundation.Collections.IObservableVector<Windows.Storage.StorageFolder*>;
+        interface Windows.Foundation.Collections.IObservableVector<Windows.Storage.StorageFile*>;
+        interface Windows.Foundation.Collections.IObservableVector<Windows.Storage.IStorageItem*>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.IStorageItem *> *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile *> *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder *> *>;
@@ -193,7 +195,8 @@ namespace Windows.Storage {
         interface Windows.Foundation.TypedEventHandler<Windows.Storage.ApplicationData *, IInspectable *>;
         interface Windows.Foundation.TypedEventHandler<Windows.Storage.StorageLibrary*, IInspectable*>;        
         interface Windows.Foundation.Collections.VectorChangedEventHandler<Windows.Storage.StorageFolder*>;
-
+        interface Windows.Foundation.Collections.VectorChangedEventHandler<Windows.Storage.StorageFile*>;
+        interface Windows.Foundation.Collections.VectorChangedEventHandler<Windows.Storage.IStorageItem*>;
     }
 
     [

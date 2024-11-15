@@ -25,7 +25,7 @@
 #define KNOWN_FOLDERS_INTERNAL_H
 
 #include "../private.h"
-#include "util.h"
+
 
 #include "StorageFolderInternal.h"
 

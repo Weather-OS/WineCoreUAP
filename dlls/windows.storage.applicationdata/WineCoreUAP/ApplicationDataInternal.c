@@ -31,10 +31,9 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
     WCHAR manifestPath[MAX_PATH];
     DWORD username_len = sizeof(username);
     DWORD bytesRead;
-    DWORD bytesWritten;    
-    CHAR versionChar[9];
-    BYTE versionData[8];
-    INT i;
+    DWORD bytesWritten;
+
+    BYTE versionData[9] = {0};
 
     struct application_data *data;
     struct appx_package package;
@@ -94,7 +93,7 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
 
     if ( !bytesRead )
     {
-        if ( !WriteFile( settingsFile, (BYTE *)"00000000", 8, &bytesWritten, NULL ) )
+        if ( !WriteFile( settingsFile, (BYTE *)"00000000\n", 9, &bytesWritten, NULL ) )
         {
             CloseHandle( settingsFile );
             return E_ABORT;
@@ -109,9 +108,13 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
         data->Version = 0u;
     } else 
     {
-        for ( i = 0; i < 8; i++ ) versionChar[i] = (char)versionData[i];
-        versionChar[8] = '\0';
-        data->Version = atoi( versionChar );
+        data->Version = atoi( (LPCSTR)versionData );
+    }
+
+    if ( SetFilePointer( settingsFile, 9, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    {
+        CloseHandle( settingsFile );
+        return E_UNEXPECTED;
     }
 
     *value = &data->IApplicationData_iface;
