@@ -83,6 +83,7 @@ namespace Windows.Storage.Streams {
         interface Windows.Foundation.IAsyncOperationWithProgress<Windows.Storage.Streams.IBuffer*,UINT32 >;
         interface Windows.Foundation.AsyncOperationProgressHandler<Windows.Storage.Streams.IBuffer*,UINT32 >;
         interface Windows.Foundation.AsyncOperationWithProgressCompletedHandler<Windows.Storage.Streams.IBuffer*,UINT32 >;
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.Streams.RandomAccessStreamReference *>;
     }
 
     [

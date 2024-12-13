@@ -147,6 +147,7 @@ namespace Windows.Foundation {
         interface Windows.Foundation.Collections.IObservableVector<IInspectable *>;
         interface Windows.Foundation.Collections.VectorChangedEventHandler<IInspectable *>;
         interface Windows.Foundation.Collections.IMapView<HSTRING, Windows.Foundation.Collections.IVectorView<HSTRING> *>;
+        
         interface Windows.Foundation.EventHandler<IInspectable *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<HSTRING>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<IInspectable *>;
@@ -156,6 +157,7 @@ namespace Windows.Foundation {
 #ifndef _WINTYPES
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Uri *>;
 #endif
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Foundation.Collections.IPropertySet *>;
         interface Windows.Foundation.AsyncOperationProgressHandler<UINT32, UINT32>;
         interface Windows.Foundation.AsyncOperationWithProgressCompletedHandler<UINT32, UINT32>;
         interface Windows.Foundation.IAsyncOperation<HSTRING>;
@@ -166,6 +168,7 @@ namespace Windows.Foundation {
 #ifndef _WINTYPES
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Uri *>;
 #endif
+        interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IPropertySet *>;
         interface Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32>;
         interface Windows.Foundation.IReference<BYTE>;
         interface Windows.Foundation.IReference<DOUBLE>;
