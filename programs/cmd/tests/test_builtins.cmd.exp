@@ -760,6 +760,10 @@ e@or_broken@qwerty
 ''@or_broken@'qwerty'
 r@or_broken@qwerty
 ty
+azertyazERTY
+ertyERTY
+=_QWERTY
+QWERTY
 mmydir
 ------------ Testing variable substitution ------------
 --- in FOR variables
@@ -1084,6 +1088,9 @@ exist subdir with /. ok
 exist subdir with / ok
 exist subdir with / and quotes ok
 exist empty string works
+ok
+ok
+ok
 ------ for numbers
 negative numbers handled
 negative numbers handled

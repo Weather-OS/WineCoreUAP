@@ -3119,6 +3119,10 @@ msgstr "桌面"
 msgid "&Reset"
 msgstr "重置(&R)"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -14770,6 +14774,12 @@ msgstr "KerbTicket 加密类型"
 #: programs/klist/klist.rc:37
 msgid "Current LogonId is"
 msgstr "当前 LogonId 是"
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "客户端"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

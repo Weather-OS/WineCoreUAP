@@ -11008,8 +11008,8 @@ static void test_load(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
     hr = IXMLDOMDocument_load(doc, src, &b);
-    todo_wine ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(b == VARIANT_FALSE, "got %d\n", b);
+    ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
+    ok(b == VARIANT_FALSE, "got %d\n", b);
 
     VariantClear(&src);
 
@@ -13667,6 +13667,42 @@ todo_wine {
     IXMLDOMDocument2_Release(doc);
 }
 
+static void test_max_element_depth_values(void)
+{
+    IXMLDOMDocument2 *doc;
+    VARIANT var;
+    HRESULT hr;
+
+    doc = create_document_version(60, &IID_IXMLDOMDocument2);
+
+    /* The default max element depth value should be 256. */
+    V_VT(&var) = VT_UI4;
+    V_UI4(&var) = 0xdeadbeef;
+    hr = IXMLDOMDocument2_getProperty(doc, _bstr_("MaxElementDepth"), &var);
+todo_wine {
+    ok(hr == S_OK, "Failed to get property value, hr %#lx.\n", hr);
+    ok(V_VT(&var) == VT_I4, "Unexpected property value type, vt %d.\n", V_VT(&var));
+    ok(V_I4(&var) == 256, "Unexpected property value.\n");
+}
+
+    /* Changes to the depth value should be observable when subsequently retrieved. */
+    V_VT(&var) = VT_I4;
+    V_I4(&var) = 32;
+    hr = IXMLDOMDocument2_setProperty(doc, _bstr_("MaxElementDepth"), var);
+    ok(hr == S_OK, "Failed to set property, hr %#lx.\n", hr);
+
+    V_VT(&var) = VT_UI4;
+    V_UI4(&var) = 0xdeadbeef;
+    hr = IXMLDOMDocument2_getProperty(doc, _bstr_("MaxElementDepth"), &var);
+todo_wine {
+    ok(hr == S_OK, "Failed to get property value, hr %#lx.\n", hr);
+    ok(V_VT(&var) == VT_I4, "Unexpected property value type, vt %d.\n", V_VT(&var));
+    ok(V_I4(&var) == 32, "Unexpected property value.\n");
+}
+
+    IXMLDOMDocument2_Release(doc);
+}
+
 typedef struct _namespace_as_attribute_t {
     const GUID *guid;
     const char *clsid;
@@ -14137,9 +14173,56 @@ static void test_validate_on_parse_values(void)
     }
 }
 
+static void test_indent(void)
+{
+    HRESULT hr;
+    VARIANT_BOOL b = VARIANT_FALSE;
+    BSTR data, str;
+    const WCHAR *data_expected;
+    IXMLDOMDocument *doc;
+    IXMLDOMElement *element = NULL;
+
+    str = SysAllocString(L"<?xml version='1.0' encoding='Windows-1252'?>\n"
+                          "<root>\n"
+                              "<a>\n"
+                                  "<b/>\n"
+                              "</a>\n"
+                          "</root>\n");
+    hr = CoCreateInstance(&CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void **)&doc);
+    ok(hr == S_OK, "Unable to create instance hr %#lx.\n", hr);
+    hr = IXMLDOMDocument_loadXML(doc, str, &b);
+    ok(hr == S_OK, "Unable to load XML hr %#lx.\n", hr);
+    hr = IXMLDOMDocument_get_documentElement(doc, &element);
+    ok(hr == S_OK, "Unable to get element hr %#lx.\n", hr);
+    hr = IXMLDOMElement_get_xml(element, &data);
+    ok(hr == S_OK, "Unable to get XML hr %#lx.\n", hr);
+
+    data_expected = L"<root>\r\n"
+                         "\t<a>\r\n"
+                             "\t\t<b/>\r\n"
+                         "\t</a>\r\n"
+                     "</root>";
+    ok(!lstrcmpW(data, data_expected), "incorrect element string, got '%s'\n", wine_dbgstr_w(data));
+
+    SysFreeString(str);
+}
+
+static DWORD WINAPI new_thread(void *arg)
+{
+    HRESULT hr = CoInitialize(NULL);
+    ok(hr == S_OK, "failed to init com\n");
+    if (hr != S_OK) return 1;
+
+    test_indent();
+
+    CoUninitialize();
+    return 0;
+}
+
 START_TEST(domdoc)
 {
     HRESULT hr;
+    HANDLE thread;
 
     hr = CoInitialize( NULL );
     ok( hr == S_OK, "failed to init com\n");
@@ -14226,12 +14309,20 @@ START_TEST(domdoc)
     test_validate_on_parse_values();
     test_xsltemplate();
     test_xsltext();
+    test_max_element_depth_values();
 
     if (is_clsid_supported(&CLSID_MXNamespaceManager40, &IID_IMXNamespaceManager))
     {
         test_mxnamespacemanager();
         test_mxnamespacemanager_override();
     }
+
+    /* We need to test test_indent in a seperate thread. This is to prevent regressions in multi-threaded
+    applications where the default indentation is set (e.g. by setting xmlTreeIndentString) in the first
+    thread but not for new threads, leading to the wrong indentation in subsequent threads. */
+    thread = CreateThread(NULL, 0, new_thread, NULL, 0, NULL);
+    WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
 
     CoUninitialize();
 }

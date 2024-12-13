@@ -608,47 +608,26 @@ empty:
  *           list_window_children
  *
  * Build an array of the children of a given window. The array must be
- * freed with HeapFree. Returns NULL when no windows are found.
+ * freed with free(). Returns NULL when no windows are found.
  */
-HWND *list_window_children( HDESK desktop, HWND hwnd, UNICODE_STRING *class, DWORD tid )
+HWND *list_window_children( HWND hwnd )
 {
     HWND *list;
-    int i, size = 128;
-    ATOM atom = class ? get_int_atom_value( class ) : 0;
+    ULONG size = 128;
+    NTSTATUS status;
 
-    /* empty class is not the same as NULL class */
-    if (!atom && class && !class->Length) return NULL;
+    if (hwnd && !(hwnd = get_window_relative( hwnd, GW_CHILD ))) return NULL;
 
     for (;;)
     {
-        int count = 0;
-
-        if (!(list = malloc( size * sizeof(HWND) ))) break;
-
-        SERVER_START_REQ( get_window_children )
-        {
-            req->desktop = wine_server_obj_handle( desktop );
-            req->parent = wine_server_user_handle( hwnd );
-            req->tid = tid;
-            req->atom = atom;
-            if (!atom && class) wine_server_add_data( req, class->Buffer, class->Length );
-            wine_server_set_reply( req, list, (size-1) * sizeof(user_handle_t) );
-            if (!wine_server_call( req )) count = reply->count;
-        }
-        SERVER_END_REQ;
-        if (count && count < size)
-        {
-            /* start from the end since HWND is potentially larger than user_handle_t */
-            for (i = count - 1; i >= 0; i--)
-                list[i] = wine_server_ptr_handle( ((user_handle_t *)list)[i] );
-            list[count] = 0;
-            return list;
-        }
+        if (!(list = malloc( size * sizeof(HWND) ))) return NULL;
+        status = NtUserBuildHwndList( 0, hwnd, FALSE, TRUE, 0, size, list, &size );
+        if (!status && size) break;
         free( list );
-        if (!count) break;
-        size = count + 1;  /* restart with a large enough buffer */
+        if (status != STATUS_BUFFER_TOO_SMALL) return NULL;
     }
-    return NULL;
+    list[size - 1] = 0;
+    return list;
 }
 
 /*****************************************************************
@@ -850,6 +829,21 @@ BOOL enable_window( HWND hwnd, BOOL enable )
     return ret;
 }
 
+
+/* see IsHungAppWindow */
+static BOOL is_hung_app_window( HWND hwnd )
+{
+    BOOL ret;
+
+    SERVER_START_REQ( is_window_hung )
+    {
+        req->win = wine_server_user_handle( hwnd );
+        ret = !wine_server_call_err( req ) && reply->is_hung;
+    }
+    SERVER_END_REQ;
+    return ret;
+}
+
 /* see IsWindowEnabled */
 BOOL is_window_enabled( HWND hwnd )
 {
@@ -923,6 +917,20 @@ UINT get_dpi_for_window( HWND hwnd )
 
     if (NTUSER_DPI_CONTEXT_IS_MONITOR_AWARE( context )) return get_win_monitor_dpi( hwnd, &raw_dpi );
     return NTUSER_DPI_CONTEXT_GET_DPI( context );
+}
+
+/* see GetLastActivePopup */
+static HWND get_last_active_popup( HWND hwnd )
+{
+    HWND retval = hwnd;
+
+    SERVER_START_REQ( get_window_info )
+    {
+        req->handle = wine_server_user_handle( hwnd );
+        if (!wine_server_call_err( req )) retval = wine_server_ptr_handle( reply->last_active );
+    }
+    SERVER_END_REQ;
+    return retval;
 }
 
 static LONG_PTR get_win_data( const void *ptr, UINT size )
@@ -1078,7 +1086,7 @@ static LONG_PTR get_window_long_size( HWND hwnd, INT offset, UINT size, BOOL ans
          * more tolerant to A/W mismatches. The lack of W->A->W conversion for such a mismatch suggests
          * that the hack is in GetWindowLongPtr[AW], not in winprocs.
          */
-        if (win->winproc == BUILTIN_WINPROC(WINPROC_EDIT) && (!!ansi != !(win->flags & WIN_ISUNICODE)))
+        if (win->winproc == BUILTIN_WINPROC(NTUSER_WNDPROC_EDIT) && (!!ansi != !(win->flags & WIN_ISUNICODE)))
             retval = (ULONG_PTR)win->winproc;
         else
             retval = (ULONG_PTR)get_winproc( win->winproc, ansi );
@@ -1561,6 +1569,43 @@ HANDLE WINAPI NtUserRemoveProp( HWND hwnd, const WCHAR *str )
     return (HANDLE)ret;
 }
 
+
+/***********************************************************************
+ *           NtUserBuildPropList   (win32u.@)
+ */
+NTSTATUS WINAPI NtUserBuildPropList( HWND hwnd, ULONG count, struct ntuser_property_list *buffer, ULONG *ret_count )
+{
+    struct property_data *data;
+    ULONG i;
+    NTSTATUS status;
+
+    if (!buffer || !ret_count) return STATUS_INVALID_PARAMETER;
+
+    if (!(data = malloc( count * sizeof(*data) ))) return STATUS_NO_MEMORY;
+
+    SERVER_START_REQ( get_window_properties )
+    {
+        req->window = wine_server_user_handle( hwnd );
+        wine_server_set_reply( req, data, count * sizeof(*data) );
+        if (!(status = wine_server_call( req )))
+        {
+            for (i = 0; i < wine_server_reply_size(reply) / sizeof(*data); i++)
+            {
+                buffer[i].data   = data[i].data;
+                buffer[i].atom   = data[i].atom;
+                buffer[i].string = data[i].string;
+            }
+            *ret_count = reply->total;
+            if (reply->total > count) status = STATUS_BUFFER_TOO_SMALL;
+        }
+    }
+    SERVER_END_REQ;
+
+    free( data );
+    return status;
+}
+
+
 static void mirror_rect( const RECT *window_rect, RECT *rect )
 {
     int width = window_rect->right - window_rect->left;
@@ -1855,7 +1900,7 @@ static RECT get_visible_rect( HWND hwnd, BOOL shaped, UINT style, UINT ex_style,
 
 static BOOL get_surface_rect( const RECT *visible_rect, RECT *surface_rect )
 {
-    RECT virtual_rect = get_virtual_screen_rect( 0, MDT_DEFAULT );
+    RECT virtual_rect = get_virtual_screen_rect( 0, MDT_RAW_DPI );
 
     *surface_rect = *visible_rect;
 
@@ -1910,7 +1955,7 @@ static struct window_surface *get_window_surface( HWND hwnd, UINT swp_flags, BOO
     HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
     struct window_surface *new_surface;
     struct window_rects monitor_rects;
-    UINT raw_dpi, monitor_dpi, style, ex_style;
+    UINT raw_dpi, style, ex_style;
     RECT dummy;
     HRGN shape;
 
@@ -1918,14 +1963,16 @@ static struct window_surface *get_window_surface( HWND hwnd, UINT swp_flags, BOO
     ex_style = NtUserGetWindowLongW( hwnd, GWL_EXSTYLE );
     is_child = parent && parent != NtUserGetDesktopWindow();
 
-    if (is_child) monitor_dpi = get_win_monitor_dpi( parent, &raw_dpi );
-    else monitor_dpi = monitor_dpi_from_rect( rects->window, get_thread_dpi(), &raw_dpi );
+    if (is_child) get_win_monitor_dpi( parent, &raw_dpi );
+    else monitor_dpi_from_rect( rects->window, get_thread_dpi(), &raw_dpi );
 
     if (get_window_region( hwnd, FALSE, &shape, &dummy )) shaped = FALSE;
     else if ((shaped = !!shape)) NtGdiDeleteObjectApp( shape );
 
     rects->visible = rects->window;
-    monitor_rects = map_dpi_window_rects( *rects, get_thread_dpi(), monitor_dpi );
+    if (is_child) monitor_rects = map_dpi_window_rects( *rects, get_thread_dpi(), raw_dpi );
+    else monitor_rects = map_window_rects_virt_to_raw( *rects, get_thread_dpi() );
+
     if (!user_driver->pWindowPosChanging( hwnd, swp_flags, shaped, &monitor_rects )) needs_surface = FALSE;
     else if (is_child) needs_surface = FALSE;
     else if (swp_flags & SWP_HIDEWINDOW) needs_surface = FALSE;
@@ -1950,7 +1997,7 @@ static struct window_surface *get_window_surface( HWND hwnd, UINT swp_flags, BOO
     else if (create_layered || is_layered) needs_surface = TRUE;
 
     if (needs_surface)
-        create_window_surface( hwnd, create_layered, surface_rect, monitor_dpi, &new_surface );
+        create_window_surface( hwnd, create_layered, surface_rect, raw_dpi, &new_surface );
     else if (new_surface && new_surface != &dummy_surface)
     {
         window_surface_release( new_surface );
@@ -1977,7 +2024,7 @@ static void update_children_window_state( HWND hwnd )
     HWND *children;
     int i;
 
-    if (!(children = list_window_children( 0, hwnd, NULL, 0 ))) return;
+    if (!(children = list_window_children( hwnd ))) return;
 
     for (i = 0; children[i]; i++)
     {
@@ -1998,7 +2045,7 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
 {
     struct window_rects monitor_rects;
     WND *win;
-    HWND surface_win = 0, parent = NtUserGetAncestor( hwnd, GA_PARENT );
+    HWND owner_hint, surface_win = 0, parent = NtUserGetAncestor( hwnd, GA_PARENT );
     BOOL ret, is_fullscreen, is_layered, is_child, needs_update = FALSE;
     struct window_rects old_rects;
     RECT extra_rects[3];
@@ -2017,7 +2064,12 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
 
     if (!(win = get_win_ptr( hwnd )) || win == WND_DESKTOP || win == WND_OTHER_PROCESS) return FALSE;
     old_surface = win->surface;
-    if (old_surface != new_surface) swp_flags |= SWP_FRAMECHANGED;  /* force refreshing non-client area */
+    if (old_surface != new_surface)
+    {
+        if (old_surface && new_surface) window_surface_set_shape( new_surface, old_surface->shape_region );
+        swp_flags |= SWP_FRAMECHANGED;  /* force refreshing non-client area */
+    }
+
     if (new_surface == &dummy_surface) swp_flags |= SWP_NOREDRAW;
     else if (old_surface == &dummy_surface)
     {
@@ -2025,7 +2077,8 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
         valid_rects = NULL;
     }
 
-    monitor_rects = map_dpi_window_rects( *new_rects, get_thread_dpi(), monitor_dpi );
+    if (is_child) monitor_rects = map_dpi_window_rects( *new_rects, get_thread_dpi(), raw_dpi );
+    else monitor_rects = map_window_rects_virt_to_raw( *new_rects, get_thread_dpi() );
 
     SERVER_START_REQ( set_window_pos )
     {
@@ -2132,12 +2185,19 @@ static BOOL apply_window_pos( HWND hwnd, HWND insert_after, UINT swp_flags, stru
                 user_driver->pMoveWindowBits( hwnd, &old_rects, new_rects, valid_rects );
             else
             {
-                OffsetRect( &rects[1], new_rects->visible.left - old_rects.visible.left, new_rects->visible.top - old_rects.visible.top );
+                /* move a child window bits within its parent window surface, the surface itself
+                 * didn't move and valid rects are already relative to the surface rect. */
                 move_window_bits( hwnd, new_rects, valid_rects );
             }
         }
 
-        user_driver->pWindowPosChanged( hwnd, insert_after, swp_flags, is_fullscreen, &monitor_rects, get_driver_window_surface( new_surface, monitor_dpi ) );
+        owner_hint = NtUserGetWindowRelative(hwnd, GW_OWNER);
+        /* fallback to any window that is right below our top left corner */
+        if (!owner_hint) owner_hint = NtUserWindowFromPoint(new_rects->window.left - 1, new_rects->window.top - 1);
+        if (owner_hint) owner_hint = NtUserGetAncestor(owner_hint, GA_ROOT);
+
+        user_driver->pWindowPosChanged( hwnd, insert_after, owner_hint, swp_flags, is_fullscreen, &monitor_rects,
+                                        get_driver_window_surface( new_surface, raw_dpi ) );
 
         update_children_window_state( hwnd );
     }
@@ -2285,13 +2345,13 @@ int WINAPI NtUserSetWindowRgn( HWND hwnd, HRGN hrgn, BOOL redraw )
     {
         UINT swp_flags = SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED |
             SWP_NOCLIENTSIZE | SWP_NOCLIENTMOVE;
-        UINT raw_dpi, dpi;
+        UINT raw_dpi;
         HRGN monitor_hrgn;
 
         if (!redraw) swp_flags |= SWP_NOREDRAW;
 
-        dpi = get_win_monitor_dpi( hwnd, &raw_dpi );
-        monitor_hrgn = map_dpi_region( hrgn, get_thread_dpi(), dpi );
+        get_win_monitor_dpi( hwnd, &raw_dpi );
+        monitor_hrgn = map_dpi_region( hrgn, get_thread_dpi(), raw_dpi );
         user_driver->pSetWindowRgn( hwnd, monitor_hrgn, redraw );
         if (monitor_hrgn) NtGdiDeleteObjectApp( monitor_hrgn );
 
@@ -2584,7 +2644,7 @@ HWND WINAPI NtUserChildWindowFromPointEx( HWND parent, LONG x, LONG y, UINT flag
 
     if (!get_client_rect( parent, &rect, get_thread_dpi() )) return 0;
     if (!PtInRect( &rect, pt )) return 0;
-    if (!(list = list_window_children( 0, parent, NULL, 0 ))) return parent;
+    if (!(list = list_window_children( parent ))) return parent;
 
     for (i = 0; list[i]; i++)
     {
@@ -2907,24 +2967,26 @@ BOOL WINAPI NtUserSetWindowPlacement( HWND hwnd, const WINDOWPLACEMENT *wpl )
 /*****************************************************************************
  *           NtUserBuildHwndList (win32u.@)
  */
-NTSTATUS WINAPI NtUserBuildHwndList( HDESK desktop, ULONG unk2, ULONG unk3, ULONG unk4,
+NTSTATUS WINAPI NtUserBuildHwndList( HDESK desktop, HWND hwnd, BOOL children, BOOL non_immersive,
                                      ULONG thread_id, ULONG count, HWND *buffer, ULONG *size )
 {
     user_handle_t *list = (user_handle_t *)buffer;
     int i;
     NTSTATUS status;
 
-    SERVER_START_REQ( get_window_children )
+    SERVER_START_REQ( get_window_list )
     {
-        req->desktop = wine_server_obj_handle( desktop );
-        req->tid = thread_id;
-        if (count) wine_server_set_reply( req, list, (count - 1) * sizeof(user_handle_t) );
+        req->desktop  = wine_server_obj_handle( desktop );
+        req->handle   = wine_server_user_handle( hwnd );
+        req->tid      = thread_id;
+        req->children = children;
+        if (count) wine_server_set_reply( req, list, (count - 1) * sizeof(*list) );
         status = wine_server_call( req );
-        if (status && status != STATUS_BUFFER_TOO_SMALL) return status;
-        *size = reply->count + 1;
+        if (!status || status == STATUS_BUFFER_TOO_SMALL) *size = reply->count + 1;
     }
     SERVER_END_REQ;
-    if (*size > count) return STATUS_BUFFER_TOO_SMALL;
+
+    if (status) return status;
 
     /* start from the end since HWND is potentially larger than user_handle_t */
     for (i = *size - 2; i >= 0; i--)
@@ -2939,46 +3001,59 @@ NTSTATUS WINAPI NtUserBuildHwndList( HDESK desktop, ULONG unk2, ULONG unk3, ULON
 HWND WINAPI NtUserFindWindowEx( HWND parent, HWND child, UNICODE_STRING *class, UNICODE_STRING *title,
                                 ULONG unk )
 {
-    HWND *list;
+    user_handle_t *list;
     HWND retvalue = 0;
-    int i = 0, len = 0, title_len;
-    WCHAR *buffer = NULL;
+    int i = 0, size = 128, title_len;
+    ATOM atom = class ? get_int_atom_value( class ) : 0;
+    NTSTATUS status;
 
-    if (!parent && child) parent = get_desktop_window();
-    else if (parent == HWND_MESSAGE) parent = get_hwnd_message_parent();
+    /* empty class is not the same as NULL class */
+    if (!atom && class && !class->Length) return 0;
 
-    if (title)
+    if (parent == HWND_MESSAGE) parent = get_hwnd_message_parent();
+
+    for (;;)
     {
-        len = title->Length / sizeof(WCHAR) + 1;  /* one extra char to check for chars beyond the end */
-        if (!(buffer = malloc( (len + 1) * sizeof(WCHAR) ))) return 0;
-    }
+        if (!(list = malloc( size * sizeof(*list) ))) return 0;
 
-    if (!(list = list_window_children( 0, parent, class, 0 ))) goto done;
-
-    if (child)
-    {
-        child = get_full_window_handle( child );
-        while (list[i] && list[i] != child) i++;
-        if (!list[i]) goto done;
-        i++;  /* start from next window */
-    }
-
-    if (title)
-    {
-        while (list[i])
+        SERVER_START_REQ( get_class_windows )
         {
-            title_len = NtUserInternalGetWindowText( list[i], buffer, len + 1 );
+            req->parent = wine_server_user_handle( parent );
+            req->child  = wine_server_user_handle( child );
+            req->atom   = atom;
+            if (!atom && class) wine_server_add_data( req, class->Buffer, class->Length );
+            wine_server_set_reply( req, list, size * sizeof(user_handle_t) );
+            status = wine_server_call( req );
+            size = reply->count;
+        }
+        SERVER_END_REQ;
+
+        if (!status && size) break;
+        free( list );
+        if (status != STATUS_BUFFER_TOO_SMALL) return 0;
+    }
+
+    if (title)
+    {
+        int len = title->Length / sizeof(WCHAR) + 1;  /* one extra char to check for chars beyond the end */
+        WCHAR *buffer = malloc( (len + 1) * sizeof(WCHAR) );
+
+        if (!buffer) goto done;
+        while (i < size)
+        {
+            title_len = NtUserInternalGetWindowText( wine_server_ptr_handle(list[i]), buffer, len + 1 );
             if (title_len * sizeof(WCHAR) == title->Length &&
                 (!title_len || !wcsnicmp( buffer, title->Buffer, title_len )))
                 break;
             i++;
         }
+        free( buffer );
     }
-    retvalue = list[i];
+
+    if (i < size) retvalue = wine_server_ptr_handle(list[i]);
 
  done:
     free( list );
-    free( buffer );
     return retvalue;
 }
 
@@ -3603,7 +3678,7 @@ static HWND swp_owner_popups( HWND hwnd, HWND after )
 
         if (after != HWND_TOPMOST)
         {
-            if (!(list = list_window_children( 0, get_desktop_window(), NULL, 0 ))) return after;
+            if (!(list = list_window_children( 0 ))) return after;
 
             for (i = 0; list[i]; i++)
             {
@@ -3626,7 +3701,7 @@ static HWND swp_owner_popups( HWND hwnd, HWND after )
     }
 
     if (after == HWND_BOTTOM) goto done;
-    if (!list && !(list = list_window_children( 0, get_desktop_window(), NULL, 0 ))) goto done;
+    if (!list && !(list = list_window_children( 0 ))) goto done;
 
     i = 0;
     if (after == HWND_TOP || after == HWND_NOTOPMOST)
@@ -3681,10 +3756,12 @@ BOOL set_window_pos( WINDOWPOS *winpos, int parent_x, int parent_y )
         if (winpos->hwndInsertAfter == (HWND)0xffff) winpos->hwndInsertAfter = HWND_TOPMOST;
         else if (winpos->hwndInsertAfter == (HWND)0xfffe) winpos->hwndInsertAfter = HWND_NOTOPMOST;
 
-        if (!(winpos->hwndInsertAfter == HWND_TOP ||
-              winpos->hwndInsertAfter == HWND_BOTTOM ||
-              winpos->hwndInsertAfter == HWND_TOPMOST ||
-              winpos->hwndInsertAfter == HWND_NOTOPMOST))
+        if (winpos->hwndInsertAfter == HWND_TOPMOST || winpos->hwndInsertAfter == HWND_NOTOPMOST)
+        {
+            HWND parent = NtUserGetAncestor( NtUserGetAncestor( winpos->hwnd, GA_ROOT ), GA_PARENT );
+            if (parent == get_hwnd_message_parent()) return TRUE;
+        }
+        else if (winpos->hwndInsertAfter != HWND_TOP && winpos->hwndInsertAfter != HWND_BOTTOM)
         {
             HWND parent = NtUserGetAncestor( winpos->hwnd, GA_PARENT );
             HWND insertafter_parent = NtUserGetAncestor( winpos->hwndInsertAfter, GA_PARENT );
@@ -4759,7 +4836,7 @@ BOOL WINAPI NtUserShowWindow( HWND hwnd, INT cmd )
 BOOL show_owned_popups( HWND owner, BOOL show )
 {
     int count = 0;
-    HWND *win_array = list_window_children( 0, get_desktop_window(), NULL, 0 );
+    HWND *win_array = list_window_children( 0 );
 
     if (!win_array) return TRUE;
 
@@ -4962,7 +5039,7 @@ static void send_destroy_message( HWND hwnd, BOOL winevent )
         HWND *children;
         int i;
 
-        if (!(children = list_window_children( 0, hwnd, NULL, 0 ))) return;
+        if (!(children = list_window_children( hwnd ))) return;
 
         for (i = 0; children[i]; i++)
         {
@@ -5017,7 +5094,7 @@ LRESULT destroy_window( HWND hwnd )
     unregister_imm_window( hwnd );
 
     /* free child windows */
-    if ((children = list_window_children( 0, hwnd, NULL, 0 )))
+    if ((children = list_window_children( hwnd )))
     {
         int i;
         for (i = 0; children[i]; i++)
@@ -5129,7 +5206,7 @@ static BOOL user_destroy_window( HWND hwnd, BOOL winevent )
             HWND *children;
             unsigned int i;
 
-            if (!(children = list_window_children( 0, get_desktop_window(), NULL, 0 ))) break;
+            if (!(children = list_window_children( 0 ))) break;
 
             for (i = 0; children[i]; i++)
             {
@@ -5725,12 +5802,9 @@ static BOOL set_dialog_info( HWND hwnd, void *info )
 
 static BOOL set_raw_window_pos( HWND hwnd, RECT rect, UINT flags, BOOL internal )
 {
-    UINT dpi, raw_dpi;
-
     TRACE( "hwnd %p, rect %s, flags %#x, internal %u\n", hwnd, wine_dbgstr_rect(&rect), flags, internal );
 
-    dpi = get_win_monitor_dpi( hwnd, &raw_dpi );
-    rect = map_dpi_rect( rect, dpi, get_thread_dpi() );
+    rect = map_rect_raw_to_virt( rect, get_thread_dpi() );
 
     if (internal)
     {
@@ -5758,11 +5832,11 @@ ULONG_PTR WINAPI NtUserCallHwnd( HWND hwnd, DWORD code )
     case NtUserCallHwnd_DrawMenuBar:
         return draw_menu_bar( hwnd );
 
-    case NtUserCallHwnd_GetDefaultImeWindow:
-        return HandleToUlong( get_default_ime_window( hwnd ));
-
     case NtUserCallHwnd_GetDpiForWindow:
         return get_dpi_for_window( hwnd );
+
+    case NtUserCallHwnd_GetLastActivePopup:
+        return (ULONG_PTR)get_last_active_popup( hwnd );
 
     case NtUserCallHwnd_GetParent:
         return HandleToUlong( get_parent( hwnd ));
@@ -6037,6 +6111,55 @@ HWND get_shell_window(void)
     SERVER_END_REQ;
 
     return hwnd;
+}
+
+/*******************************************************************
+ *           NtUserQueryWindow (win32u.@)
+ */
+HANDLE WINAPI NtUserQueryWindow( HWND hwnd, WINDOWINFOCLASS cls )
+{
+    DWORD pid;
+    GUITHREADINFO info;
+
+    switch (cls)
+    {
+    case WindowProcess:
+    case WindowProcess2:
+        get_window_thread( hwnd, &pid );
+        return UlongToHandle( pid );
+
+    case WindowThread:
+        return UlongToHandle( get_window_thread( hwnd, NULL ));
+
+    case WindowActiveWindow:
+        info.cbSize = sizeof(info);
+        NtUserGetGUIThreadInfo( get_window_thread( hwnd, NULL ), &info );
+        return info.hwndActive;
+
+    case WindowFocusWindow:
+        info.cbSize = sizeof(info);
+        NtUserGetGUIThreadInfo( get_window_thread( hwnd, NULL ), &info );
+        return info.hwndFocus;
+
+    case WindowIsHung:
+        return UlongToHandle( is_hung_app_window( hwnd ));
+
+    case WindowIsForegroundThread:
+        return UlongToHandle( get_window_thread( NtUserGetForegroundWindow(), NULL ) ==
+                              get_window_thread( hwnd, NULL ));
+
+    case WindowDefaultImeWindow:
+        return get_default_ime_window( hwnd );
+
+    case WindowDefaultInputContext:
+        /* FIXME: should get it for the specified window */
+        return get_default_input_context();
+
+    case WindowClientBase:
+    default:
+        WARN( "unsupported class %u\n", cls );
+        return 0;
+    }
 }
 
 /***********************************************************************

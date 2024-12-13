@@ -3160,6 +3160,10 @@ msgstr "Escritoriu"
 msgid "&Reset"
 msgstr "&Reafitar"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -14885,6 +14889,12 @@ msgstr ""
 #: programs/klist/klist.rc:37
 msgid "Current LogonId is"
 msgstr ""
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "veceru"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: Wine\n"
 "Report-Msgid-Bugs-To: https://bugs.winehq.org\n"
 "POT-Creation-Date: N/A\n"
-"PO-Revision-Date: 2024-09-20 00:23+0300\n"
+"PO-Revision-Date: 2024-11-13 23:36+0200\n"
 "Last-Translator: Aurimas Fišeras <aurimas@members.fsf.org>\n"
 "Language-Team: Lithuanian <komp_lt@konf.lt>\n"
 "Language: lt\n"
@@ -3163,6 +3163,10 @@ msgstr "Virtualus darbalaukis"
 #: dlls/desk.cpl/desk.rc:40 dlls/joy.cpl/joy.rc:41
 msgid "&Reset"
 msgstr "&Atkurti"
+
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr "Emuliuoti rodymo veiksenos pakeitimus (reikia perleisti)"
 
 #: dlls/desk.cpl/desk.rc:29
 msgid "Display Settings"
@@ -14965,6 +14969,10 @@ msgstr "Kerberos leidimo šifravimo tipas"
 #: programs/klist/klist.rc:37
 msgid "Current LogonId is"
 msgstr "Dabartinis prisijungimo ID yra"
+
+#: programs/klist/klist.rc:38
+msgid "Client"
+msgstr "Klientas"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

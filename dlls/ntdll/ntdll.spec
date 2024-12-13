@@ -145,6 +145,7 @@
 @ stdcall -syscall NtAlertThread(long)
 @ stdcall -syscall NtAlertThreadByThreadId(ptr)
 @ stdcall -syscall NtAllocateLocallyUniqueId(ptr)
+@ stdcall -syscall NtAllocateReserveObject(ptr long long)
 # @ stub NtAllocateUserPhysicalPages
 @ stdcall -syscall NtAllocateUuids(ptr ptr ptr ptr)
 @ stdcall -syscall NtAllocateVirtualMemory(long ptr long ptr long long)
@@ -168,6 +169,7 @@
 # @ stub NtCompressKey
 @ stdcall -syscall NtConnectPort(ptr ptr ptr ptr ptr ptr ptr ptr)
 @ stdcall -syscall NtContinue(ptr long)
+@ stdcall -syscall NtContinueEx(ptr ptr)
 @ stdcall -syscall NtCreateDebugObject(ptr long ptr long)
 @ stdcall -syscall NtCreateDirectoryObject(ptr long ptr)
 @ stdcall -syscall NtCreateEvent(ptr long ptr long long)
@@ -221,6 +223,7 @@
 @ stdcall -syscall NtFilterToken(long long ptr ptr ptr ptr)
 @ stdcall -syscall NtFindAtom(ptr long ptr)
 @ stdcall -syscall NtFlushBuffersFile(long ptr)
+@ stdcall -syscall NtFlushBuffersFileEx(long long ptr long ptr)
 @ stdcall -syscall NtFlushInstructionCache(long ptr long)
 @ stdcall -syscall NtFlushKey(long)
 @ stdcall -syscall NtFlushProcessWriteBuffers()
@@ -399,6 +402,7 @@
 @ stdcall -syscall NtSetInformationVirtualMemory(long long ptr ptr ptr long)
 @ stdcall -syscall NtSetIntervalProfile(long long)
 @ stdcall -syscall NtSetIoCompletion(ptr long long long long)
+@ stdcall -syscall NtSetIoCompletionEx(ptr ptr long long long long)
 @ stdcall -syscall NtSetLdtEntries(long int64 long int64)
 # @ stub NtSetLowEventPair
 # @ stub NtSetLowWaitHighEventPair
@@ -450,6 +454,7 @@
 @ stdcall -syscall -arch=win32 NtWow64AllocateVirtualMemory64(long ptr int64 ptr long long)
 @ stdcall -syscall -arch=win32 NtWow64GetNativeSystemInformation(long ptr long ptr)
 @ stdcall -syscall -arch=win32 NtWow64IsProcessorFeaturePresent(long)
+@ stdcall -syscall -arch=win32 NtWow64QueryInformationProcess64(long long ptr long ptr)
 @ stdcall -syscall -arch=win32 NtWow64ReadVirtualMemory64(long int64 ptr int64 ptr)
 @ stdcall -syscall -arch=win32 NtWow64WriteVirtualMemory64(long int64 ptr int64 ptr)
 @ stdcall -syscall NtWriteFile(long long ptr ptr ptr ptr long ptr ptr)
@@ -457,6 +462,10 @@
 # @ stub NtWriteRequestData
 @ stdcall -syscall NtWriteVirtualMemory(long ptr ptr long ptr)
 @ stdcall -syscall NtYieldExecution()
+@ stdcall NtdllDefWindowProc_A(long long long long)
+@ stdcall NtdllDefWindowProc_W(long long long long)
+@ stdcall NtdllDialogWndProc_A(long long long long)
+@ stdcall NtdllDialogWndProc_W(long long long long)
 @ stub PfxFindPrefix
 @ stub PfxInitialize
 @ stub PfxInsertPrefix
@@ -801,6 +810,7 @@
 @ stdcall RtlInitializeGenericTable(ptr ptr ptr ptr ptr)
 @ stdcall RtlInitializeGenericTableAvl(ptr ptr ptr ptr ptr)
 @ stdcall RtlInitializeHandleTable(long long ptr)
+@ stdcall RtlInitializeNtUserPfn(ptr long ptr long ptr long)
 @ stub RtlInitializeRXact
 # @ stub RtlInitializeRangeList
 @ stdcall RtlInitializeResource(ptr)
@@ -972,9 +982,11 @@
 @ stub RtlRemoteCall
 @ stdcall RtlRemoveVectoredContinueHandler(ptr)
 @ stdcall RtlRemoveVectoredExceptionHandler(ptr)
+@ stdcall RtlResetNtUserPfn()
 @ stdcall RtlResetRtlTranslations(ptr)
 @ cdecl RtlRestoreContext(ptr ptr)
 @ stdcall RtlRestoreLastWin32Error(long) RtlSetLastWin32Error
+@ stdcall RtlRetrieveNtUserPfn(ptr ptr ptr)
 @ stub RtlRevertMemoryStream
 @ stub RtlRunDecodeUnicodeString
 @ stub RtlRunEncodeUnicodeString
@@ -1225,6 +1237,7 @@
 # @ stub ZwCompressKey
 @ stdcall -private -syscall ZwConnectPort(ptr ptr ptr ptr ptr ptr ptr ptr) NtConnectPort
 @ stdcall -private -syscall ZwContinue(ptr long) NtContinue
+@ stdcall -private -syscall ZwContinueEx(ptr ptr) NtContinueEx
 # @ stub ZwCreateDebugObject
 @ stdcall -private -syscall ZwCreateDirectoryObject(ptr long ptr) NtCreateDirectoryObject
 @ stdcall -private -syscall ZwCreateEvent(ptr long ptr long long) NtCreateEvent
@@ -1276,6 +1289,7 @@
 @ stdcall -private -syscall ZwFilterToken(long long ptr ptr ptr ptr) NtFilterToken
 @ stdcall -private -syscall ZwFindAtom(ptr long ptr) NtFindAtom
 @ stdcall -private -syscall ZwFlushBuffersFile(long ptr) NtFlushBuffersFile
+@ stdcall -private -syscall ZwFlushBuffersFileEx(long long ptr long ptr) NtFlushBuffersFileEx
 @ stdcall -private -syscall ZwFlushInstructionCache(long ptr long) NtFlushInstructionCache
 @ stdcall -private -syscall ZwFlushKey(long) NtFlushKey
 @ stdcall -private -syscall ZwFlushProcessWriteBuffers() NtFlushProcessWriteBuffers
@@ -1451,6 +1465,7 @@
 @ stdcall -private -syscall ZwSetInformationVirtualMemory(long long ptr ptr ptr long) NtSetInformationVirtualMemory
 @ stdcall -private -syscall ZwSetIntervalProfile(long long) NtSetIntervalProfile
 @ stdcall -private -syscall ZwSetIoCompletion(ptr long long long long) NtSetIoCompletion
+@ stdcall -private -syscall ZwSetIoCompletionEx(ptr ptr long long long long) NtSetIoCompletionEx
 @ stdcall -private -syscall ZwSetLdtEntries(long int64 long int64) NtSetLdtEntries
 # @ stub ZwSetLowEventPair
 # @ stub ZwSetLowWaitHighEventPair

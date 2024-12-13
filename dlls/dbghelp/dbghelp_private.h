@@ -743,6 +743,7 @@ extern BOOL         module_remove(struct process* pcs,
 extern void         module_set_module(struct module* module, const WCHAR* name);
 extern WCHAR*       get_wine_loader_name(struct process *pcs) __WINE_DEALLOC(HeapFree, 3) __WINE_MALLOC;
 extern BOOL         module_is_wine_host(const WCHAR* module_name, const WCHAR* ext);
+extern BOOL         module_refresh_list(struct process *pcs);
 
 /* msc.c */
 extern BOOL         pe_load_debug_directory(const struct process* pcs,
@@ -787,6 +788,8 @@ extern BOOL         pe_unmap_directory(struct module* module, int dirno, const c
 extern DWORD        pe_get_file_indexinfo(void* image, DWORD size, SYMSRV_INDEX_INFOW* info);
 extern const BYTE*  pe_lock_region_from_rva(struct module *module, DWORD rva, DWORD size, DWORD *length);
 extern BOOL         pe_unlock_region(struct module *module, const BYTE* region);
+struct image_file_map;
+extern BOOL         pe_has_buildid_debug(struct image_file_map *fmap, GUID *guid);
 
 /* source.c */
 extern unsigned     source_new(struct module* module, const char* basedir, const char* source);

@@ -3179,6 +3179,10 @@ msgstr "Área de Trabalho"
 msgid "&Reset"
 msgstr "&Reiniciar"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -15206,6 +15210,12 @@ msgstr "Tipo de encriptação"
 #| msgid "Current Connections"
 msgid "Current LogonId is"
 msgstr "Conexões Atuais"
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "cliente"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

@@ -417,7 +417,7 @@ static DWORD check_bus_option(const WCHAR *option, DWORD default_value)
     return default_value;
 }
 
-static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages)
+static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, UINT buttons)
 {
     char buffer[FIELD_OFFSET(KEY_VALUE_PARTIAL_INFORMATION, Data[1024])];
     KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
@@ -435,6 +435,48 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages)
 
     if (is_dualshock4_gamepad(vid, pid)) prefer_hidraw = TRUE;
     if (is_dualsense_gamepad(vid, pid)) prefer_hidraw = TRUE;
+
+    switch (vid)
+    {
+    case 0x044f:
+        if (pid == 0xb679) prefer_hidraw = TRUE; /* ThrustMaster T-Rudder */
+        if (pid == 0xb687) prefer_hidraw = TRUE; /* ThrustMaster TWCS Throttle */
+        if (pid == 0xb10a) prefer_hidraw = TRUE; /* ThrustMaster T.16000M Joystick */
+        break;
+    case 0x16d0:
+        if (pid == 0x0d61) prefer_hidraw = TRUE; /* Simucube 2 Sport */
+        if (pid == 0x0d60) prefer_hidraw = TRUE; /* Simucube 2 Pro */
+        if (pid == 0x0d5f) prefer_hidraw = TRUE; /* Simucube 2 Ultimate */
+        if (pid == 0x0d5a) prefer_hidraw = TRUE; /* Simucube 1 */
+        break;
+    case 0x0eb7:
+        if (pid == 0x183b) prefer_hidraw = TRUE; /* Fanatec ClubSport Pedals v3 */
+        if (pid == 0x1839) prefer_hidraw = TRUE; /* Fanatec ClubSport Pedals v1/v2 */
+        break;
+    case 0x231d:
+        /* comes with 128 buttons in the default configuration */
+        if (buttons == 128) prefer_hidraw = TRUE;
+        /* if customized, less than 128 buttons may be shown, decide by PID */
+        if (pid == 0x0200) prefer_hidraw = TRUE; /* VKBsim Gladiator EVO Right Grip */
+        if (pid == 0x0201) prefer_hidraw = TRUE; /* VKBsim Gladiator EVO Left Grip */
+        if (pid == 0x0126) prefer_hidraw = TRUE; /* VKB-Sim Space Gunfighter */
+        if (pid == 0x0127) prefer_hidraw = TRUE; /* VKB-Sim Space Gunfighter L */
+        break;
+    case 0x3344:
+        /* comes with 31 buttons in the default configuration, or 128 max */
+        if ((buttons == 31) || (buttons == 128)) prefer_hidraw = TRUE;
+        /* users may have configured button limits, usually 32/50/64 */
+        if ((buttons == 32) || (buttons == 50) || (buttons == 64)) prefer_hidraw = TRUE;
+        /* if customized, arbitrary amount of buttons may be shown, decide by PID */
+        if (pid == 0x412f) prefer_hidraw = TRUE; /* Virpil Constellation ALPHA-R */
+        if (pid == 0x812c) prefer_hidraw = TRUE; /* Virpil Constellation ALPHA-L */
+        break;
+    case 0x03eb:
+        /* users may have configured button limits, usually 32/50/64 */
+        if ((buttons == 32) || (buttons == 50) || (buttons == 64)) prefer_hidraw = TRUE;
+        if (pid == 0x2055) prefer_hidraw = TRUE; /* ATMEL/VIRPIL/200325 VPC Throttle MT-50 CM2 */
+        break;
+    }
 
     RtlInitUnicodeString(&str, L"EnableHidraw");
     if (!NtQueryValueKey(driver_key, &str, KeyValuePartialInformation, info,
@@ -492,6 +534,8 @@ static void process_hid_report(DEVICE_OBJECT *device, BYTE *report_buf, DWORD re
     ULONG size = offsetof(struct hid_report, buffer[report_len]);
     struct hid_report *report, *last_report;
     IRP *irp;
+
+    TRACE("device %p report_buf %p (%#x), report_len %#lx\n", device, report_buf, *report_buf, report_len);
 
     if (!(report = RtlAllocateHeap(GetProcessHeap(), 0, size))) return;
     memcpy(report->buffer, report_buf, report_len);
@@ -551,10 +595,24 @@ static void process_hid_report(DEVICE_OBJECT *device, BYTE *report_buf, DWORD re
     }
 
     RtlEnterCriticalSection(&ext->cs);
-    list_add_tail(&ext->reports, &report->entry);
+
+    if (ext->state != DEVICE_STATE_STARTED)
+    {
+        RtlLeaveCriticalSection(&ext->cs);
+        return;
+    }
 
     if (!ext->collection_desc.ReportIDs[0].ReportID) last_report = ext->last_reports[0];
     else last_report = ext->last_reports[report_buf[0]];
+    if (!last_report)
+    {
+        WARN("Ignoring report with unexpected id %#x\n", *report_buf);
+        RtlLeaveCriticalSection(&ext->cs);
+        return;
+    }
+
+    list_add_tail(&ext->reports, &report->entry);
+
     memcpy(last_report->buffer, report_buf, report_len);
 
     if ((irp = pop_pending_read(ext)))
@@ -684,22 +742,41 @@ static NTSTATUS get_device_descriptors(UINT64 unix_device, BYTE **report_desc, U
     return STATUS_SUCCESS;
 }
 
-static USAGE_AND_PAGE get_hidraw_device_usages(UINT64 unix_device)
+static USAGE_AND_PAGE get_device_usages(UINT64 unix_device, UINT *buttons)
 {
     HIDP_DEVICE_DESC device_desc;
     USAGE_AND_PAGE usages = {0};
-    UINT report_desc_length;
+    UINT i, count = 0, report_desc_length;
+    HIDP_BUTTON_CAPS *button_caps;
     BYTE *report_desc;
     NTSTATUS status;
+    HIDP_CAPS caps;
 
     if (!(status = get_device_descriptors(unix_device, &report_desc, &report_desc_length, &device_desc)))
     {
+        PHIDP_PREPARSED_DATA preparsed = device_desc.CollectionDesc[0].PreparsedData;
         usages.UsagePage = device_desc.CollectionDesc[0].UsagePage;
         usages.Usage = device_desc.CollectionDesc[0].Usage;
+
+        if ((status = HidP_GetCaps(preparsed, &caps)) == HIDP_STATUS_SUCCESS &&
+            (button_caps = malloc(sizeof(*button_caps) * caps.NumberInputButtonCaps)))
+        {
+            status = HidP_GetButtonCaps(HidP_Input, button_caps, &caps.NumberInputButtonCaps, preparsed);
+            if (status != HIDP_STATUS_SUCCESS) WARN("HidP_GetButtonCaps returned %#lx\n", status);
+            else for (i = 0; i < caps.NumberInputButtonCaps; i++)
+            {
+                if (button_caps[i].UsagePage != HID_USAGE_PAGE_BUTTON) continue;
+                if (button_caps[i].IsRange) count = max(count, button_caps[i].Range.UsageMax);
+                else count = max(count, button_caps[i].NotRange.Usage);
+            }
+            free(button_caps);
+        }
+
         HidP_FreeCollectionDescription(&device_desc);
         RtlFreeHeap(GetProcessHeap(), 0, report_desc);
     }
 
+    *buttons = count;
     return usages;
 }
 
@@ -749,18 +826,21 @@ static DWORD CALLBACK bus_main_thread(void *args)
         case BUS_EVENT_TYPE_DEVICE_CREATED:
         {
             struct device_desc desc = event->device_created.desc;
-            if (desc.is_hidraw && !desc.usages.UsagePage) desc.usages = get_hidraw_device_usages(event->device);
-            if (!desc.is_hidraw != !is_hidraw_enabled(desc.vid, desc.pid, &desc.usages))
+            USAGE_AND_PAGE usages;
+            UINT buttons;
+
+            usages = get_device_usages(event->device, &buttons);
+            if (!desc.is_hidraw != !is_hidraw_enabled(desc.vid, desc.pid, &usages, buttons))
             {
                 struct device_remove_params params = {.device = event->device};
                 WARN("ignoring %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
-                     desc.vid, desc.pid, desc.usages.UsagePage, desc.usages.Usage);
+                     desc.vid, desc.pid, usages.UsagePage, usages.Usage);
                 winebus_call(device_remove, &params);
                 break;
             }
 
             TRACE("creating %shidraw device %04x:%04x with usages %04x:%04x\n", desc.is_hidraw ? "" : "non-",
-                  desc.vid, desc.pid, desc.usages.UsagePage, desc.usages.Usage);
+                  desc.vid, desc.pid, usages.UsagePage, usages.Usage);
 
             device = bus_create_hid_device(&event->device_created.desc, event->device);
             if (device) IoInvalidateDeviceRelations(bus_pdo, BusRelations);

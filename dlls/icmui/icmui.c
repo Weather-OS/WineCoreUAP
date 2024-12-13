@@ -1,7 +1,5 @@
 /*
- * X11 driver definitions
- *
- * Copyright 2022 Jacek Caban for CodeWeavers
+ * Copyright (C) 2024 Mohamad Al-Jaf
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,24 +16,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef __WINE_X11DRV_DLL_H
-#define __WINE_X11DRV_DLL_H
-
 #include <stdarg.h>
+
 #include "windef.h"
 #include "winbase.h"
-#include "ntgdi.h"
-#include "unixlib.h"
+#include "wingdi.h"
+#include "winuser.h"
+#include "icm.h"
+#include "wine/debug.h"
 
-extern NTSTATUS WINAPI x11drv_dnd_enter_event( void *params, ULONG size );
-extern NTSTATUS WINAPI x11drv_dnd_position_event( void *params, ULONG size );
-extern NTSTATUS WINAPI x11drv_dnd_post_drop( void *data, ULONG size );
-extern NTSTATUS WINAPI x11drv_dnd_drop_event( void *params, ULONG size );
-extern NTSTATUS WINAPI x11drv_dnd_leave_event( void *params, ULONG size );
+WINE_DEFAULT_DEBUG_CHANNEL(icmui);
 
-extern LRESULT WINAPI foreign_window_proc( HWND hwnd, UINT msg, WPARAM wparam,
-                                           LPARAM lparam );
-
-extern HMODULE x11drv_module;
-
-#endif /* __WINE_X11DRV_DLL_H */
+BOOL WINAPI SetupColorMatchingW( COLORMATCHSETUPW *cms )
+{
+    FIXME( "cms %p - stub!\n", cms );
+    SetLastError( ERROR_INVALID_PARAMETER );
+    return FALSE;
+}

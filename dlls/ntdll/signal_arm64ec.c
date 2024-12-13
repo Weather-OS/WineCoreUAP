@@ -155,6 +155,25 @@ static BOOL send_cross_process_notification( HANDLE process, UINT id, const void
 }
 
 
+static void *arm64ec_redirect_ptr( HMODULE module, void *ptr, const IMAGE_ARM64EC_METADATA *metadata )
+{
+    const IMAGE_ARM64EC_REDIRECTION_ENTRY *map = get_rva( module, metadata->RedirectionMetadata );
+    int min = 0, max = metadata->RedirectionMetadataCount - 1;
+    ULONG_PTR rva = (ULONG_PTR)ptr - (ULONG_PTR)module;
+
+    if (!ptr) return NULL;
+    while (min <= max)
+    {
+        int pos = (min + max) / 2;
+        if (map[pos].Source == rva) return get_rva( module, map[pos].Destination );
+        if (map[pos].Source < rva) min = pos + 1;
+        else max = pos - 1;
+    }
+    return ptr;
+}
+
+static void arm64x_check_call(void);
+
 /*******************************************************************
  *         arm64ec_process_init
  */
@@ -162,12 +181,14 @@ NTSTATUS arm64ec_process_init( HMODULE module )
 {
     NTSTATUS status = STATUS_SUCCESS;
     CHPEV2_PROCESS_INFO *info = (CHPEV2_PROCESS_INFO *)(RtlGetCurrentPeb() + 1);
+    const IMAGE_ARM64EC_METADATA *metadata = arm64ec_get_module_metadata( module );
 
     __os_arm64x_dispatch_call_no_redirect = RtlFindExportedRoutineByName( module, "ExitToX64" );
     __os_arm64x_dispatch_fptr = RtlFindExportedRoutineByName( module, "DispatchJump" );
     __os_arm64x_dispatch_ret = RtlFindExportedRoutineByName( module, "RetToEntryThunk" );
 
-#define GET_PTR(name) p ## name = RtlFindExportedRoutineByName( module, #name )
+#define GET_PTR(name) p ## name = arm64ec_redirect_ptr( module, \
+                                      RtlFindExportedRoutineByName( module, #name ), metadata )
     GET_PTR( BTCpu64FlushInstructionCache );
     GET_PTR( BTCpu64IsProcessorFeaturePresent );
     GET_PTR( BTCpu64NotifyMemoryDirty );
@@ -202,6 +223,9 @@ NTSTATUS arm64ec_process_init( HMODULE module )
     }
     if (!status && pThreadInit) status = pThreadInit();
     leave_syscall_callback();
+    __os_arm64x_check_call = arm64x_check_call;
+    __os_arm64x_check_icall = arm64x_check_call;
+    __os_arm64x_check_icall_cfg = arm64x_check_call;
     return status;
 }
 
@@ -217,6 +241,81 @@ NTSTATUS arm64ec_thread_init(void)
     if (pThreadInit) status = pThreadInit();
     leave_syscall_callback();
     return status;
+}
+
+
+/**********************************************************************
+ *           arm64ec_get_module_metadata
+ */
+IMAGE_ARM64EC_METADATA *arm64ec_get_module_metadata( HMODULE module )
+{
+    IMAGE_LOAD_CONFIG_DIRECTORY *cfg;
+    ULONG size;
+
+    if (!(cfg = RtlImageDirectoryEntryToData( module, TRUE,
+                                              IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG, &size )))
+        return NULL;
+
+    size = min( size, cfg->Size );
+    if (size <= offsetof( IMAGE_LOAD_CONFIG_DIRECTORY, CHPEMetadataPointer )) return NULL;
+    return (IMAGE_ARM64EC_METADATA *)cfg->CHPEMetadataPointer;
+}
+
+
+static void update_hybrid_pointer( void *module, const IMAGE_SECTION_HEADER *sec, UINT rva, void *ptr )
+{
+    if (!rva) return;
+
+    if (rva < sec->VirtualAddress || rva >= sec->VirtualAddress + sec->Misc.VirtualSize)
+        ERR( "rva %x outside of section %s (%lx-%lx)\n", rva,
+             sec->Name, sec->VirtualAddress, sec->VirtualAddress + sec->Misc.VirtualSize );
+    else
+        *(void **)get_rva( module, rva ) = ptr;
+}
+
+/*******************************************************************
+ *         arm64ec_update_hybrid_metadata
+ */
+void arm64ec_update_hybrid_metadata( void *module, IMAGE_NT_HEADERS *nt,
+                                     const IMAGE_ARM64EC_METADATA *metadata )
+{
+    DWORD i, protect_old;
+    const IMAGE_SECTION_HEADER *sec = IMAGE_FIRST_SECTION( nt );
+
+    /* assume that all pointers are in the same section */
+
+    for (i = 0; i < nt->FileHeader.NumberOfSections; i++, sec++)
+    {
+        if ((sec->VirtualAddress <= metadata->__os_arm64x_dispatch_call) &&
+            (sec->VirtualAddress + sec->Misc.VirtualSize > metadata->__os_arm64x_dispatch_call))
+        {
+            void *base = get_rva( module, sec->VirtualAddress );
+            SIZE_T size = sec->Misc.VirtualSize;
+
+            NtProtectVirtualMemory( NtCurrentProcess(), &base, &size, PAGE_READWRITE, &protect_old );
+
+#define SET_FUNC(func,val) update_hybrid_pointer( module, sec, metadata->func, val )
+            SET_FUNC( __os_arm64x_dispatch_call, arm64x_check_call );
+            SET_FUNC( __os_arm64x_dispatch_call_no_redirect, __os_arm64x_dispatch_call_no_redirect );
+            SET_FUNC( __os_arm64x_dispatch_fptr, __os_arm64x_dispatch_fptr );
+            SET_FUNC( __os_arm64x_dispatch_icall, arm64x_check_call );
+            SET_FUNC( __os_arm64x_dispatch_icall_cfg, arm64x_check_call );
+            SET_FUNC( __os_arm64x_dispatch_ret, __os_arm64x_dispatch_ret );
+            SET_FUNC( __os_arm64x_helper3, __os_arm64x_helper3 );
+            SET_FUNC( __os_arm64x_helper4, __os_arm64x_helper4 );
+            SET_FUNC( __os_arm64x_helper5, __os_arm64x_helper5 );
+            SET_FUNC( __os_arm64x_helper6, __os_arm64x_helper6 );
+            SET_FUNC( __os_arm64x_helper7, __os_arm64x_helper7 );
+            SET_FUNC( __os_arm64x_helper8, __os_arm64x_helper8 );
+            SET_FUNC( GetX64InformationFunctionPointer, __os_arm64x_get_x64_information );
+            SET_FUNC( SetX64InformationFunctionPointer, __os_arm64x_set_x64_information );
+#undef SET_FUNC
+
+            NtProtectVirtualMemory( NtCurrentProcess(), &base, &size, protect_old, &protect_old );
+            return;
+        }
+    }
+    ERR( "module %p no section found for %lx\n", module, metadata->__os_arm64x_dispatch_call );
 }
 
 
@@ -251,6 +350,7 @@ DEFINE_SYSCALL(NtAlertResumeThread, (HANDLE handle, ULONG *count))
 DEFINE_SYSCALL(NtAlertThread, (HANDLE handle))
 DEFINE_SYSCALL(NtAlertThreadByThreadId, (HANDLE tid))
 DEFINE_SYSCALL(NtAllocateLocallyUniqueId, (LUID *luid))
+DEFINE_SYSCALL(NtAllocateReserveObject, (HANDLE *handle, const OBJECT_ATTRIBUTES *attr, MEMORY_RESERVE_OBJECT_TYPE type))
 DEFINE_SYSCALL(NtAllocateUuids, (ULARGE_INTEGER *time, ULONG *delta, ULONG *sequence, UCHAR *seed))
 DEFINE_WRAPPED_SYSCALL(NtAllocateVirtualMemory, (HANDLE process, PVOID *ret, ULONG_PTR zero_bits, SIZE_T *size_ptr, ULONG type, ULONG protect))
 DEFINE_WRAPPED_SYSCALL(NtAllocateVirtualMemoryEx, (HANDLE process, PVOID *ret, SIZE_T *size_ptr, ULONG type, ULONG protect, MEM_EXTENDED_PARAMETER *parameters, ULONG count))
@@ -269,6 +369,7 @@ DEFINE_SYSCALL(NtCompareTokens, (HANDLE first, HANDLE second, BOOLEAN *equal))
 DEFINE_SYSCALL(NtCompleteConnectPort, (HANDLE handle))
 DEFINE_SYSCALL(NtConnectPort, (HANDLE *handle, UNICODE_STRING *name, SECURITY_QUALITY_OF_SERVICE *qos, LPC_SECTION_WRITE *write, LPC_SECTION_READ *read, ULONG *max_len, void *info, ULONG *info_len))
 DEFINE_WRAPPED_SYSCALL(NtContinue, (ARM64_NT_CONTEXT *context, BOOLEAN alertable))
+DEFINE_WRAPPED_SYSCALL(NtContinueEx, (ARM64_NT_CONTEXT *context, KCONTINUE_ARGUMENT *args))
 DEFINE_SYSCALL(NtCreateDebugObject, (HANDLE *handle, ACCESS_MASK access, OBJECT_ATTRIBUTES *attr, ULONG flags))
 DEFINE_SYSCALL(NtCreateDirectoryObject, (HANDLE *handle, ACCESS_MASK access, OBJECT_ATTRIBUTES *attr))
 DEFINE_SYSCALL(NtCreateEvent, (HANDLE *handle, ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN state))
@@ -309,6 +410,7 @@ DEFINE_SYSCALL(NtEnumerateValueKey, (HANDLE handle, ULONG index, KEY_VALUE_INFOR
 DEFINE_SYSCALL(NtFilterToken, (HANDLE token, ULONG flags, TOKEN_GROUPS *disable_sids, TOKEN_PRIVILEGES *privileges, TOKEN_GROUPS *restrict_sids, HANDLE *new_token))
 DEFINE_SYSCALL(NtFindAtom, (const WCHAR *name, ULONG length, RTL_ATOM *atom))
 DEFINE_SYSCALL(NtFlushBuffersFile, (HANDLE handle, IO_STATUS_BLOCK *io))
+DEFINE_SYSCALL(NtFlushBuffersFileEx, (HANDLE handle, ULONG flags, void *params, ULONG size, IO_STATUS_BLOCK *io))
 DEFINE_WRAPPED_SYSCALL(NtFlushInstructionCache, (HANDLE handle, const void *addr, SIZE_T size))
 DEFINE_SYSCALL(NtFlushKey, (HANDLE key))
 DEFINE_SYSCALL(NtFlushProcessWriteBuffers, (void))
@@ -442,6 +544,7 @@ DEFINE_SYSCALL(NtSetInformationToken, (HANDLE token, TOKEN_INFORMATION_CLASS cla
 DEFINE_SYSCALL(NtSetInformationVirtualMemory, (HANDLE process, VIRTUAL_MEMORY_INFORMATION_CLASS info_class, ULONG_PTR count, PMEMORY_RANGE_ENTRY addresses, PVOID ptr, ULONG size))
 DEFINE_SYSCALL(NtSetIntervalProfile, (ULONG interval, KPROFILE_SOURCE source))
 DEFINE_SYSCALL(NtSetIoCompletion, (HANDLE handle, ULONG_PTR key, ULONG_PTR value, NTSTATUS status, SIZE_T count))
+DEFINE_SYSCALL(NtSetIoCompletionEx, (HANDLE completion_handle, HANDLE completion_reserve_handle, ULONG_PTR key, ULONG_PTR value, NTSTATUS status, SIZE_T count))
 DEFINE_SYSCALL(NtSetLdtEntries, (ULONG sel1, LDT_ENTRY entry1, ULONG sel2, LDT_ENTRY entry2))
 DEFINE_SYSCALL(NtSetSecurityObject, (HANDLE handle, SECURITY_INFORMATION info, PSECURITY_DESCRIPTOR descr))
 DEFINE_SYSCALL(NtSetSystemInformation, (SYSTEM_INFORMATION_CLASS class, void *info, ULONG length))
@@ -535,6 +638,14 @@ NTSTATUS SYSCALL_API NtContinue( CONTEXT *context, BOOLEAN alertable )
 
     context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
     return syscall_NtContinue( &arm_ctx, alertable );
+}
+
+NTSTATUS SYSCALL_API NtContinueEx( CONTEXT *context, KCONTINUE_ARGUMENT *args )
+{
+    ARM64_NT_CONTEXT arm_ctx;
+
+    context_x64_to_arm( &arm_ctx, (ARM64EC_NT_CONTEXT *)context );
+    return syscall_NtContinueEx( &arm_ctx, args );
 }
 
 NTSTATUS SYSCALL_API NtFlushInstructionCache( HANDLE process, const void *addr, SIZE_T size )
@@ -784,7 +895,7 @@ static NTSTATUS WINAPI LdrpGetX64Information( ULONG type, void *output, void *ex
         *(UINT *)output = 0x27f;  /* hard-coded x87 control word */
         return STATUS_SUCCESS;
     default:
-        FIXME( "not implemented type %u\n", type );
+        FIXME( "not implemented type %lu\n", type );
         return STATUS_INVALID_PARAMETER;
     }
 }
@@ -803,7 +914,7 @@ static NTSTATUS WINAPI LdrpSetX64Information( ULONG type, ULONG_PTR input, void 
         return STATUS_SUCCESS;
     }
     default:
-        FIXME( "not implemented type %u\n", type );
+        FIXME( "not implemented type %lu\n", type );
         return STATUS_INVALID_PARAMETER;
     }
 }
@@ -1703,6 +1814,16 @@ NTSTATUS __attribute__((naked)) __wine_unix_call_arm64ec( unixlib_handle_t handl
 
 NTSTATUS (WINAPI *__wine_unix_call_dispatcher_arm64ec)( unixlib_handle_t, unsigned int, void * ) = __wine_unix_call_arm64ec;
 
+static void __attribute__((naked)) arm64x_check_call_early(void)
+{
+    asm( "mov x11, x9\n\t"
+         "ret" );
+}
+
+static void __attribute__((naked)) arm64x_check_icall_early(void)
+{
+    asm( "ret" );
+}
 
 /**************************************************************************
  *		arm64x_check_call
@@ -1930,9 +2051,9 @@ void WINAPI LdrInitializeThunk( CONTEXT *arm_context, ULONG_PTR unk2, ULONG_PTR 
 
     if (!__os_arm64x_check_call)
     {
-        __os_arm64x_check_call = arm64x_check_call;
-        __os_arm64x_check_icall = arm64x_check_call;
-        __os_arm64x_check_icall_cfg = arm64x_check_call;
+        __os_arm64x_check_call = arm64x_check_call_early;
+        __os_arm64x_check_icall = arm64x_check_icall_early;
+        __os_arm64x_check_icall_cfg = arm64x_check_icall_early;
         __os_arm64x_get_x64_information = LdrpGetX64Information;
         __os_arm64x_set_x64_information = LdrpSetX64Information;
     }

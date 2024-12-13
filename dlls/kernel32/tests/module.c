@@ -48,6 +48,8 @@ static NTSTATUS (WINAPI *pLdrGetDllFullName)( HMODULE module, UNICODE_STRING *na
 
 static BOOL (WINAPI *pIsApiSetImplemented)(LPCSTR);
 
+static NTSTATUS (WINAPI *pRtlHashUnicodeString)( const UNICODE_STRING *, BOOLEAN, ULONG, ULONG * );
+
 static BOOL is_unicode_enabled = TRUE;
 
 static BOOL cmpStrAW(const char* a, const WCHAR* b, DWORD lenA, DWORD lenB)
@@ -139,6 +141,34 @@ static void create_test_dll( const char *name )
     SetFilePointer( handle, dll_image.nt.OptionalHeader.SizeOfImage, NULL, FILE_BEGIN );
     SetEndOfFile( handle );
     CloseHandle( handle );
+}
+
+static BOOL is_old_loader_struct(void)
+{
+    LDR_DATA_TABLE_ENTRY *mod, *mod2;
+    LDR_DDAG_NODE *ddag_node;
+    NTSTATUS status;
+    HMODULE hexe;
+
+    /* Check for old LDR data strcuture. */
+    hexe = GetModuleHandleW( NULL );
+    ok( !!hexe, "Got NULL exe handle.\n" );
+    status = LdrFindEntryForAddress( hexe, &mod );
+    ok( !status, "got %#lx.\n", status );
+    if (!(ddag_node = mod->DdagNode))
+    {
+        win_skip( "DdagNode is NULL, skipping tests.\n" );
+        return TRUE;
+    }
+    ok( !!ddag_node->Modules.Flink, "Got NULL module link.\n" );
+    mod2 = CONTAINING_RECORD(ddag_node->Modules.Flink, LDR_DATA_TABLE_ENTRY, NodeModuleLink);
+    ok( mod2 == mod || broken( (void **)mod2 == (void **)mod - 1 ), "got %p, expected %p.\n", mod2, mod );
+    if (mod2 != mod)
+    {
+        win_skip( "Old LDR_DATA_TABLE_ENTRY structure, skipping tests.\n" );
+        return TRUE;
+    }
+    return FALSE;
 }
 
 static void testGetModuleFileName(const char* name)
@@ -939,6 +969,7 @@ static void init_pointers(void)
     MAKEFUNC(LdrGetDllHandle);
     MAKEFUNC(LdrGetDllHandleEx);
     MAKEFUNC(LdrGetDllFullName);
+    MAKEFUNC(RtlHashUnicodeString);
     mod = GetModuleHandleA( "kernelbase.dll" );
     MAKEFUNC(IsApiSetImplemented);
 #undef MAKEFUNC
@@ -1317,7 +1348,7 @@ static void test_LdrGetDllHandleEx(void)
 {
     HMODULE mod, loaded_mod;
     UNICODE_STRING name;
-    char path[MAX_PATH];
+    WCHAR path[MAX_PATH];
     NTSTATUS status;
     unsigned int i;
     BOOL bret;
@@ -1395,7 +1426,8 @@ static void test_LdrGetDllHandleEx(void)
     check_refcount( loaded_mod, ~0u );
     winetest_pop_context();
 
-    GetCurrentDirectoryA( ARRAY_SIZE(path), path );
+    GetCurrentDirectoryW( ARRAY_SIZE(path), path );
+    if (pAddDllDirectory) pAddDllDirectory( path );
     create_test_dll( "d01.dll" );
     mod = LoadLibraryA( "d01.dll" );
     ok( !!mod, "got error %lu.\n", GetLastError() );
@@ -1749,29 +1781,9 @@ static void test_base_address_index_tree(void)
     unsigned int tree_count, list_count = 0;
     LDR_DATA_TABLE_ENTRY *mod, *mod2;
     RTL_BALANCED_NODE *root, *node;
-    LDR_DDAG_NODE *ddag_node;
-    NTSTATUS status;
-    HMODULE hexe;
     char *base;
 
-    /* Check for old LDR data strcuture. */
-    hexe = GetModuleHandleW( NULL );
-    ok( !!hexe, "Got NULL exe handle.\n" );
-    status = LdrFindEntryForAddress( hexe, &mod );
-    ok( !status, "got %#lx.\n", status );
-    if (!(ddag_node = mod->DdagNode))
-    {
-        win_skip( "DdagNode is NULL, skipping tests.\n" );
-        return;
-    }
-    ok( !!ddag_node->Modules.Flink, "Got NULL module link.\n" );
-    mod2 = CONTAINING_RECORD(ddag_node->Modules.Flink, LDR_DATA_TABLE_ENTRY, NodeModuleLink);
-    ok( mod2 == mod || broken( (void **)mod2 == (void **)mod - 1 ), "got %p, expected %p.\n", mod2, mod );
-    if (mod2 != mod)
-    {
-        win_skip( "Old LDR_DATA_TABLE_ENTRY structure, skipping tests.\n" );
-        return;
-    }
+    if (is_old_loader_struct()) return;
 
     mod = CONTAINING_RECORD(first->Flink, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
     ok( mod->BaseAddressIndexNode.ParentValue || mod->BaseAddressIndexNode.Left || mod->BaseAddressIndexNode.Right,
@@ -1799,6 +1811,45 @@ static void test_base_address_index_tree(void)
         ok( base == (char *)mod2->DllBase, "module %s not found.\n", debugstr_w(mod->BaseDllName.Buffer) );
     }
     ok( tree_count == list_count, "count mismatch %u, %u.\n", tree_count, list_count );
+}
+
+static ULONG hash_basename( const UNICODE_STRING *basename )
+{
+    NTSTATUS status;
+    ULONG hash;
+
+    status = pRtlHashUnicodeString( basename, TRUE, HASH_STRING_ALGORITHM_DEFAULT, &hash );
+    ok( !status, "got %#lx.\n", status );
+    return hash & 31;
+}
+
+static void test_hash_links(void)
+{
+    LIST_ENTRY *hash_map, *entry, *entry2, *mark, *root;
+    LDR_DATA_TABLE_ENTRY *module;
+    const WCHAR *modname;
+    BOOL found;
+
+    /* Hash links structure is the same on older Windows loader but hashing algorithm is different. */
+    if (is_old_loader_struct()) return;
+
+    root = &NtCurrentTeb()->Peb->LdrData->InLoadOrderModuleList;
+    module = CONTAINING_RECORD(root->Flink, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+    hash_map = module->HashLinks.Blink - hash_basename( &module->BaseDllName );
+
+    for (entry = root->Flink; entry != root; entry = entry->Flink)
+    {
+        module = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+        modname = module->BaseDllName.Buffer;
+        mark = &hash_map[hash_basename( &module->BaseDllName )];
+        found = FALSE;
+        for (entry2 = mark->Flink; entry2 != mark; entry2 = entry2->Flink)
+        {
+            module = CONTAINING_RECORD(entry2, LDR_DATA_TABLE_ENTRY, HashLinks);
+            if ((found = !lstrcmpiW( module->BaseDllName.Buffer, modname ))) break;
+        }
+        ok( found, "Could not find %s.\n", debugstr_w(modname) );
+    }
 }
 
 START_TEST(module)
@@ -1839,4 +1890,5 @@ START_TEST(module)
     test_ddag_node();
     test_tls_links();
     test_base_address_index_tree();
+    test_hash_links();
 }

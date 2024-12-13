@@ -175,7 +175,7 @@ case "$host_cpu" in
   x86_64)          HOST_ARCH=x86_64 ;;
 esac
 m4_set_add_all([_AC_SUBST_VARS],[HOST_ARCH]m4_foreach([cpu],[aarch64,arm,arm64ec,i386,x86_64],
-                                [m4_foreach([var],[CC,CFLAGS,EXTRACFLAGS,LDFLAGS,DEBUG,TARGET,DELAYLOADFLAG,DISABLED_SUBDIRS],[,cpu[_]var])]))
+                                [m4_foreach([var],[CC,CFLAGS,EXTRACFLAGS,LDFLAGS,DEBUG,TARGET,STRIP,DELAYLOADFLAG,DISABLED_SUBDIRS],[,cpu[_]var])]))
 
 AC_CACHE_CHECK([for the directory containing the Wine tools], wine_cv_toolsdir,
   [wine_cv_toolsdir="$with_wine_tools"
@@ -853,6 +853,7 @@ do
 
     dnl Check if cross compiler supports -target argument
     llvm_target=$target
+    target_strip=${target:-llvm}-strip
     if test -z "$llvm_target"
     then
         case $wine_arch in
@@ -878,7 +879,7 @@ do
         AS_VAR_SET([${wine_arch}_DELAYLOADFLAG],["-Wl,-delayload,"])
         AS_VAR_APPEND([${wine_arch}_EXTRACFLAGS],[" $llvm_extra_cflags"])
         AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" $llvm_extra_ldflags"])
-        CFLAGS="$llvm_extra_cflags $llvm_cflags"
+        CFLAGS="$CFLAGS $llvm_extra_cflags $llvm_cflags"
     else
         AS_VAR_PUSHDEF([wine_cv_crosscc], [wine_cv_${wine_arch}_crosscc])
         AC_CACHE_CHECK([whether $CC works], wine_cv_crosscc,
@@ -896,6 +897,7 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     fi
 
     AS_VAR_SET([${wine_arch}_TARGET],[$target])
+    AS_VAR_SET([${wine_arch}_STRIP],[$target_strip])
     AS_VAR_PUSHDEF([wine_cv_crosscc_c99],[ac_cv_${wine_arch}_crosscc_c99])
     AC_MSG_CHECKING([for $CC option to enable C99 features])
     AC_CACHE_VAL([wine_cv_crosscc_c99],
@@ -959,6 +961,12 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     WINE_TRY_PE_CFLAGS([-Wlogical-op])
     WINE_TRY_PE_CFLAGS([-Wabsolute-value])
     WINE_TRY_PE_CFLAGS([-Wenum-enum-conversion],[:],WINE_TRY_PE_CFLAGS([-Wenum-conversion]))
+    WINE_TRY_PE_CFLAGS([-ffunction-sections])
+
+    dnl clang had broken -fms-hotpatch support before version 18 (https://github.com/llvm/llvm-project/pull/77245)
+    WINE_TRY_PE_CFLAGS([-fms-hotpatch -DMIN_CLANG_VERSION=18],
+                       [AS_VAR_APPEND([${wine_arch}_EXTRACFLAGS],[" -fms-hotpatch"])
+                        AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -fms-hotpatch"])])
 
     dnl GCC can't handle large files when -Wmisleading-indentation is enabled (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=89549)
     WINE_TRY_PE_CFLAGS([-flarge-source-files -Wmisleading-indentation],[AS_VAR_APPEND(${wine_arch}_EXTRACFLAGS,[" -Wno-misleading-indentation"])])
@@ -996,16 +1004,19 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     if test "x$ac_debug_format_seen" = x
     then
       case $wine_crossdebug in
-        *dwarf)  WINE_TRY_PE_CFLAGS([-gdwarf-4]) ;;
+        *dwarf)  dnl clang emits a warning without -Wl,-debug:dwarf, so ensure linker option is present
+                 WINE_TRY_PE_CFLAGS([-Wl,-debug:dwarf],[AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,-debug:dwarf"])
+                                                        CFLAGS="$CFLAGS -Wl,-debug:dwarf"])
+                 WINE_TRY_PE_CFLAGS([-gdwarf-4]) ;;
         pdb)     WINE_TRY_PE_CFLAGS([-gcodeview]) ;;
       esac
     fi
     AS_VAR_SET([${wine_arch}_DEBUG],[$wine_crossdebug])
 
     test "x$enable_werror" != xyes || WINE_TRY_PE_CFLAGS([-Werror])
-    test "x$enable_build_id" != xyes || WINE_TRY_PE_CFLAGS([-Wl,--build-id],
-                                         [AS_VAR_APPEND([${wine_arch}_CFLAGS],[" -Wl,--build-id"])
-                                          AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,--build-id"])])
+    dnl clang for PE target wants -build-id (and not --build-id as gcc/mingw or clang in unix target)
+    dnl don't bother testing flags, compilation will fail afterwards
+    test "x$enable_build_id" != xyes || AS_VAR_APPEND([${wine_arch}_LDFLAGS],[" -Wl,--build-id"])
 
 done
 
@@ -2006,11 +2017,8 @@ int a(int b, ...) { __builtin_ms_va_list list; __builtin_ms_va_start(list,b); }]
   then
       WINE_TRY_CFLAGS([-Werror])
   fi
-  if test "x$enable_build_id" = "xyes"
-  then
-      WINE_TRY_CFLAGS([-Wl,--build-id], [CFLAGS="$CFLAGS -Wl,--build-id"
-                      LDFLAGS="$LDFLAGS -Wl,--build-id"])
-  fi
+
+  AS_VAR_IF([enable_build_id],[yes],[WINE_TRY_CFLAGS([-Wl,--build-id],[LDFLAGS="$LDFLAGS -Wl,--build-id"])])
 fi
 
 dnl **** Disable Fortify, it has too many false positives
@@ -2092,6 +2100,7 @@ AC_CHECK_FUNCS(\
 	posix_fadvise \
 	posix_fallocate \
 	prctl \
+	sched_getcpu \
 	sched_yield \
 	setproctitle \
 	setprogname \
@@ -2576,8 +2585,11 @@ WINE_CONFIG_MAKEFILE(dlls/d3dx9_40)
 WINE_CONFIG_MAKEFILE(dlls/d3dx9_41)
 WINE_CONFIG_MAKEFILE(dlls/d3dx9_42)
 WINE_CONFIG_MAKEFILE(dlls/d3dx9_43)
+WINE_CONFIG_MAKEFILE(dlls/d3dx9_43/tests)
 WINE_CONFIG_MAKEFILE(dlls/d3dxof)
 WINE_CONFIG_MAKEFILE(dlls/d3dxof/tests)
+WINE_CONFIG_MAKEFILE(dlls/dataexchange)
+WINE_CONFIG_MAKEFILE(dlls/dataexchange/tests)
 WINE_CONFIG_MAKEFILE(dlls/davclnt)
 WINE_CONFIG_MAKEFILE(dlls/dbgeng)
 WINE_CONFIG_MAKEFILE(dlls/dbgeng/tests)
@@ -2713,9 +2725,13 @@ WINE_CONFIG_MAKEFILE(dlls/hvsimanagementapi/tests)
 WINE_CONFIG_MAKEFILE(dlls/ia2comproxy)
 WINE_CONFIG_MAKEFILE(dlls/iccvid)
 WINE_CONFIG_MAKEFILE(dlls/icmp)
+WINE_CONFIG_MAKEFILE(dlls/icmui)
+WINE_CONFIG_MAKEFILE(dlls/icmui/tests)
 WINE_CONFIG_MAKEFILE(dlls/ieframe)
 WINE_CONFIG_MAKEFILE(dlls/ieframe/tests)
 WINE_CONFIG_MAKEFILE(dlls/ieproxy)
+WINE_CONFIG_MAKEFILE(dlls/iertutil)
+WINE_CONFIG_MAKEFILE(dlls/iertutil/tests)
 WINE_CONFIG_MAKEFILE(dlls/ifsmgr.vxd,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/imaadp32.acm)
 WINE_CONFIG_MAKEFILE(dlls/imagehlp)
@@ -3237,6 +3253,8 @@ WINE_CONFIG_MAKEFILE(dlls/windows.media.speech)
 WINE_CONFIG_MAKEFILE(dlls/windows.media.speech/tests)
 WINE_CONFIG_MAKEFILE(dlls/windows.media)
 WINE_CONFIG_MAKEFILE(dlls/windows.media/tests)
+WINE_CONFIG_MAKEFILE(dlls/windows.networking.connectivity)
+WINE_CONFIG_MAKEFILE(dlls/windows.networking.connectivity/tests)
 WINE_CONFIG_MAKEFILE(dlls/windows.networking.hostname)
 WINE_CONFIG_MAKEFILE(dlls/windows.networking.hostname/tests)
 WINE_CONFIG_MAKEFILE(dlls/windows.networking)
@@ -3262,6 +3280,7 @@ WINE_CONFIG_MAKEFILE(dlls/windowscodecsext)
 WINE_CONFIG_MAKEFILE(dlls/windowscodecsext/tests)
 WINE_CONFIG_MAKEFILE(dlls/winealsa.drv)
 WINE_CONFIG_MAKEFILE(dlls/wineandroid.drv)
+WINE_CONFIG_MAKEFILE(dlls/winebth.sys)
 WINE_CONFIG_MAKEFILE(dlls/winebus.sys)
 WINE_CONFIG_MAKEFILE(dlls/winecoreaudio.drv)
 WINE_CONFIG_MAKEFILE(dlls/winecrt0)
@@ -3316,6 +3335,7 @@ WINE_CONFIG_MAKEFILE(dlls/wldp/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmadmod)
 WINE_CONFIG_MAKEFILE(dlls/wmasf)
 WINE_CONFIG_MAKEFILE(dlls/wmi)
+WINE_CONFIG_MAKEFILE(dlls/wmilib.sys)
 WINE_CONFIG_MAKEFILE(dlls/wmiutils)
 WINE_CONFIG_MAKEFILE(dlls/wmiutils/tests)
 WINE_CONFIG_MAKEFILE(dlls/wmp)
@@ -3478,6 +3498,7 @@ WINE_CONFIG_MAKEFILE(programs/msidb)
 WINE_CONFIG_MAKEFILE(programs/msiexec)
 WINE_CONFIG_MAKEFILE(programs/msinfo32)
 WINE_CONFIG_MAKEFILE(programs/net)
+WINE_CONFIG_MAKEFILE(programs/net/tests)
 WINE_CONFIG_MAKEFILE(programs/netsh)
 WINE_CONFIG_MAKEFILE(programs/netstat)
 WINE_CONFIG_MAKEFILE(programs/ngen)
@@ -3512,6 +3533,7 @@ WINE_CONFIG_MAKEFILE(programs/services)
 WINE_CONFIG_MAKEFILE(programs/services/tests)
 WINE_CONFIG_MAKEFILE(programs/setx)
 WINE_CONFIG_MAKEFILE(programs/shutdown)
+WINE_CONFIG_MAKEFILE(programs/sort)
 WINE_CONFIG_MAKEFILE(programs/spoolsv)
 WINE_CONFIG_MAKEFILE(programs/start)
 WINE_CONFIG_MAKEFILE(programs/subst)

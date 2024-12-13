@@ -953,6 +953,11 @@ echo %WINE_VAR:~2,-3%
 echo '%WINE_VAR:~-2,-4%'
 echo %WINE_VAR:~-3,-2%
 echo %WINE_VAR:~4,4%
+set WINE_VAR=qwertyQWERTY
+echo %WINE_VAR:qw=az%
+echo %WINE_VAR:qw=%
+echo %WINE_VAR:*TY==_%
+echo %WINE_VAR:*TY=%
 set WINE_VAR=
 mkdir dummydir
 cd dummydir
@@ -1597,6 +1602,10 @@ if not exist "" (
 )
 del foo subdir\bar
 rd subdir
+
+if exist %~D0 (echo ok) else echo failure
+if exist %~D0\ (echo ok) else echo failure
+if exist %~D0\. (echo ok) else echo failure
 
 echo ------ for numbers
 if -1 LSS 1 (echo negative numbers handled)

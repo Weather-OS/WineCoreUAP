@@ -3110,6 +3110,10 @@ msgstr "Wine உதவி"
 msgid "&Reset"
 msgstr "மீட்டமை (&E)"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 msgid "Display Settings"
 msgstr ""
@@ -14430,6 +14434,10 @@ msgstr ""
 
 #: programs/klist/klist.rc:37
 msgid "Current LogonId is"
+msgstr ""
+
+#: programs/klist/klist.rc:38
+msgid "Client"
 msgstr ""
 
 #: programs/msinfo32/msinfo32.rc:28

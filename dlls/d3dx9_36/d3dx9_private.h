@@ -90,6 +90,57 @@ static inline void set_volume_struct(struct volume *volume, uint32_t width, uint
     volume->depth = depth;
 }
 
+/* These values act as indexes into the pixel_format_desc table. */
+enum d3dx_pixel_format_id
+{
+    D3DX_PIXEL_FORMAT_B8G8R8_UNORM,
+    D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM,
+    D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM,
+    D3DX_PIXEL_FORMAT_R8G8B8A8_UNORM,
+    D3DX_PIXEL_FORMAT_R8G8B8X8_UNORM,
+    D3DX_PIXEL_FORMAT_B5G6R5_UNORM,
+    D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM,
+    D3DX_PIXEL_FORMAT_B5G5R5A1_UNORM,
+    D3DX_PIXEL_FORMAT_B2G3R3_UNORM,
+    D3DX_PIXEL_FORMAT_B2G3R3A8_UNORM,
+    D3DX_PIXEL_FORMAT_B4G4R4A4_UNORM,
+    D3DX_PIXEL_FORMAT_B4G4R4X4_UNORM,
+    D3DX_PIXEL_FORMAT_B10G10R10A2_UNORM,
+    D3DX_PIXEL_FORMAT_R10G10B10A2_UNORM,
+    D3DX_PIXEL_FORMAT_R16G16B16_UNORM,
+    D3DX_PIXEL_FORMAT_R16G16B16A16_UNORM,
+    D3DX_PIXEL_FORMAT_R16G16_UNORM,
+    D3DX_PIXEL_FORMAT_A8_UNORM,
+    D3DX_PIXEL_FORMAT_L8A8_UNORM,
+    D3DX_PIXEL_FORMAT_L4A4_UNORM,
+    D3DX_PIXEL_FORMAT_L8_UNORM,
+    D3DX_PIXEL_FORMAT_L16_UNORM,
+    D3DX_PIXEL_FORMAT_DXT1_UNORM,
+    D3DX_PIXEL_FORMAT_DXT2_UNORM,
+    D3DX_PIXEL_FORMAT_DXT3_UNORM,
+    D3DX_PIXEL_FORMAT_DXT4_UNORM,
+    D3DX_PIXEL_FORMAT_DXT5_UNORM,
+    D3DX_PIXEL_FORMAT_R16_FLOAT,
+    D3DX_PIXEL_FORMAT_R16G16_FLOAT,
+    D3DX_PIXEL_FORMAT_R16G16B16A16_FLOAT,
+    D3DX_PIXEL_FORMAT_R32_FLOAT,
+    D3DX_PIXEL_FORMAT_R32G32_FLOAT,
+    D3DX_PIXEL_FORMAT_R32G32B32A32_FLOAT,
+    D3DX_PIXEL_FORMAT_P8_UINT,
+    D3DX_PIXEL_FORMAT_P8_UINT_A8_UNORM,
+    D3DX_PIXEL_FORMAT_U8V8W8Q8_SNORM,
+    D3DX_PIXEL_FORMAT_U16V16W16Q16_SNORM,
+    D3DX_PIXEL_FORMAT_U8V8_SNORM,
+    D3DX_PIXEL_FORMAT_U16V16_SNORM,
+    D3DX_PIXEL_FORMAT_U8V8_SNORM_L8X8_UNORM,
+    D3DX_PIXEL_FORMAT_U10V10W10_SNORM_A2_UNORM,
+    D3DX_PIXEL_FORMAT_R8G8_B8G8_UNORM,
+    D3DX_PIXEL_FORMAT_G8R8_G8B8_UNORM,
+    D3DX_PIXEL_FORMAT_UYVY,
+    D3DX_PIXEL_FORMAT_YUY2,
+    D3DX_PIXEL_FORMAT_COUNT,
+};
+
 /* for internal use */
 enum component_type
 {
@@ -105,10 +156,12 @@ enum format_flag
 {
     FMT_FLAG_DXT  = 0x01,
     FMT_FLAG_PACKED = 0x02,
+    /* Internal only format, has no exact D3DFORMAT equivalent. */
+    FMT_FLAG_INTERNAL = 0x04,
 };
 
 struct pixel_format_desc {
-    D3DFORMAT format;
+    enum d3dx_pixel_format_id format;
     BYTE bits[4];
     BYTE shift[4];
     UINT bytes_per_pixel;
@@ -147,7 +200,7 @@ static inline void set_d3dx_pixels(struct d3dx_pixels *pixels, const void *data,
 struct d3dx_image
 {
     D3DRESOURCETYPE resource_type;
-    D3DFORMAT format;
+    enum d3dx_pixel_format_id format;
 
     struct volume size;
     uint32_t mip_levels;
@@ -185,7 +238,7 @@ extern const struct ID3DXIncludeVtbl d3dx_include_from_file_vtbl;
 
 static inline BOOL is_unknown_format(const struct pixel_format_desc *format)
 {
-    return (format->format == D3DFMT_UNKNOWN);
+    return (format->format == D3DX_PIXEL_FORMAT_COUNT);
 }
 
 static inline BOOL is_index_format(const struct pixel_format_desc *format)
@@ -217,6 +270,11 @@ static inline BOOL format_types_match(const struct pixel_format_desc *src, const
     return (src->rgb_type == dst->rgb_type || src->a_type == dst->a_type);
 }
 
+static inline BOOL is_internal_format(const struct pixel_format_desc *format)
+{
+    return !!(format->flags & FMT_FLAG_INTERNAL);
+}
+
 static inline BOOL is_conversion_from_supported(const struct pixel_format_desc *format)
 {
     return !is_packed_format(format) && !is_unknown_format(format);
@@ -232,6 +290,9 @@ HRESULT load_resource_into_memory(HMODULE module, HRSRC resinfo, void **buffer, 
 
 HRESULT write_buffer_to_file(const WCHAR *filename, ID3DXBuffer *buffer);
 
+D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
+enum d3dx_pixel_format_id d3dx_pixel_format_id_from_d3dformat(D3DFORMAT format);
+const struct pixel_format_desc *get_d3dx_pixel_format_info(enum d3dx_pixel_format_id format);
 const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
@@ -256,8 +317,8 @@ HRESULT lock_surface(IDirect3DSurface9 *surface, const RECT *surface_rect, D3DLO
 HRESULT unlock_surface(IDirect3DSurface9 *surface, const RECT *surface_rect,
         IDirect3DSurface9 *temp_surface, BOOL update);
 HRESULT d3dx_pixels_init(const void *data, uint32_t row_pitch, uint32_t slice_pitch,
-        const PALETTEENTRY *palette, D3DFORMAT format, uint32_t left, uint32_t top, uint32_t right, uint32_t bottom,
-        uint32_t front, uint32_t back, struct d3dx_pixels *pixels);
+        const PALETTEENTRY *palette, enum d3dx_pixel_format_id format, uint32_t left, uint32_t top, uint32_t right,
+        uint32_t bottom, uint32_t front, uint32_t back, struct d3dx_pixels *pixels);
 HRESULT d3dx_load_pixels_from_pixels(struct d3dx_pixels *dst_pixels,
        const struct pixel_format_desc *dst_desc, struct d3dx_pixels *src_pixels,
        const struct pixel_format_desc *src_desc, uint32_t filter_flags, uint32_t color_key);

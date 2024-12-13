@@ -128,6 +128,9 @@ struct file_id
     BYTE ObjectId[16];
 };
 
+#define HASH_MAP_SIZE 32
+static LIST_ENTRY hash_table[HASH_MAP_SIZE];
+
 /* internal representation of loaded modules */
 typedef struct _wine_modref
 {
@@ -192,12 +195,6 @@ static FARPROC find_ordinal_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY
                                     DWORD exp_size, DWORD ordinal, LPCWSTR load_path );
 static FARPROC find_named_export( HMODULE module, const IMAGE_EXPORT_DIRECTORY *exports,
                                   DWORD exp_size, const char *name, int hint, LPCWSTR load_path );
-
-/* convert PE image VirtualAddress to Real Address */
-static inline void *get_rva( HMODULE module, DWORD va )
-{
-    return (void *)((char *)module + va);
-}
 
 /* check whether the file name contains a path */
 static inline BOOL contains_path( LPCWSTR name )
@@ -271,65 +268,6 @@ static RTL_BALANCED_NODE *rtl_rb_tree_get( RTL_RB_TREE *tree, const void *key,
     return NULL;
 }
 
-#ifdef __arm64ec__
-
-static void update_hybrid_pointer( void *module, const IMAGE_SECTION_HEADER *sec, UINT rva, void *ptr )
-{
-    if (!rva) return;
-
-    if (rva < sec->VirtualAddress || rva >= sec->VirtualAddress + sec->Misc.VirtualSize)
-        ERR( "rva %x outside of section %s (%lx-%lx)\n", rva,
-             sec->Name, sec->VirtualAddress, sec->VirtualAddress + sec->Misc.VirtualSize );
-    else
-        *(void **)get_rva( module, rva ) = ptr;
-}
-
-static void update_hybrid_metadata( void *module, IMAGE_NT_HEADERS *nt,
-                                    const IMAGE_ARM64EC_METADATA *metadata )
-{
-    DWORD i, protect_old;
-    const IMAGE_SECTION_HEADER *sec = IMAGE_FIRST_SECTION( nt );
-
-    /* assume that all pointers are in the same section */
-
-    for (i = 0; i < nt->FileHeader.NumberOfSections; i++, sec++)
-    {
-        if ((sec->VirtualAddress <= metadata->__os_arm64x_dispatch_call) &&
-            (sec->VirtualAddress + sec->Misc.VirtualSize > metadata->__os_arm64x_dispatch_call))
-        {
-            void *base = get_rva( module, sec->VirtualAddress );
-            SIZE_T size = sec->Misc.VirtualSize;
-
-            NtProtectVirtualMemory( NtCurrentProcess(), &base, &size, PAGE_READWRITE, &protect_old );
-
-#define SET_FUNC(func,val) update_hybrid_pointer( module, sec, metadata->func, val )
-            SET_FUNC( __os_arm64x_dispatch_call, __os_arm64x_check_call );
-            SET_FUNC( __os_arm64x_dispatch_call_no_redirect, __os_arm64x_dispatch_call_no_redirect );
-            SET_FUNC( __os_arm64x_dispatch_fptr, __os_arm64x_dispatch_fptr );
-            SET_FUNC( __os_arm64x_dispatch_icall, __os_arm64x_check_icall );
-            SET_FUNC( __os_arm64x_dispatch_icall_cfg, __os_arm64x_check_icall_cfg );
-            SET_FUNC( __os_arm64x_dispatch_ret, __os_arm64x_dispatch_ret );
-            SET_FUNC( __os_arm64x_helper0, __os_arm64x_helper0 );
-            SET_FUNC( __os_arm64x_helper1, __os_arm64x_helper1 );
-            SET_FUNC( __os_arm64x_helper2, __os_arm64x_helper2 );
-            SET_FUNC( __os_arm64x_helper3, __os_arm64x_helper3 );
-            SET_FUNC( __os_arm64x_helper4, __os_arm64x_helper4 );
-            SET_FUNC( __os_arm64x_helper5, __os_arm64x_helper5 );
-            SET_FUNC( __os_arm64x_helper6, __os_arm64x_helper6 );
-            SET_FUNC( __os_arm64x_helper7, __os_arm64x_helper7 );
-            SET_FUNC( __os_arm64x_helper8, __os_arm64x_helper8 );
-            SET_FUNC( GetX64InformationFunctionPointer, __os_arm64x_get_x64_information );
-            SET_FUNC( SetX64InformationFunctionPointer, __os_arm64x_set_x64_information );
-#undef SET_FUNC
-
-            NtProtectVirtualMemory( NtCurrentProcess(), &base, &size, protect_old, &protect_old );
-            return;
-        }
-    }
-    ERR( "module %p no section found for %lx\n", module, metadata->__os_arm64x_dispatch_call );
-}
-
-#endif
 
 /*********************************************************************
  *           RtlGetUnloadEventTrace [NTDLL.@]
@@ -603,6 +541,15 @@ static int base_address_compare( const void *key, const RTL_BALANCED_NODE *entry
     return 0;
 }
 
+/* compute basename hash */
+static ULONG hash_basename( const UNICODE_STRING *basename )
+{
+    ULONG hash = 0;
+
+    RtlHashUnicodeString( basename, TRUE, HASH_STRING_ALGORITHM_DEFAULT, &hash );
+    return hash % HASH_MAP_SIZE;
+}
+
 /*************************************************************************
  *		get_modref
  *
@@ -638,10 +585,10 @@ static WINE_MODREF *find_basename_module( LPCWSTR name )
     if (cached_modref && RtlEqualUnicodeString( &name_str, &cached_modref->ldr.BaseDllName, TRUE ))
         return cached_modref;
 
-    mark = &NtCurrentTeb()->Peb->LdrData->InLoadOrderModuleList;
+    mark = &hash_table[hash_basename( &name_str )];
     for (entry = mark->Flink; entry != mark; entry = entry->Flink)
     {
-        WINE_MODREF *mod = CONTAINING_RECORD(entry, WINE_MODREF, ldr.InLoadOrderLinks);
+        WINE_MODREF *mod = CONTAINING_RECORD(entry, WINE_MODREF, ldr.HashLinks);
         if (RtlEqualUnicodeString( &name_str, &mod->ldr.BaseDllName, TRUE ) && !mod->system)
         {
             cached_modref = CONTAINING_RECORD(mod, WINE_MODREF, ldr);
@@ -1599,6 +1546,7 @@ static WINE_MODREF *alloc_module( HMODULE hModule, const UNICODE_STRING *nt_name
                    &wm->ldr.InLoadOrderLinks);
     InsertTailList(&NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList,
                    &wm->ldr.InMemoryOrderLinks);
+    InsertTailList(&hash_table[hash_basename( &wm->ldr.BaseDllName )], &wm->ldr.HashLinks);
     if (rtl_rb_tree_put( &base_address_index_tree, wm->ldr.DllBase, &wm->ldr.BaseAddressIndexNode, base_address_compare ))
         ERR( "rtl_rb_tree_put failed.\n" );
     /* wait until init is called for inserting into InInitializationOrderModuleList */
@@ -2166,7 +2114,7 @@ static void update_load_config( void *module )
         cfg->CHPEMetadataPointer > (ULONG_PTR)module &&
         cfg->CHPEMetadataPointer < (ULONG_PTR)module + nt->OptionalHeader.SizeOfImage)
     {
-        update_hybrid_metadata( module, nt, (void *)cfg->CHPEMetadataPointer );
+        arm64ec_update_hybrid_metadata( module, nt, (void *)cfg->CHPEMetadataPointer );
     }
 #endif
 }
@@ -2299,6 +2247,7 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
             /* the module has only be inserted in the load & memory order lists */
             RemoveEntryList(&wm->ldr.InLoadOrderLinks);
             RemoveEntryList(&wm->ldr.InMemoryOrderLinks);
+            RemoveEntryList(&wm->ldr.HashLinks);
             RtlRbRemoveNode( &base_address_index_tree, &wm->ldr.BaseAddressIndexNode );
 
             /* FIXME: there are several more dangling references
@@ -3969,6 +3918,7 @@ static void free_modref( WINE_MODREF *wm )
 
     RemoveEntryList(&wm->ldr.InLoadOrderLinks);
     RemoveEntryList(&wm->ldr.InMemoryOrderLinks);
+    RemoveEntryList(&wm->ldr.HashLinks);
     RtlRbRemoveNode( &base_address_index_tree, &wm->ldr.BaseAddressIndexNode );
     if (wm->ldr.InInitializationOrderLinks.Flink)
         RemoveEntryList(&wm->ldr.InInitializationOrderLinks);
@@ -4390,6 +4340,7 @@ void loader_init( CONTEXT *context, void **entry )
         ANSI_STRING ctrl_routine = RTL_CONSTANT_STRING( "CtrlRoutine" );
         WINE_MODREF *kernel32;
         PEB *peb = NtCurrentTeb()->Peb;
+        unsigned int i;
 
         peb->LdrData            = &ldr;
         peb->FastPebLock        = &peb_lock;
@@ -4407,6 +4358,9 @@ void loader_init( CONTEXT *context, void **entry )
 
         if (!(tls_dirs = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, tls_module_count * sizeof(*tls_dirs) )))
             NtTerminateProcess( GetCurrentProcess(), STATUS_NO_MEMORY );
+
+        for (i = 0; i < HASH_MAP_SIZE; i++)
+            InitializeListHead( &hash_table[i] );
 
         init_user_process_params();
         load_global_options();

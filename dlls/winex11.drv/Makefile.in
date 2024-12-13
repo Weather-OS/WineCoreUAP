@@ -1,7 +1,6 @@
 MODULE    = winex11.drv
 UNIXLIB   = winex11.so
 IMPORTS   = uuid user32 gdi32 win32u
-DELAYIMPORTS = combase
 UNIX_CFLAGS  = $(X_CFLAGS)
 UNIX_LIBS    = -lwin32u $(X_LIBS) $(PTHREAD_LIBS) -lm
 
@@ -20,13 +19,11 @@ SOURCES = \
 	opengl.c \
 	palette.c \
 	pen.c \
-	systray.c \
 	version.rc \
 	vulkan.c \
 	window.c \
 	wintab.c \
 	x11drv_main.c \
-	xdnd.c \
 	xim.c \
 	xinerama.c \
 	xrandr.c \

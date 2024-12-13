@@ -3638,10 +3638,18 @@ static const dispex_static_data_vtbl_t DOMKeyboardEvent_dispex_vtbl = {
     .unlink           = DOMKeyboardEvent_unlink
 };
 
+static void KeyboardEvent_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t hooks[] = {
+        {DISPID_IDOMKEYBOARDEVENT_IE9_CHAR, NULL, L"char"},
+        {DISPID_UNKNOWN}
+    };
+    dispex_info_add_interface(info, IDOMKeyboardEvent_tid, hooks);
+}
+
 static const tid_t KeyboardEvent_iface_tids[] = {
     IDOMEvent_tid,
     IDOMUIEvent_tid,
-    IDOMKeyboardEvent_tid,
     0
 };
 
@@ -3651,12 +3659,12 @@ dispex_static_data_t KeyboardEvent_dispex = {
     .vtbl         = &DOMKeyboardEvent_dispex_vtbl,
     .disp_tid     = DispDOMKeyboardEvent_tid,
     .iface_tids   = KeyboardEvent_iface_tids,
+    .init_info    = KeyboardEvent_init_dispex_info,
 };
 
 static void DOMPageTransitionEvent_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 {
-    if(mode >= COMPAT_MODE_IE11)
-        dispex_info_add_interface(info, IWinePageTransitionEvent_tid, NULL);
+    dispex_info_add_interface(info, IWinePageTransitionEvent_tid, NULL);
 }
 
 static const dispex_static_data_vtbl_t DOMPageTransitionEvent_dispex_vtbl = {
@@ -3667,12 +3675,13 @@ static const dispex_static_data_vtbl_t DOMPageTransitionEvent_dispex_vtbl = {
 };
 
 dispex_static_data_t PageTransitionEvent_dispex = {
-    .id           = PROT_PageTransitionEvent,
-    .prototype_id = PROT_Event,
-    .vtbl         = &DOMPageTransitionEvent_dispex_vtbl,
-    .disp_tid     = DispDOMEvent_tid,
-    .iface_tids   = Event_iface_tids,
-    .init_info    = DOMPageTransitionEvent_init_dispex_info,
+    .id              = PROT_PageTransitionEvent,
+    .prototype_id    = PROT_Event,
+    .vtbl            = &DOMPageTransitionEvent_dispex_vtbl,
+    .disp_tid        = DispDOMEvent_tid,
+    .iface_tids      = Event_iface_tids,
+    .init_info       = DOMPageTransitionEvent_init_dispex_info,
+    .min_compat_mode = COMPAT_MODE_IE11,
 };
 
 static const dispex_static_data_vtbl_t DOMCustomEvent_dispex_vtbl = {
@@ -3726,11 +3735,12 @@ static const tid_t ProgressEvent_iface_tids[] = {
 };
 
 dispex_static_data_t ProgressEvent_dispex = {
-    .id           = PROT_ProgressEvent,
-    .prototype_id = PROT_Event,
-    .vtbl         = &DOMProgressEvent_dispex_vtbl,
-    .disp_tid     = DispDOMProgressEvent_tid,
-    .iface_tids   = ProgressEvent_iface_tids,
+    .id              = PROT_ProgressEvent,
+    .prototype_id    = PROT_Event,
+    .vtbl            = &DOMProgressEvent_dispex_vtbl,
+    .disp_tid        = DispDOMProgressEvent_tid,
+    .iface_tids      = ProgressEvent_iface_tids,
+    .min_compat_mode = COMPAT_MODE_IE10,
 };
 
 static const dispex_static_data_vtbl_t DOMStorageEvent_dispex_vtbl = {
@@ -3890,7 +3900,7 @@ static const struct {
     [EVENT_TYPE_CLIPBOARD]      = { NULL,                         generic_event_ctor },
     [EVENT_TYPE_FOCUS]          = { NULL,                         generic_event_ctor },
     [EVENT_TYPE_DRAG]           = { NULL,                         generic_event_ctor },
-    [EVENT_TYPE_PAGETRANSITION] = { NULL,                         page_transition_event_ctor },
+    [EVENT_TYPE_PAGETRANSITION] = { NULL,                         page_transition_event_ctor, COMPAT_MODE_IE11 },
     [EVENT_TYPE_CUSTOM]         = { &IID_nsIDOMCustomEvent,       custom_event_ctor },
     [EVENT_TYPE_PROGRESS]       = { &IID_nsIDOMProgressEvent,     progress_event_ctor, COMPAT_MODE_IE10 },
     [EVENT_TYPE_MESSAGE]        = { NULL,                         message_event_ctor },

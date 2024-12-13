@@ -1785,26 +1785,12 @@ BOOL WINAPI GetXStateFeaturesMask( CONTEXT *context, DWORD64 *feature_mask )
  * Firmware functions
  ***********************************************************************/
 
-
-/***********************************************************************
- *             EnumSystemFirmwareTable   (kernelbase.@)
- */
-UINT WINAPI EnumSystemFirmwareTables( DWORD provider, void *buffer, DWORD size )
-{
-    FIXME( "(0x%08lx, %p, %ld)\n", provider, buffer, size );
-    return 0;
-}
-
-
-/***********************************************************************
- *             GetSystemFirmwareTable   (kernelbase.@)
- */
-UINT WINAPI GetSystemFirmwareTable( DWORD provider, DWORD id, void *buffer, DWORD size )
+static UINT get_firmware_table( DWORD provider, SYSTEM_FIRMWARE_TABLE_ACTION action, DWORD id,
+                                void *buffer, DWORD size )
 {
     SYSTEM_FIRMWARE_TABLE_INFORMATION *info;
     ULONG buffer_size = offsetof( SYSTEM_FIRMWARE_TABLE_INFORMATION, TableBuffer ) + size;
-
-    TRACE( "(0x%08lx, 0x%08lx, %p, %ld)\n", provider, id, buffer, size );
+    NTSTATUS status;
 
     if (!(info = RtlAllocateHeap( GetProcessHeap(), 0, buffer_size )))
     {
@@ -1813,14 +1799,34 @@ UINT WINAPI GetSystemFirmwareTable( DWORD provider, DWORD id, void *buffer, DWOR
     }
 
     info->ProviderSignature = provider;
-    info->Action = SystemFirmwareTable_Get;
+    info->Action = action;
     info->TableID = id;
 
-    set_ntstatus( NtQuerySystemInformation( SystemFirmwareTableInformation,
-                                            info, buffer_size, &buffer_size ));
+    status = NtQuerySystemInformation( SystemFirmwareTableInformation, info, buffer_size, &buffer_size );
+    set_ntstatus(status);
     buffer_size -= offsetof( SYSTEM_FIRMWARE_TABLE_INFORMATION, TableBuffer );
     if (buffer_size <= size) memcpy( buffer, info->TableBuffer, buffer_size );
 
     HeapFree( GetProcessHeap(), 0, info );
-    return buffer_size;
+    return NT_SUCCESS(status) || status == STATUS_BUFFER_TOO_SMALL ? buffer_size : 0;
+}
+
+/***********************************************************************
+ *             EnumSystemFirmwareTables   (kernelbase.@)
+ */
+UINT WINAPI EnumSystemFirmwareTables( DWORD provider, void *buffer, DWORD size )
+{
+    TRACE( "(0x%08lx, %p, %ld)\n", provider, buffer, size );
+
+    return get_firmware_table( provider, SystemFirmwareTable_Enumerate, 0, buffer, size );
+}
+
+/***********************************************************************
+ *             GetSystemFirmwareTable   (kernelbase.@)
+ */
+UINT WINAPI GetSystemFirmwareTable( DWORD provider, DWORD id, void *buffer, DWORD size )
+{
+    TRACE( "(0x%08lx, 0x%08lx, %p, %ld)\n", provider, id, buffer, size );
+
+    return get_firmware_table( provider, SystemFirmwareTable_Get, id, buffer, size );
 }

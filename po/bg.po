@@ -3162,6 +3162,10 @@ msgstr "Работен плот"
 msgid "&Reset"
 msgstr "&Възстанови"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 msgid "Display Settings"
@@ -14980,6 +14984,10 @@ msgstr ""
 #| msgid "LAN Connection"
 msgid "Current LogonId is"
 msgstr "LAN връзка"
+
+#: programs/klist/klist.rc:38
+msgid "Client"
+msgstr ""
 
 #: programs/msinfo32/msinfo32.rc:28
 #, fuzzy

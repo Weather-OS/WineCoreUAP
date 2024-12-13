@@ -1127,10 +1127,20 @@ NTSTATUS SYSCALL_API NtUserBuildHimcList( UINT thread_id, UINT count, HIMC *buff
     SYSCALL_FUNC( NtUserBuildHimcList );
 }
 
-NTSTATUS SYSCALL_API NtUserBuildHwndList( HDESK desktop, ULONG unk2, ULONG unk3, ULONG unk4,
+NTSTATUS SYSCALL_API NtUserBuildHwndList( HDESK desktop, HWND hwnd, BOOL children, BOOL non_immersive,
                                           ULONG thread_id, ULONG count, HWND *buffer, ULONG *size )
 {
     SYSCALL_FUNC( NtUserBuildHwndList );
+}
+
+NTSTATUS SYSCALL_API NtUserBuildNameList( HWINSTA winsta, ULONG size, struct ntuser_name_list *buffer, ULONG *ret_size )
+{
+    SYSCALL_FUNC( NtUserBuildNameList );
+}
+
+NTSTATUS SYSCALL_API NtUserBuildPropList( HWND hwnd, ULONG count, struct ntuser_property_list *buffer, ULONG *ret_count )
+{
+    SYSCALL_FUNC( NtUserBuildPropList );
 }
 
 ULONG_PTR SYSCALL_API NtUserCallHwnd( HWND hwnd, DWORD code )
@@ -1348,6 +1358,11 @@ BOOL SYSCALL_API NtUserEnableMenuItem( HMENU handle, UINT id, UINT flags )
 BOOL SYSCALL_API NtUserEnableMouseInPointer( BOOL enable )
 {
     SYSCALL_FUNC( NtUserEnableMouseInPointer );
+}
+
+BOOL SYSCALL_API NtUserEnableMouseInPointerForThread(void)
+{
+    SYSCALL_FUNC( NtUserEnableMouseInPointerForThread );
 }
 
 BOOL SYSCALL_API NtUserEnableScrollBar( HWND hwnd, UINT bar, UINT flags )
@@ -1724,9 +1739,9 @@ BOOL SYSCALL_API NtUserHiliteMenuItem( HWND hwnd, HMENU handle, UINT item, UINT 
     SYSCALL_FUNC( NtUserHiliteMenuItem );
 }
 
-NTSTATUS SYSCALL_API NtUserInitializeClientPfnArrays( const struct user_client_procs *client_procsA,
-                                                      const struct user_client_procs *client_procsW,
-                                                      const void *client_workers, HINSTANCE user_module )
+NTSTATUS SYSCALL_API NtUserInitializeClientPfnArrays( const ntuser_client_func_ptr *client_procsA,
+                                                      const ntuser_client_func_ptr *client_procsW,
+                                                      const ntuser_client_func_ptr *client_workers, HINSTANCE user_module )
 {
     SYSCALL_FUNC( NtUserInitializeClientPfnArrays );
 }
@@ -1870,6 +1885,11 @@ UINT_PTR SYSCALL_API NtUserQueryInputContext( HIMC handle, UINT attr )
     SYSCALL_FUNC( NtUserQueryInputContext );
 }
 
+HANDLE SYSCALL_API NtUserQueryWindow( HWND hwnd, WINDOWINFOCLASS cls )
+{
+    SYSCALL_FUNC( NtUserQueryWindow );
+}
+
 HWND SYSCALL_API NtUserRealChildWindowFromPoint( HWND parent, LONG x, LONG y )
 {
     SYSCALL_FUNC( NtUserRealChildWindowFromPoint );
@@ -1895,6 +1915,11 @@ BOOL SYSCALL_API NtUserRegisterHotKey( HWND hwnd, INT id, UINT modifiers, UINT v
 BOOL SYSCALL_API NtUserRegisterRawInputDevices( const RAWINPUTDEVICE *devices, UINT device_count, UINT device_size )
 {
     SYSCALL_FUNC( NtUserRegisterRawInputDevices );
+}
+
+BOOL SYSCALL_API NtUserRegisterTouchPadCapable( BOOL capable )
+{
+    SYSCALL_FUNC( NtUserRegisterTouchPadCapable );
 }
 
 INT SYSCALL_API NtUserReleaseDC( HWND hwnd, HDC hdc )

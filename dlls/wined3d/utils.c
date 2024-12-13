@@ -1933,7 +1933,7 @@ static inline int get_format_idx(enum wined3d_format_id format_id)
 {
     unsigned int i;
 
-    if (format_id < WINED3D_FORMAT_FOURCC_BASE)
+    if ((unsigned int)format_id < WINED3D_FORMAT_FOURCC_BASE)
         return format_id;
 
     for (i = 0; i < ARRAY_SIZE(format_index_remap); ++i)
@@ -5608,38 +5608,43 @@ static void compute_texture_matrix(const struct wined3d_matrix *matrix, uint32_t
 
     mat = *matrix;
 
-    /* Under Direct3D the R/Z coord can be used for translation, under
-     * OpenGL we use the Q coord instead. */
+    /* When less than 4 components are provided for an attribute, the remaining
+     * components are filled with (..., 0, 0, 1). This is the case when using
+     * shaders in Direct3D as well as in GL and Vulkan.
+     *
+     * However, when using the Direct3D fixed function vertex pipeline, the
+     * texture coordinates transformed by texture matrices effectively have
+     * 1 in the first "default" component and 0 in the others (e.g. for
+     * R32_FLOAT the coordinates are (..., 1, 0, 0).
+     *
+     * We could approximate this by modifying the shader, but modifying uniforms
+     * is generally cheaper, so instead we change the matrix, copying the 2nd or
+     * 3rd column to the 4th. That is, whichever coefficients expect a value of
+     * 1 will instead be used as the coefficients for the 4th column, which
+     * actually has a value of 1. The coefficients for other columns don't need
+     * to be modified, since the corresponding texcoord components are zero. */
+
     if (!(flags & WINED3D_TTFF_PROJECTED) && !calculated_coords)
     {
         switch (format_id)
         {
-            /* Direct3D passes the default 1.0 in the 2nd coord, while GL
-             * passes it in the 4th. Swap 2nd and 4th coord. No need to
-             * store the value of mat._41 in mat._21 because the input
-             * value to the transformation will be 0, so the matrix value
-             * is irrelevant. */
             case WINED3DFMT_R32_FLOAT:
                 mat._41 = mat._21;
                 mat._42 = mat._22;
                 mat._43 = mat._23;
                 mat._44 = mat._24;
                 break;
-            /* See above, just 3rd and 4th coord. */
+
             case WINED3DFMT_R32G32_FLOAT:
                 mat._41 = mat._31;
                 mat._42 = mat._32;
                 mat._43 = mat._33;
                 mat._44 = mat._34;
                 break;
-            case WINED3DFMT_R32G32B32_FLOAT: /* Opengl defaults match dx defaults */
-            case WINED3DFMT_R32G32B32A32_FLOAT: /* No defaults apply, all app defined */
 
-            /* This is to prevent swapping the matrix lines and put the default 4th coord = 1.0
-             * into a bad place. The division elimination below will apply to make sure the
-             * 1.0 doesn't do anything bad. The caller will set this value if the stride is 0
-             */
-            case WINED3DFMT_UNKNOWN: /* No texture coords, 0/0/0/1 defaults are passed */
+            case WINED3DFMT_R32G32B32_FLOAT:
+            case WINED3DFMT_R32G32B32A32_FLOAT:
+            case WINED3DFMT_UNKNOWN:
                 break;
             default:
                 FIXME("Unexpected fixed function texture coord input\n");
@@ -5649,23 +5654,29 @@ static void compute_texture_matrix(const struct wined3d_matrix *matrix, uint32_t
     *out_matrix = mat;
 }
 
-void get_texture_matrix(const struct wined3d_stream_info *si,
-        const struct wined3d_stateblock_state *state, const unsigned int tex, struct wined3d_matrix *mat)
+static enum wined3d_format_id get_texcoord_format(const struct wined3d_vertex_declaration *decl, unsigned int index)
+{
+    for (unsigned int i = 0; i < decl->element_count; ++i)
+    {
+        if (decl->elements[i].usage == WINED3D_DECL_USAGE_TEXCOORD
+                && decl->elements[i].usage_idx == index)
+            return decl->elements[i].format->id;
+    }
+
+    return WINED3DFMT_UNKNOWN;
+}
+
+void get_texture_matrix(const struct wined3d_stateblock_state *state,
+        const unsigned int tex, struct wined3d_matrix *mat)
 {
     BOOL generated = (state->texture_states[tex][WINED3D_TSS_TEXCOORD_INDEX] & 0xffff0000)
             != WINED3DTSS_TCI_PASSTHRU;
     unsigned int coord_idx = min(state->texture_states[tex][WINED3D_TSS_TEXCOORD_INDEX] & 0x0000ffff,
             WINED3D_MAX_FFP_TEXTURES - 1);
-    enum wined3d_format_id attribute_format;
-
-    if (si->use_map & (1u << (WINED3D_FFP_TEXCOORD0 + coord_idx)))
-        attribute_format = si->elements[WINED3D_FFP_TEXCOORD0 + coord_idx].format->id;
-    else
-        attribute_format = WINED3DFMT_UNKNOWN;
 
     compute_texture_matrix(&state->transforms[WINED3D_TS_TEXTURE0 + tex],
             state->texture_states[tex][WINED3D_TSS_TEXTURE_TRANSFORM_FLAGS],
-            generated, attribute_format, mat);
+            generated, get_texcoord_format(state->vertex_declaration, coord_idx), mat);
 }
 
 void get_pointsize_minmax(const struct wined3d_context *context, const struct wined3d_state *state,
@@ -6437,7 +6448,7 @@ void wined3d_ffp_get_vs_settings(const struct wined3d_state *state, const struct
 
     memset(settings, 0, sizeof(*settings));
 
-    if (si->position_transformed)
+    if (vdecl->position_transformed)
     {
         settings->transformed = 1;
         settings->point_size = state->primitive_type == WINED3D_PT_POINTLIST;

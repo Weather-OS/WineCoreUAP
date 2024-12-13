@@ -1169,6 +1169,15 @@ static struct inode *get_inode( dev_t dev, ino_t ino, int unix_fd )
     return inode;
 }
 
+static int inode_has_pending_close( struct inode *inode, const char *path )
+{
+    struct closed_fd *fd;
+
+    LIST_FOR_EACH_ENTRY( fd, &inode->closed, struct closed_fd, entry )
+        if (!strcmp( fd->unix_name, path )) return 1;
+    return 0;
+}
+
 /* add fd to the inode list of file descriptors to close */
 static void inode_add_closed_fd( struct inode *inode, struct closed_fd *fd )
 {
@@ -1185,7 +1194,7 @@ static void inode_add_closed_fd( struct inode *inode, struct closed_fd *fd )
         free( fd->unix_name );
         free( fd );
     }
-    else if (fd->disp_flags & FILE_DISPOSITION_DELETE)
+    else if ((fd->disp_flags & FILE_DISPOSITION_DELETE) && !inode_has_pending_close( inode, fd->unix_name ))
     {
         /* close the fd but keep the structure around for unlink */
         if (fd->unix_fd != -1) close( fd->unix_fd );
@@ -1943,15 +1952,6 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
 
     fd->nt_name = dup_nt_name( root, nt_name, &fd->nt_namelen );
     fd->unix_name = NULL;
-    if ((path = dup_fd_name( root, name )))
-    {
-        fd->unix_name = realpath( path, NULL );
-        free( path );
-    }
-
-    closed_fd->unix_fd = fd->unix_fd;
-    closed_fd->disp_flags = 0;
-    closed_fd->unix_name = fd->unix_name;
     fstat( fd->unix_fd, &st );
     *mode = st.st_mode;
 
@@ -1968,6 +1968,16 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
              */
             goto error;
         }
+
+        if ((path = dup_fd_name( root, name )))
+        {
+            fd->unix_name = realpath( path, NULL );
+            free( path );
+        }
+
+        closed_fd->unix_fd = fd->unix_fd;
+        closed_fd->unix_name = fd->unix_name;
+        closed_fd->disp_flags = 0;
         fd->inode = inode;
         fd->closed = closed_fd;
         fd->cacheable = !inode->device->removable;
@@ -2911,6 +2921,7 @@ DECL_HANDLER(set_completion_info)
         {
             fd->completion = get_completion_obj( current->process, req->chandle, IO_COMPLETION_MODIFY_STATE );
             fd->comp_key = req->ckey;
+            set_fd_signaled( fd, 1 );
         }
         else set_error( STATUS_INVALID_PARAMETER );
         release_object( fd );

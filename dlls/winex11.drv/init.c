@@ -194,11 +194,37 @@ static HFONT X11DRV_SelectFont( PHYSDEV dev, HFONT hfont, UINT *aa_flags )
     return dev->funcs->pSelectFont( dev, hfont, aa_flags );
 }
 
+static BOOL needs_client_window_clipping( HWND hwnd )
+{
+    struct x11drv_win_data *data;
+    RECT rect, client;
+    UINT ret = 0;
+    HRGN region;
+    HDC hdc;
+
+    if (!(data = get_win_data( hwnd ))) return TRUE;
+    client = data->rects.client;
+    release_win_data( data );
+    OffsetRect( &client, -client.left, -client.top );
+
+    if (!(hdc = NtUserGetDCEx( hwnd, 0, DCX_CACHE | DCX_CLIPCHILDREN ))) return FALSE;
+    if ((region = NtGdiCreateRectRgn( 0, 0, 0, 0 )))
+    {
+        ret = NtGdiGetRandomRgn( hdc, region, SYSRGN | NTGDI_RGN_MONITOR_DPI );
+        if (ret > 0 && (ret = NtGdiGetRgnBox( region, &rect )) <= NULLREGION) ret = 0;
+        if (ret == SIMPLEREGION && EqualRect( &rect, &client )) ret = 0;
+        NtGdiDeleteObjectApp( region );
+    }
+    NtGdiDeleteObjectApp( hdc );
+
+    return ret > 0;
+}
+
 BOOL needs_offscreen_rendering( HWND hwnd, BOOL known_child )
 {
-    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_DEFAULT )) return TRUE; /* needs DPI scaling */
+    if (NtUserGetDpiForWindow( hwnd ) != NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI )) return TRUE; /* needs DPI scaling */
     if (NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow()) return TRUE; /* child window, needs compositing */
-    if (NtUserGetWindowRelative( hwnd, GW_CHILD )) return TRUE; /* window has children, needs compositing */
+    if (NtUserGetWindowRelative( hwnd, GW_CHILD )) return needs_client_window_clipping( hwnd ); /* window has children, needs compositing */
     if (known_child) return TRUE; /* window is/have children, needs compositing */
     return FALSE;
 }
@@ -225,33 +251,10 @@ Drawable get_dc_drawable( HDC hdc, RECT *rect )
 
 HRGN get_dc_monitor_region( HWND hwnd, HDC hdc )
 {
-    RGNDATA *data;
-    UINT i, size;
     HRGN region;
-    POINT pt;
 
     if (!(region = NtGdiCreateRectRgn( 0, 0, 0, 0 ))) return 0;
-    if (NtGdiGetRandomRgn( hdc, region, SYSRGN ) <= 0) goto failed;
-    if (!(size = NtGdiGetRegionData( region, 0, NULL ))) goto failed;
-    if (!(data = malloc( size ))) goto failed;
-    NtGdiGetRegionData( region, size, data );
-    NtGdiDeleteObjectApp( region );
-
-    NtGdiGetDCPoint( hdc, NtGdiGetDCOrg, &pt );
-    NtUserLogicalToPerMonitorDPIPhysicalPoint( hwnd, &pt );
-    for (i = 0; i < data->rdh.nCount; i++)
-    {
-        RECT *rect = (RECT *)data->Buffer + i;
-        NtUserLogicalToPerMonitorDPIPhysicalPoint( hwnd, (POINT *)&rect->left );
-        NtUserLogicalToPerMonitorDPIPhysicalPoint( hwnd, (POINT *)&rect->right );
-        OffsetRect( rect, -pt.x, -pt.y );
-    }
-
-    region = NtGdiExtCreateRegion( NULL, size, data );
-    free( data );
-    return region;
-
-failed:
+    if (NtGdiGetRandomRgn( hdc, region, SYSRGN | NTGDI_RGN_MONITOR_DPI ) > 0) return region;
     NtGdiDeleteObjectApp( region );
     return 0;
 }
@@ -470,6 +473,7 @@ static const struct user_driver_funcs x11drv_funcs =
     .pWindowMessage = X11DRV_WindowMessage,
     .pWindowPosChanging = X11DRV_WindowPosChanging,
     .pGetWindowStyleMasks = X11DRV_GetWindowStyleMasks,
+    .pGetWindowStateUpdates = X11DRV_GetWindowStateUpdates,
     .pCreateWindowSurface = X11DRV_CreateWindowSurface,
     .pMoveWindowBits = X11DRV_MoveWindowBits,
     .pWindowPosChanged = X11DRV_WindowPosChanged,

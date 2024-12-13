@@ -7156,11 +7156,17 @@ static void test_effect_get_pass_desc(IDirect3DDevice9 *device)
     pass = effect->lpVtbl->GetPass(effect, "tech0", 1);
     ok(!!pass, "GetPass() failed.\n");
 
+    /* Calling GetPassDesc() on a D3DXFX_NOT_CLONEABLE effect is apparently
+     * not safe on Windows: the following Release() would crash with a
+     * STATUS_ACCESS_VIOLATION exception on the GitLab CI instance. */
+    if (0)
+    {
     hr = effect->lpVtbl->GetPassDesc(effect, pass, &desc);
     ok(hr == D3D_OK, "Got result %#lx.\n", hr);
 
     ok(!desc.pVertexShaderFunction, "Unexpected non null desc.pVertexShaderFunction.\n");
     ok(!desc.pPixelShaderFunction, "Unexpected non null desc.pPixelShaderFunction.\n");
+    }
 
     effect->lpVtbl->Release(effect);
 }
@@ -8059,8 +8065,11 @@ static HRESULT WINAPI d3dxinclude_open(ID3DXInclude *iface, D3DXINCLUDE_TYPE inc
         "}\n";
     char *buffer;
 
-    trace("filename %s.\n", filename);
-    trace("parent_data %p: %s.\n", parent_data, parent_data ? (char *)parent_data : "(null)");
+    if (winetest_debug > 1)
+    {
+        trace("filename %s.\n", filename);
+        trace("parent_data %p: %s.\n", parent_data, parent_data ? (char *)parent_data : "(null)");
+    }
 
     if (!strcmp(filename, "effect2.fx"))
     {
@@ -8081,7 +8090,8 @@ static HRESULT WINAPI d3dxinclude_open(ID3DXInclude *iface, D3DXINCLUDE_TYPE inc
         buffer = malloc(sizeof(include2));
         memcpy(buffer, include2, sizeof(include2));
         *bytes = sizeof(include2);
-        todo_wine ok(parent_data && !strncmp(parent_data, effect2, strlen(effect2)),
+        /* d3dx9_36 passes parent_data even for includes from the main file. */
+        ok(!parent_data || (parent_data && !strncmp(parent_data, effect2, strlen(effect2))),
                 "unexpected parent_data value.\n");
     }
     else
@@ -8265,7 +8275,7 @@ static void test_create_effect_from_file(void)
     /* This is apparently broken on native, it ends up using the wrong include. */
     hr = D3DXCreateEffectFromFileExW(device, filename_w, NULL, NULL, NULL,
             0, NULL, &effect, &messages);
-    ok(hr == E_FAIL, "Unexpected error, hr %#lx.\n", hr);
+    todo_wine ok(hr == E_FAIL, "Unexpected error, hr %#lx.\n", hr);
     if (messages)
     {
         trace("D3DXCreateEffectFromFileExW messages:\n%s", (char *)ID3DXBuffer_GetBufferPointer(messages));
@@ -8288,7 +8298,7 @@ static void test_create_effect_from_file(void)
      * is "ID3DXEffectCompiler: There were no techniques" */
     hr = D3DXCreateEffectFromFileExW(device, filename_w, NULL, &include.ID3DXInclude_iface, NULL,
             0, NULL, &effect, &messages);
-    ok(hr == E_FAIL, "D3DXInclude test failed with error %#lx.\n", hr);
+    todo_wine ok(hr == E_FAIL, "D3DXInclude test failed with error %#lx.\n", hr);
     if (messages)
     {
         trace("D3DXCreateEffectFromFileExW messages:\n%s", (char *)ID3DXBuffer_GetBufferPointer(messages));

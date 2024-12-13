@@ -791,7 +791,8 @@ static VOID set_installer_properties(MSIPACKAGE *package)
         PathAddBackslashW( pth );
         msi_set_property( package->db, L"CommonFilesFolder", pth, -1 );
     }
-    else if (sys_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
+    else if (sys_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
+             sys_info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
     {
         msi_set_property( package->db, L"MsiAMD64", bufstr, -1 );
         msi_set_property( package->db, L"Msix64", bufstr, -1 );
@@ -1102,6 +1103,8 @@ static UINT parse_suminfo( MSISUMMARYINFO *si, MSIPACKAGE *package )
     package->version = msi_suminfo_get_int32( si, PID_PAGECOUNT );
     TRACE("version: %d\n", package->version);
 
+    package->platform = PLATFORM_INTEL;
+
     template = msi_suminfo_dup_string( si, PID_TEMPLATE );
     if (!template)
         return ERROR_SUCCESS; /* native accepts missing template property */
@@ -1158,27 +1161,39 @@ static UINT parse_suminfo( MSISUMMARYINFO *si, MSIPACKAGE *package )
     return ERROR_SUCCESS;
 }
 
+static BOOL validate_package_platform( enum platform platform )
+{
+    USHORT proc_machine, native_machine;
+    IsWow64Process2( GetCurrentProcess(), &proc_machine, &native_machine );
+    switch (platform)
+    {
+    case PLATFORM_INTEL:
+        return native_machine == IMAGE_FILE_MACHINE_I386 ||
+               native_machine == IMAGE_FILE_MACHINE_AMD64 ||
+               native_machine == IMAGE_FILE_MACHINE_ARM64;
+    case PLATFORM_X64:
+        return native_machine == IMAGE_FILE_MACHINE_AMD64 ||
+               native_machine == IMAGE_FILE_MACHINE_ARM64;
+    case PLATFORM_ARM:
+        return native_machine == IMAGE_FILE_MACHINE_ARM;
+    case PLATFORM_ARM64:
+        return native_machine == IMAGE_FILE_MACHINE_ARM64;
+    case PLATFORM_INTEL64:
+    default:
+        return FALSE;
+    }
+}
+
 static UINT validate_package( MSIPACKAGE *package )
 {
     UINT i;
 
-    if (package->platform == PLATFORM_INTEL64)
+    if (!validate_package_platform( package->platform ))
         return ERROR_INSTALL_PLATFORM_UNSUPPORTED;
-#ifndef __arm__
-    if (package->platform == PLATFORM_ARM)
-        return ERROR_INSTALL_PLATFORM_UNSUPPORTED;
-#endif
-#ifndef __aarch64__
-    if (package->platform == PLATFORM_ARM64)
-        return ERROR_INSTALL_PLATFORM_UNSUPPORTED;
-#endif
-    if (package->platform == PLATFORM_X64)
-    {
-        if (!is_64bit && !is_wow64)
-            return ERROR_INSTALL_PLATFORM_UNSUPPORTED;
-        if (package->version < 200)
-            return ERROR_INSTALL_PACKAGE_INVALID;
-    }
+
+    if (package->platform == PLATFORM_X64 && package->version < 200)
+        return ERROR_INSTALL_PACKAGE_INVALID;
+
     if (!package->num_langids)
     {
         return ERROR_SUCCESS;

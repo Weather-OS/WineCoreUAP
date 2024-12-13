@@ -332,6 +332,26 @@ HRESULT WINAPI PropVariantToBoolean(REFPROPVARIANT propvarIn, BOOL *ret)
     return hr;
 }
 
+HRESULT WINAPI PropVariantToBSTR(REFPROPVARIANT propvar, BSTR *bstr)
+{
+    WCHAR *str;
+    HRESULT hr;
+
+    TRACE("propvar %p, propvar->vt %#x, bstr %p.\n",
+            propvar, propvar ? propvar->vt : 0, bstr);
+
+    if (FAILED(hr = PropVariantToStringAlloc(propvar, &str)))
+        return hr;
+
+    *bstr = SysAllocString(str);
+    CoTaskMemFree(str);
+
+    if (!*bstr)
+        return E_OUTOFMEMORY;
+
+    return S_OK;
+}
+
 HRESULT WINAPI PropVariantToBuffer(REFPROPVARIANT propvarIn, void *ret, UINT cb)
 {
     HRESULT hr = S_OK;
@@ -1049,6 +1069,8 @@ INT WINAPI PropVariantCompareEx(REFPROPVARIANT propvar1, REFPROPVARIANT propvar2
 
 HRESULT WINAPI PropVariantToVariant(const PROPVARIANT *propvar, VARIANT *var)
 {
+    HRESULT hr = S_OK;
+
     TRACE("propvar %p, var %p, propvar->vt %#x.\n", propvar, var, propvar ? propvar->vt : 0);
 
     if (!var || !propvar)
@@ -1095,19 +1117,26 @@ HRESULT WINAPI PropVariantToVariant(const PROPVARIANT *propvar, VARIANT *var)
         case VT_R8:
             V_R8(var) = propvar->dblVal;
             break;
+        case VT_LPSTR:
+        case VT_LPWSTR:
+        case VT_BSTR:
+        case VT_CLSID:
+            var->vt = VT_BSTR;
+            hr = PropVariantToBSTR(propvar, &V_BSTR(var));
+            break;
         default:
             FIXME("Unsupported type %d.\n", propvar->vt);
             return E_INVALIDARG;
     }
 
-    return S_OK;
+    return hr;
 }
 
 HRESULT WINAPI VariantToPropVariant(const VARIANT *var, PROPVARIANT *propvar)
 {
     HRESULT hr;
 
-    TRACE("var %p, propvar %p, var->vt %04x.\n", var, propvar, var->vt);
+    TRACE("var %p, propvar %p.\n", debugstr_variant(var), propvar);
 
     if (!var || !propvar)
         return E_INVALIDARG;

@@ -352,6 +352,7 @@ void texture2d_read_from_framebuffer(struct wined3d_texture *texture, unsigned i
     unsigned int row_pitch, slice_pitch;
     unsigned int width, height, level;
     struct wined3d_bo_address data;
+    bool restore_context = false;
     unsigned int restore_idx;
     BYTE *row, *top, *bottom;
     BOOL src_is_upside_down;
@@ -369,9 +370,10 @@ void texture2d_read_from_framebuffer(struct wined3d_texture *texture, unsigned i
     restore_texture = context->current_rt.texture;
     restore_idx = context->current_rt.sub_resource_idx;
     if (!wined3d_resource_is_offscreen(resource) && (restore_texture != texture || restore_idx != sub_resource_idx))
+    {
         context = context_acquire(device, texture, sub_resource_idx);
-    else
-        restore_texture = NULL;
+        restore_context = true;
+    }
     context_gl = wined3d_context_gl(context);
     gl_info = context_gl->gl_info;
 
@@ -473,7 +475,7 @@ error:
         checkGLcall("glBindBuffer");
     }
 
-    if (restore_texture)
+    if (restore_context)
         context_restore(context, restore_texture, restore_idx);
 }
 
@@ -1517,7 +1519,6 @@ HRESULT texture2d_blt(struct wined3d_texture *dst_texture, unsigned int dst_sub_
         }
     }
     else if (!sub_resource_is_on_cpu(src_texture, src_sub_resource_idx)
-            && (dst_sub_resource->locations & dst_texture->resource.map_binding)
             && !(dst_texture->resource.access & WINED3D_RESOURCE_ACCESS_GPU))
     {
         /* Download */

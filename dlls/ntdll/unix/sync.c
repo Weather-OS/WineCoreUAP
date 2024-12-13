@@ -993,7 +993,7 @@ NTSTATUS WINAPI NtSetInformationDebugObject( HANDLE handle, DEBUGOBJECTINFOCLASS
 
 
 /* convert the server event data to an NT state change; helper for NtWaitForDebugEvent */
-static NTSTATUS event_data_to_state_change( const debug_event_t *data, DBGUI_WAIT_STATE_CHANGE *state )
+static NTSTATUS event_data_to_state_change( const union debug_event_data *data, DBGUI_WAIT_STATE_CHANGE *state )
 {
     int i;
 
@@ -1098,7 +1098,7 @@ static NTSTATUS get_image_machine( HANDLE handle, USHORT *machine )
 NTSTATUS WINAPI NtWaitForDebugEvent( HANDLE handle, BOOLEAN alertable, LARGE_INTEGER *timeout,
                                      DBGUI_WAIT_STATE_CHANGE *state )
 {
-    debug_event_t data;
+    union debug_event_data data;
     unsigned int ret;
     BOOL wait = TRUE;
 
@@ -1572,7 +1572,7 @@ NTSTATUS WINAPI NtQueryTimer( HANDLE handle, TIMER_INFORMATION_CLASS class,
 NTSTATUS WINAPI NtWaitForMultipleObjects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                           BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
-    select_op_t select_op;
+    union select_op select_op;
     UINT i, flags = SELECT_INTERRUPTIBLE;
 
     if (!count || count > MAXIMUM_WAIT_OBJECTS) return STATUS_INVALID_PARAMETER_1;
@@ -1580,7 +1580,7 @@ NTSTATUS WINAPI NtWaitForMultipleObjects( DWORD count, const HANDLE *handles, BO
     if (alertable) flags |= SELECT_ALERTABLE;
     select_op.wait.op = wait_any ? SELECT_WAIT : SELECT_WAIT_ALL;
     for (i = 0; i < count; i++) select_op.wait.handles[i] = wine_server_obj_handle( handles[i] );
-    return server_wait( &select_op, offsetof( select_op_t, wait.handles[count] ), flags, timeout );
+    return server_wait( &select_op, offsetof( union select_op, wait.handles[count] ), flags, timeout );
 }
 
 
@@ -1599,7 +1599,7 @@ NTSTATUS WINAPI NtWaitForSingleObject( HANDLE handle, BOOLEAN alertable, const L
 NTSTATUS WINAPI NtSignalAndWaitForSingleObject( HANDLE signal, HANDLE wait,
                                                 BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
-    select_op_t select_op;
+    union select_op select_op;
     UINT flags = SELECT_INTERRUPTIBLE;
 
     if (!signal) return STATUS_INVALID_HANDLE;
@@ -1883,7 +1883,7 @@ NTSTATUS WINAPI NtOpenKeyedEvent( HANDLE *handle, ACCESS_MASK access, const OBJE
 NTSTATUS WINAPI NtWaitForKeyedEvent( HANDLE handle, const void *key,
                                      BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
-    select_op_t select_op;
+    union select_op select_op;
     UINT flags = SELECT_INTERRUPTIBLE;
 
     if (!handle) handle = keyed_event;
@@ -1902,7 +1902,7 @@ NTSTATUS WINAPI NtWaitForKeyedEvent( HANDLE handle, const void *key,
 NTSTATUS WINAPI NtReleaseKeyedEvent( HANDLE handle, const void *key,
                                      BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
-    select_op_t select_op;
+    union select_op select_op;
     UINT flags = SELECT_INTERRUPTIBLE;
 
     if (!handle) handle = keyed_event;
@@ -1935,7 +1935,8 @@ NTSTATUS WINAPI NtCreateIoCompletion( HANDLE *handle, ACCESS_MASK access, OBJECT
         req->access     = access;
         req->concurrent = threads;
         wine_server_add_data( req, objattr, len );
-        if (!(status = wine_server_call( req ))) *handle = wine_server_ptr_handle( reply->handle );
+        status = wine_server_call( req );
+        *handle = wine_server_ptr_handle( reply->handle );
     }
     SERVER_END_REQ;
 
@@ -1992,6 +1993,35 @@ NTSTATUS WINAPI NtSetIoCompletion( HANDLE handle, ULONG_PTR key, ULONG_PTR value
     return ret;
 }
 
+/***********************************************************************
+ *             NtSetIoCompletionEx (NTDLL.@)
+ *
+ * completion_reserve_handle is a handle allocated by NtAllocateReserveObject() for pre-allocating
+ * memory for completion objects to deal with low-memory situations. It's not in use for now.
+ */
+NTSTATUS WINAPI NtSetIoCompletionEx( HANDLE completion_handle, HANDLE completion_reserve_handle,
+                                     ULONG_PTR key, ULONG_PTR value, NTSTATUS status, SIZE_T count )
+{
+    unsigned int ret;
+
+    TRACE( "(%p, %p, %lx, %lx, %x, %lx)\n", completion_handle, completion_reserve_handle,
+           key, value, (int)status, count );
+
+    if (!completion_reserve_handle) return STATUS_INVALID_HANDLE;
+
+    SERVER_START_REQ( add_completion )
+    {
+        req->handle         = wine_server_obj_handle( completion_handle );
+        req->ckey           = key;
+        req->cvalue         = value;
+        req->status         = status;
+        req->information    = count;
+        req->reserve_handle = wine_server_obj_handle( completion_reserve_handle );
+        ret = wine_server_call( req );
+    }
+    SERVER_END_REQ;
+    return ret;
+}
 
 /***********************************************************************
  *             NtRemoveIoCompletion (NTDLL.@)
@@ -1999,28 +2029,43 @@ NTSTATUS WINAPI NtSetIoCompletion( HANDLE handle, ULONG_PTR key, ULONG_PTR value
 NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *value,
                                       IO_STATUS_BLOCK *io, LARGE_INTEGER *timeout )
 {
+    HANDLE wait_handle = NULL;
     unsigned int status;
 
     TRACE( "(%p, %p, %p, %p, %p)\n", handle, key, value, io, timeout );
 
-    for (;;)
+    SERVER_START_REQ( remove_completion )
     {
-        SERVER_START_REQ( remove_completion )
+        req->handle = wine_server_obj_handle( handle );
+        req->alertable = 0;
+        if (!(status = wine_server_call( req )))
         {
-            req->handle = wine_server_obj_handle( handle );
-            if (!(status = wine_server_call( req )))
-            {
-                *key            = reply->ckey;
-                *value          = reply->cvalue;
-                io->Information = reply->information;
-                io->Status      = reply->status;
-            }
+            *key            = reply->ckey;
+            *value          = reply->cvalue;
+            io->Information = reply->information;
+            io->Status      = reply->status;
         }
-        SERVER_END_REQ;
-        if (status != STATUS_PENDING) return status;
-        status = NtWaitForSingleObject( handle, FALSE, timeout );
-        if (status != WAIT_OBJECT_0) return status;
+        else wait_handle = wine_server_ptr_handle( reply->wait_handle );
     }
+    SERVER_END_REQ;
+    if (status != STATUS_PENDING) return status;
+    if (!timeout || timeout->QuadPart) status = NtWaitForSingleObject( wait_handle, FALSE, timeout );
+    else                               status = STATUS_TIMEOUT;
+    if (status != WAIT_OBJECT_0) return status;
+
+    SERVER_START_REQ( get_thread_completion )
+    {
+        if (!(status = wine_server_call( req )))
+        {
+            *key            = reply->ckey;
+            *value          = reply->cvalue;
+            io->Information = reply->information;
+            io->Status      = reply->status;
+        }
+    }
+    SERVER_END_REQ;
+
+    return status;
 }
 
 
@@ -2030,38 +2075,60 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
 NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORMATION *info, ULONG count,
                                         ULONG *written, LARGE_INTEGER *timeout, BOOLEAN alertable )
 {
+    HANDLE wait_handle = NULL;
     unsigned int status;
     ULONG i = 0;
 
     TRACE( "%p %p %u %p %p %u\n", handle, info, (int)count, written, timeout, alertable );
 
-    for (;;)
+    while (i < count)
     {
-        while (i < count)
+        SERVER_START_REQ( remove_completion )
         {
-            SERVER_START_REQ( remove_completion )
+            req->handle = wine_server_obj_handle( handle );
+            req->alertable = alertable;
+            if (!(status = wine_server_call( req )))
             {
-                req->handle = wine_server_obj_handle( handle );
-                if (!(status = wine_server_call( req )))
-                {
-                    info[i].CompletionKey             = reply->ckey;
-                    info[i].CompletionValue           = reply->cvalue;
-                    info[i].IoStatusBlock.Information = reply->information;
-                    info[i].IoStatusBlock.Status      = reply->status;
-                }
+                info[i].CompletionKey             = reply->ckey;
+                info[i].CompletionValue           = reply->cvalue;
+                info[i].IoStatusBlock.Information = reply->information;
+                info[i].IoStatusBlock.Status      = reply->status;
             }
-            SERVER_END_REQ;
-            if (status != STATUS_SUCCESS) break;
+            else wait_handle = wine_server_ptr_handle( reply->wait_handle );
+        }
+        SERVER_END_REQ;
+        if (status != STATUS_SUCCESS) break;
+        ++i;
+    }
+    if (i || (status != STATUS_PENDING && status != STATUS_USER_APC))
+    {
+        if (i) status = STATUS_SUCCESS;
+        goto done;
+    }
+    if (status == STATUS_USER_APC)
+    {
+        status = NtDelayExecution( TRUE, NULL );
+        assert( status == STATUS_USER_APC );
+        goto done;
+    }
+    if (!timeout || timeout->QuadPart) status = NtWaitForSingleObject( wait_handle, alertable, timeout );
+    else                               status = STATUS_TIMEOUT;
+    if (status != WAIT_OBJECT_0) goto done;
+
+    SERVER_START_REQ( get_thread_completion )
+    {
+        if (!(status = wine_server_call( req )))
+        {
+            info[i].CompletionKey             = reply->ckey;
+            info[i].CompletionValue           = reply->cvalue;
+            info[i].IoStatusBlock.Information = reply->information;
+            info[i].IoStatusBlock.Status      = reply->status;
             ++i;
         }
-        if (i || status != STATUS_PENDING)
-        {
-            if (status == STATUS_PENDING) status = STATUS_SUCCESS;
-            break;
-        }
-        status = NtWaitForSingleObject( handle, alertable, timeout );
-        if (status != WAIT_OBJECT_0) break;
     }
+    SERVER_END_REQ;
+
+done:
     *written = i ? i : 1;
     return status;
 }

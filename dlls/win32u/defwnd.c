@@ -947,6 +947,9 @@ static void track_nc_scroll_bar( HWND hwnd, WPARAM wparam, POINT pt )
 
 static LRESULT handle_sys_command( HWND hwnd, WPARAM wparam, LPARAM lparam )
 {
+    POINT pos;
+    RECT rect;
+
     TRACE( "hwnd %p WM_SYSCOMMAND %lx %lx\n", hwnd, (long)wparam, lparam );
 
     if (!is_window_enabled( hwnd )) return 0;
@@ -954,7 +957,15 @@ static LRESULT handle_sys_command( HWND hwnd, WPARAM wparam, LPARAM lparam )
     if (call_hooks( WH_CBT, HCBT_SYSCOMMAND, wparam, lparam, 0 ))
         return 0;
 
-    if (!user_driver->pSysCommand( hwnd, wparam, lparam ))
+    pos.x = (short)LOWORD( NtUserGetThreadInfo()->message_pos );
+    pos.y = (short)HIWORD( NtUserGetThreadInfo()->message_pos );
+    NtUserLogicalToPerMonitorDPIPhysicalPoint( hwnd, &pos );
+    SetRect( &rect, pos.x, pos.y, pos.x, pos.y );
+    rect = map_rect_virt_to_raw( rect, 0 );
+    pos.x = rect.left;
+    pos.y = rect.top;
+
+    if (!user_driver->pSysCommand( hwnd, wparam, lparam, &pos ))
         return 0;
 
     switch (wparam & 0xfff0)
@@ -2907,7 +2918,7 @@ LRESULT default_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, 
     case WM_INPUTLANGCHANGE:
         {
             struct user_thread_info *info = get_user_thread_info();
-            HWND *win_array = list_window_children( 0, hwnd, NULL, 0 );
+            HWND *win_array = list_window_children( hwnd );
             int count = 0;
             info->kbd_layout = (HKL)lparam;
 
@@ -2941,12 +2952,12 @@ static void update_children_window_state( HWND hwnd )
     HWND *children;
     int i;
 
-    if (!(children = list_window_children( 0, hwnd, NULL, 0 ))) return;
+    if (!(children = list_window_children( hwnd ))) return;
     for (i = 0; children[i]; i++) update_window_state( children[i] );
     free( children );
 }
 
-LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
+LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, BOOL ansi )
 {
     static const WCHAR wine_display_device_guidW[] =
         {'_','_','w','i','n','e','_','d','i','s','p','l','a','y','_','d','e','v','i','c','e',
@@ -3012,7 +3023,7 @@ LRESULT desktop_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
             return user_driver->pDesktopWindowProc( hwnd, msg, wparam, lparam );
     }
 
-    return default_window_proc( hwnd, msg, wparam, lparam, FALSE );
+    return default_window_proc( hwnd, msg, wparam, lparam, ansi );
 }
 
 /***********************************************************************

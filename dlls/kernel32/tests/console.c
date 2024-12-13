@@ -4500,6 +4500,63 @@ static void test_file_info(HANDLE input, HANDLE output)
     ok(type == FILE_TYPE_CHAR, "GetFileType returned %lu\n", type);
 }
 
+static void test_console_as_root_directory(void)
+{
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK iosb;
+    UNICODE_STRING name;
+    HANDLE handle, h2;
+    NTSTATUS status;
+
+    handle = CreateFileA( "CON", GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, 0 );
+    ok( handle != INVALID_HANDLE_VALUE, "CreateFileA error %lu\n", GetLastError() );
+
+    RtlInitUnicodeString( &name, L"" );
+    InitializeObjectAttributes( &attr, &name, 0, handle, NULL );
+    status = NtCreateFile( &h2, SYNCHRONIZE, &attr, &iosb, NULL, 0,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           FILE_OPEN, 0, NULL, 0 );
+    ok( status == STATUS_NOT_FOUND || broken( status == STATUS_OBJECT_TYPE_MISMATCH ) /* Win7 */,
+        "NtCreateFile returned %#lx\n", status );
+
+    CloseHandle( handle );
+}
+
+static void test_condrv_server_as_root_directory(void)
+{
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK iosb;
+    UNICODE_STRING name;
+    HANDLE handle, h2;
+    NTSTATUS status;
+
+    FreeConsole();
+
+    RtlInitUnicodeString( &name, L"\\Device\\ConDrv\\Server" );
+    InitializeObjectAttributes( &attr, &name, 0, NULL, NULL );
+    status = NtCreateFile( &handle, SYNCHRONIZE, &attr, &iosb, NULL, 0,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           FILE_OPEN, 0, NULL, 0 );
+    ok( !status || broken( status == STATUS_OBJECT_PATH_NOT_FOUND ) /* Win7 */,
+        "NtCreateFile returned %#lx\n", status );
+
+    if (status)
+    {
+        win_skip( "cannot open \\Device\\ConDrv\\Server, skipping RootDirectory test" );
+    }
+    else
+    {
+        RtlInitUnicodeString( &name, L"" );
+        InitializeObjectAttributes( &attr, &name, 0, handle, NULL );
+        status = NtCreateFile( &h2, SYNCHRONIZE, &attr, &iosb, NULL, 0,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               FILE_OPEN, 0, NULL, 0 );
+        ok( status == STATUS_NOT_FOUND, "NtCreateFile returned %#lx\n", status );
+
+        CloseHandle( handle );
+    }
+}
+
 static void test_AttachConsole_child(DWORD console_pid)
 {
     HANDLE pipe_in, pipe_out;
@@ -5274,6 +5331,43 @@ static void test_CtrlHandlerSubsystem(void)
         winetest_pop_context();
     }
 
+    /* test default handlers return code */
+    res = snprintf(buf, ARRAY_SIZE(buf), "\"%s\" console no_ctrl_handler %p", cuiexec, event_child);
+    ok((LONG)res >= 0 && res < ARRAY_SIZE(buf), "Truncated string %s (%lu)\n", buf, res);
+
+    ret = CreateProcessA(NULL, buf, NULL, NULL, TRUE, 0, NULL, NULL, &si, &info);
+    ok(ret, "CreateProcess failed: %lu %s\n", GetLastError(), cuiexec);
+
+    res = WaitForSingleObject(event_child, 5000);
+    ok(res == WAIT_OBJECT_0, "Child didn't init %lu\n", res);
+
+    pgid = RtlGetCurrentPeb()->ProcessParameters->ProcessGroupId;
+    ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, pgid);
+    if (!ret && broken(GetLastError() == ERROR_INVALID_PARAMETER) /* Win7 */)
+    {
+        win_skip("Skip test on Win7\n");
+        TerminateProcess(info.hProcess, 0);
+    }
+    else
+    {
+        ok(ret, "GenerateConsoleCtrlEvent failed: %lu\n", GetLastError());
+
+        res = WaitForSingleObject(info.hProcess, 2000);
+        ok(res == WAIT_OBJECT_0, "Expecting child to be terminated\n");
+
+        if (ret)
+        {
+            ret = GetExitCodeProcess(info.hProcess, &exit_code);
+            ok(ret, "Couldn't get exit code\n");
+
+            ok(exit_code == STATUS_CONTROL_C_EXIT, "Unexpected exit code %#lx, instead of %#lx\n",
+               exit_code, STATUS_CONTROL_C_EXIT);
+        }
+    }
+
+    CloseHandle(info.hProcess);
+    CloseHandle(info.hThread);
+
     CloseHandle(event_child);
 
     RtlGetCurrentPeb()->ProcessParameters->ConsoleFlags = saved_console_flags;
@@ -5325,6 +5419,24 @@ START_TEST(console)
 
         WaitForSingleObject(mch_child_kill_event, 1000); /* enough for all events to be distributed? */
         ExitProcess(mch_child_event);
+    }
+
+    if (argc == 4 && !strcmp(argv[2], "no_ctrl_handler"))
+    {
+        HANDLE event;
+
+        SetConsoleCtrlHandler(NULL, FALSE);
+        sscanf(argv[3], "%p", &event);
+        ret = SetEvent(event);
+        ok(ret, "SetEvent failed\n");
+
+        event = CreateEventA(NULL, FALSE, FALSE, NULL);
+        ok(event != NULL, "Couldn't create event\n");
+
+        /* wait for parent to kill us */
+        WaitForSingleObject(event, INFINITE);
+        ok(0, "Shouldn't happen\n");
+        ExitProcess(0xff);
     }
 
     if (argc == 3 && !strcmp(argv[2], "check_console"))
@@ -5547,12 +5659,14 @@ START_TEST(console)
     test_GetConsoleOriginalTitle();
     test_GetConsoleTitleA();
     test_GetConsoleTitleW();
+    test_console_as_root_directory();
     if (!test_current)
     {
         test_pseudo_console();
         test_AttachConsole(hConOut);
         test_AllocConsole();
         test_FreeConsole();
+        test_condrv_server_as_root_directory();
         test_CreateProcessCUI();
         test_CtrlHandlerSubsystem();
     }

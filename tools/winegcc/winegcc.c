@@ -178,6 +178,7 @@ struct options
     int strip;
     int pic;
     int no_default_config;
+    int build_id;
     const char* wine_objdir;
     const char* winebuild;
     const char* output_name;
@@ -427,6 +428,9 @@ static struct strarray get_link_args( struct options *opts, const char *output_n
         if (opts->debug_file && strendswith(opts->debug_file, ".pdb"))
             strarray_add(&link_args, strmake("-Wl,--pdb=%s", opts->debug_file));
 
+        if (opts->build_id)
+            strarray_add( &link_args, "-Wl,--build-id");
+
         if (opts->out_implib)
             strarray_add(&link_args, strmake("-Wl,--out-implib,%s", opts->out_implib));
 
@@ -466,6 +470,9 @@ static struct strarray get_link_args( struct options *opts, const char *output_n
         else if (!opts->strip)
             strarray_add(&link_args, "-Wl,-debug:dwarf");
 
+        if (opts->build_id)
+            strarray_add( &link_args, "-Wl,-build-id");
+
         if (opts->out_implib)
             strarray_add(&link_args, strmake("-Wl,-implib:%s", opts->out_implib));
         else
@@ -486,6 +493,9 @@ static struct strarray get_link_args( struct options *opts, const char *output_n
             strarray_add( &flags, "-Wl,-z,max-page-size=0x1000");
         break;
     }
+
+    if (opts->build_id)
+        strarray_add( &link_args, "-Wl,--build-id");
 
     /* generic Unix shared library flags */
 
@@ -870,13 +880,16 @@ static const char *find_libgcc(struct strarray prefix, struct strarray link_tool
     const char *out = make_temp_file( "find_libgcc", ".out" );
     const char *err = make_temp_file( "find_libgcc", ".err" );
     struct strarray link = empty_strarray;
-    int sout = -1, serr = -1;
+    int sout = -1, serr = -1, i;
     char *libgcc, *p;
     struct stat st;
     size_t cnt;
     int ret;
 
-    strarray_addall( &link, link_tool );
+    for (i = 0; i < link_tool.count; i++)
+	if (strcmp(link_tool.str[i], "--no-default-config" ))
+            strarray_add( &link, link_tool.str[i] );
+
     strarray_add( &link, "-print-libgcc-file-name" );
 
     sout = dup( fileno(stdout) );
@@ -939,7 +952,7 @@ static void add_library( struct options *opts, struct strarray lib_dirs,
 /* run winebuild to generate the .spec.o file */
 static void build_spec_obj( struct options *opts, const char *spec_file, const char *output_file,
                             const char *target, struct strarray files, struct strarray resources,
-                            struct strarray lib_dirs, const char *entry_point, struct strarray *spec_objs )
+                            const char *entry_point, struct strarray *spec_objs )
 {
     unsigned int i;
     int is_pe = is_pe_target( opts );
@@ -1006,9 +1019,6 @@ static void build_spec_obj( struct options *opts, const char *spec_file, const c
         strarray_add(&spec_args, "--subsystem");
         strarray_add(&spec_args, opts->subsystem);
     }
-
-    for (i = 0; i < lib_dirs.count; i++)
-	strarray_add(&spec_args, strmake("-L%s", lib_dirs.str[i]));
 
     if (!is_pe)
     {
@@ -1131,7 +1141,6 @@ static void build(struct options* opts)
 	{
 	    switch(get_file_type(file))
 	    {
-		case file_def:
 		case file_spec:
 		    if (spec_file)
 			error("Only one spec file can be specified\n");
@@ -1224,14 +1233,14 @@ static void build(struct options* opts)
     for (i = 0; i < files.count; i++)
 	if (files.str[i][1] == 'r') strarray_add( &resources, files.str[i] );
 
-    build_spec_obj( opts, spec_file, output_file, opts->target_alias, files, resources, lib_dirs,
+    build_spec_obj( opts, spec_file, output_file, opts->target_alias, files, resources,
                     entry_point, &spec_objs );
     if (opts->native_arch)
     {
         const char *suffix = strchr( opts->target_alias, '-' );
         if (!suffix) suffix = "";
         build_spec_obj( opts, spec_file, output_file, strmake( "%s%s", opts->native_arch, suffix ),
-                        files, empty_strarray, lib_dirs, entry_point, &spec_objs );
+                        files, empty_strarray, entry_point, &spec_objs );
     }
 
     if (opts->fake_module) return;  /* nothing else to do */
@@ -1638,6 +1647,8 @@ int main(int argc, char **argv)
                         opts.unwind_tables = 1;
 		    else if (!strcmp("-fno-asynchronous-unwind-tables", opts.args.str[i]))
                         opts.unwind_tables = 0;
+		    else if (!strcmp("-fms-hotpatch", opts.args.str[i]))
+                        raw_linker_arg = 1;
                     else if (!strcmp("-fPIC", opts.args.str[i]) || !strcmp("-fpic", opts.args.str[i]))
                         opts.pic = 1;
                     else if (!strcmp("-fno-PIC", opts.args.str[i]) || !strcmp("-fno-pic", opts.args.str[i]))
@@ -1836,6 +1847,11 @@ int main(int argc, char **argv)
                             if (!strcmp(Wl.str[j], "--out-implib"))
                             {
                                 opts.out_implib = xstrdup( Wl.str[++j] );
+                                continue;
+                            }
+                            if (!strcmp( Wl.str[j], "--build-id" ))
+                            {
+                                opts.build_id = 1;
                                 continue;
                             }
                             if (!strcmp(Wl.str[j], "-static")) linking = -1;

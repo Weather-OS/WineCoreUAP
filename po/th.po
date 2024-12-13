@@ -3125,6 +3125,10 @@ msgstr "พื้นที่ทำงาน"
 msgid "&Reset"
 msgstr "แก้ออก"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 msgid "Display Settings"
 msgstr ""
@@ -14997,6 +15001,10 @@ msgstr ""
 #, fuzzy
 msgid "Current LogonId is"
 msgstr "รายละเอียด"
+
+#: programs/klist/klist.rc:38
+msgid "Client"
+msgstr ""
 
 #: programs/msinfo32/msinfo32.rc:28
 #, fuzzy

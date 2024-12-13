@@ -1518,7 +1518,7 @@ static HRESULT PropertyStorage_ReadProperty(PROPVARIANT *prop, const struct read
     {
         DWORD count, i;
 
-        switch (prop->vt & VT_VECTOR)
+        switch (prop->vt & ~VT_VECTOR)
         {
             case VT_BSTR:
             case VT_VARIANT:
@@ -1798,6 +1798,10 @@ static HRESULT PropertyStorage_ReadFromStream(PropertyStorage_impl *This)
         hr = STG_E_INVALIDHEADER;
         goto end;
     }
+    seek.QuadPart = fmtOffset.dwOffset;
+    hr = IStream_Seek(This->stm, seek, STREAM_SEEK_SET, NULL);
+    if (FAILED(hr))
+        goto end;
     /* wackiness alert: if the format ID is FMTID_DocSummaryInformation, there
      * follows not one, but two sections.  The first contains the standard properties
      * for the document summary information, and the second consists of user-defined

@@ -122,11 +122,15 @@ extern unsigned int _fmode;
 #endif  /* __i386__ */
 
 _ACRTIMP int             __cdecl ___mb_cur_max_func(void);
+_ACRTIMP int             __cdecl ___mb_cur_max_l_func(_locale_t);
 #define __mb_cur_max             ___mb_cur_max_func()
+#define MB_CUR_MAX               ___mb_cur_max_func()
 _ACRTIMP __msvcrt_ulong* __cdecl __doserrno(void);
 #define _doserrno              (*__doserrno())
 _ACRTIMP int*            __cdecl _errno(void);
 #define errno                  (*_errno())
+_ACRTIMP int*            __cdecl __sys_nerr(void);
+#define _sys_nerr              (*__sys_nerr())
 
 /* FIXME: We need functions to access these:
  * int _sys_nerr;
@@ -152,7 +156,6 @@ _ACRTIMP int           __cdecl _atodbl_l(_CRT_DOUBLE*,char*,_locale_t);
 _ACRTIMP int           __cdecl _atoflt(_CRT_FLOAT*,char*);
 _ACRTIMP int           __cdecl _atoflt_l(_CRT_FLOAT*,char*,_locale_t);
 _ACRTIMP __int64       __cdecl _atoi64(const char*);
-_ACRTIMP long double   __cdecl _atold(const char*);
 _ACRTIMP int           __cdecl _atoldbl(_LDOUBLE*,char*);
 _ACRTIMP void          __cdecl _beep(unsigned int,unsigned int);
 _ACRTIMP unsigned short   __cdecl _byteswap_ushort(unsigned short);
@@ -227,6 +230,14 @@ _ACRTIMP void          __cdecl srand(unsigned int);
 _ACRTIMP float         __cdecl strtof(const char*,char**);
 _ACRTIMP float         __cdecl _strtof_l(const char*,char**,_locale_t);
 _ACRTIMP double        __cdecl strtod(const char*,char**);
+_ACRTIMP double        __cdecl _strtod_l(const char*,char**,_locale_t);
+#if defined(__GNUC__) || _MSVCR_VER < 120
+static inline long double strtold(const char *string, char **endptr) { return strtod(string, endptr); }
+static inline long double _strtold_l(const char *string, char **endptr, _locale_t locale) { return _strtod_l(string, endptr, locale); }
+#else
+_ACRTIMP long double   __cdecl strtold(const char*,char**);
+_ACRTIMP long double   __cdecl _strtold_l(const char*,char**,_locale_t);
+#endif
 _ACRTIMP __msvcrt_long __cdecl strtol(const char*,char**,int);
 _ACRTIMP __msvcrt_ulong __cdecl strtoul(const char*,char**,int);
 _ACRTIMP __int64       __cdecl _strtoll_l(const char*,char**,int,_locale_t);
@@ -253,11 +264,6 @@ _ACRTIMP _invalid_parameter_handler __cdecl _set_thread_local_invalid_parameter_
 void __cdecl _invalid_parameter(const wchar_t *expr, const wchar_t *func, const wchar_t *file,
                                 unsigned int line, uintptr_t arg);
 
-#ifdef _UCRT
-_ACRTIMP double __cdecl _strtold_l(const char*,char**,_locale_t);
-static inline long double strtold(const char *string, char **endptr) { return _strtold_l(string, endptr, NULL); }
-#endif /* _UCRT */
-
 #ifdef __cplusplus
 extern "C++" {
 
@@ -266,6 +272,9 @@ inline errno_t getenv_s(size_t *ret, char (&buf)[size], const char *var)
 {
     return getenv_s(ret, buf, size, var);
 }
+
+inline long abs(long const x) throw() { return labs(x); }
+inline long long abs(long long const x) throw() { return llabs(x); }
 
 } /* extern "C++" */
 

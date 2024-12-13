@@ -37,16 +37,6 @@
 WINE_DEFAULT_DEBUG_CHANNEL(waylanddrv);
 
 
-/* per-monitor DPI aware NtUserWindowFromPoint call */
-static HWND window_from_point(INT x, INT y)
-{
-    UINT context = NtUserSetThreadDpiAwarenessContext(NTUSER_DPI_PER_MONITOR_AWARE_V2);
-    HWND ret = NtUserWindowFromPoint(x, y);
-    NtUserSetThreadDpiAwarenessContext(context);
-    return ret;
-}
-
-
 static int wayland_win_data_cmp_rb(const void *key,
                                    const struct rb_entry *entry)
 {
@@ -184,7 +174,7 @@ static void wayland_win_data_get_config(struct wayland_win_data *data,
     }
 
     conf->state = window_state;
-    conf->scale = NtUserGetWinMonitorDpi(data->hwnd, MDT_DEFAULT) / 96.0;
+    conf->scale = NtUserGetSystemDpiForProcess(0) / 96.0;
     conf->visible = (style & WS_VISIBLE) == WS_VISIBLE;
     conf->managed = data->managed;
 }
@@ -444,7 +434,7 @@ BOOL WAYLAND_WindowPosChanging(HWND hwnd, UINT swp_flags, BOOL shaped, const str
 /***********************************************************************
  *           WAYLAND_WindowPosChanged
  */
-void WAYLAND_WindowPosChanged(HWND hwnd, HWND insert_after, UINT swp_flags, BOOL fullscreen,
+void WAYLAND_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT swp_flags, BOOL fullscreen,
                               const struct window_rects *new_rects, struct window_surface *surface)
 {
     HWND toplevel = NtUserGetAncestor(hwnd, GA_ROOT);
@@ -458,13 +448,7 @@ void WAYLAND_WindowPosChanged(HWND hwnd, HWND insert_after, UINT swp_flags, BOOL
     /* Get the managed state with win_data unlocked, as is_window_managed
      * may need to query win_data information about other HWNDs and thus
      * acquire the lock itself internally. */
-    if (!(managed = is_window_managed(hwnd, swp_flags, &new_rects->window)) && surface)
-    {
-        toplevel = NtUserGetWindowRelative(hwnd, GW_OWNER);
-        /* fallback to any window that is right below our top left corner */
-        if (!toplevel) toplevel = window_from_point(new_rects->window.left - 1, new_rects->window.top - 1);
-        if (toplevel) toplevel = NtUserGetAncestor(toplevel, GA_ROOT);
-    }
+    if (!(managed = is_window_managed(hwnd, swp_flags, &new_rects->window)) && surface) toplevel = owner_hint;
 
     if (!(data = wayland_win_data_get(hwnd))) return;
     toplevel_data = toplevel && toplevel != hwnd ? wayland_win_data_get_nolock(toplevel) : NULL;
@@ -687,7 +671,7 @@ void WAYLAND_SetWindowText(HWND hwnd, LPCWSTR text)
 /***********************************************************************
  *          WAYLAND_SysCommand
  */
-LRESULT WAYLAND_SysCommand(HWND hwnd, WPARAM wparam, LPARAM lparam)
+LRESULT WAYLAND_SysCommand(HWND hwnd, WPARAM wparam, LPARAM lparam, const POINT *pos)
 {
     LRESULT ret = -1;
     WPARAM command = wparam & 0xfff0;

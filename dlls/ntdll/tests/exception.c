@@ -44,7 +44,7 @@ static NTSTATUS  (WINAPI *pNtGetContextThread)(HANDLE,CONTEXT*);
 static NTSTATUS  (WINAPI *pNtSetContextThread)(HANDLE,CONTEXT*);
 static NTSTATUS  (WINAPI *pNtQueueApcThread)(HANDLE handle, PNTAPCFUNC func,
         ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3);
-static NTSTATUS  (WINAPI *pNtCallbackReturn)( void *ret_ptr, ULONG ret_len, NTSTATUS status );
+static NTSTATUS  (WINAPI *pNtContinueEx)(CONTEXT*,KCONTINUE_ARGUMENT*);
 static NTSTATUS  (WINAPI *pRtlRaiseException)(EXCEPTION_RECORD *rec);
 static PVOID     (WINAPI *pRtlUnwind)(PVOID, PVOID, PEXCEPTION_RECORD, PVOID);
 static VOID      (WINAPI *pRtlCaptureContext)(CONTEXT*);
@@ -175,8 +175,17 @@ static int      my_argc;
 static char**   my_argv;
 static BOOL     is_wow64;
 static BOOL old_wow64;  /* Wine old-style wow64 */
+static UINT apc_count;
 static BOOL have_vectored_api;
 static enum debugger_stages test_stage;
+
+static void CALLBACK apc_func( ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
+{
+    ok( arg1 == 0x1234 + apc_count, "wrong arg1 %Ix\n", arg1 );
+    ok( arg2 == 0x5678, "wrong arg2 %Ix\n", arg2 );
+    ok( arg3 == 0xdeadbeef, "wrong arg3 %Ix\n", arg3 );
+    apc_count++;
+}
 
 #if defined(__i386__) || defined(__x86_64__)
 static void test_debugger_xstate(HANDLE thread, CONTEXT *ctx, enum debugger_stages stage)
@@ -2089,15 +2098,6 @@ static void test_KiUserExceptionDispatcher(void)
 }
 
 static BYTE saved_KiUserApcDispatcher[7];
-static UINT apc_count;
-
-static void CALLBACK apc_func( ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
-{
-    ok( arg1 == 0x1234 + apc_count, "wrong arg1 %Ix\n", arg1 );
-    ok( arg2 == 0x5678, "wrong arg2 %Ix\n", arg2 );
-    ok( arg3 == 0xdeadbeef, "wrong arg3 %Ix\n", arg3 );
-    apc_count++;
-}
 
 static void * CDECL hook_KiUserApcDispatcher( void *func, ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
 {
@@ -4099,7 +4099,8 @@ static void test_continue(void)
         CONTEXT before;
         CONTEXT after;
     } contexts;
-    NTSTATUS (*func_ptr)( struct context_pair *, BOOL alertable, void *continue_func, void *capture_func ) = code_mem;
+    NTSTATUS (*func_ptr)( struct context_pair *, void *arg, void *continue_func, void *capture_func ) = code_mem;
+    KCONTINUE_ARGUMENT args = { .ContinueType = KCONTINUE_UNWIND };
     int i;
 
     static const BYTE call_func[] =
@@ -4168,7 +4169,7 @@ static void test_continue(void)
 
         /* load args */
         0x48, 0x8b, 0x4c, 0x24, 0x70, /* mov 8*14(%rsp), %rcx; context   */
-        0x48, 0x8b, 0x54, 0x24, 0x78, /* mov 8*15(%rsp), %rdx; alertable */
+        0x48, 0x8b, 0x54, 0x24, 0x78, /* mov 8*15(%rsp), %rdx; arg */
         0x48, 0x83, 0xec, 0x70,       /* sub $0x70, %rsp; change stack   */
 
         /* setup context to return to label 1 */
@@ -4228,7 +4229,7 @@ static void test_continue(void)
     memcpy( func_ptr, call_func, sizeof(call_func) );
     FlushInstructionCache( GetCurrentProcess(), func_ptr, sizeof(call_func) );
 
-    func_ptr( &contexts, FALSE, NtContinue, pRtlCaptureContext );
+    func_ptr( &contexts, 0, NtContinue, pRtlCaptureContext );
 
 #define COMPARE(reg) \
     ok( contexts.before.reg == contexts.after.reg, "wrong " #reg " %p/%p\n", (void *)(ULONG64)contexts.before.reg, (void *)(ULONG64)contexts.after.reg )
@@ -4252,6 +4253,51 @@ static void test_continue(void)
         ok( !memcmp( &contexts.before.Xmm0 + i, &contexts.after.Xmm0 + i, sizeof(contexts.before.Xmm0) ),
             "wrong xmm%u %08I64x%08I64x/%08I64x%08I64x\n", i, *(&contexts.before.Xmm0.High + i*2), *(&contexts.before.Xmm0.Low + i*2),
             *(&contexts.after.Xmm0.High + i*2), *(&contexts.after.Xmm0.Low + i*2) );
+
+    apc_count = 0;
+    pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef );
+    func_ptr( &contexts, 0, NtContinue, pRtlCaptureContext );
+    ok( apc_count == 0, "apc called\n" );
+    func_ptr( &contexts, (void *)1, NtContinue, pRtlCaptureContext );
+    ok( apc_count == 1, "apc not called\n" );
+
+    if (!pNtContinueEx)
+    {
+        win_skip( "NtContinueEx not supported\n" );
+        return;
+    }
+
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+
+#define COMPARE(reg) \
+    ok( contexts.before.reg == contexts.after.reg, "wrong " #reg " %p/%p\n", (void *)(ULONG64)contexts.before.reg, (void *)(ULONG64)contexts.after.reg )
+
+    COMPARE( Rax );
+    COMPARE( Rdx );
+    COMPARE( Rbx );
+    COMPARE( Rbp );
+    COMPARE( Rsi );
+    COMPARE( Rdi );
+    COMPARE( R8 );
+    COMPARE( R9 );
+    COMPARE( R10 );
+    COMPARE( R11 );
+    COMPARE( R12 );
+    COMPARE( R13 );
+    COMPARE( R14 );
+    COMPARE( R15 );
+
+    for (i = 0; i < 16; i++)
+        ok( !memcmp( &contexts.before.Xmm0 + i, &contexts.after.Xmm0 + i, sizeof(contexts.before.Xmm0) ),
+            "wrong xmm%u %08I64x%08I64x/%08I64x%08I64x\n", i, *(&contexts.before.Xmm0.High + i*2), *(&contexts.before.Xmm0.Low + i*2),
+            *(&contexts.after.Xmm0.High + i*2), *(&contexts.after.Xmm0.Low + i*2) );
+
+    pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234 + apc_count, 0x5678, 0xdeadbeef );
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+    ok( apc_count == 1, "apc called\n" );
+    args.ContinueFlags = KCONTINUE_FLAG_TEST_ALERT;
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+    ok( apc_count == 2, "apc not called\n" );
 
 #undef COMPARE
 }
@@ -4963,15 +5009,6 @@ static void test_KiUserExceptionDispatcher(void)
 
 
 static BYTE saved_KiUserApcDispatcher[12];
-static BOOL apc_called;
-
-static void CALLBACK apc_func( ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
-{
-    ok( arg1 == 0x1234, "wrong arg1 %Ix\n", arg1 );
-    ok( arg2 == 0x5678, "wrong arg2 %Ix\n", arg2 );
-    ok( arg3 == 0xdeadbeef, "wrong arg3 %Ix\n", arg3 );
-    apc_called = TRUE;
-}
 
 static void * WINAPI hook_KiUserApcDispatcher(CONTEXT *context)
 {
@@ -5037,10 +5074,10 @@ static void test_KiUserApcDispatcher(void)
     memcpy( pKiUserApcDispatcher, patched_KiUserApcDispatcher, sizeof(patched_KiUserApcDispatcher) );
 
     hook_called = FALSE;
-    apc_called = FALSE;
+    apc_count = 0;
     pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef );
     SleepEx( 0, TRUE );
-    ok( apc_called, "APC was not called\n" );
+    ok( apc_count == 1, "APC was not called\n" );
     /* hooking is bypassed on arm64ec */
     ok( is_arm64ec ? !hook_called : hook_called, "hook was not called\n" );
 
@@ -5661,13 +5698,13 @@ static void test_instrumentation_callback(void)
     ok( pass == 5, "got %ld.\n", pass );
     RemoveVectoredExceptionHandler( vectored_handler );
 
+    apc_count = 0;
     status = pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef );
     ok( !status, "got %#lx.\n", status );
     init_instrumentation_data( &curr_data );
-    apc_called = FALSE;
     SleepEx( 0, TRUE );
     data = curr_data;
-    ok( apc_called, "APC was not called.\n" );
+    ok( apc_count == 1, "APC was not called.\n" );
     ok( data.call_count == 1, "got %u.\n", data.call_count );
     ok( data.call_data[0].r10 == pKiUserApcDispatcher, "got %p, expected %p.\n", data.call_data[0].r10, pKiUserApcDispatcher );
 
@@ -5722,6 +5759,45 @@ static void test_instrumentation_callback(void)
     data = curr_data;
     ok( !status, "got %#lx.\n", status );
     ok( !data.call_count, "got %u.\n", data.call_count );
+}
+
+static UINT32 find_syscall_nr(const char *function)
+{
+    UINT32 syscall_nr;
+
+    char *code = (char *)GetProcAddress(hntdll, function);
+
+    /* This assumes that Nt* syscall thunks are all formatted as:
+     *
+     * 4c 8b d1                      movq    %rcx, %r10
+     * b8 ?? ?? ?? ??                movl    $(syscall number), %eax
+     */
+    memcpy(&syscall_nr, code + 4, sizeof(UINT32));
+    return syscall_nr;
+}
+
+static void test_direct_syscalls(void)
+{
+    static const BYTE code[] =
+    {
+        0x49, 0x89, 0xd2,           /* movq %rdx, %r10 */
+        0x4c, 0x89, 0xc2,           /* movq %r8,  %rdx */
+        0x89, 0xc8,                 /* movl %ecx, %eax */
+        0x0f, 0x05,                 /* syscall */
+        0xc3,                       /* ret */
+    };
+
+    HANDLE event;
+    NTSTATUS (WINAPI *func)(UINT32 syscall_nr, HANDLE h, LONG *prev_state);
+
+    event = CreateEventW(NULL, FALSE, FALSE, NULL);
+    memcpy(code_mem, code, sizeof(code));
+    func = code_mem;
+    func(find_syscall_nr("NtSetEvent"), event, NULL);
+
+    todo_wine
+    ok(WaitForSingleObject(event, 0) == WAIT_OBJECT_0, "Event not signaled.\n");
+    CloseHandle(event);
 }
 
 #elif defined(__arm__)
@@ -6180,16 +6256,7 @@ static void test_KiUserExceptionDispatcher(void)
     VirtualProtect(code_ptr, sizeof(saved_code), old_protect, &old_protect);
 }
 
-static UINT apc_count;
 static UINT alertable_supported;
-
-static void CALLBACK apc_func( ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
-{
-    ok( arg1 == 0x1234 + apc_count, "wrong arg1 %Ix\n", arg1 );
-    ok( arg2 == 0x5678, "wrong arg2 %Ix\n", arg2 );
-    ok( arg3 == 0xdeadbeef, "wrong arg3 %Ix\n", arg3 );
-    apc_count++;
-}
 
 static void * WINAPI hook_KiUserApcDispatcher(void *stack)
 {
@@ -7261,8 +7328,9 @@ static void test_continue(void)
         CONTEXT before;
         CONTEXT after;
     } contexts;
+    KCONTINUE_ARGUMENT args = { .ContinueType = KCONTINUE_UNWIND };
     unsigned int i;
-    NTSTATUS (*func_ptr)( struct context_pair *, BOOL alertable, void *continue_func, void *capture_func ) = code_mem;
+    NTSTATUS (*func_ptr)( struct context_pair *, void *arg, void *continue_func, void *capture_func ) = code_mem;
 
     static const DWORD call_func[] =
     {
@@ -7362,7 +7430,7 @@ static void test_continue(void)
 #define COMPARE_INDEXED(reg) \
     ok( contexts.before.reg == contexts.after.reg, "wrong " #reg " i: %u, %p/%p\n", i, (void *)(ULONG64)contexts.before.reg, (void *)(ULONG64)contexts.after.reg )
 
-    func_ptr( &contexts, FALSE, NtContinue, pRtlCaptureContext );
+    func_ptr( &contexts, 0, NtContinue, pRtlCaptureContext );
 
     for (i = 1; i < 29; i++) COMPARE_INDEXED( X[i] );
 
@@ -7374,6 +7442,40 @@ static void test_continue(void)
         COMPARE_INDEXED( V[i].Low );
         COMPARE_INDEXED( V[i].High );
     }
+
+    apc_count = 0;
+    pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef );
+    func_ptr( &contexts, 0, NtContinue, pRtlCaptureContext );
+    ok( apc_count == 0, "apc called\n" );
+    func_ptr( &contexts, (void *)1, NtContinue, pRtlCaptureContext );
+    ok( apc_count == 1, "apc not called\n" );
+
+    if (!pNtContinueEx)
+    {
+        win_skip( "NtContinueEx not supported\n" );
+        return;
+    }
+
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+
+    for (i = 1; i < 29; i++) COMPARE_INDEXED( X[i] );
+
+    COMPARE( Fpcr );
+    COMPARE( Fpsr );
+
+    for (i = 0; i < 32; i++)
+    {
+        COMPARE_INDEXED( V[i].Low );
+        COMPARE_INDEXED( V[i].High );
+    }
+
+    pNtQueueApcThread( GetCurrentThread(), apc_func, 0x1234 + apc_count, 0x5678, 0xdeadbeef );
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+    ok( apc_count == 1, "apc called\n" );
+    args.ContinueFlags = KCONTINUE_FLAG_TEST_ALERT;
+    func_ptr( &contexts, &args, pNtContinueEx, pRtlCaptureContext );
+    ok( apc_count == 2, "apc not called\n" );
+
 #undef COMPARE
 }
 
@@ -7492,17 +7594,6 @@ static void test_KiUserExceptionDispatcher(void)
 
     RemoveVectoredExceptionHandler(vectored_handler);
     VirtualProtect(pKiUserExceptionDispatcher, sizeof(saved_code), old_protect, &old_protect);
-}
-
-
-static UINT apc_count;
-
-static void CALLBACK apc_func( ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3 )
-{
-    ok( arg1 == 0x1234 + apc_count, "wrong arg1 %Ix\n", arg1 );
-    ok( arg2 == 0x5678, "wrong arg2 %Ix\n", arg2 );
-    ok( arg3 == 0xdeadbeef, "wrong arg3 %Ix\n", arg3 );
-    apc_count++;
 }
 
 static void * WINAPI hook_KiUserApcDispatcher(void *stack)
@@ -7958,6 +8049,67 @@ static void test_rtlraiseexception(void)
     run_rtlraiseexception_test(EXCEPTION_INVALID_HANDLE);
 }
 
+static DWORD brk_exception_handler_code;
+
+static DWORD WINAPI brk_exception_handler( EXCEPTION_RECORD *rec, void *frame,
+                                           CONTEXT *context, DISPATCHER_CONTEXT *dispatcher )
+{
+    ok( rec->ExceptionCode == brk_exception_handler_code, "got: %08lx\n", rec->ExceptionCode );
+    ok( rec->NumberParameters == 0, "got: %ld\n", rec->NumberParameters );
+    ok( rec->ExceptionAddress == (void *)context->Pc, "got addr: %p, pc: %p\n", rec->ExceptionAddress, (void *)context->Pc );
+    context->Pc += 4;
+    return ExceptionContinueExecution;
+}
+
+
+static void test_brk(void)
+{
+    DWORD call_brk[] =
+    {
+        0xa9bf7bfd, /* 00: stp x29, x30, [sp, #-16]! */
+        0x910003fd, /* 04: mov x29, sp */
+        0x00000000, /* 08: <filled in later> */
+        0xd503201f, /* 0c: nop */
+        0xa8c17bfd, /* 10: ldp x29, x30, [sp], #16 */
+        0xd65f03c0, /* 14: ret */
+    };
+
+    /* brk #0xf000 is tested as part of breakpoint tests */
+
+    brk_exception_handler_code = STATUS_ASSERTION_FAILURE;
+    call_brk[2] = 0xd43e0020; /* 08: brk #0xf001 */
+    run_exception_test( brk_exception_handler, NULL, call_brk,
+                        sizeof(call_brk), sizeof(call_brk),
+                        PAGE_EXECUTE_READ, UNW_FLAG_EHANDLER,
+                        0, 0 );
+
+    /* FIXME: brk #0xf002 needs debug service tests */
+
+    /* brk #0xf003 is tested as part of fastfail tests*/
+
+    brk_exception_handler_code = EXCEPTION_INT_DIVIDE_BY_ZERO;
+    call_brk[2] = 0xd43e0080; /* 08: brk #0xf004 */
+    run_exception_test( brk_exception_handler, NULL, call_brk,
+                        sizeof(call_brk), sizeof(call_brk),
+                        PAGE_EXECUTE_READ, UNW_FLAG_EHANDLER,
+                        0, 0 );
+
+    /* Any unknown immediate raises EXCEPTION_ILLEGAL_INSTRUCTION */
+
+    brk_exception_handler_code = EXCEPTION_ILLEGAL_INSTRUCTION;
+    call_brk[2] = 0xd43e00a0; /* 08: brk #0xf005 */
+    run_exception_test( brk_exception_handler, NULL, call_brk,
+                        sizeof(call_brk), sizeof(call_brk),
+                        PAGE_EXECUTE_READ, UNW_FLAG_EHANDLER,
+                        0, 0 );
+
+    brk_exception_handler_code = EXCEPTION_ILLEGAL_INSTRUCTION;
+    call_brk[2] = 0xd4200000; /* 08: brk #0x0 */
+    run_exception_test( brk_exception_handler, NULL, call_brk,
+                        sizeof(call_brk), sizeof(call_brk),
+                        PAGE_EXECUTE_READ, UNW_FLAG_EHANDLER,
+                        0, 0 );
+}
 
 static LONG consolidate_dummy_called;
 static LONG pass;
@@ -9107,13 +9259,6 @@ static void test_vectored_continue_handler(void)
     ok(!ret, "RtlRemoveVectoredContinueHandler succeeded\n");
 }
 
-static BOOL test_apc_called;
-
-static void CALLBACK test_apc(ULONG_PTR arg1, ULONG_PTR arg2, ULONG_PTR arg3)
-{
-    test_apc_called = TRUE;
-}
-
 static void test_user_apc(void)
 {
     NTSTATUS status;
@@ -9176,13 +9321,13 @@ static void test_user_apc(void)
 
         c[0] = context;
 
-        test_apc_called = FALSE;
-        status = pNtQueueApcThread(GetCurrentThread(), test_apc, 0, 0, 0);
+        apc_count = 0;
+        status = pNtQueueApcThread(GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef);
         ok(!status, "Got unexpected status %#lx.\n", status);
         SleepEx(0, TRUE);
-        ok(test_apc_called, "Test user APC was not called.\n");
-        test_apc_called = FALSE;
-        status = pNtQueueApcThread(GetCurrentThread(), test_apc, 0, 0, 0);
+        ok(apc_count == 1, "Test user APC was not called.\n");
+        apc_count = 0;
+        status = pNtQueueApcThread(GetCurrentThread(), apc_func, 0x1234, 0x5678, 0xdeadbeef);
         ok(!status, "Got unexpected status %#lx.\n", status);
         status = NtContinue(&c[0], TRUE );
 
@@ -9191,12 +9336,12 @@ static void test_user_apc(void)
     }
     ok(ret == 0xabacab, "Got return value %#x.\n", ret);
     ok(pass == 3, "Got unexpected pass %ld.\n", pass);
-    ok(test_apc_called, "Test user APC was not called.\n");
+    ok(apc_count > 0, "Test user APC was not called.\n");
 }
 
 static void test_user_callback(void)
 {
-    NTSTATUS status = pNtCallbackReturn( NULL, 0, STATUS_SUCCESS );
+    NTSTATUS status = NtCallbackReturn( NULL, 0, STATUS_SUCCESS );
     ok( status == STATUS_NO_CALLBACK_ACTIVE, "failed %lx\n", status );
 }
 
@@ -11653,7 +11798,7 @@ START_TEST(exception)
     X(NtGetContextThread);
     X(NtSetContextThread);
     X(NtQueueApcThread);
-    X(NtCallbackReturn);
+    X(NtContinueEx);
     X(NtReadVirtualMemory);
     X(NtClose);
     X(RtlUnwind);
@@ -11870,10 +12015,12 @@ START_TEST(exception)
     test_raiseexception_regs();
     test_hwbpt_in_syscall();
     test_instrumentation_callback();
+    test_direct_syscalls();
 
 #elif defined(__aarch64__)
 
     test_continue();
+    test_brk();
     test_nested_exception();
     test_collided_unwind();
     test_restore_context();

@@ -3126,6 +3126,10 @@ msgstr "桌面"
 msgid "&Reset"
 msgstr "重設(&R)"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -14860,6 +14864,12 @@ msgstr "加密類型"
 #| msgid "Current Connections"
 msgid "Current LogonId is"
 msgstr "目前的連線"
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "用戶端"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

@@ -1735,17 +1735,38 @@ static void shader_glsl_load_constants(struct shader_glsl_priv *priv,
     constant_version = prog->constant_version;
     update_mask = context->constant_update_mask & prog->constant_update_mask;
 
-    if (update_mask & WINED3D_SHADER_CONST_VS_F)
-        shader_glsl_load_constants_f(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_F],
-                prog->vs.uniform_f_locations, &priv->vconst_heap, priv->stack, constant_version);
+    if (vshader && vshader->is_ffp_vs)
+    {
+        /* The shader's constant update mask is WINED3D_SHADER_CONST_VS_F.
+         * This may be set from shader_glsl_update_graphics_program().
+         * However, we also need to update constants when FFP flags change. */
+        static const uint32_t vs_update_mask = WINED3D_SHADER_CONST_VS_F
+                | WINED3D_SHADER_CONST_FFP_LIGHTS
+                | WINED3D_SHADER_CONST_FFP_MATERIAL
+                | WINED3D_SHADER_CONST_FFP_MODELVIEW
+                | WINED3D_SHADER_CONST_FFP_PROJ
+                | WINED3D_SHADER_CONST_FFP_TEXMATRIX
+                | WINED3D_SHADER_CONST_FFP_VERTEXBLEND
+                | WINED3D_SHADER_CONST_VS_POINTSIZE;
 
-    if (update_mask & WINED3D_SHADER_CONST_VS_I)
-        shader_glsl_load_constants_i(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_I],
-                prog->vs.uniform_i_locations, vshader->reg_maps.integer_constants);
+        if (context->constant_update_mask & vs_update_mask)
+            shader_glsl_load_constants_f(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_FFP],
+                    prog->vs.uniform_f_locations, &priv->vconst_heap, priv->stack, constant_version);
+    }
+    else
+    {
+        if (update_mask & WINED3D_SHADER_CONST_VS_F)
+            shader_glsl_load_constants_f(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_F],
+                    prog->vs.uniform_f_locations, &priv->vconst_heap, priv->stack, constant_version);
 
-    if (update_mask & WINED3D_SHADER_CONST_VS_B)
-        shader_glsl_load_constants_b(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_B],
-                prog->vs.uniform_b_locations, vshader->reg_maps.boolean_constants);
+        if (update_mask & WINED3D_SHADER_CONST_VS_I)
+            shader_glsl_load_constants_i(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_I],
+                    prog->vs.uniform_i_locations, vshader->reg_maps.integer_constants);
+
+        if (update_mask & WINED3D_SHADER_CONST_VS_B)
+            shader_glsl_load_constants_b(vshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_VS_B],
+                    prog->vs.uniform_b_locations, vshader->reg_maps.boolean_constants);
+    }
 
     if (update_mask & WINED3D_SHADER_CONST_VS_CLIP_PLANES)
     {
@@ -1890,17 +1911,30 @@ static void shader_glsl_load_constants(struct shader_glsl_priv *priv,
                     WINED3D_LIGHT_PARALLELPOINT, &constants->light.lights[i], prog);
     }
 
-    if (update_mask & WINED3D_SHADER_CONST_PS_F)
-        shader_glsl_load_constants_f(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_F],
-                prog->ps.uniform_f_locations, &priv->pconst_heap, priv->stack, constant_version);
+    if (pshader && pshader->is_ffp_ps)
+    {
+        static const uint32_t ps_update_mask = WINED3D_SHADER_CONST_PS_F
+                | WINED3D_SHADER_CONST_FFP_COLOR_KEY
+                | WINED3D_SHADER_CONST_FFP_PS;
 
-    if (update_mask & WINED3D_SHADER_CONST_PS_I)
-        shader_glsl_load_constants_i(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_I],
-                prog->ps.uniform_i_locations, pshader->reg_maps.integer_constants);
+        if (context->constant_update_mask & ps_update_mask)
+            shader_glsl_load_constants_f(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_FFP],
+                    prog->ps.uniform_f_locations, &priv->pconst_heap, priv->stack, constant_version);
+    }
+    else
+    {
+        if (update_mask & WINED3D_SHADER_CONST_PS_F)
+            shader_glsl_load_constants_f(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_F],
+                    prog->ps.uniform_f_locations, &priv->pconst_heap, priv->stack, constant_version);
 
-    if (update_mask & WINED3D_SHADER_CONST_PS_B)
-        shader_glsl_load_constants_b(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_B],
-                prog->ps.uniform_b_locations, pshader->reg_maps.boolean_constants);
+        if (update_mask & WINED3D_SHADER_CONST_PS_I)
+            shader_glsl_load_constants_i(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_I],
+                    prog->ps.uniform_i_locations, pshader->reg_maps.integer_constants);
+
+        if (update_mask & WINED3D_SHADER_CONST_PS_B)
+            shader_glsl_load_constants_b(pshader, context_gl, device->push_constants[WINED3D_PUSH_CONSTANTS_PS_B],
+                    prog->ps.uniform_b_locations, pshader->reg_maps.boolean_constants);
+    }
 
     if (update_mask & WINED3D_SHADER_CONST_PS_BUMP_ENV)
     {
@@ -7366,7 +7400,7 @@ static GLuint shader_glsl_generate_vs3_rasterizer_input_setup(struct shader_glsl
             }
             else if (shader_match_semantic(semantic_name, WINED3D_DECL_USAGE_FOG))
             {
-                shader_addline(buffer, "%s = clamp(outputs[%u].%c, 0.0, 1.0);\n",
+                shader_addline(buffer, "%s = outputs[%u].%c;\n",
                         legacy_syntax ? "gl_FogFragCoord" : "ffp_varying_fogcoord",
                         output->register_idx, reg_mask[1]);
             }
@@ -10391,10 +10425,10 @@ static void set_glsl_shader_program(const struct wined3d_context_gl *context_gl,
         vs_id = ctx_data->glsl_program->vs.id;
         vs_list = &ctx_data->glsl_program->vs.shader_entry;
 
-        if (use_vs(state))
+        if (use_vs(state) || d3d_info->ffp_hlsl)
             vshader = state->shader[WINED3D_SHADER_TYPE_VERTEX];
     }
-    else if (use_vs(state))
+    else if (use_vs(state) || d3d_info->ffp_hlsl)
     {
         struct vs_compile_args vs_compile_args;
 
@@ -11402,6 +11436,8 @@ static void shader_glsl_get_caps(const struct wined3d_adapter *adapter, struct s
 
     TRACE("Shader model %u.\n", shader_model);
 
+    memset(caps, 0, sizeof(*caps));
+
     caps->vs_version = min(wined3d_settings.max_sm_vs, shader_model);
     caps->hs_version = min(wined3d_settings.max_sm_hs, shader_model);
     caps->ds_version = min(wined3d_settings.max_sm_ds, shader_model);
@@ -11742,6 +11778,8 @@ static void glsl_vertex_pipe_vp_disable(const struct wined3d_context *context) {
 static void glsl_vertex_pipe_vp_get_caps(const struct wined3d_adapter *adapter, struct wined3d_vertex_caps *caps)
 {
     const struct wined3d_gl_info *gl_info = &wined3d_adapter_gl_const(adapter)->gl_info;
+
+    memset(caps, 0, sizeof(*caps));
 
     caps->emulated_flatshading = !needs_legacy_glsl_syntax(gl_info);
     caps->max_active_lights = WINED3D_MAX_ACTIVE_LIGHTS;
@@ -12109,7 +12147,7 @@ static void glsl_fragment_pipe_fogparams(struct wined3d_context *context,
 static void glsl_fragment_pipe_fog(struct wined3d_context *context,
         const struct wined3d_state *state, DWORD state_id)
 {
-    BOOL use_vshader = use_vs(state);
+    BOOL use_vshader = use_vs(state) && !state->shader[WINED3D_SHADER_TYPE_VERTEX]->is_ffp_vs;
     enum fogsource new_source;
     DWORD fogstart = state->render_states[WINED3D_RS_FOGSTART];
     DWORD fogend = state->render_states[WINED3D_RS_FOGEND];

@@ -3256,6 +3256,16 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
      */
     - (NSDragOperation) draggingEntered:(id <NSDraggingInfo>)sender
     {
+        macdrv_query* query = macdrv_create_query();
+        NSPasteboard* pb = [sender draggingPasteboard];
+
+        query->type = QUERY_DRAG_DROP_ENTER;
+        query->window = (macdrv_window)[self retain];
+        query->drag_drop.pasteboard = (CFTypeRef)[pb retain];
+
+        [self.queue query:query timeout:0.1];
+        macdrv_release_query(query);
+
         return [self draggingUpdated:sender];
     }
 
@@ -3265,7 +3275,7 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
         // has to be processed in a similar manner as the other drag-and-drop
         // queries in order to maintain the proper order of operations.
         macdrv_query* query = macdrv_create_query();
-        query->type = QUERY_DRAG_EXITED;
+        query->type = QUERY_DRAG_DROP_LEAVE;
         query->window = (macdrv_window)[self retain];
 
         [self.queue query:query timeout:0.1];
@@ -3277,19 +3287,16 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
         NSDragOperation ret;
         NSPoint pt = [[self contentView] convertPoint:[sender draggingLocation] fromView:nil];
         CGPoint cgpt = cgpoint_win_from_mac(NSPointToCGPoint(pt));
-        NSPasteboard* pb = [sender draggingPasteboard];
 
         macdrv_query* query = macdrv_create_query();
-        query->type = QUERY_DRAG_OPERATION;
+        query->type = QUERY_DRAG_DROP_DRAG;
         query->window = (macdrv_window)[self retain];
-        query->drag_operation.x = floor(cgpt.x);
-        query->drag_operation.y = floor(cgpt.y);
-        query->drag_operation.offered_ops = [sender draggingSourceOperationMask];
-        query->drag_operation.accepted_op = NSDragOperationNone;
-        query->drag_operation.pasteboard = (CFTypeRef)[pb retain];
+        query->drag_drop.x = floor(cgpt.x);
+        query->drag_drop.y = floor(cgpt.y);
+        query->drag_drop.ops = [sender draggingSourceOperationMask];
 
         [self.queue query:query timeout:3];
-        ret = query->status ? query->drag_operation.accepted_op : NSDragOperationNone;
+        ret = query->status ? query->drag_drop.ops : NSDragOperationNone;
         macdrv_release_query(query);
 
         return ret;
@@ -3300,15 +3307,13 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
         BOOL ret;
         NSPoint pt = [[self contentView] convertPoint:[sender draggingLocation] fromView:nil];
         CGPoint cgpt = cgpoint_win_from_mac(NSPointToCGPoint(pt));
-        NSPasteboard* pb = [sender draggingPasteboard];
 
         macdrv_query* query = macdrv_create_query();
-        query->type = QUERY_DRAG_DROP;
+        query->type = QUERY_DRAG_DROP_DROP;
         query->window = (macdrv_window)[self retain];
         query->drag_drop.x = floor(cgpt.x);
         query->drag_drop.y = floor(cgpt.y);
-        query->drag_drop.op = [sender draggingSourceOperationMask];
-        query->drag_drop.pasteboard = (CFTypeRef)[pb retain];
+        query->drag_drop.ops = [sender draggingSourceOperationMask];
 
         [self.queue query:query timeout:3 * 60 flags:WineQueryProcessEvents];
         ret = query->status;

@@ -430,9 +430,17 @@ static const NodeImplVtbl HTMLTableCellImplVtbl = {
     .get_attr_col          = HTMLElement_get_attr_col,
 };
 
+static const tid_t HTMLTableDataCellElement_iface_tids[] = {
+    IHTMLTableCell_tid,
+    0
+};
+
 dispex_static_data_t HTMLTableCellElement_dispex = {
     .id           = PROT_HTMLTableCellElement,
     .prototype_id = PROT_HTMLElement,
+    .disp_tid     = DispHTMLTableCell_tid,
+    .iface_tids   = HTMLTableDataCellElement_iface_tids,
+    .init_info    = HTMLElement_init_dispex_info,
 };
 
 static const event_target_vtbl_t HTMLTableDataCellElement_event_target_vtbl = {
@@ -445,12 +453,6 @@ static const event_target_vtbl_t HTMLTableDataCellElement_event_target_vtbl = {
     },
     HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
     .handle_event       = HTMLElement_handle_event
-};
-
-static const tid_t HTMLTableDataCellElement_iface_tids[] = {
-    HTMLELEMENT_TIDS,
-    IHTMLTableCell_tid,
-    0
 };
 
 dispex_static_data_t HTMLTableDataCellElement_dispex = {
@@ -823,7 +825,6 @@ static const event_target_vtbl_t HTMLTableRowElement_event_target_vtbl = {
 };
 
 static const tid_t HTMLTableRowElement_iface_tids[] = {
-    HTMLELEMENT_TIDS,
     IHTMLTableRow_tid,
     0
 };
@@ -1675,7 +1676,6 @@ static const event_target_vtbl_t HTMLTableElement_event_target_vtbl = {
 };
 
 static const tid_t HTMLTableElement_iface_tids[] = {
-    HTMLELEMENT_TIDS,
     IHTMLTable_tid,
     IHTMLTable2_tid,
     IHTMLTable3_tid,

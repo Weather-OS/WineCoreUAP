@@ -73,6 +73,8 @@
 #define ARCH "none"
 #endif
 
+static void pump_msg_loop(HWND hwnd, HACCEL hAccel);
+
 /* encoded DRAWITEMSTRUCT into an LPARAM */
 typedef struct
 {
@@ -108,6 +110,7 @@ typedef struct
 
 static BOOL test_DestroyWindow_flag;
 static BOOL test_context_menu;
+static BOOL ignore_mouse_messages = TRUE;
 static HWINEVENTHOOK hEvent_hook;
 static HHOOK hKBD_hook;
 static HHOOK hCBT_hook;
@@ -6160,6 +6163,37 @@ static const struct message WmFrameChanged_move[] = {
     { 0 }
 };
 
+static const struct message WmMove_mouse[] = {
+    { WM_WINDOWPOSCHANGING, sent|wparam, SWP_NOACTIVATE|SWP_NOSIZE },
+    { WM_WINDOWPOSCHANGED, sent|wparam, SWP_NOACTIVATE|SWP_NOACTIVATE|SWP_NOSIZE|SWP_NOCLIENTSIZE },
+    { WM_MOVE, sent|defwinproc, 0 },
+    { WM_GETTEXT, sent|optional },
+    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam, 0, 0 },
+    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam|optional, 0, 0 }, /* Win7 seems to send this twice. */
+    { WM_SETCURSOR, sent|lparam, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent },
+    /* WM_MOUSEMOVE with accompanying WM_SETCURSOR may sometimes appear a few extra times on Windows 7 with the
+     * same parameters. */
+    { WM_SETCURSOR, sent|lparam|optional, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent|optional },
+    { WM_SETCURSOR, sent|lparam|optional, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent|optional },
+    { WM_SETCURSOR, sent|lparam|optional, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent|optional },
+    { WM_SETCURSOR, sent|lparam|optional, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent|optional },
+    { WM_SETCURSOR, sent|lparam|optional, 0, HTCLIENT | (WM_MOUSEMOVE << 16) },
+    { WM_MOUSEMOVE, sent|optional },
+    { 0 }
+};
+
+static const struct message WmMove_mouse2[] = {
+    { WM_WINDOWPOSCHANGING, sent|wparam, SWP_NOACTIVATE },
+    { WM_GETTEXT, sent|optional },
+    { WM_GETMINMAXINFO, sent|defwinproc },
+    { 0 }
+};
+
 static void test_setwindowpos(void)
 {
     HWND hwnd;
@@ -6198,6 +6232,7 @@ static void test_setwindowpos(void)
     expect(sysX + X, rc.right);
     expect(winY + Y, rc.bottom);
 
+    GetWindowRect(hwnd, &rc);
     res = SetWindowPos( hwnd, 0, 0, 0, 0, 0,
             SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     ok_sequence(WmFrameChanged_move, "FrameChanged", FALSE);
@@ -6206,6 +6241,31 @@ static void test_setwindowpos(void)
     GetWindowRect(hwnd, &rc);
     expect(sysX, rc.right);
     expect(winY, rc.bottom);
+
+    /* get away from possible menu bar to avoid spurious position changed induced by WM. */
+    res = SetWindowPos( hwnd, HWND_TOPMOST, 200, 200, 200, 200, SWP_SHOWWINDOW );
+    ok(res == TRUE, "SetWindowPos expected TRUE, got %Id.\n", res);
+    SetForegroundWindow( hwnd );
+    SetActiveWindow( hwnd );
+    flush_events();
+    pump_msg_loop( hwnd, 0 );
+    flush_sequence();
+    GetWindowRect( hwnd, &rc );
+    SetCursorPos( rc.left + 100, rc.top + 100 );
+    flush_events();
+    pump_msg_loop( hwnd, 0 );
+    flush_sequence();
+    ignore_mouse_messages = FALSE;
+    res = SetWindowPos( hwnd, 0, 205, 205, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE );
+    ok(res == TRUE, "SetWindowPos expected TRUE, got %Id.\n", res);
+    flush_events();
+    ok_sequence(WmMove_mouse, "MouseMove", FALSE);
+    /* if the window and client rects were not changed WM_MOUSEMOVE is not sent. */
+    res = SetWindowPos( hwnd, 0, 205, 205, 200, 200, SWP_NOZORDER | SWP_NOACTIVATE );
+    ok(res == TRUE, "SetWindowPos expected TRUE, got %Id.\n", res);
+    flush_events();
+    ok_sequence(WmMove_mouse2, "MouseMove2", FALSE);
+    ignore_mouse_messages = TRUE;
 
     DestroyWindow(hwnd);
 }
@@ -10853,7 +10913,8 @@ static LRESULT MsgCheckProc (BOOL unicode, HWND hwnd, UINT message,
 	case WM_NCMOUSEMOVE:
 	case WM_SETCURSOR:
 	case WM_IME_SELECT:
-	    return 0;
+	    if (ignore_mouse_messages) return 0;
+        break;
     }
 
     msg.hwnd = hwnd;
@@ -20477,6 +20538,113 @@ static void test_hook_changing_window_proc(void)
     DestroyWindow( hwnd );
 }
 
+static void test_radiobutton_focus(void)
+{
+    HWND hwnd, button;
+    DWORD style;
+    int i;
+    DWORD types[] = { BS_RADIOBUTTON, BS_AUTORADIOBUTTON };
+
+    static const struct message set_focus_default_seq[] =
+    {
+        { WM_COMMAND, sent|parent|wparam, MAKEWPARAM(ID_BUTTON, BN_SETFOCUS) },
+        { WM_COMMAND, sent|parent|wparam, MAKEWPARAM(ID_BUTTON, BN_CLICKED) },
+        { 0 }
+    };
+
+    static const struct message set_focus_checked_seq[] =
+    {
+        { WM_COMMAND, sent|parent|wparam, MAKEWPARAM(ID_BUTTON, BN_SETFOCUS) },
+        { 0 }
+    };
+
+    static const struct message WM_LBUTTONDOWN_seq[] =
+    {
+        { WM_KILLFOCUS, sent|parent },
+        { WM_IME_SETCONTEXT, sent|optional|parent },
+        { WM_IME_SETCONTEXT, sent|optional|defwinproc },
+        { WM_COMMAND, sent|parent },
+        { 0 }
+    };
+
+    static const struct message set_focus_without_notify_seq[] =
+    {
+        { WM_COMMAND, sent|parent|wparam, ID_BUTTON },
+        { 0 }
+    };
+
+    hwnd = CreateWindowExA(0, "TestParentClass", "Test parent", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                           100, 100, 200, 200, 0, 0, 0, NULL);
+    ok(hwnd != 0, "Failed to create parent window\n");
+
+    for (i = 0; i < ARRAY_SIZE(types); i++)
+    {
+        /* Test default button */
+        style = types[i] | WS_CHILD | WS_VISIBLE | BS_NOTIFY;
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        ok(button != NULL, "failed to create a button, 0x%08lx, %p\n", style, hwnd);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        flush_events();
+        ok_sequence(set_focus_default_seq, "WM_SETFOCUS on default radiobutton", FALSE);
+        DestroyWindow(button);
+
+        /* Test already checked button */
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        SendMessageA(button, BM_SETCHECK, BST_CHECKED, 0);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        flush_events();
+        ok_sequence(set_focus_checked_seq, "WM_SETFOCUS on checked radiobutton", FALSE);
+        DestroyWindow(button);
+
+        /* Test already focused button */
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        SendMessageA(button, BM_SETCHECK, BST_UNCHECKED, 0);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        flush_events();
+        ok_sequence(set_focus_default_seq, "WM_SETFOCUS on focused radiobutton", FALSE);
+        DestroyWindow(button);
+
+        /* Test WM_LBUTTONDOWN */
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_LBUTTONDOWN, 0, MAKELPARAM(7, 7));
+        flush_events();
+        ok_sequence(WM_LBUTTONDOWN_seq, "WM_LBUTTONDOWN on radiobutton", FALSE);
+        DestroyWindow(button);
+
+        /* Test without BS_NOTIFY */
+        style = types[i] | WS_CHILD | WS_VISIBLE;
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        flush_events();
+        ok_sequence(set_focus_without_notify_seq, "WM_SETFOCUS on radiobutton without BS_NOTIFY", FALSE);
+        DestroyWindow(button);
+
+        /* Test disabled button */
+        style = types[i] | WS_CHILD | WS_VISIBLE | BS_NOTIFY;
+        button = CreateWindowExA(0, WC_BUTTONA, "test", style, 0, 0, 50, 14, hwnd, (HMENU)ID_BUTTON, 0, NULL);
+        EnableWindow(button, FALSE);
+        flush_events();
+        flush_sequence();
+        SendMessageA(button, WM_SETFOCUS, 0, 0);
+        flush_events();
+        ok_sequence(set_focus_default_seq, "WM_SETFOCUS on disabled radiobutton", FALSE);
+        DestroyWindow(button);
+    }
+
+    DestroyWindow(hwnd);
+}
+
 START_TEST(msg)
 {
     char **test_argv;
@@ -20524,6 +20692,7 @@ START_TEST(msg)
     test_setparent_status();
     test_InSendMessage();
     test_SetFocus();
+    test_radiobutton_focus();
     test_SetParent();
     test_PostMessage();
     test_broadcast();

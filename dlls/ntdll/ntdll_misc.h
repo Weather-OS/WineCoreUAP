@@ -112,6 +112,11 @@ static inline TEB64 *NtCurrentTeb64(void) { return NULL; }
 static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiBatchCount; }
 #endif
 
+static inline void *get_rva( HMODULE module, DWORD va )
+{
+    return (void *)((char *)module + va);
+}
+
 /* convert from straight ASCII to Unicode without depending on the current codepage */
 static inline void ascii_to_unicode( WCHAR *dst, const char *src, size_t len )
 {
@@ -164,6 +169,9 @@ extern void heap_thread_detach(void);
 
 extern NTSTATUS arm64ec_process_init( HMODULE module );
 extern NTSTATUS arm64ec_thread_init(void);
+extern IMAGE_ARM64EC_METADATA *arm64ec_get_module_metadata( HMODULE module );
+extern void arm64ec_update_hybrid_metadata( void *module, IMAGE_NT_HEADERS *nt,
+                                            const IMAGE_ARM64EC_METADATA *metadata );
 extern void invoke_arm64ec_syscall(void);
 
 extern void *__os_arm64x_check_call;
@@ -174,9 +182,6 @@ extern void *__os_arm64x_dispatch_fptr;
 extern void *__os_arm64x_dispatch_ret;
 extern void *__os_arm64x_get_x64_information;
 extern void *__os_arm64x_set_x64_information;
-extern void *__os_arm64x_helper0;
-extern void *__os_arm64x_helper1;
-extern void *__os_arm64x_helper2;
 extern void *__os_arm64x_helper3;
 extern void *__os_arm64x_helper4;
 extern void *__os_arm64x_helper5;

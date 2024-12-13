@@ -58,6 +58,8 @@ SOURCES = \
 	bits5_0.idl \
 	bitsmsg.h \
 	bluetoothapis.h \
+	bthdef.h \
+	bthioctl.h \
 	bthsdpdef.h \
 	cderr.h \
 	cdosys.idl \
@@ -269,6 +271,7 @@ SOURCES = \
 	dplobby.h \
 	dplobby8.h \
 	dpnathlp.h \
+	dragdropinterop.idl \
 	driverspecs.h \
 	drmexternals.idl \
 	dsclient.h \
@@ -303,6 +306,7 @@ SOURCES = \
 	dxgitype.idl \
 	dxva.h \
 	dxva2api.idl \
+	dxvahd.idl \
 	dyngraph.idl \
 	endpointvolume.idl \
 	errorrep.h \
@@ -679,10 +683,14 @@ SOURCES = \
 	rpcsal.h \
 	rstbas.idl \
 	rstchg.idl \
+	rstfnd.idl \
+	rstidn.idl \
 	rstinf.idl \
 	rstloc.idl \
 	rstnot.idl \
+	rstscr.idl \
 	rstupd.idl \
+	rstxsc.idl \
 	rtlsupportapi.h \
 	rtutils.h \
 	rtworkq.idl \
@@ -808,6 +816,7 @@ SOURCES = \
 	wdbgexts.h \
 	weakreference.idl \
 	webservices.h \
+	websocket.h \
 	werapi.h \
 	wfext.h \
 	wia.h \
@@ -830,6 +839,9 @@ SOURCES = \
 	windows.applicationmodel.activation.idl \
 	windows.applicationmodel.background.idl \
 	windows.applicationmodel.core.idl \
+	windows.applicationmodel.datatransfer.dragdrop.core.idl \
+	windows.applicationmodel.datatransfer.dragdrop.idl \
+	windows.applicationmodel.datatransfer.idl \
 	windows.applicationmodel.idl \
 	windows.data.json.idl \
 	windows.data.xml.dom.idl \
@@ -878,6 +890,7 @@ SOURCES = \
 	windows.security.credentials.idl \
 	windows.security.credentials.ui.idl \
 	windows.security.cryptography.idl \
+	windows.security.enterprisedata.idl \
 	windows.security.exchangeactivesyncprovisioning.idl \
 	windows.security.isolation.idl \
 	windows.storage.fileproperties.idl \

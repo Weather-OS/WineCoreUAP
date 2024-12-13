@@ -346,7 +346,7 @@ static void sync_window_min_max_info(HWND hwnd)
 {
     LONG style = NtUserGetWindowLongW(hwnd, GWL_STYLE);
     LONG exstyle = NtUserGetWindowLongW(hwnd, GWL_EXSTYLE);
-    UINT dpi = NtUserGetWinMonitorDpi(hwnd, MDT_DEFAULT);
+    UINT dpi = NtUserGetWinMonitorDpi(hwnd, MDT_RAW_DPI);
     RECT win_rect, primary_monitor_rect;
     MINMAXINFO minmax;
     LONG adjustedStyle;
@@ -1591,7 +1591,7 @@ done:
  *
  * Perform WM_SYSCOMMAND handling.
  */
-LRESULT macdrv_SysCommand(HWND hwnd, WPARAM wparam, LPARAM lparam)
+LRESULT macdrv_SysCommand(HWND hwnd, WPARAM wparam, LPARAM lparam, const POINT *pos)
 {
     struct macdrv_win_data *data;
     LRESULT ret = -1;
@@ -1723,7 +1723,7 @@ BOOL macdrv_GetWindowStyleMasks(HWND hwnd, UINT style, UINT ex_style, UINT *styl
 /***********************************************************************
  *              WindowPosChanged   (MACDRV.@)
  */
-void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, UINT swp_flags, BOOL fullscreen,
+void macdrv_WindowPosChanged(HWND hwnd, HWND insert_after, HWND owner_hint, UINT swp_flags, BOOL fullscreen,
                              const struct window_rects *new_rects, struct window_surface *surface)
 {
     struct macdrv_thread_data *thread_data;

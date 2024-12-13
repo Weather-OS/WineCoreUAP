@@ -3118,7 +3118,7 @@ static void test_process_security_child(void)
     /* Test thread security */
     handle = OpenThread( THREAD_TERMINATE, FALSE, GetCurrentThreadId() );
     ok(handle != NULL, "OpenThread(THREAD_TERMINATE) with err:%ld\n", GetLastError());
-    TEST_GRANTED_ACCESS( handle, PROCESS_TERMINATE );
+    TEST_GRANTED_ACCESS( handle, THREAD_TERMINATE );
     CloseHandle( handle );
 
     handle = OpenThread( THREAD_SET_THREAD_TOKEN, FALSE, GetCurrentThreadId() );
@@ -6152,6 +6152,40 @@ static void test_process_access(void)
     ok(access == (PROCESS_QUERY_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION) /* Vista+ */ ||
        access == PROCESS_QUERY_INFORMATION /* before Vista */,
        "expected PROCESS_QUERY_INFORMATION|PROCESS_QUERY_LIMITED_INFORMATION, got %#lx\n", access);
+    CloseHandle(dup);
+
+    SetLastError( 0xdeadbeef );
+    ret = DuplicateHandle(GetCurrentProcess(), process, GetCurrentProcess(), &dup,
+                          PROCESS_VM_OPERATION, FALSE, 0);
+    ok(ret, "DuplicateHandle error %ld\n", GetLastError());
+    access = get_obj_access(dup);
+    ok(access == PROCESS_VM_OPERATION, "unexpected access right %lx\n", access);
+    CloseHandle(dup);
+
+    SetLastError( 0xdeadbeef );
+    ret = DuplicateHandle(GetCurrentProcess(), process, GetCurrentProcess(), &dup,
+                          PROCESS_VM_WRITE, FALSE, 0);
+    ok(ret, "DuplicateHandle error %ld\n", GetLastError());
+    access = get_obj_access(dup);
+    ok(access == PROCESS_VM_WRITE, "unexpected access right %lx\n", access);
+    CloseHandle(dup);
+
+    SetLastError( 0xdeadbeef );
+    ret = DuplicateHandle(GetCurrentProcess(), process, GetCurrentProcess(), &dup,
+                          PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, 0);
+    ok(ret, "DuplicateHandle error %ld\n", GetLastError());
+    access = get_obj_access(dup);
+    ok(access == (PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_QUERY_LIMITED_INFORMATION) ||
+       broken(access == (PROCESS_VM_OPERATION | PROCESS_VM_WRITE)) /* Win8 and before */,
+       "expected PROCESS_VM_OPERATION|PROCESS_VM_WRITE|PROCESS_QUERY_LIMITED_INFORMATION, got %#lx\n", access);
+    CloseHandle(dup);
+
+    SetLastError( 0xdeadbeef );
+    ret = DuplicateHandle(GetCurrentProcess(), process, GetCurrentProcess(), &dup,
+                          PROCESS_VM_OPERATION | PROCESS_VM_READ, FALSE, 0);
+    ok(ret, "DuplicateHandle error %ld\n", GetLastError());
+    access = get_obj_access(dup);
+    ok(access == (PROCESS_VM_OPERATION | PROCESS_VM_READ), "unexpected access right %lx\n", access);
     CloseHandle(dup);
 
     TerminateProcess(process, 0);

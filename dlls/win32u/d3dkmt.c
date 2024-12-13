@@ -29,8 +29,6 @@
 #include "ntgdi_private.h"
 #include "win32u_private.h"
 #include "ntuser_private.h"
-#include "wine/vulkan.h"
-#include "wine/vulkan_driver.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(vulkan);
 
@@ -89,14 +87,14 @@ static void d3dkmt_init_vulkan(void)
         return;
     }
 
-    p_vkCreateInstance = p_vkGetInstanceProcAddr( NULL, "vkCreateInstance" );
+    p_vkCreateInstance = (PFN_vkCreateInstance)p_vkGetInstanceProcAddr( NULL, "vkCreateInstance" );
     if ((vr = p_vkCreateInstance( &create_info, NULL, &d3dkmt_vk_instance )))
     {
         WARN( "Failed to create a Vulkan instance, vr %d.\n", vr );
         return;
     }
 
-    p_vkDestroyInstance = p_vkGetInstanceProcAddr( d3dkmt_vk_instance, "vkDestroyInstance" );
+    p_vkDestroyInstance = (PFN_vkDestroyInstance)p_vkGetInstanceProcAddr( d3dkmt_vk_instance, "vkDestroyInstance" );
 #define LOAD_VK_FUNC( f )                                                                      \
     if (!(p##f = (void *)p_vkGetInstanceProcAddr( d3dkmt_vk_instance, #f )))                   \
     {                                                                                          \

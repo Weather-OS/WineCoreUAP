@@ -180,7 +180,7 @@ static void test_bufferrawformat(void* buff, int size, REFGUID expected, int lin
     LPBYTE   data;
     HRESULT  hres;
     GpStatus stat;
-    GpImage *img;
+    GpImage *img, *copy;
 
     hglob = GlobalAlloc (0, size);
     data = GlobalLock (hglob);
@@ -199,8 +199,12 @@ static void test_bufferrawformat(void* buff, int size, REFGUID expected, int lin
     }
 
     expect_rawformat(expected, img, line, todo);
+    stat = GdipCloneImage(img, &copy);
+    expect(Ok, stat);
+    expect_rawformat(expected, copy, line, todo);
 
     GdipDisposeImage(img);
+    GdipDisposeImage(copy);
     IStream_Release(stream);
 }
 
@@ -5407,20 +5411,44 @@ static void test_createeffect(void)
     static const GUID noneffect = { 0xcd0c3d4b, 0xe15e, 0x4cf2, { 0x9e, 0xa8, 0x6e, 0x1d, 0x65, 0x48, 0xc5, 0xa5 } };
     GpStatus (WINAPI *pGdipCreateEffect)( const GUID guid, CGpEffect **effect);
     GpStatus (WINAPI *pGdipDeleteEffect)( CGpEffect *effect);
+    GpStatus (WINAPI *pGdipGetEffectParameterSize)(CGpEffect *effect, UINT *size);
+    GpStatus (WINAPI *pGdipGetEffectParameters)(CGpEffect *effect, const VOID *params, const UINT size);
     GpStatus stat;
-    CGpEffect *effect;
+    CGpEffect *effect = NULL;
     HMODULE mod = GetModuleHandleA("gdiplus.dll");
     int i;
-    const GUID * const effectlist[] =
-               {&BlurEffectGuid, &SharpenEffectGuid, &ColorMatrixEffectGuid, &ColorLUTEffectGuid,
-                &BrightnessContrastEffectGuid, &HueSaturationLightnessEffectGuid, &LevelsEffectGuid,
-                &TintEffectGuid, &ColorBalanceEffectGuid, &RedEyeCorrectionEffectGuid, &ColorCurveEffectGuid};
+    UINT param_size;
+
+    static const struct test_data {
+        const GUID *effect;
+        const UINT parameters_number;
+    } td[] =
+    {
+        { &BlurEffectGuid, 8 },
+        { &BrightnessContrastEffectGuid, 8 },
+        { &ColorBalanceEffectGuid, 12 },
+        { &ColorCurveEffectGuid, 12 },
+        { &ColorLUTEffectGuid, 1024 },
+        { &ColorMatrixEffectGuid, 100 },
+        { &HueSaturationLightnessEffectGuid, 12 },
+        { &LevelsEffectGuid, 12 },
+        /* Parameter Size for Red Eye Correction effect is different for 64 bits build */
+#ifdef _WIN64
+        { &RedEyeCorrectionEffectGuid, 16 },
+#else
+        { &RedEyeCorrectionEffectGuid, 8 },
+#endif
+        { &SharpenEffectGuid, 8 },
+        { &TintEffectGuid, 8 },
+    };
 
     pGdipCreateEffect = (void*)GetProcAddress( mod, "GdipCreateEffect");
     pGdipDeleteEffect = (void*)GetProcAddress( mod, "GdipDeleteEffect");
-    if(!pGdipCreateEffect || !pGdipDeleteEffect)
+    pGdipGetEffectParameterSize = (void*)GetProcAddress( mod, "GdipGetEffectParameterSize");
+    pGdipGetEffectParameters = (void*)GetProcAddress( mod, "GdipGetEffectParameters");
+    if (!pGdipCreateEffect || !pGdipDeleteEffect || !pGdipGetEffectParameterSize || !pGdipGetEffectParameters)
     {
-        /* GdipCreateEffect/GdipDeleteEffect was introduced in Windows Vista. */
+        /* GdipCreateEffect/GdipDeleteEffect/GdipGetEffectParameterSize/GdipGetEffectParameters were introduced in Windows Vista. */
         win_skip("GDIPlus version 1.1 not available\n");
         return;
     }
@@ -5429,18 +5457,31 @@ static void test_createeffect(void)
     expect(InvalidParameter, stat);
 
     stat = pGdipCreateEffect(noneffect, &effect);
-    todo_wine expect(Win32Error, stat);
+    expect(Win32Error, stat);
+    ok( !effect, "expected null effect\n");
 
-    for(i=0; i < ARRAY_SIZE(effectlist); i++)
+    param_size = 0;
+    stat = pGdipGetEffectParameterSize(NULL, &param_size);
+    expect(InvalidParameter, stat);
+    expect(0, param_size);
+
+    for (i = 0; i < ARRAY_SIZE(td); i++)
     {
-        stat = pGdipCreateEffect(*effectlist[i], &effect);
-        todo_wine expect(Ok, stat);
-        if(stat == Ok)
+        stat = pGdipCreateEffect(*(td[i].effect), &effect);
+        expect(Ok, stat);
+        if (stat == Ok)
         {
+            param_size = 0;
+            stat = pGdipGetEffectParameterSize(effect, &param_size);
+            expect(Ok, stat);
+            expect(td[i].parameters_number, param_size);
             stat = pGdipDeleteEffect(effect);
             expect(Ok, stat);
         }
     }
+
+    stat = pGdipDeleteEffect(NULL);
+    expect(InvalidParameter, stat);
 }
 
 static void test_getadjustedpalette(void)

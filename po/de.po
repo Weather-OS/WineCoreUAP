@@ -3174,6 +3174,10 @@ msgstr "Desktop"
 msgid "&Reset"
 msgstr "&Reset"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -15071,6 +15075,12 @@ msgstr "KerbTicket Verschlüsselungszeit"
 #: programs/klist/klist.rc:37
 msgid "Current LogonId is"
 msgstr "Aktuelle LogonId ist"
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "Client"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

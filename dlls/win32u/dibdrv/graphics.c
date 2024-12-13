@@ -217,7 +217,7 @@ static unsigned int generate_ellipse_top_half( const DC *dc, double width, doubl
         double dy = -(a * pt.x + b * pt.y);
         int x_inc = (dx > 0 ? 1 : -1);
         int y_inc = (dy > 0 ? 1 : -1);
-        double sigma;
+        double sigma1, sigma2;
 
         points[pos++] = pt;
 
@@ -226,35 +226,48 @@ static unsigned int generate_ellipse_top_half( const DC *dc, double width, doubl
             /* Increment y, maybe increment x. */
             pt.y += y_inc;
 
-            sigma = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
-            /* σ < 0 if the next point would be inside the ellipse.
-             * If we are moving towards a vertical or horizontal tangent point,
-             * and (x, y+1) is outside the ellipse, then it's certainly
-             * closer to the ellipse than (x-1, y+1). [Same for the 180°
-             * rotation.] Hence we want to increment x if σ < 0.
-             * If we are moving away from a tangent point, the opposite applies,
-             * and we want to increment x if σ > 0.
-             * We are moving towards a tangent point if (dx > 0 XOR dy > 0),
-             * so want to increment x if (dx > 0 XOR dy > 0 XOR σ > 0). */
-            if (sigma != 0.0 && (dx > 0) ^ (dy > 0) ^ (sigma > 0))
+            /* If this point has 45° slope, and it's directly adjacent to one
+             * we just wrote, using the algorithm as-is will select this point
+             * and then the one horizontally adjacent to it (our reflection
+             * across the 45° line.) This creates an L-shaped corner, which we
+             * don't want. Force incrementing X to skip that corner. */
+            if (fabs(b * pt.x + c * pt.y) == fabs(a * pt.x + b * pt.y))
+            {
                 pt.x += x_inc;
+                continue;
+            }
+
+            sigma1 = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
+            pt.x += x_inc;
+            sigma2 = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
+
+            /* Pick whichever point is closer to the ellipse. */
+            if (fabs(sigma2) > fabs(sigma1))
+                pt.x -= x_inc;
         }
         else
         {
             /* Increment x, maybe increment y. */
             pt.x += x_inc;
 
-            sigma = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
-            /* As above, but we are moving towards a tangent point if the
-             * opposite condition is true, i.e. (dx < 0 XOR dy > 0). */
-            if (sigma != 0.0 && (dx < 0) ^ (dy > 0) ^ (sigma > 0))
+            if (fabs(b * pt.x + c * pt.y) == fabs(a * pt.x + b * pt.y))
+            {
                 pt.y += y_inc;
+                continue;
+            }
+
+            sigma1 = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
+            pt.y += y_inc;
+            sigma2 = (a * pt.x * pt.x) + (2 * b * pt.x * pt.y) + (c * pt.y * pt.y) - d;
+
+            if (fabs(sigma2) > fabs(sigma1))
+                pt.y -= y_inc;
         }
     }
     return pos;
 }
 
-static int find_intersection( const POINT *points, int x, int y, int count )
+static int find_intersection( const POINT *points, double x, double y, int count )
 {
     int i;
 
@@ -286,15 +299,16 @@ static int find_intersection( const POINT *points, int x, int y, int count )
     }
 }
 
-static void lp_to_dp_no_translate( DC *dc, POINT *point )
+static void lp_to_dp_no_translate( DC *dc, double *x, double *y )
 {
-    double x = point->x;
-    double y = point->y;
-    point->x = GDI_ROUND( x * dc->xformWorld2Vport.eM11 + y * dc->xformWorld2Vport.eM21 );
-    point->y = GDI_ROUND( x * dc->xformWorld2Vport.eM12 + y * dc->xformWorld2Vport.eM22 );
+    double in_x = *x, in_y = *y;
+
+    *x = in_x * dc->xformWorld2Vport.eM11 + in_y * dc->xformWorld2Vport.eM21;
+    *y = in_x * dc->xformWorld2Vport.eM12 + in_y * dc->xformWorld2Vport.eM22;
 }
 
-static int get_arc_points( DC *dc, int arc_dir, const RECT *rect, POINT start, POINT end, POINT *points )
+static int get_arc_points( DC *dc, int arc_dir, const RECT *rect, double start_x, double start_y,
+                           double end_x, double end_y, POINT *points )
 {
     int i, pos, count, start_pos, end_pos;
     int width = rect->right - rect->left;
@@ -303,13 +317,19 @@ static int get_arc_points( DC *dc, int arc_dir, const RECT *rect, POINT start, P
 
     count = generate_ellipse_top_half( dc, width, height, points );
 
+    /* The ellipse is always generated counterclockwise from the origin.
+     * This means our points will essentially be backwards if the world
+     * transform includes a flip. Swap the arc direction to correct for this. */
+    if (dc->xformWorld2Vport.eM11 * dc->xformWorld2Vport.eM22 < dc->xformWorld2Vport.eM12 * dc->xformWorld2Vport.eM21)
+        arc_dir = (arc_dir == AD_CLOCKWISE ? AD_COUNTERCLOCKWISE : AD_CLOCKWISE);
+
     /* Transform the start and end, but do not translate them, so that they
      * remain relative to the ellipse center. */
-    lp_to_dp_no_translate( dc, &start );
-    lp_to_dp_no_translate( dc, &end );
+    lp_to_dp_no_translate( dc, &start_x, &start_y );
+    lp_to_dp_no_translate( dc, &end_x, &end_y );
 
-    start_pos = find_intersection( points, start.x, start.y, count );
-    end_pos = find_intersection( points, end.x, end.y, count );
+    start_pos = find_intersection( points, start_x, start_y, count );
+    end_pos = find_intersection( points, end_x, end_y, count );
     if (arc_dir == AD_CLOCKWISE)
     {
         int tmp = start_pos;
@@ -410,9 +430,9 @@ static BOOL draw_arc( PHYSDEV dev, INT left, INT top, INT right, INT bottom,
     {
         points[0] = dc->attr->cur_pos;
         lp_to_dp( dc, points, 1 );
-        count = 1 + get_arc_points( dc, dc->attr->arc_direction, &rect, pt[0], pt[1], points + 1 );
+        count = 1 + get_arc_points( dc, dc->attr->arc_direction, &rect, pt[0].x, pt[0].y, pt[1].x, pt[1].y, points + 1 );
     }
-    else count = get_arc_points( dc, dc->attr->arc_direction, &rect, pt[0], pt[1], points );
+    else count = get_arc_points( dc, dc->attr->arc_direction, &rect, pt[0].x, pt[0].y, pt[1].x, pt[1].y, points );
 
     if (count > max_points)
         ERR( "point count %u exceeds max points %u\n", count, max_points );
@@ -1518,18 +1538,21 @@ BOOL dibdrv_RoundRect( PHYSDEV dev, INT left, INT top, INT right, INT bottom,
 {
     dibdrv_physdev *pdev = get_dibdrv_pdev( dev );
     DC *dc = get_physdev_dc( dev );
-    RECT rect;
-    POINT start, end, rect_center, *points, *top_points;
+    RECT rect, arc_rect;
+    POINT rect_center, *points, *top_points;
     int count, max_points;
     BOOL ret = TRUE;
     HRGN outline = 0, interior = 0;
 
-    SetRect( &rect, 0, 0, ellipse_width, ellipse_height );
+    if (!ellipse_width || !ellipse_height)
+        return dibdrv_Rectangle( dev, left, top, right, bottom );
+
+    SetRect( &arc_rect, 0, 0, ellipse_width, ellipse_height );
     /* We are drawing four arcs, but the number of points we will actually use
      * is exactly as many as in one ellipse arc. */
-    max_points = get_arc_max_points( dc, &rect );
+    max_points = get_arc_max_points( dc, &arc_rect );
     points = malloc( max_points * sizeof(*points) );
-    top_points = malloc( max_points / 2 * sizeof(*points) );
+    top_points = malloc( max_points * sizeof(*points) );
     if (!points || !top_points)
     {
         free( points );
@@ -1543,27 +1566,22 @@ BOOL dibdrv_RoundRect( PHYSDEV dev, INT left, INT top, INT right, INT bottom,
         return FALSE;
     }
 
-    SetRect( &rect, left, top, left + ellipse_width, top + ellipse_height );
+    SetRect( &rect, left, top, right, bottom );
+    order_rect( &rect );
+
+    SetRect( &arc_rect, rect.left, rect.top, rect.left + ellipse_width, rect.top + ellipse_height );
     /* Points are relative to the arc center.
      * We just need to specify any point on the vector. */
-    start.x = -1;
-    start.y = 0;
-    end.x = 0;
-    end.y = -1;
-    count = get_arc_points( dc, AD_CLOCKWISE, &rect, start, end, top_points );
+    count = get_arc_points( dc, AD_CLOCKWISE, &arc_rect, -1.0, 0.0, 0.0, -1.0, top_points );
 
-    SetRect( &rect, right - ellipse_width, top, right, top + ellipse_height );
-    start.x = 0;
-    start.y = -1;
-    end.x = 1;
-    end.y = 0;
-    count += get_arc_points( dc, AD_CLOCKWISE, &rect, start, end, top_points + count );
+    SetRect( &arc_rect, rect.right - ellipse_width, rect.top, rect.right, rect.top + ellipse_height );
+    count += get_arc_points( dc, AD_CLOCKWISE, &arc_rect, 0.0, -1.0, 1.0, 0.0, top_points + count );
 
     if (count * 2 > max_points)
         ERR( "point count %u * 2 exceeds max points %u\n", count, max_points );
 
-    rect_center.x = (left + right) / 2;
-    rect_center.y = (top + bottom) / 2;
+    rect_center.x = (rect.left + rect.right) / 2;
+    rect_center.y = (rect.top + rect.bottom) / 2;
     lp_to_dp( dc, &rect_center, 1 );
 
     if (dc->attr->arc_direction == AD_CLOCKWISE)

@@ -3986,18 +3986,35 @@ struct zvalue
     struct hash_table_elt       elt;
 };
 
-#define PEV_ERROR(pev, msg)       snprintf((pev)->error, sizeof((pev)->error), "%s", (msg))
-#define PEV_ERROR1(pev, msg, pmt) snprintf((pev)->error, sizeof((pev)->error), (msg), (pmt))
+static void pev_set_error(struct pevaluator* pev, const char* msg, ...) __WINE_PRINTF_ATTR(2,3);
+static void pev_set_error(struct pevaluator* pev, const char* msg, ...)
+{
+    va_list args;
+
+    va_start(args, msg);
+    vsnprintf(pev->error, sizeof(pev->error), msg, args);
+    va_end(args);
+}
 
 #if 0
 static void pev_dump_stack(struct pevaluator* pev)
 {
     unsigned i;
+    struct hash_table_iter      hti;
+
     FIXME("stack #%d\n", pev->stk_index);
     for (i = 0; i < pev->stk_index; i++)
     {
         FIXME("\t%d) %s\n", i, *(char**)vector_at(&pev->stack, i));
     }
+    hash_table_iter_init(&pev->values, &hti, str);
+    FIXME("hash\n");
+    while ((ptr = hash_table_iter_up(&hti)))
+    {
+        struct zvalue* zval = CONTAINING_RECORD(ptr, struct zvalue, elt);
+        FIXME("\t%s: Ix\n", zval->elt.name, zval->value);
+    }
+
 }
 #endif
 
@@ -4021,12 +4038,13 @@ static BOOL  pev_get_val(struct pevaluator* pev, const char* str, DWORD_PTR* val
                 return TRUE;
             }
         }
-        return PEV_ERROR1(pev, "get_zvalue: no value found (%s)", str);
+        pev_set_error(pev, "get_zvalue: no value found (%s)", str);
+        return FALSE;
     default:
         *val = strtol(str, &n, 10);
-        if (n == str || *n != '\0')
-            return PEV_ERROR1(pev, "get_val: not a literal (%s)", str);
-        return TRUE;
+        if (n != str && *n == '\0') return TRUE;
+        pev_set_error(pev, "get_val: not a literal (%s)", str);
+        return FALSE;
     }
 }
 
@@ -4038,7 +4056,11 @@ static BOOL  pev_push(struct pevaluator* pev, const char* elt)
         at = vector_at(&pev->stack, pev->stk_index);
     else
         at = vector_add(&pev->stack, &pev->pool);
-    if (!at) return PEV_ERROR(pev, "push: out of memory");
+    if (!at)
+    {
+        pev_set_error(pev, "push: out of memory");
+        return FALSE;
+    }
     *at = pool_strdup(&pev->pool, elt);
     pev->stk_index++;
     return TRUE;
@@ -4048,7 +4070,11 @@ static BOOL  pev_push(struct pevaluator* pev, const char* elt)
 static BOOL  pev_pop(struct pevaluator* pev, char* elt)
 {
     char**      at = vector_at(&pev->stack, --pev->stk_index);
-    if (!at) return PEV_ERROR(pev, "pop: stack empty");
+    if (!at)
+    {
+        pev_set_error(pev, "pop: stack empty");
+        return FALSE;
+    }
     strcpy(elt, *at);
     return TRUE;
 }
@@ -4079,7 +4105,11 @@ static BOOL  pev_set_value(struct pevaluator* pev, const char* name, DWORD_PTR v
     if (!ptr)
     {
         struct zvalue* zv = pool_alloc(&pev->pool, sizeof(*zv));
-        if (!zv) return PEV_ERROR(pev, "set_value: out of memory");
+        if (!zv)
+        {
+            pev_set_error(pev, "set_value: out of memory");
+            return FALSE;
+        }
         zv->value = val;
 
         zv->elt.name = pool_strdup(&pev->pool, name);
@@ -4096,6 +4126,11 @@ static BOOL  pev_binop(struct pevaluator* pev, char op)
     DWORD_PTR   v1, v2, c;
 
     if (!pev_pop_val(pev, &v1) || !pev_pop_val(pev, &v2)) return FALSE;
+    if ((op == '/' || op == '%') && v2 == 0)
+    {
+        pev_set_error(pev, "binop: division by zero");
+        return FALSE;
+    }
     switch (op)
     {
     case '+': c = v1 + v2; break;
@@ -4103,7 +4138,9 @@ static BOOL  pev_binop(struct pevaluator* pev, char op)
     case '*': c = v1 * v2; break;
     case '/': c = v1 / v2; break;
     case '%': c = v1 % v2; break;
-    default: return PEV_ERROR1(pev, "binop: unknown op (%c)", op);
+    default:
+        pev_set_error(pev, "binop: unknown op (%c)", op);
+        return FALSE;
     }
     snprintf(res, sizeof(res), "%Id", c);
     pev_push(pev, res);
@@ -4118,7 +4155,10 @@ static BOOL  pev_deref(struct pevaluator* pev)
 
     if (!pev_pop_val(pev, &v1)) return FALSE;
     if (!sw_read_mem(pev->csw, v1, &v2, pev->csw->cpu->word_size))
-        return PEV_ERROR1(pev, "deref: cannot read mem at %Ix\n", v1);
+    {
+        pev_set_error(pev, "deref: cannot read mem at %Ix", v1);
+        return FALSE;
+    }
     snprintf(res, sizeof(res), "%Id", v2);
     pev_push(pev, res);
     return TRUE;
@@ -4131,7 +4171,11 @@ static BOOL  pev_assign(struct pevaluator* pev)
     DWORD_PTR           v1;
 
     if (!pev_pop_val(pev, &v1) || !pev_pop(pev, p2)) return FALSE;
-    if (p2[0] != '$') return PEV_ERROR1(pev, "assign: %s isn't a variable", p2);
+    if (p2[0] != '$')
+    {
+        pev_set_error(pev, "assign: %s isn't a variable", p2);
+        return FALSE;
+    }
     pev_set_value(pev, p2, v1);
 
     return TRUE;
@@ -4139,7 +4183,7 @@ static BOOL  pev_assign(struct pevaluator* pev)
 
 /* initializes the postfix evaluator */
 static void  pev_init(struct pevaluator* pev, struct cpu_stack_walk* csw,
-                      PDB_FPO_DATA* fpoext, struct pdb_cmd_pair* cpair)
+                      const PDB_FPO_DATA* fpoext, struct pdb_cmd_pair* cpair)
 {
     pev->csw = csw;
     pool_init(&pev->pool, 512);
@@ -4208,7 +4252,7 @@ static BOOL  pdb_parse_cmd_string(struct cpu_stack_walk* csw, PDB_FPO_DATA* fpoe
         {
             if (ptok - token >= PEV_MAX_LEN - 1)
             {
-                PEV_ERROR1(&pev, "parse: token too long (%s)", ptr - (ptok - token));
+                pev_set_error(&pev, "parse: token too long (%s)", ptr - (ptok - token));
                 goto done;
             }
             *ptok++ = *ptr;
@@ -4379,7 +4423,13 @@ static BOOL codeview_process_info(const struct process *pcs,
 
         TRACE("Got RSDS type of PDB file: guid=%s age=%08x name=%s\n",
               wine_dbgstr_guid(&rsds->guid), rsds->age, debugstr_a(rsds->name));
-        ret = pdb_process_file(pcs, msc_dbg, rsds->name, &rsds->guid, 0, rsds->age);
+        /* gcc/mingw and clang can emit build-id information, but with an empty PDB filename.
+         * Don't search for the .pdb file in that case.
+         */
+        if (rsds->name[0])
+            ret = pdb_process_file(pcs, msc_dbg, rsds->name, &rsds->guid, 0, rsds->age);
+        else
+            ret = TRUE;
         break;
     }
     default:
@@ -4487,7 +4537,7 @@ typedef struct _FPO_DATA
     __ENDTRY
 
     /* we haven't found yet any debug information, fallback to unmatched pdb */
-    if (module->module.SymType == SymDeferred)
+    if (!ret && module->module.SymType == SymDeferred)
     {
         SYMSRV_INDEX_INFOW info = {.sizeofstruct = sizeof(info)};
         char buffer[MAX_PATH];
@@ -4549,38 +4599,35 @@ DWORD msc_get_file_indexinfo(void* image, const IMAGE_DEBUG_DIRECTORY* debug_dir
             num_misc_records++;
         }
     }
-    return info->stripped && !num_misc_records ? ERROR_BAD_EXE_FORMAT : ERROR_SUCCESS;
+    return (!num_dir || (info->stripped && !num_misc_records)) ? ERROR_BAD_EXE_FORMAT : ERROR_SUCCESS;
 }
 
 DWORD dbg_get_file_indexinfo(void* image, DWORD size, SYMSRV_INDEX_INFOW* info)
 {
     const IMAGE_SEPARATE_DEBUG_HEADER *header;
+    IMAGE_DEBUG_DIRECTORY *dbg;
     DWORD num_directories;
 
-    if (size < sizeof(*header)) return ERROR_BAD_EXE_FORMAT;
+    if (size < sizeof(*header)) return ERROR_BAD_FORMAT;
     header = image;
     if (header->Signature != 0x4944 /* DI */ ||
         size < sizeof(*header) + header->NumberOfSections * sizeof(IMAGE_SECTION_HEADER) + header->ExportedNamesSize + header->DebugDirectorySize)
-        return ERROR_BAD_EXE_FORMAT;
+        return ERROR_BAD_FORMAT;
+
+    info->size = header->SizeOfImage;
+    /* seems to use header's timestamp, not debug_directory one */
+    info->timestamp = header->TimeDateStamp;
+    info->stripped = FALSE; /* FIXME */
 
     /* header is followed by:
      * - header->NumberOfSections of IMAGE_SECTION_HEADER
      * - header->ExportedNameSize
      * - then num_directories of IMAGE_DEBUG_DIRECTORY
      */
+    dbg = (IMAGE_DEBUG_DIRECTORY*)((char*)(header + 1) +
+                                   header->NumberOfSections * sizeof(IMAGE_SECTION_HEADER) +
+                                   header->ExportedNamesSize);
     num_directories = header->DebugDirectorySize / sizeof(IMAGE_DEBUG_DIRECTORY);
 
-    if (!num_directories) return ERROR_BAD_EXE_FORMAT;
-
-    info->age = 0;
-    memset(&info->guid, 0, sizeof(info->guid));
-    info->sig = 0;
-    info->dbgfile[0] = L'\0';
-    info->pdbfile[0] = L'\0';
-    info->size = header->SizeOfImage;
-    /* seems to use header's timestamp, not debug_directory one */
-    info->timestamp = header->TimeDateStamp;
-    info->stripped = FALSE; /* FIXME */
-
-    return ERROR_SUCCESS;
+    return msc_get_file_indexinfo(image, dbg, num_directories, info);
 }

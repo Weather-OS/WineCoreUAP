@@ -3131,6 +3131,10 @@ msgstr "Plocha"
 msgid "&Reset"
 msgstr "Restart"
 
+#: dlls/desk.cpl/desk.rc:42
+msgid "Emulate display mode changes (requires restart)"
+msgstr ""
+
 #: dlls/desk.cpl/desk.rc:29
 #, fuzzy
 #| msgid "Default Settings"
@@ -15816,6 +15820,12 @@ msgstr "Šifrování souborového systému"
 #| msgid "Current Connections"
 msgid "Current LogonId is"
 msgstr "Současná spojení"
+
+#: programs/klist/klist.rc:38
+#, fuzzy
+#| msgid "client"
+msgid "Client"
+msgstr "klient"
 
 #: programs/msinfo32/msinfo32.rc:28
 msgid "System Information"

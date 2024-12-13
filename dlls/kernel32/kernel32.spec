@@ -637,6 +637,7 @@
 @ stdcall GetCurrentPackageFamilyName(ptr ptr) kernelbase.GetCurrentPackageFamilyName
 @ stdcall GetCurrentPackageFullName(ptr ptr) kernelbase.GetCurrentPackageFullName
 @ stdcall GetCurrentPackageId(ptr ptr) kernelbase.GetCurrentPackageId
+@ stdcall GetCurrentPackageInfo(long ptr ptr ptr) kernelbase.GetCurrentPackageInfo
 @ stdcall GetCurrentPackagePath(ptr ptr) kernelbase.GetCurrentPackagePath
 @ stdcall -norelay GetCurrentProcess() KERNEL32_GetCurrentProcess
 @ stdcall -norelay GetCurrentProcessId() KERNEL32_GetCurrentProcessId
@@ -945,7 +946,7 @@
 @ stub HeapCreateTagsW
 @ stdcall HeapDestroy(long)
 @ stub HeapExtend
-@ stdcall HeapFree(long long ptr)
+@ stdcall -import HeapFree(long long ptr)
 @ stdcall -import HeapLock(long)
 @ stdcall -import HeapQueryInformation(long long ptr long ptr)
 @ stub HeapQueryTagW

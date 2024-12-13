@@ -39,9 +39,6 @@
 #include "x11drv.h"
 #include "xcomposite.h"
 
-#define VK_NO_PROTOTYPES
-#define WINE_VK_HOST
-
 #include "wine/vulkan.h"
 #include "wine/vulkan_driver.h"
 
@@ -65,7 +62,7 @@ static VkBool32 (*pvkGetPhysicalDeviceXlibPresentationSupportKHR)(VkPhysicalDevi
 
 static const struct vulkan_driver_funcs x11drv_vulkan_driver_funcs;
 
-struct vulkan_surface
+struct x11drv_vulkan_surface
 {
     Window window;
     RECT rect;
@@ -75,7 +72,7 @@ struct vulkan_surface
     HDC hdc_dst;
 };
 
-static void vulkan_surface_destroy( HWND hwnd, struct vulkan_surface *surface )
+static void vulkan_surface_destroy( HWND hwnd, struct x11drv_vulkan_surface *surface )
 {
     destroy_client_window( hwnd, surface->window );
     if (surface->hdc_dst) NtGdiDeleteObjectApp( surface->hdc_dst );
@@ -90,7 +87,7 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, VkInstance instance, Vk
         .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
         .dpy = gdi_display,
     };
-    struct vulkan_surface *surface;
+    struct x11drv_vulkan_surface *surface;
 
     TRACE( "%p %p %p %p\n", hwnd, instance, handle, private );
 
@@ -123,7 +120,7 @@ static VkResult X11DRV_vulkan_surface_create( HWND hwnd, VkInstance instance, Vk
 
 static void X11DRV_vulkan_surface_destroy( HWND hwnd, void *private )
 {
-    struct vulkan_surface *surface = private;
+    struct x11drv_vulkan_surface *surface = private;
 
     TRACE( "%p %p\n", hwnd, private );
 
@@ -132,7 +129,7 @@ static void X11DRV_vulkan_surface_destroy( HWND hwnd, void *private )
 
 static void X11DRV_vulkan_surface_detach( HWND hwnd, void *private )
 {
-    struct vulkan_surface *surface = private;
+    struct x11drv_vulkan_surface *surface = private;
     Window client_window = surface->window;
     struct x11drv_win_data *data;
 
@@ -145,7 +142,7 @@ static void X11DRV_vulkan_surface_detach( HWND hwnd, void *private )
     }
 }
 
-static void vulkan_surface_update_size( HWND hwnd, struct vulkan_surface *surface )
+static void vulkan_surface_update_size( HWND hwnd, struct x11drv_vulkan_surface *surface )
 {
     XWindowChanges changes;
     RECT rect;
@@ -159,7 +156,7 @@ static void vulkan_surface_update_size( HWND hwnd, struct vulkan_surface *surfac
     surface->rect = rect;
 }
 
-static void vulkan_surface_update_offscreen( HWND hwnd, struct vulkan_surface *surface )
+static void vulkan_surface_update_offscreen( HWND hwnd, struct x11drv_vulkan_surface *surface )
 {
     BOOL offscreen = needs_offscreen_rendering( hwnd, FALSE );
     struct x11drv_win_data *data;
@@ -205,7 +202,7 @@ static void vulkan_surface_update_offscreen( HWND hwnd, struct vulkan_surface *s
 
 static void X11DRV_vulkan_surface_update( HWND hwnd, void *private )
 {
-    struct vulkan_surface *surface = private;
+    struct x11drv_vulkan_surface *surface = private;
 
     TRACE( "%p %p\n", hwnd, private );
 
@@ -215,7 +212,7 @@ static void X11DRV_vulkan_surface_update( HWND hwnd, void *private )
 
 static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult result )
 {
-    struct vulkan_surface *surface = private;
+    struct x11drv_vulkan_surface *surface = private;
     HWND toplevel = NtUserGetAncestor( hwnd, GA_ROOT );
     struct x11drv_win_data *data;
     RECT rect_dst, rect;
@@ -231,8 +228,8 @@ static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult 
     window = X11DRV_get_whole_window( toplevel );
     region = get_dc_monitor_region( hwnd, hdc );
 
-    NtUserGetClientRect( hwnd, &rect_dst, NtUserGetWinMonitorDpi( hwnd, MDT_DEFAULT ) );
-    NtUserMapWindowPoints( hwnd, toplevel, (POINT *)&rect_dst, 2, NtUserGetWinMonitorDpi( hwnd, MDT_DEFAULT ) );
+    NtUserGetClientRect( hwnd, &rect_dst, NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) );
+    NtUserMapWindowPoints( hwnd, toplevel, (POINT *)&rect_dst, 2, NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) );
 
     if ((data = get_win_data( toplevel )))
     {
