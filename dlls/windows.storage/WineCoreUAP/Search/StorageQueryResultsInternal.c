@@ -28,9 +28,11 @@ DEFINE_ASYNC_COMPLETED_HANDLER( storage_item_vector_view, IAsyncOperationComplet
 HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, IVector_IStorageItem **items )
 {
     struct query_result_base *impl = impl_from_IStorageQueryResultBase( iface );
+    struct storage_file *file;
+    struct storage_folder *queryFolder;
+
     IQueryOptions *options = impl->Options;
     IStorageFolder *folder = impl->Folder;
-    IStorageFile *queryFile = NULL;
     IStorageItem *queryItem = NULL;
     FolderDepth depth;
 
@@ -49,6 +51,9 @@ HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, 
     DEFINE_VECTOR_IIDS( IStorageItem )
     #define IStorageItem __x_ABI_CWindows_CStorage_CIStorageItem
 
+    if (!(file = calloc( 1, sizeof(*file) ))) return E_OUTOFMEMORY;
+    if (!(queryFolder = calloc( 1, sizeof(*queryFolder) ))) return E_OUTOFMEMORY;
+
     status = vector_create( &IStorageItem_iids, (void **)items );
     if ( FAILED( status ) ) return status;
 
@@ -64,7 +69,7 @@ HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, 
         return E_ABORT;
     }
 
-    do 
+    while ( FindNextFileW( hFind, &findFileData ) != 0 )
     {
         if ( wcscmp( findFileData.cFileName, L"." ) != 0 && wcscmp( findFileData.cFileName, L".." ) != 0 ) 
         {
@@ -72,14 +77,16 @@ HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, 
             if ( findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) 
             {                    
                 WindowsCreateString( fullPath, wcslen( fullPath ), &folderPath );
-                storage_folder_AssignFolder( folderPath, folder );
+                status = storage_folder_AssignFolder( folderPath, &queryFolder->IStorageFolder_iface );
+                if ( FAILED( status ) ) return status;
+
                 if ( impl->searchType == StorageItemTypes_Folder || impl->searchType == StorageItemTypes_None )
                 {
                     //AQS is not supported yet.
-                    if ( wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFolder( folder )->Name, NULL), WindowsGetStringRawBuffer( ApplicationFilter, NULL ) ) 
-                         && wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFolder( folder )->Name, NULL), WindowsGetStringRawBuffer( UserFilter, NULL ) ) )
+                    if ( wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFolder( &queryFolder->IStorageFolder_iface )->Name, NULL), WindowsGetStringRawBuffer( ApplicationFilter, NULL ) ) 
+                         && wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFolder( &queryFolder->IStorageFolder_iface )->Name, NULL), WindowsGetStringRawBuffer( UserFilter, NULL ) ) )
                     {
-                        status = IStorageFolder_QueryInterface( folder, &IID_IStorageItem, (void **)&queryItem );
+                        status = IStorageFolder_QueryInterface( &queryFolder->IStorageFolder_iface, &IID_IStorageItem, (void **)&queryItem );
                         if ( FAILED( status ) ) return status;
                         status = IVector_IStorageItem_Append( *items, queryItem );
                         if ( FAILED( status ) ) return status;
@@ -91,14 +98,16 @@ HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, 
             else 
             {
                 WindowsCreateString( fullPath, wcslen( fullPath ), &filePath );
-                storage_file_AssignFile( filePath, queryFile );
-                if ( impl->searchType == StorageItemTypes_Folder || impl->searchType == StorageItemTypes_None )
-                {
+                status = storage_file_AssignFile( filePath, &file->IStorageFile_iface );
+                if ( FAILED( status ) ) return status;
+
+                if ( impl->searchType == StorageItemTypes_File || impl->searchType == StorageItemTypes_None )
+                {                
                     //AQS is not supported yet.
-                    if ( wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFile( queryFile )->Name, NULL), WindowsGetStringRawBuffer( ApplicationFilter, NULL ) ) 
-                         && wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFile( queryFile )->Name, NULL), WindowsGetStringRawBuffer( UserFilter, NULL ) ) )
+                    if ( wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFile( &file->IStorageFile_iface )->Name, NULL), WindowsGetStringRawBuffer( ApplicationFilter, NULL ) ) 
+                         && wcsstr( WindowsGetStringRawBuffer( impl_from_IStorageFile( &file->IStorageFile_iface )->Name, NULL), WindowsGetStringRawBuffer( UserFilter, NULL ) ) )
                     {
-                        status = IStorageFile_QueryInterface( queryFile, &IID_IStorageItem, (void **)&queryItem );
+                        status = IStorageFile_QueryInterface( &file->IStorageFile_iface, &IID_IStorageItem, (void **)&queryItem );
                         if ( FAILED( status ) ) return status;
                         status = IVector_IStorageItem_Append( *items, queryItem );
                         if ( FAILED( status ) ) return status;
@@ -106,9 +115,7 @@ HRESULT WINAPI query_result_base_ConductSearch( IStorageQueryResultBase *iface, 
                 }
             }
         }
-    } 
-
-    while ( FindNextFileW( hFind, &findFileData ) != 0 );
+    }
     FindClose( hFind );
 
     return status;

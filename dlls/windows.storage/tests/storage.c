@@ -327,6 +327,8 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     IVectorView_StorageFolder *storage_folder_vector_view = NULL;
     IAsyncOperation_IVectorView_StorageFolder *storage_folder_vector_view_operation = NULL;
 
+    IStorageFolderQueryOperations *storage_folder_query_operations = NULL;
+
     HSTRING pathString;
     HSTRING tmpString;
     HSTRING itemName;
@@ -377,7 +379,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
 
     check_interface( storage_folder, &IID_IStorageFolder );
     check_interface( storage_folder, &IID_IStorageItem );
-    //notimpl: check_interface( storage_folder, &IID_IStorageFolderQueryOperations ); 
+    check_interface( storage_folder, &IID_IStorageFolderQueryOperations ); 
     check_interface( storage_folder, &IID_IStorageItemProperties );
     //notimpl: check_interface( storage_folder, &IID_IStorageItemProperties2 );
     check_interface( storage_folder, &IID_IStorageItem2 );
@@ -431,7 +433,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( hr );
 
     hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
-    CHECK_HR( hr )
+    CHECK_HR( hr );
 
     hr = IStorageItem_get_Name( storage_item, &itemName );
     CHECK_HR( hr );
@@ -458,12 +460,12 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( hr );
 
     hr = IVectorView_StorageFile_IndexOf( storage_file_vector_view, storage_file, &index, &found );
-    CHECK_HR( hr )
+    CHECK_HR( hr );
     ok( found, "storage file element (%p) not found in vector!\n", storage_file );
     ok( index == 0u, "index (%u) is not at 0!\n", index );
 
     hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
-    CHECK_HR( hr )
+    CHECK_HR( hr );
 
     hr = IStorageItem_get_Name( storage_item, &itemName );
     CHECK_HR( hr );
@@ -484,7 +486,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( hr );
 
     hr = IStorageFolder_QueryInterface( sub_storage_folder, &IID_IStorageItem, (void **)&storage_item );
-    CHECK_HR( hr )
+    CHECK_HR( hr );
 
     hr = IStorageItem_get_Name( storage_item, &itemName );
     CHECK_HR( hr );
@@ -507,7 +509,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( hr );
 
     hr = IStorageFolder_QueryInterface( sub_storage_folder, &IID_IStorageItem, (void **)&storage_item );
-    CHECK_HR( hr )
+    CHECK_HR( hr );
 
     hr = IStorageItem_get_Name( storage_item, &itemName );
     CHECK_HR( hr );
@@ -589,6 +591,58 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( hr );
     WindowsCompareStringOrdinal( tmpString, itemName, &compResult );
     ok( !compResult, "the string tmpString is not the same as itemName! compResult %d\n", compResult );
+
+    /**
+     * ABI::Windows::Storage::IStorageFolderQueryOperations
+     */
+    hr = IStorageFolder_QueryInterface( storage_folder, &IID_IStorageFolderQueryOperations, (void **)&storage_folder_query_operations );
+    CHECK_HR ( hr );
+
+    /**
+     * ABI::Windows::Storage::IStorageFolderQueryOperations::GetFilesAsync
+     */
+    //This tests pretty much everything relating to default behaviors of Windows.Storage.Search
+    hr = IStorageFolderQueryOperations_GetFilesAsyncOverloadDefaultStartAndCount( storage_folder_query_operations, CommonFileQuery_DefaultQuery, &storage_file_vector_view_operation );
+    CHECK_HR ( hr );
+
+    asyncRes = await_IAsyncOperation_IVectorView_StorageFile( storage_file_vector_view_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_IVectorView_StorageFile_GetResults( storage_file_vector_view_operation, &storage_file_vector_view );
+    CHECK_HR( hr );
+
+    hr = IVectorView_StorageFile_get_Size( storage_file_vector_view, &size );
+    CHECK_HR( hr );
+    ok( size == 1u, "unexpected size of %u\n", size );
+
+    hr = IVectorView_StorageFile_GetAt( storage_file_vector_view, 0, &storage_file );
+    CHECK_HR( hr );
+
+    hr = IVectorView_StorageFile_IndexOf( storage_file_vector_view, storage_file, &index, &found );
+    CHECK_HR( hr );
+    ok( found, "storage file element (%p) not found in vector!\n", storage_file );
+    ok( index == 0u, "index (%u) is not at 0!\n", index );
+
+    hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::IStorageFolderQueryOperations::GetFoldersAsync
+     */
+    hr = IStorageFolderQueryOperations_GetFoldersAsyncOverloadDefaultStartAndCount( storage_folder_query_operations, CommonFolderQuery_DefaultQuery, &storage_folder_vector_view_operation );
+    CHECK_HR ( hr );
+
+    asyncRes = await_IAsyncOperation_IVectorView_StorageFolder( storage_folder_vector_view_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_IVectorView_StorageFolder_GetResults( storage_folder_vector_view_operation, &storage_folder_vector_view );
+    CHECK_HR( hr );
+
+    hr = IVectorView_StorageFolder_GetAt( storage_folder_vector_view, 0, &sub_storage_folder );
+    CHECK_HR( hr );
+
+    hr = IStorageFolder_QueryInterface( sub_storage_folder, &IID_IStorageItem, (void **)&storage_item );
+    CHECK_HR( hr );
 
     test_StorageItem( storage_item );
 

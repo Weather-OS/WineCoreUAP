@@ -204,7 +204,8 @@ static HRESULT WINAPI query_options_factory_CreateCommonFileQuery( IQueryOptions
     hr = vector_create( &SortEntry_iids, (void **)&queryOptions->SortOrders );
 
     if ( fileTypeFilter )
-    {
+    {    
+
         hr = IIterable_HSTRING_First( fileTypeFilter, &fileTypeFilterIterator );
         if ( FAILED( hr ) ) return hr;
 
@@ -248,8 +249,6 @@ static HRESULT WINAPI query_options_factory_CreateCommonFileQuery( IQueryOptions
         default:
             return E_NOTIMPL;
     }
-
-    IVector_SortEntry_Append( queryOptions->SortOrders, sortEntry );
 
     queryOptions->Depth = FolderDepth_Shallow;
     queryOptions->Indexer = IndexerOption_DoNotUseIndexer;
@@ -295,8 +294,6 @@ static HRESULT WINAPI query_options_factory_CreateCommonFolderQuery( IQueryOptio
         default:
             return E_NOTIMPL;
     }
-
-    IVector_SortEntry_Append( queryOptions->SortOrders, sortEntry );
 
     queryOptions->Depth = FolderDepth_Shallow;
     queryOptions->Indexer = IndexerOption_DoNotUseIndexer;

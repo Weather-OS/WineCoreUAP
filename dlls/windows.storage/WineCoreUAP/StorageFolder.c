@@ -173,6 +173,13 @@ static HRESULT WINAPI storage_folder_QueryInterface( IStorageFolder *iface, REFI
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageFolderQueryOperations ))
+    {
+        *out = &impl->IStorageFolderQueryOperations_iface;
+        IInspectable_AddRef( *out );        
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;

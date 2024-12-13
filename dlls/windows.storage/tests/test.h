@@ -44,6 +44,8 @@
 #include "windows.storage.fileproperties.h"
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
+#define WIDL_using_Windows_Storage_Search
+#include "windows.storage.search.h"
 
 #include "wine/test.h"
 
