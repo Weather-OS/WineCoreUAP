@@ -147,6 +147,13 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IStorageItem2 ))
+    {
+        *out = &impl->IStorageItem2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     if (IsEqualGUID( iid, &IID_IStorageFilePropertiesWithAvailability ))
     {
         *out = &impl->IStorageFilePropertiesWithAvailability_iface;

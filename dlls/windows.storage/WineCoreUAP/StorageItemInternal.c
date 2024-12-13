@@ -108,8 +108,6 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
     item = impl_from_IStorageItem( result );
 
-    WindowsDuplicateString( itemPath, &item->Path );
-
     if ( PathIsURLW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
         status = E_INVALIDARG;
     
@@ -162,7 +160,7 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
 
         //File Name
         wcscpy( itemName, wcsrchr( WindowsGetStringRawBuffer( itemPath, NULL ), '\\' ) );
-        WindowsCreateString( itemName + 1, wcslen( itemName ), &tempName );
+        WindowsCreateString( itemName + 1, wcslen( itemName + 1 ), &tempName );
         WindowsDuplicateString( tempName, &item->Name );
 
         CloseHandle( itemFile );
@@ -375,6 +373,10 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
 
 HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties *result )
 {
+    LPWSTR pathParts[MAX_PATH];
+    WCHAR id[MAX_PATH];
+    INT partCount = 0;
+    LPWSTR token;
     HRESULT status = S_OK;
     SHFILEINFOW shFileInfo = { 0 };
 
@@ -390,6 +392,22 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
     if ( SHGetFileInfoW( WindowsGetStringRawBuffer( impl_from_IStorageItem( iface )->Path, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
         WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &properties->DisplayType );
     }
+
+    wcscpy( id, WindowsGetStringRawBuffer( impl_from_IStorageItem( iface )->Path, NULL ) );
+
+    token = wcstok( id, L"\\", NULL );
+    while ( token != NULL ) 
+    {
+        pathParts[partCount++] = token;
+        token = wcstok( NULL, L"\\", NULL );
+    }
+
+    if ( partCount >= 2 ) 
+    {
+        wnsprintfW( id, 23 + MAX_PATH, L"System.ItemPathDisplay:%s\\%s", pathParts[partCount - 2], pathParts[partCount - 1] );
+    }
+
+    WindowsCreateString( id, wcslen( id ), &properties->FolderRelativeId );
 
     return status;
 }

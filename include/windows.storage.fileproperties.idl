@@ -30,7 +30,9 @@ import "windows.devices.geolocation.idl";
 import "windows.storage.streams.idl";
 
 namespace Windows.Storage.FileProperties {
+    typedef enum PropertyPrefetchOptions PropertyPrefetchOptions;
     typedef enum ThumbnailMode ThumbnailMode;
+    typedef enum ThumbnailOptions ThumbnailOptions;
 
     interface IBasicProperties;
     interface IStorageItemContentProperties;
@@ -43,6 +45,19 @@ namespace Windows.Storage.FileProperties {
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.BasicProperties *>;
     }
 
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    enum PropertyPrefetchOptions
+    {
+        None               = 0x0,
+        MusicProperties    = 0x1,
+        VideoProperties    = 0x2,
+        ImageProperties    = 0x4,
+        DocumentProperties = 0x8,
+        BasicProperties    = 0x10
+    };
+
     [contract(Windows.Foundation.UniversalApiContract, 1.0)]
     enum ThumbnailMode
     {
@@ -52,6 +67,17 @@ namespace Windows.Storage.FileProperties {
         DocumentsView = 3,
         ListView      = 4,
         SingleItem    = 5
+    };
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    enum ThumbnailOptions
+    {
+        None               = 0x0,
+        ReturnOnlyIfCached = 0x1,
+        ResizeThumbnail    = 0x2,
+        UseCurrentScale    = 0x4
     };
 
     [

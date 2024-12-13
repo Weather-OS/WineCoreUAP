@@ -34,6 +34,26 @@ struct storage_library_statics
     LONG ref;
 };
 
+struct definition_changed_handler
+{
+    ITypedEventHandler_StorageLibrary_IInspectable ITypedEventHandler_StorageLibrary_IInspectable_iface;
+    EventRegistrationToken token;
+    BOOL isStillAvailable;
+};
+
+struct storage_library
+{
+    //Derivatives
+    IStorageLibrary IStorageLibrary_iface;
+    HANDLE folderHandle;
+    IObservableVector_StorageFolder *folderContents;
+    IStorageFolder *folder;
+
+    struct definition_changed_handler **definitionChangedHandlers;
+    UINT32 handlerSize;
+    UINT32 handlerCapacity;
+};
+
 struct storage_provider *impl_from_IStorageProvider( IStorageProvider *iface );
 
 #endif

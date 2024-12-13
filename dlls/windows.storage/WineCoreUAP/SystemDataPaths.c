@@ -25,13 +25,6 @@ _ENABLE_DEBUGGING_
 
 // System Data Paths
 
-struct system_data_paths_statics
-{
-    IActivationFactory IActivationFactory_iface;
-    ISystemDataPathsStatics ISystemDataPathsStatics_iface;
-    LONG ref;
-};
-
 static inline struct system_data_paths_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
     return CONTAINING_RECORD( iface, struct system_data_paths_statics, IActivationFactory_iface );

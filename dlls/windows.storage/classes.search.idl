@@ -1,4 +1,5 @@
-/* WinRT Windows.Storage.AppDataPaths Implementation
+/*
+ * Runtime Classes for windows.storage.dll
  *
  * Written by Weather
  *
@@ -19,28 +20,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef SYSTEM_PROPERTIES_INTERNAL_H
-#define SYSTEM_PROPERTIES_INTERNAL_H
+#pragma makedep register
 
-#include <appx.h>
-#include <windows.h>
-
-#include "wine/debug.h"
-#include "../private.h"
-
-struct system_properties
-{
-    IActivationFactory IActivationFactory_iface;
-    ISystemProperties ISystemProperties_iface;
-    ISystemAudioProperties ISystemAudioProperties_iface;
-    ISystemGPSProperties ISystemGPSProperties_iface;
-    ISystemMediaProperties ISystemMediaProperties_iface;
-    ISystemMusicProperties ISystemMusicProperties_iface;
-    ISystemPhotoProperties ISystemPhotoProperties_iface;
-    ISystemVideoProperties ISystemVideoProperties_iface;
-    ISystemImageProperties ISystemImageProperties_iface;
-
-    LONG ref;
-};
-
-#endif
+#include "windows.storage.search.idl"

@@ -65,6 +65,7 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     status = storage_item_Internal_CreateNew( path, &file->IStorageItem_iface );
 
     file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    file->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
     file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
 
     if ( SUCCEEDED(status) )
@@ -107,6 +108,7 @@ HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param
 
     file->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
     file->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    file->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
     file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
     file->ref = 1;
 
@@ -151,6 +153,7 @@ HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIA
 
     newFile->IStorageFile_iface.lpVtbl = &storage_file_vtbl;
     newFile->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    newFile->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
     newFile->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
     newFile->ref = 1;
 

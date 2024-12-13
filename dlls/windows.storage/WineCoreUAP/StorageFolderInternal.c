@@ -97,6 +97,8 @@ HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value
     folder->IStorageFolder_iface.lpVtbl = &storage_folder_vtbl;
     folder->IStorageFolder2_iface.lpVtbl = &storage_folder2_vtbl;
     folder->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    folder->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
+    folder->IStorageFolderQueryOperations_iface.lpVtbl = &storage_folder_query_operations_vtbl;
     folder->ref = 1;
 
     status = storage_item_Internal_CreateNew( path, &folder->IStorageItem_iface );
@@ -333,6 +335,7 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
     if (!result) return E_INVALIDARG;
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
 
     PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
     PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
@@ -365,6 +368,7 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
 {
     IVector_IStorageItem *vector = NULL;
     IVectorView_IStorageItem *vectorView = NULL;
+
     WIN32_FIND_DATAW findFileData;
     HANDLE hFind = INVALID_HANDLE_VALUE;
     HRESULT status = S_OK;
@@ -387,6 +391,7 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
 
     status = vector_create( &IStorageItem_iids, (void **)&vector );
     if ( FAILED( status ) ) return status;
@@ -682,6 +687,7 @@ HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param,
     if (!result) return E_INVALIDARG;
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
     item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
 
     PathAppendW( fullPath, WindowsGetStringRawBuffer( Path, NULL ) );
     PathAppendW( fullPath, WindowsGetStringRawBuffer( (HSTRING)param, NULL ) );
@@ -708,7 +714,6 @@ HRESULT WINAPI storage_folder2_TryFetchItem( IUnknown *invoker, IUnknown *param,
     } else 
     {
         result->vt = VT_NULL;
-        result->punkVal = (IUnknown *)NULL;
     }
 
     return S_OK;

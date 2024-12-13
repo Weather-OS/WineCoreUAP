@@ -25,13 +25,6 @@ _ENABLE_DEBUGGING_
 
 // User Data Paths
 
-struct user_data_paths_statics
-{
-    IActivationFactory IActivationFactory_iface;
-    IUserDataPathsStatics IUserDataPathsStatics_iface;
-    LONG ref;
-};
-
 static inline struct user_data_paths_statics *impl_from_IActivationFactory( IActivationFactory *iface )
 {
     return CONTAINING_RECORD( iface, struct user_data_paths_statics, IActivationFactory_iface );

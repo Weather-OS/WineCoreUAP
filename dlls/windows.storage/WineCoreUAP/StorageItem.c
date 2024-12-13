@@ -233,6 +233,138 @@ struct IStorageItemVtbl storage_item_vtbl =
     storage_item_IsOfType
 };
 
+struct storage_item *impl_from_IStorageItem2( IStorageItem2 *iface )
+{
+    return CONTAINING_RECORD( iface, struct storage_item, IStorageItem2_iface );
+}
+
+static HRESULT WINAPI storage_item2_QueryInterface( IStorageItem2 *iface, REFIID iid, void **out )
+{
+    struct storage_item *impl = impl_from_IStorageItem2( iface );
+
+    // Inheritence 
+    struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItem2_iface, struct storage_folder, IStorageItem2_iface );
+    struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItem2_iface, struct storage_file, IStorageItem2_iface );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IStorageItem2 ))
+    {
+        *out = &impl->IStorageItem2_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
+    if ( inheritedFile->IStorageFile_iface.lpVtbl == &storage_file_vtbl )
+    {
+        return IStorageFile_QueryInterface( &inheritedFile->IStorageFile_iface, iid, out );
+    }
+
+    if ( inheritedFolder->IStorageFolder_iface.lpVtbl == &storage_folder_vtbl )
+    {
+        return IStorageFolder_QueryInterface( &inheritedFolder->IStorageFolder_iface, iid, out );
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI storage_item2_AddRef( IStorageItem2 *iface )
+{
+    struct storage_item *impl = impl_from_IStorageItem2( iface );
+    ULONG IStorageItemRef = InterlockedIncrement( &impl->IStorageItemRef );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, IStorageItemRef );
+    return IStorageItemRef;
+}
+
+static ULONG WINAPI storage_item2_Release( IStorageItem2 *iface )
+{
+    struct storage_item *impl = impl_from_IStorageItem2( iface );
+    ULONG IStorageItemRef = InterlockedDecrement( &impl->IStorageItemRef );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, IStorageItemRef );
+
+    if (!IStorageItemRef) free( impl );
+    return IStorageItemRef;
+}
+
+static HRESULT WINAPI storage_item2_GetIids( IStorageItem2 *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item2_GetRuntimeClassName( IStorageItem2 *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item2_GetTrustLevel( IStorageItem2 *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item2_GetParentAsync( IStorageItem2 *iface, IAsyncOperation_StorageFolder **operation )
+{
+    struct storage_item *impl = impl_from_IStorageItem2( iface );
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };    
+    
+    HRESULT hr;
+    HSTRING parentPath;
+    WCHAR path[MAX_PATH];
+    LPWSTR parent;
+
+    wcscpy( path, WindowsGetStringRawBuffer( impl->Path, NULL ) );
+    parent = wcsrchr( path, L'\\' );
+
+    if ( parent != NULL )
+        *parent = L'\0';
+
+    WindowsCreateString( path, wcslen( path ), &parentPath );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)parentPath, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+    return hr;
+}
+
+static HRESULT storage_item2_IsEqual( IStorageItem2 *iface, IStorageItem *item, boolean *value )
+{
+    struct storage_item *impl = impl_from_IStorageItem2( iface );
+    HRESULT hr;
+    HSTRING path;
+    INT32 strComp;
+
+    hr = IStorageItem_get_Path( item, &path );
+    if ( FAILED( hr ) ) return hr;
+
+    WindowsCompareStringOrdinal( path, impl->Path, &strComp );
+    if ( !strComp ) 
+        *value = TRUE;
+    else 
+        *value = FALSE;
+
+    return hr;
+}
+
+struct IStorageItem2Vtbl storage_item2_vtbl =
+{
+    storage_item2_QueryInterface,
+    storage_item2_AddRef,
+    storage_item2_Release,
+    /* IInspectable methods */
+    storage_item2_GetIids,
+    storage_item2_GetRuntimeClassName,
+    storage_item2_GetTrustLevel,
+    /* IStorageItem methods */
+    storage_item2_GetParentAsync,
+    storage_item2_IsEqual
+};
+
 struct storage_item_properties *impl_from_IStorageItemProperties( IStorageItemProperties *iface )
 {
     return CONTAINING_RECORD( iface, struct storage_item_properties, IStorageItemProperties_iface );

@@ -36,6 +36,7 @@
 
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IStorageItem2Vtbl storage_item2_vtbl;
 extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl;
 
 struct storage_file
@@ -48,6 +49,7 @@ struct storage_file
 
     //IStorageItem Derivatives    
     IStorageItem IStorageItem_iface;
+        IStorageItem2 IStorageItem2_iface;
         DateTime DateCreated;    
         HSTRING Path;
         HSTRING Name;

@@ -101,7 +101,6 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    printf("why is this getting called?\n");
     FIXME( "iface %p, instance %p stub!\n", iface, instance );
     return E_NOTIMPL;
 }

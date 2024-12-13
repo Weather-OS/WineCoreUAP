@@ -25,10 +25,15 @@
 #include <appx.h>
 #include <windows.h>
 
-
 #include "../private.h"
-
 #include "wine/debug.h"
+
+struct system_data_paths_statics
+{
+    IActivationFactory IActivationFactory_iface;
+    ISystemDataPathsStatics ISystemDataPathsStatics_iface;
+    LONG ref;
+};
 
 HRESULT WINAPI system_data_paths_GetKnownFolder( ISystemDataPaths *iface, const char * FOLDERID, HSTRING *value );
 

@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.AppDataPaths Implementation
+/* WinRT Windows.Storage.Search.IQueryOptions Implementation
  *
  * Written by Weather
  *
@@ -19,26 +19,35 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef SYSTEM_PROPERTIES_INTERNAL_H
-#define SYSTEM_PROPERTIES_INTERNAL_H
+#ifndef QUERY_OPTIONS_INTERNAL_H
+#define QUERY_OPTIONS_INTERNAL_H
 
-#include <appx.h>
-#include <windows.h>
-
+#include "../../private.h"
 #include "wine/debug.h"
-#include "../private.h"
 
-struct system_properties
+extern const struct IQueryOptionsVtbl query_options_vtbl;
+extern const struct IQueryOptionsFactoryVtbl query_options_factory_vtbl;
+
+struct query_options_factory
 {
     IActivationFactory IActivationFactory_iface;
-    ISystemProperties ISystemProperties_iface;
-    ISystemAudioProperties ISystemAudioProperties_iface;
-    ISystemGPSProperties ISystemGPSProperties_iface;
-    ISystemMediaProperties ISystemMediaProperties_iface;
-    ISystemMusicProperties ISystemMusicProperties_iface;
-    ISystemPhotoProperties ISystemPhotoProperties_iface;
-    ISystemVideoProperties ISystemVideoProperties_iface;
-    ISystemImageProperties ISystemImageProperties_iface;
+    IQueryOptionsFactory IQueryOptionsFactory_iface;
+    LONG ref;
+};
+
+struct query_options
+{
+    //Derivatives
+    IQueryOptions IQueryOptions_iface;
+    IVector_HSTRING *FileTypeFilters;
+    IVector_SortEntry *SortOrders;
+    FolderDepth Depth;    
+    IndexerOption Indexer;
+    DateStackOption DateStack;
+    HSTRING ApplicationSearchFilter;
+    HSTRING UserSearchFilter;
+    HSTRING Language;
+    HSTRING GroupPropertyName;
 
     LONG ref;
 };

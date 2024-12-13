@@ -25,21 +25,6 @@ _ENABLE_DEBUGGING_
 
 // System Properties
 
-struct system_properties
-{
-    IActivationFactory IActivationFactory_iface;
-    ISystemProperties ISystemProperties_iface;
-    ISystemAudioProperties ISystemAudioProperties_iface;
-    ISystemGPSProperties ISystemGPSProperties_iface;
-    ISystemMediaProperties ISystemMediaProperties_iface;
-    ISystemMusicProperties ISystemMusicProperties_iface;
-    ISystemPhotoProperties ISystemPhotoProperties_iface;
-    ISystemVideoProperties ISystemVideoProperties_iface;
-    ISystemImageProperties ISystemImageProperties_iface;
-
-    LONG ref;
-};
-
 static inline struct system_properties *impl_from_IActivationFactory( IActivationFactory *iface )
 {
     return CONTAINING_RECORD( iface, struct system_properties, IActivationFactory_iface );

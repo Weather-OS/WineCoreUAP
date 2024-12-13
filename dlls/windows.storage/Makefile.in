@@ -48,6 +48,13 @@ SOURCES = \
 	WineCoreUAP/Streams/DataReader.c \
 	\
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
+	\
+	WineCoreUAP/Search/QueryOptions.c \
+	WineCoreUAP/Search/StorageQueryResults.c \
+	WineCoreUAP/Search/StorageQueryResultsInternal.c \
+	WineCoreUAP/Search/StorageFolderQueryOperations.c \
+	WineCoreUAP/Search/StorageFolderQueryOperationsInternal.c \
 	provider.idl \
 	classes.idl \
-	classes.streams.idl
+	classes.streams.idl \
+	classes.search.idl \

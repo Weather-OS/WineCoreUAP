@@ -2,4 +2,4 @@ TESTDLL = windows.storage.dll
 IMPORTS = shell32 combase ole32 advapi32 shlwapi
 
 SOURCES = \
-	storage.c 
+	storage.c

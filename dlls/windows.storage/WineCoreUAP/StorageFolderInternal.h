@@ -34,8 +34,10 @@
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IStorageFolder2Vtbl storage_folder2_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
+extern struct IStorageItem2Vtbl storage_item2_vtbl;
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl;
+extern struct IStorageFolderQueryOperationsVtbl storage_folder_query_operations_vtbl;
 
 
 struct storage_folder
@@ -46,6 +48,7 @@ struct storage_folder
         
     //IStorageItem Derivatives    
     IStorageItem IStorageItem_iface;
+        IStorageItem2 IStorageItem2_iface;
         DateTime DateCreated;
         HSTRING Path;
         HSTRING Name;
@@ -60,6 +63,10 @@ struct storage_folder
         HSTRING DisplayName;
         HSTRING FolderRelativeId;
         LONG IStorageItemPropertiesRef;
+
+    //IStorageFolderQueryOperations Derivatives
+    IStorageFolderQueryOperations IStorageFolderQueryOperations_iface;
+        LONG IStorageFolderQueryOperationsRef;
 
     LONG ref;
 };
