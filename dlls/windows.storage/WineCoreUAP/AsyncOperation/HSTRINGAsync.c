@@ -1,4 +1,4 @@
-/* WinRT IAsyncOperation<Windows.Storage.HSTRING *> Implementation
+/* WinRT IAsyncOperation<HSTRING> Implementation
  *
  * Written by Weather
  *

@@ -1,4 +1,4 @@
-/* WinRT IAsyncOperation<Windows.Storage.UINT32 *> Implementation
+/* WinRT IAsyncOperationWithProgress<UINT32> Implementation
  *
  * Written by Weather
  *

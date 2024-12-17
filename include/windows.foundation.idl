@@ -169,7 +169,6 @@ namespace Windows.Foundation {
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Uri *>;
 #endif
         interface Windows.Foundation.IAsyncOperation<Windows.Foundation.Collections.IPropertySet *>;
-        interface Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32>;
         interface Windows.Foundation.IReference<BYTE>;
         interface Windows.Foundation.IReference<DOUBLE>;
         interface Windows.Foundation.IReference<FLOAT>;
@@ -189,10 +188,13 @@ namespace Windows.Foundation {
         interface Windows.Foundation.TypedEventHandler<Windows.Foundation.IMemoryBufferReference *, IInspectable *>;
         interface Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32>;
         interface Windows.Foundation.IAsyncOperationWithProgress<UINT64, UINT64>;
+        interface Windows.Foundation.IAsyncOperationWithProgress<IInspectable *, UINT64>;
         interface Windows.Foundation.AsyncOperationProgressHandler<UINT32, UINT32>;
         interface Windows.Foundation.AsyncOperationProgressHandler<UINT64, UINT64>;
+        interface Windows.Foundation.AsyncOperationProgressHandler<IInspectable *, UINT64>;
         interface Windows.Foundation.AsyncOperationWithProgressCompletedHandler<UINT32, UINT32>;
         interface Windows.Foundation.AsyncOperationWithProgressCompletedHandler<UINT64, UINT64>;
+        interface Windows.Foundation.AsyncOperationWithProgressCompletedHandler<IInspectable *, UINT64>;
     }
 
     [

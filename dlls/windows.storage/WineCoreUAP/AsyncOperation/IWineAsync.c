@@ -281,7 +281,7 @@ static HRESULT WINAPI async_info_Close( IAsyncInfo *iface )
     return hr;
 }
 
-static const struct IAsyncInfoVtbl async_info_vtbl =
+const struct IAsyncInfoVtbl async_info_vtbl =
 {
     /* IUnknown methods */
     async_info_QueryInterface,
@@ -659,6 +659,6 @@ HRESULT async_operation_create( IUnknown *invoker, IUnknown *param, async_operat
     }
 
     *out = &impl->IAsyncOperation_IInspectable_iface;
-    TRACE( "created IAsyncOperation_boolean %p\n", *out );
+    TRACE( "created IAsyncOperation_IInspectable %p\n", *out );
     return S_OK;
 }

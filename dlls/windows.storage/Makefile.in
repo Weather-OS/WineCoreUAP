@@ -31,7 +31,9 @@ SOURCES = \
 	WineCoreUAP/AsyncAction/IAsyncAction.c \
 	\
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/IWineAsyncWithProgressUINT.c \
 	WineCoreUAP/AsyncOperation/UINT32Async.c \
+	WineCoreUAP/AsyncOperation/UINT32AsyncWithProgress.c \
 	WineCoreUAP/AsyncOperation/HSTRINGAsync.c \
 	\
 	WineCoreUAP/Vector/IWineVector.c \
@@ -46,6 +48,8 @@ SOURCES = \
 	WineCoreUAP/Streams/BufferByteAccess.c \
 	WineCoreUAP/Streams/BufferInternal.c \
 	WineCoreUAP/Streams/DataReader.c \
+	WineCoreUAP/Streams/InputOutputStream.c \
+	WineCoreUAP/Streams/InputOutputStreamInternal.c \
 	\
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	\

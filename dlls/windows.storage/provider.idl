@@ -35,6 +35,7 @@ import "windows.foundation.idl";
 namespace Windows.Storage {
     /* type-pruning version of AsyncOperationCompletedHandler<T> */
     delegate HRESULT WineAsyncOperationCompletedHandler([in] IInspectable *async, [in] AsyncStatus status);
+    delegate HRESULT WineAsyncOperationProgressHandler([in] IInspectable *async, [in] UINT64 progress );
 
     [
         uuid(83f377ee-c799-11ec-9d64-0242ac120002)
@@ -44,6 +45,19 @@ namespace Windows.Storage {
         [propput] HRESULT Completed([in] WineAsyncOperationCompletedHandler *handler);
         [propget] HRESULT Completed([out, retval] WineAsyncOperationCompletedHandler **handler);
         [propget] HRESULT Result([out, retval] PROPVARIANT *result);
+        HRESULT Start();
+    }
+
+    [
+        uuid(83f377ee-c799-11ec-9d64-0242ac120002)
+    ]
+    interface IWineAsyncInfoWithProgressImpl : IUnknown
+    {
+        [propput] HRESULT Completed([in] WineAsyncOperationCompletedHandler *handler);
+        [propget] HRESULT Completed([out, retval] WineAsyncOperationCompletedHandler **handler);
+        [propget] HRESULT Result([out, retval] PROPVARIANT *result);
+        [propget] HRESULT Progress([out, retval] WineAsyncOperationProgressHandler **progress );
+        [propput] HRESULT Progress([in] WineAsyncOperationProgressHandler *progress );
         HRESULT Start();
     }
 }

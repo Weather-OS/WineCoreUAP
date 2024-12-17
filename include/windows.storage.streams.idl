@@ -333,6 +333,18 @@ namespace Windows.Storage.Streams {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.Streams.RandomAccessStream),
+        uuid(524CEDCF-6E29-4CE5-9573-6B753DB66C3A)
+    ]
+    interface IRandomAccessStreamStatics : IInspectable
+    {
+        [overload("CopyAsync")] HRESULT CopyAsync([in] Windows.Storage.Streams.IInputStream* source, [in] Windows.Storage.Streams.IOutputStream* destination, [out] [retval] Windows.Foundation.IAsyncOperationWithProgress<UINT64, UINT64>** operation);
+        [overload("CopyAsync")] HRESULT CopySizeAsync([in] Windows.Storage.Streams.IInputStream* source, [in] Windows.Storage.Streams.IOutputStream* destination, [in] UINT64 bytesToCopy, [out] [retval] Windows.Foundation.IAsyncOperationWithProgress<UINT64, UINT64>** operation);
+        HRESULT CopyAndCloseAsync([in] Windows.Storage.Streams.IInputStream* source, [in] Windows.Storage.Streams.IOutputStream* destination, [out] [retval] Windows.Foundation.IAsyncOperationWithProgress<UINT64, UINT64>** operation);
+    }
+
+    [
         uuid(cc254827-4b3d-438f-9232-10c76bc7e038),
     ]
     interface IRandomAccessStreamWithContentType : IInspectable

@@ -95,10 +95,20 @@ extern IActivationFactory *query_options_activatable_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
+typedef HRESULT (WINAPI *async_operation_with_progress_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress );
+
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
+extern HRESULT async_info_with_progress_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback,
+                                  IInspectable *outer, IWineAsyncInfoWithProgressImpl **out );
 extern HRESULT async_operation_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
                                         IAsyncOperation_IInspectable **out );
+extern HRESULT async_operation_boolean_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
+                                        IAsyncOperation_boolean **out );
+extern HRESULT async_operation_with_progress_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
+                                        IAsyncOperationWithProgress_IInspectable_UINT64 **out );
+extern HRESULT async_operation_with_progress_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
+                                              IAsyncOperationWithProgress_UINT32_UINT32 **out );
 extern HRESULT async_operation_hstring_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_HSTRING **out );
 extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 

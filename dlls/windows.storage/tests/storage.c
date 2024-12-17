@@ -112,6 +112,10 @@ void test_AppDataPathsStatics( const wchar_t** pathStr )
     ok( ref == 1, "got ref %ld.\n", ref );
 }
 
+/**
+ * ABI::Windows::Storage::IStorageItem
+ */
+
 void test_StorageItem( IStorageItem *item )
 {
     DateTime time;
@@ -396,7 +400,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     /**
      * ABI::Windows::Storage::IStorageFolder::CreateFileAsync
      */
-    WindowsCreateString( L"TestFile", wcslen( L"TestFile" ), &tmpString );
+    WindowsCreateString( L"TestFile.tmp", wcslen( L"TestFile.tmp" ), &tmpString );
     hr = IStorageFolder_CreateFileAsync( storage_folder, tmpString, CreationCollisionOption_ReplaceExisting, &storage_file_operation );
     CHECK_HR( hr );
 
@@ -422,7 +426,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     /**
      * ABI::Windows::Storage::IStorageFolder::GetFileAsync
      */
-    WindowsCreateString( L"TestFile", wcslen( L"TestFile" ), &tmpString );
+    WindowsCreateString( L"TestFile.tmp", wcslen( L"TestFile.tmp" ), &tmpString );
     hr = IStorageFolder_GetFileAsync( storage_folder, tmpString, &storage_file_operation );
     CHECK_HR( hr );
 
@@ -519,7 +523,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     /**
      * ABI::Windows::Storage::IStorageFolder::GetItemAsync
      */
-    WindowsCreateString( L"TestFile", wcslen( L"TestFile" ), &tmpString );
+    WindowsCreateString( L"TestFile.tmp", wcslen( L"TestFile.tmp" ), &tmpString );
     hr = IStorageFolder_GetItemAsync( storage_folder, tmpString, &storage_item_operation );
     CHECK_HR( hr );
 
@@ -657,6 +661,103 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     ok( ref == 2, "got ref %ld.\n", ref );
 }
 
+/**
+ * ABI::Windows::Storage::StorageFile
+ */
+
+void test_StorageFile( const wchar_t* path )
+{
+    static const WCHAR *storage_file_statics_name = L"Windows.Storage.StorageFile";
+
+    IStorageFileStatics *storage_file_statics = NULL;
+
+    IStorageFile *storage_file = NULL;
+    IAsyncOperation_StorageFile *storage_file_operation = NULL;
+
+    HSTRING pathString;
+    HSTRING tmpString;
+    HSTRING fileType;
+    HSTRING contentType;
+
+    HRESULT hr;
+    LPWSTR pathStr;
+    DWORD asyncRes;
+    INT32 comparisonResult;
+
+    LONG ref;
+
+    ACTIVATE_INSTANCE( storage_file_statics_name, storage_file_statics, IID_IStorageFileStatics );
+
+    pathStr = (LPWSTR)malloc( wcslen( path ) * sizeof( WCHAR ) );
+    wcscpy( pathStr, path );
+
+    /**
+     * ABI::Windows::Storage::IStorageFileStatics::GetFileFromPathAsync
+     */
+    PathAppendW( pathStr, L"TestFile.tmp" );
+    WindowsCreateString( pathStr, wcslen( pathStr ), &pathString );
+    hr = IStorageFileStatics_GetFileFromPathAsync( storage_file_statics, pathString, &storage_file_operation );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncOperation_StorageFile( storage_file_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_StorageFile_GetResults( storage_file_operation, &storage_file );
+    CHECK_HR( hr );
+
+    check_interface( storage_file, &IID_IUnknown );
+    check_interface( storage_file, &IID_IInspectable );
+    check_interface( storage_file, &IID_IAgileObject );
+
+    /** --- (@windows.storage.idl) ---
+     * StorageFile runtime class expects: 
+     * UniversalAPIContract 1.0: 
+     *      IStorageFile 
+     *      IInputStreamReference 
+     *      IRandomAccessStreamReference 
+     *      IStorageItem
+     *      IStorageItemProperties
+     *      IStorageItemProperties2
+     *      IStorageItem2
+     *      IStorageItemPropertiesWithProvider
+     *      IStorageFilePropertiesWithAvailability
+     *      IStorageFile2
+     */
+
+    check_interface( storage_file, &IID_IStorageFile );
+    stubbed_interface( storage_file, &IID_IRandomAccessStreamReference );
+    //notimpl: check_interface( storage_file, &IID_IInputStreamReference );
+    check_interface( storage_file, &IID_IStorageItem );
+    check_interface( storage_file, &IID_IStorageItemProperties );
+    //notimpl: check_interface( storage_folder, &IID_IStorageItemProperties2 );
+    check_interface( storage_file, &IID_IStorageItem2 );
+    check_interface( storage_file, &IID_IStorageItemPropertiesWithProvider );    
+    check_interface( storage_file, &IID_IStorageFilePropertiesWithAvailability );
+    //notimpl:  check_interface( storage_file, &IID_IStorageFile2 );
+
+    /**
+     * ABI::Windows::Storage::IStorageFile
+     */
+    hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageFile, (void **)&storage_file );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::IStorageFile::FileType
+     */
+    WindowsCreateString( L".tmp", wcslen( L".tmp" ), &tmpString );
+    IStorageFile_get_FileType( storage_file, &fileType );
+    WindowsCompareStringOrdinal( tmpString, fileType, &comparisonResult );
+    ok( !comparisonResult, "unexpected filetype. expected .tmp\n" );
+
+    /**
+     * ABI::Windows::Storage::IStorageFile::ContentType
+     */
+    hr = IStorageFile_get_ContentType( storage_file, &contentType );
+    CHECK_HR( hr );
+
+    
+}
+
 START_TEST(storage)
 {
     HRESULT hr;
@@ -670,8 +771,9 @@ START_TEST(storage)
 
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
-    test_AppDataPathsStatics(&apppath);
-    test_StorageFolder(apppath, &returnedItem, &returnedFile);
+    test_AppDataPathsStatics( &apppath );
+    test_StorageFolder( apppath, &returnedItem, &returnedFile );
+    test_StorageFile( apppath );
 
     RoUninitialize();
 }
