@@ -31,13 +31,14 @@
 
 extern const struct IInputStreamVtbl input_stream_vtbl;
 extern const struct IOutputStreamVtbl output_stream_vtbl;
+extern const struct IClosableVtbl closable_stream_vtbl;
 
 struct closable_stream
 {
     //Derivates
     IClosable IClosable_iface;
     HANDLE stream;
-    DWORD streamSize;
+    UINT64 streamSize;
 
     LONG ref;
 };
@@ -50,7 +51,7 @@ struct input_stream
     //IClosable Derivatives
     IClosable IClosable_iface;
         HANDLE stream;
-        DWORD streamSize;
+        UINT64 streamSize;
         LONG closableRef;
 
     LONG ref;
@@ -61,9 +62,10 @@ struct output_stream
     //Derivatives
     IOutputStream IOutputStream_iface;
 
+    //IClosable Derivatives
     IClosable IClosable_iface;
         HANDLE stream;
-        DWORD streamSize;
+        UINT64 streamSize;
         LONG closableRef;
 
     IAsyncOperationWithProgress_UINT32_UINT32 *currentOperation; //Flushing purposes

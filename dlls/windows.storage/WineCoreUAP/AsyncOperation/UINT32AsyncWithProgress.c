@@ -96,8 +96,8 @@ static HRESULT WINAPI uint32_async_with_progress_GetIids( IAsyncOperationWithPro
 
 static HRESULT WINAPI uint32_async_with_progress_GetRuntimeClassName( IAsyncOperationWithProgress_UINT32_UINT32 *iface, HSTRING *class_name )
 {
-    return WindowsCreateString( L"Windows.Foundation.IAsyncOperation`1<Windows.Storage.StorageItem>",
-                                ARRAY_SIZE(L"Windows.Foundation.IAsyncOperation`1<Windows.Storage.StorageItem>"),
+    return WindowsCreateString( L"Windows.Foundation.IAsyncOperationWithProgress`1<UINT64, UINT64>",
+                                ARRAY_SIZE(L"Windows.Foundation.IAsyncOperationWithProgress`1<UINT32, UINT32>"),
                                 class_name );
 }
 

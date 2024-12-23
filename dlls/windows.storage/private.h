@@ -92,6 +92,8 @@ extern IActivationFactory *system_data_paths_factory;
 extern IActivationFactory *data_reader_factory;
 extern IActivationFactory *storage_library_statics_factory;
 extern IActivationFactory *query_options_activatable_factory;
+extern IActivationFactory *random_access_stream_factory;
+extern IActivationFactory *random_access_stream_reference_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
@@ -100,15 +102,17 @@ typedef HRESULT (WINAPI *async_operation_with_progress_callback)( IUnknown *invo
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
 extern HRESULT async_info_with_progress_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback,
-                                  IInspectable *outer, IWineAsyncInfoWithProgressImpl **out );
+                                              IInspectable *outer, IWineAsyncInfoWithProgressImpl **out );
 extern HRESULT async_operation_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
-                                        IAsyncOperation_IInspectable **out );
+                                              IAsyncOperation_IInspectable **out );
 extern HRESULT async_operation_boolean_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                        IAsyncOperation_boolean **out );
+                                              IAsyncOperation_boolean **out );
 extern HRESULT async_operation_with_progress_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
-                                        IAsyncOperationWithProgress_IInspectable_UINT64 **out );
+                                              IAsyncOperationWithProgress_IInspectable_UINT64 **out );
 extern HRESULT async_operation_with_progress_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperationWithProgress_UINT32_UINT32 **out );
+extern HRESULT async_operation_with_progress_uint64_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
+                                              IAsyncOperationWithProgress_UINT64_UINT64 **out );
 extern HRESULT async_operation_hstring_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_HSTRING **out );
 extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 

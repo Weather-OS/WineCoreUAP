@@ -50,6 +50,10 @@ SOURCES = \
 	WineCoreUAP/Streams/DataReader.c \
 	WineCoreUAP/Streams/InputOutputStream.c \
 	WineCoreUAP/Streams/InputOutputStreamInternal.c \
+	WineCoreUAP/Streams/RandomAccessStream.c \
+	WineCoreUAP/Streams/RandomAccessStreamInternal.c \
+	WineCoreUAP/Streams/RandomAccessStreamReference.c \
+	WineCoreUAP/Streams/RandomAccessStreamReferenceInternal.c \
 	\
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	\
