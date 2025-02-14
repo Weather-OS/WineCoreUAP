@@ -344,6 +344,7 @@ struct x11drv_escape_set_drawable
     Drawable                 drawable;     /* X drawable */
     int                      mode;         /* ClipByChildren or IncludeInferiors */
     RECT                     dc_rect;      /* DC rectangle relative to drawable */
+    XVisualInfo              visual;       /* X visual used by drawable, may be unspecified if no change is needed */
 };
 
 struct x11drv_escape_get_drawable
@@ -634,6 +635,7 @@ struct x11drv_win_data
     UINT        add_taskbar : 1; /* does window should be added to taskbar regardless of style */
     UINT        net_wm_fullscreen_monitors_set : 1; /* is _NET_WM_FULLSCREEN_MONITORS set */
     UINT        is_fullscreen : 1; /* is the window visible rect fullscreen */
+    UINT        is_offscreen : 1; /* has been moved offscreen by the window manager */
     UINT        parent_invalid : 1; /* is the parent host window possibly invalid */
     Window      embedder;       /* window id of embedder */
     Pixmap         icon_pixmap;

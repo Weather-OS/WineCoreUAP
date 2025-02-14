@@ -1688,7 +1688,11 @@ size_t user_message_size( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
     case WM_COPYDATA:
     {
         const COPYDATASTRUCT *cds = lparam_ptr;
-        size = sizeof(*cds) + cds->cbData;
+        /* If cbData <= 2048 bytes, pack the data at the end of the message. Otherwise, pack the data
+         * in an extra user buffer to avoid potential stack overflows when calling KeUserModeCallback()
+         * because cbData can be very large. Manual tests of KiUserCallbackDispatcher() when receiving
+         * WM_COPYDATA messages show that Windows does similar things */
+        size = cds->cbData <= 2048 ? sizeof(*cds) + cds->cbData : sizeof(*cds);
         break;
     }
     case WM_HELP:
@@ -1777,14 +1781,19 @@ size_t user_message_size( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
  *           pack_user_message
  *
  * Copy message to a buffer for passing to client.
+ *
+ * ret_extra_buffer returns an extra user buffer allocated to store large message data, for example,
+ * for WM_COPYDATA. Call NtFreeVirtualMemory() for *ret_extra_buffer when done using it if it's not NULL.
  */
 void pack_user_message( void *buffer, size_t size, UINT message,
-                        WPARAM wparam, LPARAM lparam, BOOL ansi )
+                        WPARAM wparam, LPARAM lparam, BOOL ansi, void **ret_extra_buffer )
 {
     const void *lparam_ptr = (const void *)lparam;
     void const *inline_ptr = (void *)0xffffffff;
 
     if (!size) return;
+
+    *ret_extra_buffer = NULL;
 
     switch (message)
     {
@@ -1822,9 +1831,47 @@ void pack_user_message( void *buffer, size_t size, UINT message,
     case WM_COPYDATA:
     {
         const COPYDATASTRUCT *cds = lparam_ptr;
-        if (cds->lpData && cds->cbData)
-            memcpy( (char *)buffer + sizeof(*cds), cds->lpData, cds->cbData );
-        size = sizeof(*cds);
+
+        if (!cds->lpData)
+        {
+            size = sizeof(*cds);
+        }
+        else
+        {
+            /* If cbData <= 2048 bytes, pack the data at the end of the message. Otherwise, pack the data
+             * in an extra user buffer to avoid potential stack overflow when calling KeUserModeCallback()
+             * because cbData can be very large. Manual tests of KiUserCallbackDispatcher() when receiving
+             * WM_COPYDATA messages show that Windows does similar things */
+            if (cds->cbData <= 2048)
+            {
+                memcpy( (char *)buffer + sizeof(*cds), cds->lpData, cds->cbData );
+                size = sizeof(*cds);
+            }
+            else
+            {
+                COPYDATASTRUCT *tmp_cds = buffer;
+                SIZE_T extra_buffer_size;
+                unsigned int status;
+
+                memcpy( tmp_cds, cds, sizeof(*cds) );
+
+                extra_buffer_size = cds->cbData;
+                status = NtAllocateVirtualMemory( GetCurrentProcess(), ret_extra_buffer, zero_bits,
+                                                  &extra_buffer_size, MEM_RESERVE | MEM_COMMIT,
+                                                  PAGE_READWRITE );
+                if (!status)
+                {
+                    memcpy( *ret_extra_buffer, cds->lpData, cds->cbData );
+                    tmp_cds->lpData = *ret_extra_buffer;
+                }
+                else
+                {
+                    tmp_cds->lpData = NULL;
+                    tmp_cds->cbData = 0;
+                }
+                return;
+            }
+        }
         break;
     }
     case EM_GETSEL:
@@ -2034,11 +2081,11 @@ static void reply_message( struct received_message_info *info, LRESULT result, M
 }
 
 /***********************************************************************
- *           reply_message_result
+ *           NtUserReplyMessage  (win32u.@)
  *
  * Send a reply to a sent message and update thread receive info.
  */
-BOOL reply_message_result( LRESULT result )
+BOOL WINAPI NtUserReplyMessage( LRESULT result )
 {
     struct user_thread_info *thread_info = get_user_thread_info();
     struct received_message_info *info = thread_info->receive_info;
@@ -2136,6 +2183,10 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         {
             if (LOWORD(state_cmd) == SC_RESTORE && HIWORD(state_cmd)) NtUserSetActiveWindow( hwnd );
             send_message( hwnd, WM_SYSCOMMAND, LOWORD(state_cmd), 0 );
+
+            /* state change might have changed the window config already, check again */
+            user_driver->pGetWindowStateUpdates( hwnd, &state_cmd, &config_cmd, &window_rect );
+            if (state_cmd) WARN( "window %p state needs another update, ignoring\n", hwnd );
         }
         if (config_cmd)
         {
@@ -2212,10 +2263,11 @@ static LRESULT call_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     struct win_proc_params p, *params = &p;
     BOOL ansi = ansi_dst && type == MSG_ASCII;
     size_t packed_size = 0, offset = sizeof(*params), reply_size;
+    void *ret_ptr, *extra_buffer = NULL;
+    SIZE_T extra_buffer_size = 0;
     LRESULT result = 0;
     CWPSTRUCT cwp;
     CWPRETSTRUCT cwpret;
-    void *ret_ptr;
     size_t ret_len = 0;
 
     if (msg & 0x80000000)
@@ -2247,10 +2299,12 @@ static LRESULT call_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
 
     if (type == MSG_OTHER_PROCESS) params->ansi = FALSE;
     if (packed_size)
-        pack_user_message( (char *)params + offset, packed_size, msg, wparam, lparam, ansi );
+        pack_user_message( (char *)params + offset, packed_size, msg, wparam, lparam, ansi, &extra_buffer );
 
     result = dispatch_win_proc_params( params, offset + packed_size, &ret_ptr, &ret_len );
     if (params != &p) free( params );
+    if (extra_buffer)
+        NtFreeVirtualMemory( GetCurrentProcess(), &extra_buffer, &extra_buffer_size, MEM_RELEASE );
 
     copy_user_result( ret_ptr, min( ret_len, reply_size ), result, msg, wparam, lparam, ansi );
 
@@ -3712,9 +3766,9 @@ NTSTATUS send_hardware_message( HWND hwnd, UINT flags, const INPUT *input, LPARA
 }
 
 /***********************************************************************
- *		post_quit_message
+ *		NtUserPostQuitMessage  (win32u.@)
  */
-BOOL post_quit_message( int exit_code )
+BOOL WINAPI NtUserPostQuitMessage( INT exit_code )
 {
     SERVER_START_REQ( post_quit_message )
     {
@@ -4575,5 +4629,21 @@ BOOL WINAPI NtUserTranslateMessage( const MSG *msg, UINT flags )
         for (i = 0; i < len; i++)
             NtUserPostMessage( msg->hwnd, message, wp[i], msg->lParam );
     }
+    return TRUE;
+}
+
+/***********************************************************************
+ *           NtUserGetCurrentInputMessageSource (win32u.@)
+ */
+BOOL WINAPI NtUserGetCurrentInputMessageSource( INPUT_MESSAGE_SOURCE *source )
+{
+    TRACE( "source %p.\n", source );
+
+    if (!source)
+    {
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    *source = NtUserGetThreadInfo()->msg_source;
     return TRUE;
 }

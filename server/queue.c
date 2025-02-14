@@ -808,6 +808,7 @@ static int merge_mousemove( struct thread_input *input, const struct message *ms
     for (ptr = list_tail( &input->msg_list ); ptr; ptr = list_prev( &input->msg_list, ptr ))
     {
         prev = LIST_ENTRY( ptr, struct message, entry );
+        if (prev->msg >> 31) continue; /* ignore internal messages */
         if (prev->msg != WM_INPUT) break;
     }
     if (!ptr) return 0;
@@ -2249,15 +2250,14 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         {
             x = input->mouse.x;
             y = input->mouse.y;
-            if (flags & ~(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE) &&
-                x == desktop_shm->cursor.x && y == desktop_shm->cursor.y)
-                flags &= ~MOUSEEVENTF_MOVE;
         }
         else
         {
             x = desktop_shm->cursor.x + input->mouse.x;
             y = desktop_shm->cursor.y + input->mouse.y;
         }
+        if (x == desktop_shm->cursor.x && y == desktop_shm->cursor.y)
+            flags &= ~MOUSEEVENTF_MOVE;
     }
     else
     {
@@ -2702,11 +2702,15 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
                                  struct get_message_reply *reply )
 {
     struct thread_input *input = thread->queue->input;
+    const struct rawinput_device *device;
     struct thread *win_thread;
     struct list *ptr;
     user_handle_t win;
     int clear_bits, got_one = 0;
     unsigned int msg_code;
+    int no_legacy;
+
+    no_legacy = (device = thread->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY);
 
     ptr = list_head( &input->msg_list );
     if (hw_id)
@@ -2732,6 +2736,12 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
         struct hardware_msg_data *data = msg->data;
 
         ptr = list_next( &input->msg_list, ptr );
+        if (no_legacy && msg->msg == WM_MOUSEMOVE && msg->type == MSG_HARDWARE)
+        {
+            list_remove( &msg->entry );
+            free_message( msg );
+            continue;
+        }
         win = find_hardware_message_window( input->desktop, input, msg, &msg_code, &win_thread );
         if (!win || !win_thread)
         {
@@ -3889,6 +3899,8 @@ DECL_HANDLER(set_capture_window)
             reply->full_handle = shared->capture;
         }
         SHARED_WRITE_END;
+        if (reply->previous && !req->handle && !req->flags)
+            update_cursor_pos(input->desktop);
     }
 }
 

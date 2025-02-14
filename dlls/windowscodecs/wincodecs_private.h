@@ -19,6 +19,8 @@
 #ifndef WINCODECS_PRIVATE_H
 #define WINCODECS_PRIVATE_H
 
+#include <stdbool.h>
+
 #include "wincodec.h"
 #include "wincodecsdk.h"
 
@@ -162,6 +164,8 @@ extern HRESULT ColorContext_Create(IWICColorContext **context);
 extern HRESULT ColorTransform_Create(IWICColorTransform **transform);
 extern HRESULT BitmapClipper_Create(IWICBitmapClipper **clipper);
 
+extern HRESULT create_stream_wrapper(IStream *input, ULONG offset, IStream **wrapper);
+
 extern HRESULT copy_pixels(UINT bpp, const BYTE *srcbuffer,
     UINT srcwidth, UINT srcheight, INT srcstride,
     const WICRect *rc, UINT dststride, UINT dstbuffersize, BYTE *dstbuffer);
@@ -203,7 +207,7 @@ typedef struct _MetadataItem
 
 typedef struct _MetadataHandlerVtbl
 {
-    int is_writer;
+    bool is_writer;
     const CLSID *clsid;
     HRESULT (*fnLoad)(IStream *stream, const GUID *preferred_vendor,
         DWORD persist_options, MetadataItem **items, DWORD *item_count);
@@ -216,7 +220,15 @@ typedef struct _MetadataHandlerVtbl
 extern HRESULT MetadataReader_Create(const MetadataHandlerVtbl *vtable, REFIID iid, void** ppv);
 
 extern HRESULT UnknownMetadataReader_CreateInstance(REFIID iid, void** ppv);
+extern HRESULT UnknownMetadataWriter_CreateInstance(REFIID iid, void** ppv);
 extern HRESULT IfdMetadataReader_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT IfdMetadataWriter_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT GpsMetadataReader_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT GpsMetadataWriter_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT ExifMetadataReader_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT ExifMetadataWriter_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT App1MetadataReader_CreateInstance(REFIID iid, void **ppv);
+extern HRESULT App1MetadataWriter_CreateInstance(REFIID iid, void **ppv);
 extern HRESULT PngChrmReader_CreateInstance(REFIID iid, void** ppv);
 extern HRESULT PngGamaReader_CreateInstance(REFIID iid, void** ppv);
 extern HRESULT PngHistReader_CreateInstance(REFIID iid, void** ppv);
@@ -314,6 +326,11 @@ HRESULT CDECL decoder_get_metadata_blocks(struct decoder* This, UINT frame, UINT
 HRESULT CDECL decoder_get_color_context(struct decoder* This, UINT frame, UINT num,
     BYTE **data, DWORD *datasize);
 void CDECL decoder_destroy(struct decoder *This);
+
+HRESULT create_metadata_reader(REFGUID format, const GUID *vendor, DWORD options, IStream *stream,
+        IWICMetadataReader **reader);
+HRESULT create_metadata_writer(REFGUID format, const GUID *vendor, DWORD options,
+        IWICMetadataWriter **writer);
 
 struct encoder_funcs;
 

@@ -7568,7 +7568,7 @@ static void test_MFCreateMediaBufferFromMediaType(void)
     ok(scanline0 == data, "Unexpected scanline0.\n");
     hr = IMF2DBuffer2_Unlock2D(buffer_2d2);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    IMF2DBuffer_Release(buffer_2d);
+    IMF2DBuffer2_Release(buffer_2d2);
 
     IMFMediaBuffer_Release(buffer);
 
@@ -7585,7 +7585,7 @@ static void test_MFCreateMediaBufferFromMediaType(void)
     ok(scanline0 == data - pitch * 7, "Unexpected scanline0.\n");
     hr = IMF2DBuffer2_Unlock2D(buffer_2d2);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    IMF2DBuffer_Release(buffer_2d);
+    IMF2DBuffer2_Release(buffer_2d2);
 
     IMFMediaBuffer_Release(buffer);
 
@@ -12715,11 +12715,50 @@ static void test_MFInitMediaTypeFromAMMediaType(void)
         { &MEDIASUBTYPE_h264, &MEDIASUBTYPE_h264 },
         { &MEDIASUBTYPE_H264, &MFVideoFormat_H264 },
     };
+    static const GUID *audio_types[] =
+    {
+        &MEDIASUBTYPE_MP3,
+        &MEDIASUBTYPE_MSAUDIO1,
+        &MEDIASUBTYPE_WMAUDIO2,
+        &MEDIASUBTYPE_WMAUDIO3,
+        &MEDIASUBTYPE_WMAUDIO_LOSSLESS,
+        &MEDIASUBTYPE_PCM,
+        &MEDIASUBTYPE_IEEE_FLOAT,
+        &DUMMY_CLSID,
+    };
     MFVideoArea aperture;
     unsigned int i;
 
     hr = MFCreateMediaType(&media_type);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    memset(&mt, 0, sizeof(mt));
+    mt.majortype = MEDIATYPE_Audio;
+
+    for (i = 0; i < ARRAY_SIZE(audio_types); i++)
+    {
+        mt.subtype = *audio_types[i];
+
+        hr = MFInitMediaTypeFromAMMediaType(media_type, &mt);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+        hr = IMFMediaType_GetCount(media_type, &value32);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(value32 == 4, "Unexpected value %#x.\n", value32);
+
+        hr = IMFMediaType_GetGUID(media_type, &MF_MT_MAJOR_TYPE, &guid);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(IsEqualGUID(&guid, &MFMediaType_Audio), "Unexpected guid %s.\n", debugstr_guid(&guid));
+        hr = IMFMediaType_GetGUID(media_type, &MF_MT_SUBTYPE, &guid);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(IsEqualGUID(&guid, audio_types[i]), "Unexpected guid %s.\n", debugstr_guid(&guid));
+        hr = IMFMediaType_GetUINT32(media_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, &value32);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(value32 == 1, "Unexpected value %#x.\n", value32);
+        hr = IMFMediaType_GetGUID(media_type, &MF_MT_AM_FORMAT_TYPE, &guid);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(IsEqualGUID(&guid, &GUID_NULL), "Unexpected guid %s.\n", debugstr_guid(&guid));
+    }
 
     memset(&mt, 0, sizeof(mt));
     mt.majortype = MEDIATYPE_Video;

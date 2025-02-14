@@ -584,8 +584,10 @@ static UINT get_com_dir_size( const IMAGE_NT_HEADERS *nt )
 {
     if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
         return ((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].Size;
-    else
+    else if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
         return ((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].Size;
+    else
+        return 0;
 }
 
 /* helper to test image section mapping */
@@ -2272,7 +2274,7 @@ static void test_import_resolution(void)
         WriteFile(hfile, &nt, sizeof(nt), &dummy, NULL);
         WriteFile(hfile, &section, sizeof(section), &dummy, NULL);
 
-        SetFilePointer( hfile, section.PointerToRawData, NULL, SEEK_SET );
+        SetFilePointer( hfile, section.PointerToRawData, NULL, FILE_BEGIN );
         WriteFile(hfile, &data, sizeof(data), &dummy, NULL);
 
         CloseHandle( hfile );
@@ -4300,7 +4302,7 @@ static void test_ResolveDelayLoadedAPI(void)
     ok(ret, "WriteFile error %ld\n", GetLastError());
 
     /* fill up to delay data */
-    SetFilePointer( hfile, nt_header.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT].VirtualAddress, NULL, SEEK_SET );
+    SetFilePointer( hfile, nt_header.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT].VirtualAddress, NULL, FILE_BEGIN );
 
     /* delay data */
     idd.Attributes.AllAttributes = 1;
@@ -4321,7 +4323,7 @@ static void test_ResolveDelayLoadedAPI(void)
     ok(ret, "WriteFile error %ld\n", GetLastError());
 
     /* fill up to extended delay data */
-    SetFilePointer( hfile, idd.DllNameRVA, NULL, SEEK_SET );
+    SetFilePointer( hfile, idd.DllNameRVA, NULL, FILE_BEGIN );
 
     /* extended delay data */
     SetLastError(0xdeadbeef);
@@ -4336,7 +4338,7 @@ static void test_ResolveDelayLoadedAPI(void)
     ret = WriteFile(hfile, test_func, sizeof(test_func), &dummy, NULL);
     ok(ret, "WriteFile error %ld\n", GetLastError());
 
-    SetFilePointer( hfile, idd.ImportAddressTableRVA, NULL, SEEK_SET );
+    SetFilePointer( hfile, idd.ImportAddressTableRVA, NULL, FILE_BEGIN );
 
     for (i = 0; i < ARRAY_SIZE(td); i++)
     {
@@ -4369,7 +4371,7 @@ static void test_ResolveDelayLoadedAPI(void)
     ok(ret, "WriteFile error %ld\n", GetLastError());
 
     /* fill up to eof */
-    SetFilePointer( hfile, section.VirtualAddress + section.Misc.VirtualSize, NULL, SEEK_SET );
+    SetFilePointer( hfile, section.VirtualAddress + section.Misc.VirtualSize, NULL, FILE_BEGIN );
     SetEndOfFile( hfile );
     CloseHandle(hfile);
 

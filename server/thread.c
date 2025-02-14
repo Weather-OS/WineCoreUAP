@@ -37,6 +37,9 @@
 #define _WITH_CPU_SET_T
 #include <sched.h>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -215,6 +218,51 @@ static const struct fd_ops thread_fd_ops =
 };
 
 static struct list thread_list = LIST_INIT(thread_list);
+
+#if defined(__linux__) && defined(RLIMIT_NICE)
+static int nice_limit;
+
+void init_threading(void)
+{
+    struct rlimit rlimit;
+
+    /* if wineserver has cap_sys_nice we are unlimited, but leave -20 to the user */
+    if (!setpriority( PRIO_PROCESS, getpid(), -20 )) nice_limit = -19;
+    setpriority( PRIO_PROCESS, getpid(), 0 );
+
+    if (!nice_limit && !getrlimit( RLIMIT_NICE, &rlimit ))
+    {
+        rlimit.rlim_cur = rlimit.rlim_max;
+        setrlimit( RLIMIT_NICE, &rlimit );
+        if (rlimit.rlim_max <= 40) nice_limit = 20 - rlimit.rlim_max;
+        else if (rlimit.rlim_max == -1) nice_limit = -20;
+        if (nice_limit >= 0 && debug_level) fprintf(stderr, "wine: RLIMIT_NICE is <= 20, unable to use setpriority safely\n");
+    }
+    if (nice_limit < 0 && debug_level) fprintf(stderr, "wine: Using setpriority to control niceness in the [%d,%d] range\n", nice_limit, -nice_limit );
+}
+
+static void apply_thread_priority( struct thread *thread, int base_priority )
+{
+    int min = -nice_limit, max = nice_limit, range = max - min, niceness;
+
+    /* FIXME: handle realtime priorities using SCHED_RR if possible */
+    if (base_priority > THREAD_BASE_PRIORITY_LOWRT) base_priority = THREAD_BASE_PRIORITY_LOWRT;
+    /* map an NT application band [1,15] base priority to [-nice_limit, nice_limit] */
+    niceness = (min + (base_priority - 1) * range / 14);
+    setpriority( PRIO_PROCESS, thread->unix_tid, niceness );
+}
+
+#else
+
+void init_threading(void)
+{
+}
+
+static void apply_thread_priority( struct thread *thread, int base_priority )
+{
+}
+
+#endif
 
 /* initialize the structure for a newly allocated thread */
 static inline void init_thread_structure( struct thread *thread )
@@ -605,8 +653,43 @@ affinity_t get_thread_affinity( struct thread *thread )
     return mask;
 }
 
+static int get_base_priority( int priority_class, int priority )
+{
+    /* offsets taken from https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities */
+    static const int class_offsets[] = { 4, 8, 13, 24, 6, 10 };
+
+    if (priority == THREAD_PRIORITY_IDLE) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 16 : 1);
+    if (priority == THREAD_PRIORITY_TIME_CRITICAL) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 31 : 15);
+    if (priority_class >= ARRAY_SIZE(class_offsets)) return 8;
+    return class_offsets[priority_class - 1] + priority;
+}
+
 #define THREAD_PRIORITY_REALTIME_HIGHEST 6
 #define THREAD_PRIORITY_REALTIME_LOWEST -7
+
+unsigned int set_thread_priority( struct thread *thread, int priority_class, int priority )
+{
+    int max = THREAD_PRIORITY_HIGHEST;
+    int min = THREAD_PRIORITY_LOWEST;
+
+    if (priority_class == PROCESS_PRIOCLASS_REALTIME)
+    {
+        max = THREAD_PRIORITY_REALTIME_HIGHEST;
+        min = THREAD_PRIORITY_REALTIME_LOWEST;
+    }
+    if ((priority < min || priority > max) &&
+        priority != THREAD_PRIORITY_IDLE &&
+        priority != THREAD_PRIORITY_TIME_CRITICAL)
+        return STATUS_INVALID_PARAMETER;
+
+    thread->priority = priority;
+
+    /* if thread is gone or hasn't started yet, this will be called again from init_thread with a unix_tid */
+    if (thread->state == RUNNING && thread->unix_tid != -1)
+        apply_thread_priority( thread, get_base_priority( priority_class, priority ));
+
+    return STATUS_SUCCESS;
+}
 
 /* set all information about a thread */
 static void set_thread_info( struct thread *thread,
@@ -614,19 +697,8 @@ static void set_thread_info( struct thread *thread,
 {
     if (req->mask & SET_THREAD_INFO_PRIORITY)
     {
-        int max = THREAD_PRIORITY_HIGHEST;
-        int min = THREAD_PRIORITY_LOWEST;
-        if (thread->process->priority == PROCESS_PRIOCLASS_REALTIME)
-        {
-            max = THREAD_PRIORITY_REALTIME_HIGHEST;
-            min = THREAD_PRIORITY_REALTIME_LOWEST;
-        }
-        if ((req->priority >= min && req->priority <= max) ||
-            req->priority == THREAD_PRIORITY_IDLE ||
-            req->priority == THREAD_PRIORITY_TIME_CRITICAL)
-            thread->priority = req->priority;
-        else
-            set_error( STATUS_INVALID_PARAMETER );
+        unsigned int status = set_thread_priority( thread, thread->process->priority, req->priority );
+        if (status) set_error( status );
     }
     if (req->mask & SET_THREAD_INFO_AFFINITY)
     {
@@ -1422,6 +1494,8 @@ DECL_HANDLER(init_first_thread)
     else
         set_thread_affinity( current, current->affinity );
 
+    set_thread_priority( current, process->priority, current->priority );
+
     debug_level = max( debug_level, req->debug_level );
 
     reply->pid          = get_process_id( process );
@@ -1451,6 +1525,7 @@ DECL_HANDLER(init_thread)
 
     init_thread_context( current );
     generate_debug_event( current, DbgCreateThreadStateChange, &req->entry );
+    set_thread_priority( current, current->process->priority, current->priority );
     set_thread_affinity( current, current->affinity );
 
     reply->suspend = (current->suspend || current->process->suspend || current->context != NULL);
@@ -2023,9 +2098,9 @@ DECL_HANDLER(get_next_thread)
     while (ptr)
     {
         thread = LIST_ENTRY( ptr, struct thread, entry );
-        if (thread->process == process)
+        if (thread->process == process &&
+            (reply->handle = alloc_handle( current->process, thread, req->access, req->attributes )))
         {
-            reply->handle = alloc_handle( current->process, thread, req->access, req->attributes );
             release_object( process );
             return;
         }

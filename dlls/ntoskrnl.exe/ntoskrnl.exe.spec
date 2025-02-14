@@ -1051,12 +1051,12 @@
 @ stdcall RtlDecompressBuffer(long ptr long ptr long ptr)
 @ stub RtlDecompressChunks
 @ stdcall RtlDecompressFragment(long ptr long ptr long long ptr ptr)
-@ stub RtlDelete
+@ stdcall RtlDelete(ptr)
 @ stdcall RtlDeleteAce(ptr long)
 @ stdcall RtlDeleteAtomFromAtomTable(ptr long)
-@ stub RtlDeleteElementGenericTable
+@ stdcall RtlDeleteElementGenericTable(ptr ptr)
 @ stub RtlDeleteElementGenericTableAvl
-@ stub RtlDeleteNoSplay
+@ stdcall RtlDeleteNoSplay(ptr ptr)
 @ stub RtlDeleteOwnersRanges
 @ stub RtlDeleteRange
 @ stdcall RtlDeleteRegistryValue(long ptr ptr)
@@ -1070,7 +1070,7 @@
 @ stdcall -arch=win32 -ret64 RtlEnlargedIntegerMultiply(long long)
 @ stdcall -arch=win32 RtlEnlargedUnsignedDivide(int64 long ptr)
 @ stdcall -arch=win32 -ret64 RtlEnlargedUnsignedMultiply(long long)
-@ stub RtlEnumerateGenericTable
+@ stdcall RtlEnumerateGenericTable(ptr long)
 @ stub RtlEnumerateGenericTableAvl
 @ stub RtlEnumerateGenericTableLikeADirectory
 @ stdcall RtlEnumerateGenericTableWithoutSplaying(ptr ptr)
@@ -1150,7 +1150,7 @@
 @ stub RtlInitializeRangeList
 @ stdcall RtlInitializeSid(ptr ptr long)
 @ stub RtlInitializeUnicodePrefix
-@ stub RtlInsertElementGenericTable
+@ stdcall RtlInsertElementGenericTable(ptr ptr long ptr)
 @ stdcall RtlInsertElementGenericTableAvl(ptr ptr long ptr)
 @ stub RtlInsertElementGenericTableFull
 @ stub RtlInsertElementGenericTableFullAvl
@@ -1176,7 +1176,7 @@
 @ stdcall RtlIpv6StringToAddressExA(str ptr ptr ptr)
 @ stdcall RtlIpv6StringToAddressExW(wstr ptr ptr ptr)
 @ stdcall RtlIpv6StringToAddressW(wstr ptr ptr)
-@ stub RtlIsGenericTableEmpty
+@ stdcall RtlIsGenericTableEmpty(ptr)
 @ stub RtlIsGenericTableEmptyAvl
 @ stdcall RtlIsNameLegalDOS8Dot3(ptr ptr ptr)
 @ stdcall RtlIsNormalizedString(long wstr long ptr)
@@ -1240,8 +1240,8 @@
 @ stdcall RtlRaiseStatus(long)
 @ stdcall RtlRandom(ptr)
 @ stdcall RtlRandomEx(ptr)
-@ stub RtlRealPredecessor
-@ stub RtlRealSuccessor
+@ stdcall RtlRealPredecessor(ptr)
+@ stdcall RtlRealSuccessor(ptr)
 @ stub RtlRemoveUnicodePrefix
 @ stub RtlReserveChunk
 @ cdecl -arch=!i386 RtlRestoreContext(ptr ptr)
@@ -1265,12 +1265,12 @@
 @ stdcall RtlSetSaclSecurityDescriptor(ptr long ptr long)
 @ stdcall RtlSetTimeZoneInformation(ptr)
 @ stdcall RtlSizeHeap(long long ptr)
-@ stub RtlSplay
+@ stdcall RtlSplay(ptr)
 @ stdcall RtlStringFromGUID(ptr ptr)
 @ stdcall RtlSubAuthorityCountSid(ptr)
 @ stdcall RtlSubAuthoritySid(ptr long)
-@ stub RtlSubtreePredecessor
-@ stub RtlSubtreeSuccessor
+@ stdcall RtlSubtreePredecessor(ptr)
+@ stdcall RtlSubtreeSuccessor(ptr)
 @ stdcall RtlSystemTimeToLocalTime(ptr ptr)
 @ stub RtlTestBit
 @ stdcall RtlTimeFieldsToTime(ptr ptr)

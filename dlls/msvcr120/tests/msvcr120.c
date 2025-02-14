@@ -155,6 +155,12 @@ typedef struct
     double i;
 } _Dcomplex;
 
+typedef struct
+{
+    float r;
+    float i;
+} _Fcomplex;
+
 typedef void (*vtable_ptr)(void);
 
 typedef struct {
@@ -221,8 +227,12 @@ static _locale_t (__cdecl *p_wcreate_locale)(int, const wchar_t *);
 static void (__cdecl *p_free_locale)(_locale_t);
 static unsigned short (__cdecl *p_wctype)(const char*);
 static int (__cdecl *p_vsscanf)(const char*, const char *, va_list valist);
-static _Dcomplex* (__cdecl *p__Cbuild)(_Dcomplex*, double, double);
+static _Dcomplex (__cdecl *p__Cbuild)(double, double);
+static _Fcomplex (__cdecl *p__FCbuild)(float, float);
 static double (__cdecl *p_creal)(_Dcomplex);
+static float (__cdecl *p_crealf)(_Fcomplex);
+static double (__cdecl *p_cimag)(_Dcomplex);
+static float (__cdecl *p_cimagf)(_Fcomplex);
 static double (__cdecl *p_nexttoward)(double, double);
 static float (__cdecl *p_nexttowardf)(float, double);
 static double (__cdecl *p_nexttowardl)(double, double);
@@ -275,6 +285,19 @@ static MSVCRT_bool (__thiscall *p__StructuredTaskCollection__IsCanceling)(_Struc
 static _Cancellation_beacon* (__thiscall *p__Cancellation_beacon_ctor)(_Cancellation_beacon*);
 static void (__thiscall *p__Cancellation_beacon_dtor)(_Cancellation_beacon*);
 static MSVCRT_bool (__thiscall *p__Cancellation_beacon__Confirm_cancel)(_Cancellation_beacon*);
+
+#ifdef __i386__
+static ULONGLONG (__cdecl *p_i386_FCbuild)(float, float);
+static _Fcomplex __cdecl i386_FCbuild(float r, float i)
+{
+    union {
+        _Fcomplex c;
+        ULONGLONG ull;
+    } ret;
+    ret.ull = p_i386_FCbuild(r, i);
+    return ret.c;
+}
+#endif
 
 #define SETNOFAIL(x,y) x = (void*)GetProcAddress(module,y)
 #define SET(x,y) do { SETNOFAIL(x,y); ok(x != NULL, "Export '%s' not found\n", y); } while(0)
@@ -333,6 +356,10 @@ static BOOL init(void)
     SET(p_vsscanf, "vsscanf");
     SET(p__Cbuild, "_Cbuild");
     SET(p_creal, "creal");
+    SET(p_cimag, "cimag");
+    SET(p__FCbuild, "_FCbuild");
+    SET(p_crealf, "crealf");
+    SET(p_cimagf, "cimagf");
     SET(p_nexttoward, "nexttoward");
     SET(p_nexttowardf, "nexttowardf");
     SET(p_nexttowardl, "nexttowardl");
@@ -496,6 +523,12 @@ static BOOL init(void)
         SET(p_Context_CurrentContext,
                 "?CurrentContext@Context@Concurrency@@SAPAV12@XZ");
     }
+
+#ifdef __i386__
+    SET(p_i386_FCbuild,
+                "_FCbuild");
+    p__FCbuild = i386_FCbuild;
+#endif
 
     init_thiscall_thunk();
     return TRUE;
@@ -1297,18 +1330,55 @@ static void test__Cbuild(void)
     _Dcomplex c;
     double d;
 
-    memset(&c, 0, sizeof(c));
-    p__Cbuild(&c, 1.0, 2.0);
+    c = p__Cbuild(1.0, 2.0);
     ok(c.r == 1.0, "c.r = %lf\n", c.r);
     ok(c.i == 2.0, "c.i = %lf\n", c.i);
     d = p_creal(c);
     ok(d == 1.0, "creal returned %lf\n", d);
+    d = p_cimag(c);
+    ok(d == 2.0, "cimag returned %lf\n", d);
 
-    p__Cbuild(&c, 3.0, NAN);
+    c = p__Cbuild(3.0, NAN);
     ok(c.r == 3.0, "c.r = %lf\n", c.r);
     ok(_isnan(c.i), "c.i = %lf\n", c.i);
     d = p_creal(c);
     ok(d == 3.0, "creal returned %lf\n", d);
+
+    c = p__Cbuild(NAN, 4.0);
+    ok(_isnan(c.r), "c.r = %lf\n", c.r);
+    ok(c.i == 4.0, "c.i = %lf\n", c.i);
+    d = p_cimag(c);
+    ok(d == 4.0, "cimag returned %lf\n", d);
+}
+
+static void test__FCbuild(void)
+{
+    _Fcomplex c;
+    float d;
+
+    c = p__FCbuild(1.0f, 2.0f);
+    ok(c.r == 1.0f, "c.r = %lf\n", c.r);
+    ok(c.i == 2.0f, "c.i = %lf\n", c.i);
+    d = p_crealf(c);
+    ok(d == 1.0f, "crealf returned %lf\n", d);
+    d = p_cimagf(c);
+    ok(d == 2.0f, "cimagf returned %lf\n", d);
+
+    c = p__FCbuild(3.0f, NAN);
+    ok(c.r == 3.0f, "c.r = %lf\n", c.r);
+    ok(_isnan(c.i), "c.i = %lf\n", c.i);
+    d = p_crealf(c);
+    ok(d == 3.0f, "crealf returned %lf\n", d);
+    d = p_cimagf(c);
+    ok(_isnan(d), "cimagf returned %lf\n", d);
+
+    c = p__FCbuild(NAN, 4.0f);
+    ok(_isnan(c.r), "c.r = %lf\n", c.r);
+    ok(c.i == 4.0f, "c.i = %lf\n", c.i);
+    d = p_crealf(c);
+    ok(_isnan(d), "crealf returned %lf\n", d);
+    d = p_cimagf(c);
+    ok(d == 4.0f, "cimagf returned %lf\n", d);
 }
 
 static void test_nexttoward(void)
@@ -1837,9 +1907,10 @@ static void test_gmtime64(void)
 
 static void test__fsopen(void)
 {
-    int i;
+    int i, ret;
     FILE *f;
     wchar_t wpath[MAX_PATH];
+    HANDLE h;
     static const struct {
         const char *loc;
         const char *path;
@@ -1858,12 +1929,21 @@ static void test__fsopen(void)
         }
 
         memset(wpath, 0, sizeof(wpath));
-        ok(MultiByteToWideChar(CP_ACP, 0, tests[i].path, -1, wpath, MAX_PATH),
-            "MultiByteToWideChar failed on %s with locale %s: %lx\n",
+        ret = MultiByteToWideChar(CP_ACP, 0, tests[i].path, -1, wpath, MAX_PATH);
+        ok(ret, "MultiByteToWideChar failed on %s with locale %s: %lx\n",
             tests[i].path, tests[i].loc, GetLastError());
 
-        f = p__fsopen(tests[i].path, "w", SH_DENYNO);
-        ok(!!f, "failed to create %s with locale %s\n", tests[i].path, tests[i].loc);
+        h = CreateFileW(wpath, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            skip("can't create test file (%s)\n", wine_dbgstr_w(wpath));
+            continue;
+        }
+        CloseHandle(h);
+
+        f = p__fsopen(tests[i].path, "r", SH_DENYNO);
+        ok(!!f, "failed to create %s with locale %s\n", wine_dbgstr_a(tests[i].path), tests[i].loc);
         p_fclose(f);
 
         f = p__wfsopen(wpath, L"r", SH_DENYNO);
@@ -1894,6 +1974,7 @@ START_TEST(msvcr120)
     test__Condition_variable();
     test_wctype();
     test_vsscanf();
+    test__FCbuild();
     test__Cbuild();
     test_nexttoward();
     test_towctrans();

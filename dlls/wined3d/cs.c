@@ -136,6 +136,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_BLT_SUB_RESOURCE,
     WINED3D_CS_OP_UPDATE_SUB_RESOURCE,
     WINED3D_CS_OP_ADD_DIRTY_TEXTURE_REGION,
+    WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE,
     WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW,
     WINED3D_CS_OP_COPY_UAV_COUNTER,
     WINED3D_CS_OP_GENERATE_MIPMAPS,
@@ -177,6 +178,15 @@ struct wined3d_cs_clear
     DWORD stencil;
     unsigned int rect_count;
     RECT rects[1];
+};
+
+struct wined3d_cs_clear_sysmem_texture
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_texture *texture;
+    unsigned int sub_resource_idx;
+    struct wined3d_color color;
+    RECT rect;
 };
 
 struct wined3d_cs_dispatch
@@ -612,6 +622,7 @@ static const char *debug_cs_op(enum wined3d_cs_op op)
         WINED3D_TO_STR(WINED3D_CS_OP_BLT_SUB_RESOURCE);
         WINED3D_TO_STR(WINED3D_CS_OP_UPDATE_SUB_RESOURCE);
         WINED3D_TO_STR(WINED3D_CS_OP_ADD_DIRTY_TEXTURE_REGION);
+        WINED3D_TO_STR(WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE);
         WINED3D_TO_STR(WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW);
         WINED3D_TO_STR(WINED3D_CS_OP_COPY_UAV_COUNTER);
         WINED3D_TO_STR(WINED3D_CS_OP_GENERATE_MIPMAPS);
@@ -866,6 +877,70 @@ void wined3d_device_context_emit_clear_rendertarget_view(struct wined3d_device_c
     wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
     if (flags & WINED3DCLEAR_SYNCHRONOUS)
         wined3d_device_context_finish(context, WINED3D_CS_QUEUE_DEFAULT);
+}
+
+static void wined3d_cs_exec_clear_sysmem_texture(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_clear_sysmem_texture *op = data;
+    struct wined3d_box box;
+
+    box.left = op->rect.left;
+    box.right = op->rect.right;
+    box.top = op->rect.top;
+    box.bottom = op->rect.bottom;
+    box.front = 0;
+    box.back = 1;
+    cpu_blitter_clear_texture(op->texture, op->sub_resource_idx, &box, &op->color);
+}
+
+HRESULT CDECL wined3d_device_context_clear_sysmem_texture(struct wined3d_device_context *context,
+        struct wined3d_texture *texture, unsigned int sub_resource_idx, const RECT *rect,
+        unsigned int flags, const struct wined3d_color *color)
+{
+    struct wined3d_cs_clear_sysmem_texture *op;
+
+    TRACE("context %p, texture %p, sub_resource_idx %u, rect %s, flags %#x, color %s.\n",
+            context, texture, sub_resource_idx, wine_dbgstr_rect(rect), flags, debug_color(color));
+
+    if (rect)
+    {
+        struct wined3d_box b = {rect->left, rect->top, rect->right, rect->bottom, 0, 1};
+        HRESULT hr;
+
+        if (FAILED(hr = wined3d_resource_check_box_dimensions(&texture->resource, sub_resource_idx, &b)))
+            return hr;
+    }
+
+    wined3d_device_context_lock(context);
+
+    op = wined3d_device_context_require_space(context, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE;
+    op->texture = texture;
+    op->sub_resource_idx = sub_resource_idx;
+    op->color = *color;
+
+    if (rect)
+    {
+        op->rect = *rect;
+    }
+    else
+    {
+        unsigned int level_idx = sub_resource_idx % texture->level_count;
+
+        op->rect.left = 0;
+        op->rect.top = 0;
+        op->rect.right = wined3d_texture_get_level_width(texture, level_idx);
+        op->rect.bottom = wined3d_texture_get_level_height(texture, level_idx);
+    }
+
+    wined3d_device_context_reference_resource(context, &texture->resource);
+
+    wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
+    if (flags & WINED3DCLEAR_SYNCHRONOUS)
+        wined3d_device_context_finish(context, WINED3D_CS_QUEUE_DEFAULT);
+
+    wined3d_device_context_unlock(context);
+    return S_OK;
 }
 
 static void reference_shader_resources(struct wined3d_device_context *context, unsigned int shader_mask)
@@ -2068,18 +2143,17 @@ static const struct push_constant_info
     size_t size;
     unsigned int max_count;
     enum wined3d_shader_type shader_type;
-    enum vkd3d_shader_d3dbc_constant_register shader_binding;
 }
 wined3d_cs_push_constant_info[] =
 {
-    [WINED3D_PUSH_CONSTANTS_VS_F]       = {sizeof(struct wined3d_vec4),  WINED3D_MAX_VS_CONSTS_F, WINED3D_SHADER_TYPE_VERTEX, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_PS_F]       = {sizeof(struct wined3d_vec4),  WINED3D_MAX_PS_CONSTS_F, WINED3D_SHADER_TYPE_PIXEL,  VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_VS_I]       = {sizeof(struct wined3d_ivec4), WINED3D_MAX_CONSTS_I,    WINED3D_SHADER_TYPE_VERTEX, VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_PS_I]       = {sizeof(struct wined3d_ivec4), WINED3D_MAX_CONSTS_I,    WINED3D_SHADER_TYPE_PIXEL,  VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_VS_B]       = {sizeof(BOOL),                 WINED3D_MAX_CONSTS_B,    WINED3D_SHADER_TYPE_VERTEX, VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_PS_B]       = {sizeof(BOOL),                 WINED3D_MAX_CONSTS_B,    WINED3D_SHADER_TYPE_PIXEL,  VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_VS_FFP]     = {1, sizeof(struct wined3d_ffp_vs_constants),            WINED3D_SHADER_TYPE_VERTEX, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER},
-    [WINED3D_PUSH_CONSTANTS_PS_FFP]     = {1, sizeof(struct wined3d_ffp_ps_constants),            WINED3D_SHADER_TYPE_PIXEL,  VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER},
+    [WINED3D_PUSH_CONSTANTS_VS_F]       = {sizeof(struct wined3d_vec4),  WINED3D_MAX_VS_CONSTS_F, WINED3D_SHADER_TYPE_VERTEX},
+    [WINED3D_PUSH_CONSTANTS_PS_F]       = {sizeof(struct wined3d_vec4),  WINED3D_MAX_PS_CONSTS_F, WINED3D_SHADER_TYPE_PIXEL},
+    [WINED3D_PUSH_CONSTANTS_VS_I]       = {sizeof(struct wined3d_ivec4), WINED3D_MAX_CONSTS_I,    WINED3D_SHADER_TYPE_VERTEX},
+    [WINED3D_PUSH_CONSTANTS_PS_I]       = {sizeof(struct wined3d_ivec4), WINED3D_MAX_CONSTS_I,    WINED3D_SHADER_TYPE_PIXEL},
+    [WINED3D_PUSH_CONSTANTS_VS_B]       = {sizeof(BOOL),                 WINED3D_MAX_CONSTS_B,    WINED3D_SHADER_TYPE_VERTEX},
+    [WINED3D_PUSH_CONSTANTS_PS_B]       = {sizeof(BOOL),                 WINED3D_MAX_CONSTS_B,    WINED3D_SHADER_TYPE_PIXEL},
+    [WINED3D_PUSH_CONSTANTS_VS_FFP]     = {1, sizeof(struct wined3d_ffp_vs_constants),            WINED3D_SHADER_TYPE_VERTEX},
+    [WINED3D_PUSH_CONSTANTS_PS_FFP]     = {1, sizeof(struct wined3d_ffp_ps_constants),            WINED3D_SHADER_TYPE_PIXEL},
 };
 
 static bool prepare_push_constant_buffer(struct wined3d_device_context *context, enum wined3d_push_constants type)
@@ -2107,13 +2181,6 @@ static bool prepare_push_constant_buffer(struct wined3d_device_context *context,
     {
         ERR("Failed to create push constant buffer, hr %#lx.\n", hr);
         return false;
-    }
-
-    if (gpu)
-    {
-        struct wined3d_constant_buffer_state state = {.buffer = device->push_constants[type], .size = desc.byte_width};
-
-        wined3d_device_context_emit_set_constant_buffers(context, info->shader_type, info->shader_binding, 1, &state);
     }
 
     return true;
@@ -2917,6 +2984,7 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_BLT_SUB_RESOURCE            */ wined3d_cs_exec_blt_sub_resource,
     /* WINED3D_CS_OP_UPDATE_SUB_RESOURCE         */ wined3d_cs_exec_update_sub_resource,
     /* WINED3D_CS_OP_ADD_DIRTY_TEXTURE_REGION    */ wined3d_cs_exec_add_dirty_texture_region,
+    /* WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE        */ wined3d_cs_exec_clear_sysmem_texture,
     /* WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW */ wined3d_cs_exec_clear_unordered_access_view,
     /* WINED3D_CS_OP_COPY_UAV_COUNTER            */ wined3d_cs_exec_copy_uav_counter,
     /* WINED3D_CS_OP_GENERATE_MIPMAPS            */ wined3d_cs_exec_generate_mipmaps,
@@ -2995,6 +3063,20 @@ static void wined3d_cs_st_submit(struct wined3d_device_context *context, enum wi
 
 static void wined3d_cs_st_finish(struct wined3d_device_context *context, enum wined3d_cs_queue_id queue_id)
 {
+}
+
+static void get_map_pitch(const struct wined3d_format *format, const struct wined3d_box *box,
+        struct wined3d_map_desc *map_desc, size_t *size)
+{
+    unsigned int height = box->bottom - box->top;
+    unsigned int width = box->right - box->left;
+    unsigned int depth = box->back - box->front;
+
+    wined3d_format_calculate_pitch(format, 1, width, height, &map_desc->row_pitch, &map_desc->slice_pitch);
+
+    *size = (depth - 1) * map_desc->slice_pitch
+            + ((height - 1) / format->block_height) * map_desc->row_pitch
+            + ((width + format->block_width - 1) / format->block_width) * format->block_byte_count;
 }
 
 static bool wined3d_cs_map_upload_bo(struct wined3d_device_context *context, struct wined3d_resource *resource,
@@ -3087,12 +3169,7 @@ static bool wined3d_cs_map_upload_bo(struct wined3d_device_context *context, str
         return true;
     }
 
-    wined3d_format_calculate_pitch(format, 1, box->right - box->left,
-            box->bottom - box->top, &map_desc->row_pitch, &map_desc->slice_pitch);
-
-    size = (box->back - box->front - 1) * map_desc->slice_pitch
-            + ((box->bottom - box->top - 1) / format->block_height) * map_desc->row_pitch
-            + ((box->right - box->left + format->block_width - 1) / format->block_width) * format->block_byte_count;
+    get_map_pitch(format, box, map_desc, &size);
 
     if (!(map_desc->data = malloc(size)))
     {
@@ -3738,6 +3815,14 @@ static void wined3d_cs_packet_decref_objects(const struct wined3d_cs_packet *pac
             break;
         }
 
+        case WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE:
+        {
+            struct wined3d_cs_clear_sysmem_texture *op = (struct wined3d_cs_clear_sysmem_texture *)packet->data;
+
+            wined3d_texture_decref(op->texture);
+            break;
+        }
+
         case WINED3D_CS_OP_DISPATCH:
         {
             struct wined3d_cs_dispatch *op = (struct wined3d_cs_dispatch *)packet->data;
@@ -3979,6 +4064,14 @@ static void wined3d_cs_packet_incref_objects(struct wined3d_cs_packet *packet)
             break;
         }
 
+        case WINED3D_CS_OP_CLEAR_SYSMEM_TEXTURE:
+        {
+            struct wined3d_cs_clear_sysmem_texture *op = (struct wined3d_cs_clear_sysmem_texture *)packet->data;
+
+            wined3d_texture_incref(op->texture);
+            break;
+        }
+
         case WINED3D_CS_OP_DISPATCH:
         {
             struct wined3d_cs_dispatch *op = (struct wined3d_cs_dispatch *)packet->data;
@@ -4175,12 +4268,7 @@ static bool wined3d_deferred_context_map_upload_bo(struct wined3d_device_context
     uint8_t *sysmem;
     size_t size;
 
-    wined3d_format_calculate_pitch(format, 1, box->right - box->left,
-            box->bottom - box->top, &map_desc->row_pitch, &map_desc->slice_pitch);
-
-    size = (box->back - box->front - 1) * map_desc->slice_pitch
-            + ((box->bottom - box->top - 1) / format->block_height) * map_desc->row_pitch
-            + ((box->right - box->left + format->block_width - 1) / format->block_width) * format->block_byte_count;
+    get_map_pitch(format, box, map_desc, &size);
 
     if (!(flags & WINED3D_MAP_WRITE))
     {

@@ -2970,8 +2970,8 @@ static void test_LocaleNameToLCID(void)
     buffer[0] = 0;
     SetLastError(0xdeadbeef);
     lcid = LocaleNameToLCID(LOCALE_NAME_SYSTEM_DEFAULT, 0);
-    ok(lcid == GetSystemDefaultLCID(),
-       "Expected lcid == %08lx, got %08lx, error %ld\n", GetSystemDefaultLCID(), lcid, GetLastError());
+    expect = GetSystemDefaultLCID();
+    ok(lcid == expect, "Expected lcid == %08lx, got %08lx, error %ld\n", expect, lcid, GetLastError());
     ret = pLCIDToLocaleName(lcid, buffer, LOCALE_NAME_MAX_LENGTH, 0);
     ok(ret > 0, "Expected ret > 0, got %d, error %ld\n", ret, GetLastError());
     trace("%08lx, %s\n", lcid, wine_dbgstr_w(buffer));
@@ -7398,7 +7398,7 @@ static void test_NormalizeString(void)
             memset(dst, 0xcc, sizeof(dst));
             dstlen = pNormalizeString( norm_forms[i], ptest->str, lstrlenW(ptest->str), dst, dstlen );
             ok(dstlen == lstrlenW( ptest->expected[i] ), "%s:%d: Copied length differed: was %d, should be %d\n",
-               wine_dbgstr_w(ptest->str), i, dstlen, lstrlenW( dst ));
+               wine_dbgstr_w(ptest->str), i, dstlen, lstrlenW( ptest->expected[i] ));
             str_cmp = wcsncmp( ptest->expected[i], dst, dstlen );
             ok( str_cmp == 0, "%s:%d: string incorrect got %s expect %s\n", wine_dbgstr_w(ptest->str), i,
                 wine_dbgstr_w(dst), wine_dbgstr_w(ptest->expected[i]) );

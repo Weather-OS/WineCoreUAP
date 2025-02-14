@@ -955,7 +955,7 @@ __ASM_GLOBAL_FUNC( user_mode_callback_return,
  */
 extern void DECLSPEC_NORETURN user_mode_abort_thread( NTSTATUS status, struct syscall_frame *frame );
 __ASM_GLOBAL_FUNC( user_mode_abort_thread,
-                   "ldr x1, [x1, #0x110]\n\t"    /* frame->syscall_cfa */
+                   "ldr x1, [x1, #0x118]\n\t"    /* frame->syscall_cfa */
                    "sub x29, x1, #0xc0\n\t"
                    /* switch to kernel stack */
                    "mov sp, x29\n\t"
@@ -1097,6 +1097,21 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 static void ill_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
     EXCEPTION_RECORD rec = { EXCEPTION_ILLEGAL_INSTRUCTION };
+    ucontext_t *context = sigcontext;
+
+    if (!(PSTATE_sig( context ) & 0x10) && /* AArch64 (not WoW) */
+        !(PC_sig( context ) & 3))
+    {
+        ULONG instr = *(ULONG *)PC_sig( context );
+        /* emulate mrs xN, CurrentEL */
+        if ((instr & ~0x1f) == 0xd5384240) {
+            ULONG reg = instr & 0x1f;
+            /* ignore writes to xzr */
+            if (reg != 31) REGn_sig(reg, context) = 0;
+            PC_sig(context) += 4;
+            return;
+        }
+    }
 
     setup_exception( sigcontext, &rec );
 }

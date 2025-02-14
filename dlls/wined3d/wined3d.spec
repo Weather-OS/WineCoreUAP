@@ -91,6 +91,7 @@
 
 @ cdecl wined3d_device_context_blt(ptr ptr long ptr ptr long ptr long ptr long)
 @ cdecl wined3d_device_context_clear_rendertarget_view(ptr ptr ptr long ptr float long)
+@ cdecl wined3d_device_context_clear_sysmem_texture(ptr ptr long ptr long ptr)
 @ cdecl wined3d_device_context_clear_uav_float(ptr ptr ptr)
 @ cdecl wined3d_device_context_clear_uav_uint(ptr ptr ptr)
 @ cdecl wined3d_device_context_copy_resource(ptr ptr ptr)
@@ -244,6 +245,7 @@
 @ cdecl wined3d_stateblock_incref(ptr)
 @ cdecl wined3d_stateblock_init_contained_states(ptr)
 @ cdecl wined3d_stateblock_multiply_transform(ptr long ptr)
+@ cdecl wined3d_stateblock_primary_dirtify_all_states(ptr ptr)
 @ cdecl wined3d_stateblock_reset(ptr)
 @ cdecl wined3d_stateblock_set_base_vertex_index(ptr long)
 @ cdecl wined3d_stateblock_set_clip_plane(ptr long ptr)

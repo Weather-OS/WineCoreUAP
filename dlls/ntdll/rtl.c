@@ -7,6 +7,7 @@
  * Copyright 1999      Alex Korobka
  * Copyright 2003      Thomas Mertes
  * Crc32 code Copyright 1986 Gary S. Brown (Public domain)
+ * Copyright 2025      Zhiyi Zhang for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -235,6 +236,338 @@ NTSTATUS WINAPI RtlResetNtUserPfn(void)
     return STATUS_SUCCESS;
 }
 
+/* data is a place holder to align stored data on a 8 byte boundary */
+struct rtl_generic_table_entry
+{
+    RTL_SPLAY_LINKS splay_links;
+    LIST_ENTRY list_entry;
+    LONGLONG data;
+};
+
+static void *get_data_from_splay_links(RTL_SPLAY_LINKS *links)
+{
+    return (unsigned char *)links + FIELD_OFFSET(struct rtl_generic_table_entry, data);
+}
+
+static void *get_data_from_list_entry(LIST_ENTRY *list_entry)
+{
+    return (unsigned char *)list_entry + FIELD_OFFSET(struct rtl_generic_table_entry, data)
+        - FIELD_OFFSET(struct rtl_generic_table_entry, list_entry);
+}
+
+static LIST_ENTRY *get_list_entry_from_splay_links(RTL_SPLAY_LINKS *links)
+{
+    return (LIST_ENTRY *)((unsigned char *)links + FIELD_OFFSET(struct rtl_generic_table_entry, list_entry));
+}
+
+static RTL_SPLAY_LINKS *rtl_splay_find(RTL_GENERIC_TABLE *table, void *value)
+{
+    RTL_GENERIC_COMPARE_RESULTS result;
+    RTL_SPLAY_LINKS *child;
+
+    child = table->TableRoot;
+    while (child)
+    {
+        result = table->CompareRoutine(table, get_data_from_splay_links(child), value);
+        if (result == GenericLessThan)
+            child = child->RightChild;
+        else if (result == GenericGreaterThan)
+            child = child->LeftChild;
+        else
+            return child;
+    }
+    return NULL;
+}
+
+static void rtl_splay_replace(RTL_SPLAY_LINKS *x, RTL_SPLAY_LINKS *y, RTL_SPLAY_LINKS **root)
+{
+    if (RtlIsRoot(x))
+        *root = y;
+    else if (RtlIsLeftChild(x))
+        x->Parent->LeftChild = y;
+    else
+        x->Parent->RightChild = y;
+
+    if (y)
+        y->Parent = RtlIsRoot(x) ? y : x->Parent;
+}
+
+static void rtl_splay_left_rotate(RTL_SPLAY_LINKS *x)
+{
+    RTL_SPLAY_LINKS *y = x->RightChild;
+
+    if (y)
+    {
+        x->RightChild = y->LeftChild;
+        if (y->LeftChild)
+            y->LeftChild->Parent = x;
+
+        y->Parent = RtlIsRoot(x) ? y : x->Parent;
+    }
+
+    if (!RtlIsRoot(x))
+    {
+        if (RtlIsLeftChild(x))
+            x->Parent->LeftChild = y;
+        else
+            x->Parent->RightChild = y;
+    }
+
+    if (y)
+        y->LeftChild = x;
+    x->Parent = y;
+}
+
+static void rtl_splay_right_rotate(RTL_SPLAY_LINKS *x)
+{
+    RTL_SPLAY_LINKS *y = x->LeftChild;
+
+    if (y)
+    {
+        x->LeftChild = y->RightChild;
+        if (y->RightChild)
+            y->RightChild->Parent = x;
+
+        y->Parent = RtlIsRoot(x) ? y : x->Parent;
+    }
+
+    if (!RtlIsRoot(x))
+    {
+        if (RtlIsLeftChild(x))
+            x->Parent->LeftChild = y;
+        else
+            x->Parent->RightChild = y;
+    }
+
+    if (y)
+        y->RightChild = x;
+    x->Parent = y;
+}
+
+/******************************************************************************
+ *  RtlSubtreePredecessor           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlSubtreePredecessor(RTL_SPLAY_LINKS *links)
+{
+    RTL_SPLAY_LINKS *child;
+
+    TRACE("(%p)\n", links);
+
+    child = RtlLeftChild(links);
+    if (!child)
+        return NULL;
+
+    while (RtlRightChild(child))
+        child = RtlRightChild(child);
+
+    return child;
+}
+
+/******************************************************************************
+ *  RtlSubtreeSuccessor           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlSubtreeSuccessor(RTL_SPLAY_LINKS *links)
+{
+    RTL_SPLAY_LINKS *child;
+
+    TRACE("(%p)\n", links);
+
+    child = RtlRightChild(links);
+    if (!child)
+        return NULL;
+
+    while (RtlLeftChild(child))
+        child = RtlLeftChild(child);
+
+    return child;
+}
+
+/******************************************************************************
+ *  RtlRealPredecessor           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlRealPredecessor(RTL_SPLAY_LINKS *links)
+{
+    PRTL_SPLAY_LINKS child;
+
+    TRACE("(%p)\n", links);
+
+    child = RtlLeftChild(links);
+    if (child)
+    {
+        while (RtlRightChild(child))
+            child = RtlRightChild(child);
+        return child;
+    }
+
+    child = links;
+    while (RtlIsLeftChild(child))
+        child = RtlParent(child);
+
+    if (RtlIsRightChild(child))
+        return RtlParent(child);
+
+    return NULL;
+}
+
+/******************************************************************************
+ *  RtlRealSuccessor           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlRealSuccessor(RTL_SPLAY_LINKS *links)
+{
+    PRTL_SPLAY_LINKS child;
+
+    TRACE("(%p)\n", links);
+
+    child = RtlRightChild(links);
+    if (child)
+    {
+        while (RtlLeftChild(child))
+            child = RtlLeftChild(child);
+        return child;
+    }
+
+    child = links;
+    while (RtlIsRightChild(child))
+        child = RtlParent(child);
+
+    if (RtlIsLeftChild(child))
+        return RtlParent(child);
+
+    return NULL;
+}
+
+/******************************************************************************
+ *  RtlSplay           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlSplay(RTL_SPLAY_LINKS *links)
+{
+    TRACE("(%p)\n", links);
+
+    while (!RtlIsRoot(links))
+    {
+        if (RtlIsRoot(links->Parent))
+        {
+            /* Zig */
+            if (RtlIsLeftChild(links))
+                rtl_splay_right_rotate(links->Parent);
+            /* Zag */
+            else
+                rtl_splay_left_rotate(links->Parent);
+        }
+        /* Zig-Zig */
+        else if (RtlIsLeftChild(links->Parent) && RtlIsLeftChild(links))
+        {
+            rtl_splay_right_rotate(links->Parent->Parent);
+            rtl_splay_right_rotate(links->Parent);
+        }
+        /* Zag-Zag */
+        else if (RtlIsRightChild(links->Parent) && RtlIsRightChild(links))
+        {
+            rtl_splay_left_rotate(links->Parent->Parent);
+            rtl_splay_left_rotate(links->Parent);
+        }
+        /* Zig-Zag */
+        else if (RtlIsRightChild(links->Parent) && RtlIsLeftChild(links))
+        {
+            rtl_splay_right_rotate(links->Parent);
+            rtl_splay_left_rotate(links->Parent);
+        }
+        /* Zag-Zig */
+        else
+        {
+            rtl_splay_left_rotate(links->Parent);
+            rtl_splay_right_rotate(links->Parent);
+        }
+    }
+
+    return links;
+}
+
+/******************************************************************************
+ *  RtlDeleteNoSplay           [NTDLL.@]
+ */
+void WINAPI RtlDeleteNoSplay(RTL_SPLAY_LINKS *links, RTL_SPLAY_LINKS **root)
+{
+    TRACE("(%p, %p)\n", links, root);
+
+    if (RtlIsRoot(links) && !RtlLeftChild(links) && !RtlRightChild(links))
+    {
+        *root = NULL;
+    }
+    else  if (!links->LeftChild)
+    {
+        rtl_splay_replace(links, links->RightChild, root);
+    }
+    else if (!links->RightChild)
+    {
+        rtl_splay_replace(links, links->LeftChild, root);
+    }
+    else
+    {
+        RTL_SPLAY_LINKS *predecessor = RtlSubtreePredecessor(links);
+        if (predecessor->Parent != links)
+        {
+            rtl_splay_replace(predecessor, predecessor->LeftChild, root);
+            RtlInsertAsLeftChild(predecessor, links->LeftChild);
+        }
+        rtl_splay_replace(links, predecessor, root);
+        RtlInsertAsRightChild(predecessor, links->RightChild);
+    }
+}
+
+/******************************************************************************
+ *  RtlDelete           [NTDLL.@]
+ */
+RTL_SPLAY_LINKS * WINAPI RtlDelete(RTL_SPLAY_LINKS *links)
+{
+    RTL_SPLAY_LINKS *root, *to_splay;
+
+    TRACE("(%p)\n", links);
+
+    if (RtlIsRoot(links) && !RtlLeftChild(links) && !RtlRightChild(links))
+    {
+        return NULL;
+    }
+    else if (!links->LeftChild)
+    {
+        rtl_splay_replace(links, links->RightChild, &root);
+        if (RtlIsRoot(links))
+            return links->RightChild;
+
+        to_splay = links->Parent;
+    }
+    else if (!links->RightChild)
+    {
+        rtl_splay_replace(links, links->LeftChild, &root);
+        if (RtlIsRoot(links))
+            return links->LeftChild;
+
+        to_splay = links->Parent;
+    }
+    else
+    {
+        RTL_SPLAY_LINKS *predecessor = RtlSubtreePredecessor(links);
+        if (predecessor->Parent != links)
+        {
+            rtl_splay_replace(predecessor, predecessor->LeftChild, &root);
+            RtlInsertAsLeftChild(predecessor, links->LeftChild);
+            /* Delete operation first swap the value of node to delete and that of the predecessor
+             * and then delete the predecessor instead. Finally, the parent of the actual deleted
+             * node, which is the predecessor, is splayed afterwards */
+            to_splay = predecessor->Parent;
+        }
+        else
+        {
+            /* links is the parent of predecessor. So after swapping, the parent of links is in
+             * fact the predecessor. So predecessor gets splayed */
+            to_splay = predecessor;
+        }
+        rtl_splay_replace(links, predecessor, &root);
+        RtlInsertAsRightChild(predecessor, links->RightChild);
+    }
+
+    return RtlSplay(to_splay);
+}
 
 /******************************************************************************
  *  RtlInitializeGenericTable           [NTDLL.@]
@@ -258,15 +591,155 @@ void WINAPI RtlInitializeGenericTable(RTL_GENERIC_TABLE *table, PRTL_GENERIC_COM
 }
 
 /******************************************************************************
+ *  RtlIsGenericTableEmpty           [NTDLL.@]
+ */
+BOOLEAN WINAPI RtlIsGenericTableEmpty(RTL_GENERIC_TABLE *table)
+{
+    TRACE("(%p)\n", table);
+    return !table->TableRoot;
+}
+
+/***********************************************************************
+ *           RtlInsertElementGenericTable  (NTDLL.@)
+ */
+void * WINAPI RtlInsertElementGenericTable(RTL_GENERIC_TABLE *table, void *value, CLONG size, BOOLEAN *new_element)
+{
+    RTL_SPLAY_LINKS *child, *parent = NULL;
+    RTL_GENERIC_COMPARE_RESULTS result;
+    void *buffer;
+
+    TRACE("(%p, %p, %lu, %p)\n", table, value, size, new_element);
+
+    child = table->TableRoot;
+    while (child)
+    {
+        buffer = get_data_from_splay_links(child);
+        result = table->CompareRoutine(table, buffer, value);
+        parent = child;
+        if (result == GenericLessThan)
+        {
+            child = child->RightChild;
+        }
+        else if (result == GenericGreaterThan)
+        {
+            child = child->LeftChild;
+        }
+        else
+        {
+            if (new_element)
+                *new_element = FALSE;
+            return buffer;
+        }
+    }
+
+    /* data should be stored on a 8 byte boundary */
+    child = (RTL_SPLAY_LINKS *)table->AllocateRoutine(table, size + FIELD_OFFSET(struct rtl_generic_table_entry, data));
+    RtlInitializeSplayLinks(child);
+    InsertTailList(&table->InsertOrderList, get_list_entry_from_splay_links(child));
+    buffer = get_data_from_splay_links(child);
+    memcpy(buffer, value, size);
+
+    if (parent)
+    {
+        buffer = get_data_from_splay_links(parent);
+        result = table->CompareRoutine(table, buffer, value);
+        if (result == GenericLessThan)
+            RtlInsertAsRightChild(parent, child);
+        else
+            RtlInsertAsLeftChild(parent, child);
+    }
+
+    if (new_element)
+        *new_element = TRUE;
+    table->TableRoot = RtlSplay(child);
+    table->NumberGenericTableElements++;
+    return get_data_from_splay_links(child);
+}
+
+BOOLEAN WINAPI RtlDeleteElementGenericTable(RTL_GENERIC_TABLE *table, void *value)
+{
+    RTL_SPLAY_LINKS *child;
+
+    TRACE("(%p, %p)\n", table, value);
+
+    child = rtl_splay_find(table, value);
+    if (!child)
+        return FALSE;
+
+    table->TableRoot = RtlDelete(child);
+    RemoveEntryList(get_list_entry_from_splay_links(child));
+    table->NumberGenericTableElements--;
+    table->OrderedPointer = &table->InsertOrderList;
+    table->WhichOrderedElement = 0;
+    table->FreeRoutine(table, child);
+    return TRUE;
+}
+
+/******************************************************************************
  *  RtlEnumerateGenericTableWithoutSplaying           [NTDLL.@]
  */
 void * WINAPI RtlEnumerateGenericTableWithoutSplaying(RTL_GENERIC_TABLE *table, PVOID *previous)
 {
-    static int warn_once;
+    RTL_SPLAY_LINKS *child;
 
-    if (!warn_once++)
-        FIXME("(%p, %p) stub!\n", table, previous);
-    return NULL;
+    TRACE("(%p, %p)\n", table, previous);
+
+    if (RtlIsGenericTableEmpty(table))
+        return NULL;
+
+    if (!*previous)
+    {
+        /* Find the smallest element */
+        child = table->TableRoot;
+        while (RtlLeftChild(child))
+            child = RtlLeftChild(child);
+    }
+    else
+    {
+        /* Find the successor of the previous element */
+        child = RtlRealSuccessor(*previous);
+        if (!child)
+            return NULL;
+    }
+
+    *previous = child;
+    return get_data_from_splay_links(child);
+}
+
+/******************************************************************************
+ *  RtlEnumerateGenericTable           [NTDLL.@]
+ *
+ * RtlEnumerateGenericTable() uses TableRoot to keep track of enumeration status according to tests.
+ * This also means that other functions that change TableRoot should not be used during enumerations.
+ * Otherwise, RtlEnumerateGenericTable() won't be able to find the correct next element when restart
+ * is FALSE. This is also the case on Windows.
+ */
+void * WINAPI RtlEnumerateGenericTable(RTL_GENERIC_TABLE *table, BOOLEAN restart)
+{
+    RTL_SPLAY_LINKS *child;
+
+    TRACE("(%p, %d)\n", table, restart);
+
+    if (RtlIsGenericTableEmpty(table))
+        return NULL;
+
+    if (restart)
+    {
+        /* Find the smallest element */
+        child = table->TableRoot;
+        while (RtlLeftChild(child))
+            child = RtlLeftChild(child);
+    }
+    else
+    {
+        /* Find the successor of the root */
+        child = RtlRealSuccessor(table->TableRoot);
+        if (!child)
+            return NULL;
+    }
+
+    table->TableRoot = RtlSplay(child);
+    return get_data_from_splay_links(child);
 }
 
 /******************************************************************************
@@ -283,17 +756,147 @@ ULONG WINAPI RtlNumberGenericTableElements(RTL_GENERIC_TABLE *table)
  */
 void * WINAPI RtlGetElementGenericTable(RTL_GENERIC_TABLE *table, ULONG index)
 {
-    FIXME("(%p, %lu) stub!\n", table, index);
-    return NULL;
+    ULONG count, ordered_element_index;
+    LIST_ENTRY *list_entry;
+    BOOL forward;
+
+    TRACE("(%p, %lu)\n", table, index);
+
+    if (index >= table->NumberGenericTableElements)
+        return NULL;
+
+    /* No OrderedPointer, use list header InsertOrderList */
+    if (table->WhichOrderedElement == 0)
+    {
+        /*
+         * |  lower half  | upper half |
+         * ^       ^      ^            ^
+         * head, 0 |      |            tail, table->NumberGenericTableElements - 1
+         *         |      (table->NumberGenericTableElements - 1) / 2
+         *         index closer to head
+         */
+        if (index <= (table->NumberGenericTableElements - 1) / 2)
+        {
+            list_entry = table->InsertOrderList.Flink;
+            count = index;
+            forward = TRUE;
+        }
+        /*
+         * |  lower half  | upper half |
+         * ^              ^       ^    ^
+         * head, 0        |       |    tail, table->NumberGenericTableElements - 1
+         *                |       index closer to tail
+         *                (table->NumberGenericTableElements - 1) / 2
+         */
+        else
+        {
+            list_entry = table->InsertOrderList.Blink;
+            count = table->NumberGenericTableElements - index - 1;
+            forward = FALSE;
+        }
+    }
+    /* Has OrderedPointer, decide to use list header or OrderedPointer */
+    else
+    {
+        ordered_element_index = table->WhichOrderedElement - 1;
+
+        /*
+         * | -------------- | ---------- |
+         * ^         ^      ^            ^
+         * head, 0   |      |            table->NumberGenericTableElements - 1
+         *           |      ordered_element_index
+         *           index, 0 <= index <= ordered_element_index
+         */
+        if (index <= ordered_element_index)
+        {
+            /*
+             * | ------------------- |
+             * ^          ^          ^
+             * | <--d1--> | <--d2--> |
+             * head, 0    |          ordered_element_index
+             *            index
+             *
+             */
+            /* d1 <= d2, index is closer to head, forward from head */
+            if (index <= ordered_element_index - index)
+            {
+                list_entry = table->InsertOrderList.Flink;
+                count = index;
+                forward = TRUE;
+            }
+            /* d1 > d2, index is closer to ordered_element_index, backward from ordered_element_index */
+            else
+            {
+                list_entry = table->OrderedPointer;
+                count = ordered_element_index - index;
+                forward = FALSE;
+            }
+        }
+        /*
+         * | ------ | ---------- |
+         * ^        ^  ^         ^
+         * head, 0  |  |         tail, table->NumberGenericTableElements - 1
+         *          |  index, ordered_element_index < index <= table->NumberGenericTableElements - 1
+         *          ordered_element_index
+         */
+        else
+        {
+            /*
+             * | --------------------------------|
+             * ^                      ^          ^
+             * | <--------d1--------> | <--d2--> |
+             * ordered_element_index  |          tail, table->NumberGenericTableElements - 1
+             *                        index
+             *
+             */
+            /* d1 <= d2, index is closer to ordered_element_index, forward from ordered_element_index */
+            if (index - ordered_element_index <= table->NumberGenericTableElements - index - 1)
+            {
+                list_entry = table->OrderedPointer;
+                count = index - ordered_element_index;
+                forward = TRUE;
+            }
+            /* d1 > d2, index is closer to tail, backward from tail */
+            else
+            {
+                list_entry = table->InsertOrderList.Blink;
+                count = table->NumberGenericTableElements - index - 1;
+                forward = FALSE;
+            }
+        }
+    }
+
+    if (forward)
+    {
+        while (count--)
+            list_entry = list_entry->Flink;
+    }
+    else
+    {
+        while (count--)
+            list_entry = list_entry->Blink;
+    }
+
+    table->OrderedPointer = list_entry;
+    table->WhichOrderedElement = index + 1;
+    return get_data_from_list_entry(list_entry);
 }
 
 /******************************************************************************
  *  RtlLookupElementGenericTable           [NTDLL.@]
  */
-void * WINAPI RtlLookupElementGenericTable(RTL_GENERIC_TABLE *table, void *buffer)
+void * WINAPI RtlLookupElementGenericTable(RTL_GENERIC_TABLE *table, void *value)
 {
-    FIXME("(%p, %p) stub!\n", table, buffer);
-    return NULL;
+    RTL_SPLAY_LINKS *child;
+
+    TRACE("(%p, %p)\n", table, value);
+
+    child = rtl_splay_find(table, value);
+    if (!child)
+        return FALSE;
+
+    table->TableRoot = RtlSplay(child);
+    return get_data_from_splay_links(child);
 }
 
 /******************************************************************************

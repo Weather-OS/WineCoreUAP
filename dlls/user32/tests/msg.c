@@ -575,9 +575,17 @@ static const struct message WmShowRestoreMaxOverlappedSeq[] = {
     { WM_GETTITLEBARINFOEX, sent|optional },
     { WM_NCPAINT, sent|beginpaint|optional },
     { WM_ERASEBKGND, sent|beginpaint|optional },
-    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam|msg_todo, 0, 0 },
+    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam, 0, 0 },
     { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam|optional, 0, 0 }, /* Win7 seems to send this twice. */
     { WM_SYNCPAINT, sent|optional },
+    { WM_WINDOWPOSCHANGING, sent|optional|wine_only },
+    { WM_WINDOWPOSCHANGED, sent|optional|wine_only },
+    { WM_MOVE, sent|defwinproc|optional|wine_only },
+    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam|optional|wine_only, 0, 0 },
+    { WM_WINDOWPOSCHANGING, sent|optional|wine_only },
+    { WM_WINDOWPOSCHANGED, sent|optional|wine_only },
+    { WM_MOVE, sent|defwinproc|optional|wine_only },
+    { EVENT_OBJECT_LOCATIONCHANGE, winevent_hook|wparam|lparam|optional|wine_only, 0, 0 },
     { 0 }
 };
 /* ShowWindow(SW_RESTORE) for a not visible minimized overlapped window */
@@ -632,6 +640,7 @@ static const struct message WmShowRestoreMinOverlappedSeq[] = {
     { WM_ACTIVATE, sent|wparam, 1 },
     { WM_GETTEXT, sent|optional },
     { WM_PAINT, sent|optional },
+    { WM_PAINT, sent|optional|wine_only },
     { WM_GETTITLEBARINFOEX, sent|optional },
     { WM_NCPAINT, sent|beginpaint|optional },
     { WM_ERASEBKGND, sent|beginpaint|optional },
@@ -2329,7 +2338,7 @@ static const struct message WmTrackPopupMenuAbort[] = {
     { 0 }
 };
 
-static BOOL after_end_dialog, test_def_id, paint_loop_done;
+static BOOL after_end_dialog, test_def_id, paint_loop_done, wm_copydata_done;
 static int sequence_cnt, sequence_size;
 static struct recvd_message* sequence;
 static int log_all_parent_messages;
@@ -5615,7 +5624,7 @@ static void test_messages(void)
     {
         ShowWindow(hwnd, SW_RESTORE);
         flush_events();
-        ok_sequence(WmShowRestoreMaxOverlappedSeq, "ShowWindow(SW_RESTORE):overlapped", TRUE);
+        ok_sequence(WmShowRestoreMaxOverlappedSeq, "ShowWindow(SW_RESTORE):overlapped", FALSE);
         flush_sequence();
     }
 
@@ -9325,6 +9334,9 @@ static void subtest_swp_paint_regions_( int line, int wrap_toplevel, LPCSTR pare
     ok( hauxchild != 0, "Creating child window (%s) returned error %lu\n",
         debugstr_a( child_class ), GetLastError() );
 
+    SetWindowPos( htoplevel ? htoplevel : hparent, NULL, 0, 0, 0, 0,
+                  SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW );
+
     for (i = 0; i < ARRAY_SIZE(exposure_tests); i++)
     {
         const struct exposure_test *extest = &exposure_tests[i];
@@ -11241,6 +11253,51 @@ static LRESULT WINAPI HotkeyMsgCheckProcA(HWND hwnd, UINT message, WPARAM wParam
     return ret;
 }
 
+static LRESULT WINAPI WmCopyDataProcA(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg)
+    {
+        case WM_COPYDATA:
+        {
+            static const DWORD expected_data_sizes[3] = {0, 64, 64 * 1024 * 1024};
+            static ULONG_PTR expected_dwdata = 0;
+            COPYDATASTRUCT *cds = (COPYDATASTRUCT *)lp;
+            unsigned char *ptr;
+            unsigned int i;
+            BOOL matched;
+
+            if (cds->dwData > 2)
+                return FALSE;
+
+            ok(!wm_copydata_done, "Got unexpected wm_copydata_done.\n");
+            ok(wp == (WPARAM)GetDesktopWindow(), "Got unexpected wp.\n");
+            ok(cds->dwData == expected_dwdata, "Got unexpected dwData %Id.\n", cds->dwData);
+            expected_dwdata++;
+            ok(cds->cbData == expected_data_sizes[cds->dwData], "Got unexpected cbData %#lx.\n", cds->cbData);
+
+            if (cds->dwData)
+                ok(!!cds->lpData, "Got unexpected lpData %p.\n", cds->lpData);
+            else
+                ok(!cds->lpData, "Got unexpected lpData %p.\n", cds->lpData);
+
+            matched = TRUE;
+            for (i = 0, ptr = cds->lpData; i < cds->cbData; i++, ptr++)
+            {
+                if (*ptr != i % 0xff)
+                {
+                    matched = FALSE;
+                    break;
+                }
+            }
+            ok(matched, "Got unexpected content.\n");
+            if (cds->dwData == 2)
+                wm_copydata_done = TRUE;
+            return TRUE;
+        }
+    }
+    return DefWindowProcA(hwnd,msg,wp,lp);
+}
+
 static void register_classes(void)
 {
     WNDCLASSA cls;
@@ -11284,6 +11341,10 @@ static void register_classes(void)
 
     cls.lpfnWndProc = PaintLoopProcA;
     cls.lpszClassName = "PaintLoopWindowClass";
+    register_class(&cls);
+
+    cls.lpfnWndProc = WmCopyDataProcA;
+    cls.lpszClassName = "WmCopyDataWindowClass";
     register_class(&cls);
 
     cls.style = CS_NOCLOSE;
@@ -14735,6 +14796,12 @@ static const struct message WmMouseHoverSeq[] = {
     { 0 }
 };
 
+static const struct message WmMouseLeaveSeq[] =
+{
+    { WM_MOUSELEAVE, sent | wparam | lparam, 0, 0 },
+    { 0 }
+};
+
 static void pump_msg_loop_timeout(DWORD timeout, BOOL inject_mouse_move)
 {
     MSG msg;
@@ -14783,9 +14850,10 @@ static void test_TrackMouseEvent(void)
 {
     TRACKMOUSEEVENT tme;
     BOOL ret;
-    HWND hwnd, hchild;
+    HWND hwnd, hwnd2, hchild;
     RECT rc_parent, rc_child;
     UINT default_hover_time, hover_width = 0, hover_height = 0;
+    POINT old_pt;
 
 #define track_hover(track_hwnd, track_hover_time) \
     tme.cbSize = sizeof(tme); \
@@ -14957,6 +15025,83 @@ static void test_TrackMouseEvent(void)
     track_hover_cancel(hwnd);
 
     DestroyWindow(hwnd);
+
+    /* Test that tracking a new window with TME_LEAVE and when the cursor is not in the new window,
+     * WM_MOUSELEAVE is immediately posted to the window */
+    hwnd = CreateWindowA("static", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 100,
+                         100, 0, NULL, NULL, 0);
+    ok(!!hwnd, "Failed to create window, error %lu.\n", GetLastError());
+    hwnd2 = CreateWindowA("TestWindowClass", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 50, 50,
+                          0, NULL, NULL, 0);
+    ok(!!hwnd2, "Failed to create window, error %lu.\n", GetLastError());
+
+    GetCursorPos(&old_pt);
+    SetCursorPos(150, 150);
+
+    flush_events();
+    flush_sequence();
+
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = hwnd;
+    tme.dwHoverTime = HOVER_DEFAULT;
+    SetLastError(0xdeadbeef);
+    ret = pTrackMouseEvent(&tme);
+    ok(ret, "TrackMouseEvent(TME_LEAVE) failed, error %ld\n", GetLastError());
+
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = hwnd2;
+    tme.dwHoverTime = HOVER_DEFAULT;
+    SetLastError(0xdeadbeef);
+    ret = pTrackMouseEvent(&tme);
+    ok(ret, "TrackMouseEvent(TME_LEAVE) failed, error %ld\n", GetLastError());
+    flush_events();
+    ok_sequence(WmMouseLeaveSeq, "WmMouseLeaveSeq", FALSE);
+
+    DestroyWindow(hwnd2);
+    DestroyWindow(hwnd);
+    SetCursorPos(old_pt.x, old_pt.y);
+
+    /* Test that tracking a new window with TME_LEAVE and when the cursor is not in the new window,
+     * the original tracking window is not changed */
+    hwnd = CreateWindowA("TestWindowClass", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 100,
+                         100, 0, NULL, NULL, 0);
+    ok(!!hwnd, "Failed to create window, error %lu.\n", GetLastError());
+    hwnd2 = CreateWindowA("static", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 50, 50, 0, NULL,
+                          NULL, 0);
+    ok(!!hwnd2, "Failed to create window, error %lu.\n", GetLastError());
+
+    GetCursorPos(&old_pt);
+    SetCursorPos(150, 150);
+
+    flush_events();
+    flush_sequence();
+
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = hwnd;
+    tme.dwHoverTime = HOVER_DEFAULT;
+    SetLastError(0xdeadbeef);
+    ret = pTrackMouseEvent(&tme);
+    ok(ret, "TrackMouseEvent(TME_LEAVE) failed, error %ld\n", GetLastError());
+
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = hwnd2;
+    tme.dwHoverTime = HOVER_DEFAULT;
+    SetLastError(0xdeadbeef);
+    ret = pTrackMouseEvent(&tme);
+    ok(ret, "TrackMouseEvent(TME_LEAVE) failed, error %ld\n", GetLastError());
+
+    SetCursorPos(500, 500);
+    Sleep(default_hover_time);
+    flush_events();
+    ok_sequence(WmMouseLeaveSeq, "WmMouseLeaveSeq", FALSE);
+
+    DestroyWindow(hwnd2);
+    DestroyWindow(hwnd);
+    SetCursorPos(old_pt.x, old_pt.y);
 
 #undef track_hover
 #undef track_query
@@ -18726,7 +18871,7 @@ static void test_WaitForInputIdle( char *argv0 )
     {
         ResetEvent( start_event );
         ResetEvent( end_event );
-        sprintf( path, "%s msg %u", argv0, i );
+        sprintf( path, "%s msg do_wait_idle_child %u", argv0, i );
         ret = CreateProcessA( NULL, path, NULL, NULL, TRUE, 0, NULL, NULL, &startup, &pi );
         ok( ret, "CreateProcess '%s' failed err %lu.\n", path, GetLastError() );
         if (ret)
@@ -20645,6 +20790,156 @@ static void test_radiobutton_focus(void)
     DestroyWindow(hwnd);
 }
 
+static LONG test_hook_cleanup_hook_proc_child_id;
+static DWORD test_hook_cleanup_hook_proc_thread_id, test_hook_cleanup_hook_proc_call_thread_id;
+
+static void CALLBACK test_hook_cleanup_hook_proc( HWINEVENTHOOK hook, DWORD event_id, HWND hwnd, LONG obj_id,
+                                                  LONG child_id, DWORD thread_id, DWORD event_time )
+{
+    test_hook_cleanup_hook_proc_child_id = child_id;
+    test_hook_cleanup_hook_proc_call_thread_id = GetCurrentThreadId();
+    test_hook_cleanup_hook_proc_thread_id = thread_id;
+}
+
+struct test_hook_cleanup_data
+{
+    HWND hwnd;
+    HANDLE hook_installed_event;
+    HANDLE done_event;
+    DWORD main_thread_id;
+};
+
+static DWORD WINAPI test_hook_cleanup_thread_proc( void *context )
+{
+    struct test_hook_cleanup_data *d = context;
+    HWINEVENTHOOK hook;
+
+    hook = SetWinEventHook( EVENT_MIN, EVENT_MAX, GetModuleHandleW( NULL ), test_hook_cleanup_hook_proc,
+                            GetCurrentProcessId(), 0, WINEVENT_INCONTEXT );
+    ok( !!hook, "got error %ld.\n", GetLastError() );
+
+    test_hook_cleanup_hook_proc_child_id = -1;
+    NotifyWinEvent( EVENT_MIN, d->hwnd, 1, 1 );
+    ok( test_hook_cleanup_hook_proc_child_id == 1, "got %ld.\n", test_hook_cleanup_hook_proc_child_id );
+    todo_wine ok( test_hook_cleanup_hook_proc_thread_id == d->main_thread_id, "got %#lx.\n",
+        test_hook_cleanup_hook_proc_thread_id );
+    ok( test_hook_cleanup_hook_proc_call_thread_id == GetCurrentThreadId(), "got %#lx.\n",
+        test_hook_cleanup_hook_proc_call_thread_id );
+
+    SetEvent( d->hook_installed_event );
+    WaitForSingleObject( d->done_event, INFINITE );
+    return 0;
+}
+
+static void test_hook_cleanup(void)
+{
+    struct test_hook_cleanup_data d;
+    HANDLE thread;
+
+    d.main_thread_id = GetCurrentThreadId();
+    d.hwnd = CreateWindowA ("static", "window", WS_OVERLAPPEDWINDOW, 0, 0, 100, 100, 0, 0, 0, 0 );
+    d.hook_installed_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    d.done_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+
+    thread = CreateThread( NULL, 0, test_hook_cleanup_thread_proc, &d, 0, NULL );
+    WaitForSingleObject( d.hook_installed_event, INFINITE );
+
+    test_hook_cleanup_hook_proc_child_id = -1;
+    NotifyWinEvent( EVENT_MIN, d.hwnd, 1, 2 );
+    ok( test_hook_cleanup_hook_proc_child_id == 2, "got %ld.\n", test_hook_cleanup_hook_proc_child_id );
+    ok( test_hook_cleanup_hook_proc_thread_id == GetCurrentThreadId(), "got %#lx.\n",
+        test_hook_cleanup_hook_proc_thread_id );
+    ok( test_hook_cleanup_hook_proc_call_thread_id == GetCurrentThreadId(), "got %#lx.\n",
+        test_hook_cleanup_hook_proc_call_thread_id );
+
+    SetEvent( d.done_event );
+    WaitForSingleObject( thread, INFINITE );
+
+    /* Hook is removed when thread which created it is terminated. */
+    test_hook_cleanup_hook_proc_child_id = -1;
+    NotifyWinEvent( EVENT_MIN, d.hwnd, 1, 3 );
+    ok( test_hook_cleanup_hook_proc_child_id == -1, "got %ld.\n", test_hook_cleanup_hook_proc_child_id );
+
+    DestroyWindow( d.hwnd );
+}
+
+static void test_WM_COPYDATA_child(void)
+{
+    HWND hwnd;
+    MSG msg;
+
+    wm_copydata_done = FALSE;
+    hwnd = CreateWindowA("WmCopyDataWindowClass", "WmCopyDataWindow",
+                         WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 100, 100, 0, 0, 0, NULL);
+    ok(!!hwnd, "CreateWindowA failed, error %lu\n", GetLastError());
+    while (!wm_copydata_done)
+    {
+        if (PeekMessageA(&msg, 0, 0, 0, 1))
+        {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+    DestroyWindow(hwnd);
+}
+
+static void test_WM_COPYDATA(char **argv)
+{
+    static const int LARGE_DATA_SIZE = 64 * 1024 * 1024;
+    unsigned char *ptr, *buffer;
+    unsigned int timeout = 0, i;
+    PROCESS_INFORMATION pi;
+    char cmdline[MAX_PATH];
+    STARTUPINFOA si = {0};
+    COPYDATASTRUCT cds;
+    HWND hwnd = NULL;
+    BOOL ret;
+
+    sprintf(cmdline, "%s %s test_WM_COPYDATA_child", argv[0], argv[1]);
+    ret = CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    ok(ret, "CreateProcessA failed, error %lu\n", GetLastError());
+
+    do
+    {
+        hwnd = FindWindowA("WmCopyDataWindowClass", "WmCopyDataWindow");
+        Sleep(100);
+        timeout += 100;
+    } while (!hwnd && timeout < 1000);
+    ok(!!hwnd, "Failed to find test window.\n");
+
+    buffer = malloc(LARGE_DATA_SIZE);
+    ok(!!buffer, "Failed to allocate memory.\n");
+    for (i = 0, ptr = buffer; i < LARGE_DATA_SIZE; i++, ptr++)
+        *ptr = i % 0xff;
+
+    /* Test a WM_COPYDATA message with no data */
+    cds.dwData = 0;
+    cds.cbData = 0;
+    cds.lpData = NULL;
+    ret = SendMessageA(hwnd, WM_COPYDATA, (WPARAM)GetDesktopWindow(), (LPARAM)&cds);
+    ok(ret, "WM_COPYDATA failed.\n");
+
+    /* Test a WM_COPYDATA message with a small amount of data */
+    cds.dwData = 1;
+    cds.cbData = 64;
+    cds.lpData = buffer;
+    ret = SendMessageA(hwnd, WM_COPYDATA, (WPARAM)GetDesktopWindow(), (LPARAM)&cds);
+    ok(ret, "WM_COPYDATA failed.\n");
+
+    /* Test a WM_COPYDATA message with a large amount of data */
+    cds.dwData = 2;
+    cds.cbData = LARGE_DATA_SIZE;
+    cds.lpData = buffer;
+    ret = SendMessageA(hwnd, WM_COPYDATA, (WPARAM)GetDesktopWindow(), (LPARAM)&cds);
+    ok(ret, "WM_COPYDATA failed.\n");
+
+    free(buffer);
+    ret = WaitForSingleObject(pi.hProcess, 1000);
+    ok(!ret, "WaitForSingleObject failed, error %ld.\n", GetLastError());
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+}
+
 START_TEST(msg)
 {
     char **test_argv;
@@ -20652,12 +20947,19 @@ START_TEST(msg)
     BOOL (WINAPI *pIsWinEventHookInstalled)(DWORD)= 0;/*GetProcAddress(user32, "IsWinEventHookInstalled");*/
     int argc;
 
-    argc = winetest_get_mainargs( &test_argv );
-    if (argc >= 3)
+    register_classes();
+
+    argc = winetest_get_mainargs(&test_argv);
+    if (argc == 3 && !strcmp(test_argv[2], "test_WM_COPYDATA_child"))
+    {
+        test_WM_COPYDATA_child();
+        return;
+    }
+    else if (argc >= 4 && !strcmp(test_argv[2], "do_wait_idle_child"))
     {
         unsigned int arg;
         /* Child process. */
-        sscanf (test_argv[2], "%d", (unsigned int *) &arg);
+        sscanf (test_argv[3], "%d", (unsigned int *) &arg);
         do_wait_idle_child( arg );
         return;
     }
@@ -20665,8 +20967,6 @@ START_TEST(msg)
     InitializeCriticalSection( &sequence_cs );
     init_procs();
     ImmDisableIME(0);
-
-    register_classes();
 
     if (pSetWinEventHook)
     {
@@ -20768,10 +21068,12 @@ START_TEST(msg)
     test_DoubleSetCapture();
     test_create_name();
     test_hook_changing_window_proc();
+    test_hook_cleanup();
     /* keep it the last test, under Windows it tends to break the tests
      * which rely on active/foreground windows being correct.
      */
     test_SetForegroundWindow();
+    test_WM_COPYDATA(test_argv);
 
     UnhookWindowsHookEx(hCBT_hook);
     if (pUnhookWinEvent && hEvent_hook)

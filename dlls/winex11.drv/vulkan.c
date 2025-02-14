@@ -161,7 +161,15 @@ static void vulkan_surface_update_offscreen( HWND hwnd, struct x11drv_vulkan_sur
     BOOL offscreen = needs_offscreen_rendering( hwnd, FALSE );
     struct x11drv_win_data *data;
 
-    if (offscreen == surface->offscreen) return;
+    if (offscreen == surface->offscreen)
+    {
+        if (!offscreen && (data = get_win_data( hwnd )))
+        {
+            attach_client_window( data, surface->window );
+            release_win_data( data );
+        }
+        return;
+    }
     surface->offscreen = offscreen;
 
     if (!surface->offscreen)
@@ -224,7 +232,7 @@ static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult 
     vulkan_surface_update_offscreen( hwnd, surface );
 
     if (!surface->offscreen) return;
-    if (!(hdc = NtUserGetDCEx( hwnd, 0, DCX_CACHE | DCX_CLIPCHILDREN ))) return;
+    if (!(hdc = NtUserGetDCEx( hwnd, 0, DCX_CACHE | DCX_USESTYLE ))) return;
     window = X11DRV_get_whole_window( toplevel );
     region = get_dc_monitor_region( hwnd, hdc );
 
@@ -239,14 +247,14 @@ static void X11DRV_vulkan_surface_presented( HWND hwnd, void *private, VkResult 
     }
 
     if (get_dc_drawable( surface->hdc_dst, &rect ) != window || !EqualRect( &rect, &rect_dst ))
-        set_dc_drawable( surface->hdc_dst, window, &rect_dst, ClipByChildren );
+        set_dc_drawable( surface->hdc_dst, window, &rect_dst, IncludeInferiors );
     if (region) NtGdiExtSelectClipRgn( surface->hdc_dst, region, RGN_COPY );
 
     NtGdiStretchBlt( surface->hdc_dst, 0, 0, rect_dst.right - rect_dst.left, rect_dst.bottom - rect_dst.top,
                      surface->hdc_src, 0, 0, surface->rect.right, surface->rect.bottom, SRCCOPY, 0 );
 
     if (region) NtGdiDeleteObjectApp( region );
-    if (hdc) NtGdiDeleteObjectApp( hdc );
+    if (hdc) NtUserReleaseDC( hwnd, hdc );
 }
 
 static VkBool32 X11DRV_vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice phys_dev,

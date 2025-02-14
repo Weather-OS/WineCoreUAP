@@ -72,7 +72,11 @@ static BOOL enum_windows( HDESK desktop, HWND hwnd, DWORD tid, BOOL children,
         status = NtUserBuildHwndList( desktop, hwnd, children, TRUE, tid, size, list, &size );
         if (!status) break;
         HeapFree( GetProcessHeap(), 0, list );
-        if (status != STATUS_BUFFER_TOO_SMALL) return FALSE;
+        if (status != STATUS_BUFFER_TOO_SMALL)
+        {
+            SetLastError( RtlNtStatusToDosError( status ));
+            return FALSE;
+        }
     }
     for (i = 0; i < size && list[i] != HWND_BOTTOM; i++)
     {
@@ -588,15 +592,6 @@ HWND WINAPI GetDesktopWindow(void)
 }
 
 
-/*******************************************************************
- *		EnableWindow (USER32.@)
- */
-BOOL WINAPI EnableWindow( HWND hwnd, BOOL enable )
-{
-    return NtUserEnableWindow( hwnd, enable );
-}
-
-
 /***********************************************************************
  *		IsWindowEnabled (USER32.@)
  */
@@ -891,15 +886,6 @@ HDWP WINAPI DeferWindowPos( HDWP hdwp, HWND hwnd, HWND after, INT x, INT y,
 BOOL WINAPI EndDeferWindowPos( HDWP hdwp )
 {
     return NtUserEndDeferWindowPosEx( hdwp, FALSE );
-}
-
-
-/***********************************************************************
- *           ArrangeIconicWindows (USER32.@)
- */
-UINT WINAPI ArrangeIconicWindows( HWND parent )
-{
-    return NtUserArrangeIconicWindows( parent );
 }
 
 
@@ -1301,15 +1287,6 @@ HWND WINAPI GetWindow( HWND hwnd, UINT rel )
 
 
 /*******************************************************************
- *		ShowOwnedPopups (USER32.@)
- */
-BOOL WINAPI ShowOwnedPopups( HWND owner, BOOL show )
-{
-    return NtUserShowOwnedPopups( owner, show );
-}
-
-
-/*******************************************************************
  *		GetLastActivePopup (USER32.@)
  */
 HWND WINAPI GetLastActivePopup( HWND hwnd )
@@ -1414,24 +1391,6 @@ BOOL WINAPI FlashWindow( HWND hWnd, BOOL bInvert )
     finfo.dwTimeout = 0;
     finfo.hwnd = hWnd;
     return NtUserFlashWindowEx( &finfo );
-}
-
-
-/*******************************************************************
- *		GetWindowContextHelpId (USER32.@)
- */
-DWORD WINAPI GetWindowContextHelpId( HWND hwnd )
-{
-    return NtUserGetWindowContextHelpId( hwnd );
-}
-
-
-/*******************************************************************
- *		SetWindowContextHelpId (USER32.@)
- */
-BOOL WINAPI SetWindowContextHelpId( HWND hwnd, DWORD id )
-{
-    return NtUserSetWindowContextHelpId( hwnd, id );
 }
 
 
@@ -1585,17 +1544,6 @@ BOOL WINAPI GetProcessDefaultLayout( DWORD *layout )
 }
 
 
-/******************************************************************************
- *                    SetProcessDefaultLayout [USER32.@]
- *
- * Sets the default layout for parentless windows.
- */
-BOOL WINAPI SetProcessDefaultLayout( DWORD layout )
-{
-    return NtUserSetProcessDefaultLayout( layout );
-}
-
-
 /***********************************************************************
  *           UpdateWindow (USER32.@)
  */
@@ -1608,21 +1556,6 @@ BOOL WINAPI UpdateWindow( HWND hwnd )
     }
 
     return NtUserRedrawWindow( hwnd, NULL, 0, RDW_UPDATENOW | RDW_ALLCHILDREN );
-}
-
-
-/***********************************************************************
- *           ValidateRgn (USER32.@)
- */
-BOOL WINAPI ValidateRgn( HWND hwnd, HRGN hrgn )
-{
-    if (!hwnd)
-    {
-        SetLastError( ERROR_INVALID_WINDOW_HANDLE );
-        return FALSE;
-    }
-
-    return NtUserRedrawWindow( hwnd, NULL, hrgn, RDW_VALIDATE );
 }
 
 

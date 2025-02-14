@@ -499,6 +499,8 @@ static void test_NtUserBuildHwndList(void)
     ULONG i, size, count, desktop_windows_cnt;
     HWND buf[512], hwnd, msg, msg_window, child, child2, grandchild;
     NTSTATUS status;
+    HDESK desktop;
+    BOOL ret;
 
     size = 0xdeadbeef;
     status = NtUserBuildHwndList( 0, 0, FALSE, FALSE, GetCurrentThreadId(), ARRAYSIZE(buf), buf, &size );
@@ -546,6 +548,10 @@ static void test_NtUserBuildHwndList(void)
     ok( !status, "NtUserBuildHwndList failed: %#lx\n", status );
     ok( size == desktop_windows_cnt + 1, "size = %lu, expected %lu\n", size, desktop_windows_cnt + 1 );
 
+    SetLastError( 0xdeadbeef );
+    ret = EnumDesktopWindows( UlongToHandle(0xdeadbeef), count_win, (LPARAM)&desktop_windows_cnt );
+    ok( !ret && GetLastError() == ERROR_INVALID_HANDLE, "wrong result %u %lu\n", ret, GetLastError() );
+
     desktop_windows_cnt = 0;
     EnumDesktopWindows( GetThreadDesktop( GetCurrentThreadId() ), count_win, (LPARAM)&desktop_windows_cnt );
 
@@ -576,6 +582,14 @@ static void test_NtUserBuildHwndList(void)
     ok( !status, "NtUserBuildHwndList failed: %#lx\n", status );
     ok( size == 1, "size = %lu\n", size );
     ok( buf[size - 1] == HWND_BOTTOM, "buf[size - 1] = %p\n", buf[size - 1] );
+
+    desktop = OpenDesktopW( L"Default", 0, FALSE, 0 );
+    ok( desktop != 0, "OpenDesktopW failed %lu\n", GetLastError() );
+    size = 0xdeadbeef;
+    status = NtUserBuildHwndList( desktop, 0, FALSE, TRUE, 0, ARRAYSIZE(buf), buf, &size );
+    ok( !status, "NtUserBuildHwndList failed: %#lx\n", status );
+    ok( size == desktop_windows_cnt + 1, "size = %lu, expected %lu\n", size, desktop_windows_cnt + 1 );
+    CloseHandle( desktop );
 
     size = 0xdeadbeef;
     status = NtUserBuildHwndList( 0, 0, TRUE, TRUE, 0, ARRAYSIZE(buf), buf, &size );
@@ -869,6 +883,7 @@ static void test_NtUserQueryWindow(void)
             ok( !ret, "wrong value %p\n", ret );
             break;
         case WindowIsForegroundThread:
+            flaky  /* foreground thread may change */
             ok( ret == (HANDLE)TRUE, "wrong value %p\n", ret );
             break;
         case WindowDefaultImeWindow:

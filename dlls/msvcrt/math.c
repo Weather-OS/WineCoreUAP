@@ -2958,16 +2958,57 @@ double CDECL _except1(DWORD fpe, _FP_OPERATION_CODE op, double arg, double res, 
     return res;
 }
 
-_Dcomplex* CDECL _Cbuild(_Dcomplex *ret, double r, double i)
+_Dcomplex CDECL _Cbuild(double r, double i)
 {
-    ret->_Val[0] = r;
-    ret->_Val[1] = i;
+    _Dcomplex ret;
+    ret._Val[0] = r;
+    ret._Val[1] = i;
     return ret;
 }
 
-double CDECL MSVCR120_creal(_Dcomplex z)
+double CDECL creal(_Dcomplex z)
 {
     return z._Val[0];
+}
+
+double CDECL cimag(_Dcomplex z)
+{
+    return z._Val[1];
+}
+
+#ifndef __i386__
+_Fcomplex CDECL _FCbuild(float r, float i)
+{
+    _Fcomplex ret;
+    ret._Val[0] = r;
+    ret._Val[1] = i;
+    return ret;
+}
+#else
+ULONGLONG CDECL _FCbuild(float r, float i)
+{
+    union
+    {
+        _Fcomplex c;
+        ULONGLONG ull;
+    } ret;
+
+    C_ASSERT(sizeof(_Fcomplex) == sizeof(ULONGLONG));
+
+    ret.c._Val[0] = r;
+    ret.c._Val[1] = i;
+    return ret.ull;
+}
+#endif
+
+float CDECL crealf(_Fcomplex z)
+{
+    return z._Val[0];
+}
+
+float CDECL cimagf(_Fcomplex z)
+{
+    return z._Val[1];
 }
 
 #endif /* _MSVCR_VER>=120 */

@@ -201,12 +201,6 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
 {
     struct wined3d_string_buffer texcoord;
 
-    if (settings->point_size)
-        FIXME("Ignoring point size.\n");
-
-    if (settings->vertexblends)
-        FIXME("Ignoring vertex blend.\n");
-
     /* This must be kept in sync with struct wined3d_ffp_vs_constants. */
     shader_addline(buffer, "uniform struct\n");
     shader_addline(buffer, "{\n");
@@ -256,6 +250,7 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
     }
     if (settings->fog_mode == WINED3D_FFP_VS_FOG_DEPTH || settings->fog_mode == WINED3D_FFP_VS_FOG_RANGE)
         shader_addline(buffer, "    float fogcoord : FOG;\n");
+    shader_addline(buffer, "    float point_size : PSIZE;\n");
     shader_addline(buffer, "};\n\n");
 
     shader_addline(buffer, "float3 ffp_normalize(float3 n)\n{\n");
@@ -265,6 +260,8 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
 
     shader_addline(buffer, "void main(in struct input i, out struct output o)\n");
     shader_addline(buffer, "{\n");
+
+    shader_addline(buffer, "    i.blend_weight[%u] = 1.0;\n", settings->vertexblends);
 
     if (settings->transformed)
     {
@@ -279,9 +276,12 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
     }
     else
     {
-        shader_addline(buffer, "    float4 ec_pos = 0.0;\n\n");
+        for (unsigned int i = 0; i < settings->vertexblends; ++i)
+            shader_addline(buffer, "    i.blend_weight[%u] -= i.blend_weight[%u];\n", settings->vertexblends, i);
 
-        shader_addline(buffer, "    ec_pos += mul(c.modelview_matrices[0], float4(i.pos.xyz, 1.0));\n\n");
+        shader_addline(buffer, "    float4 ec_pos = 0.0;\n\n");
+        for (unsigned int i = 0; i < settings->vertexblends + 1; ++i)
+            shader_addline(buffer, "    ec_pos += i.blend_weight[%u] * mul(c.modelview_matrices[%u], float4(i.pos.xyz, 1.0));\n", i, i);
 
         shader_addline(buffer, "    o.pos = mul(c.projection_matrix, ec_pos);\n");
         shader_addline(buffer, "    ec_pos /= ec_pos.w;\n\n");
@@ -290,10 +290,24 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
     shader_addline(buffer, "    float3 normal = 0.0;\n");
     if (settings->normal)
     {
-        if (settings->transformed)
-            shader_addline(buffer, "    normal = i.normal;\n");
+        if (!settings->vertexblends)
+        {
+            if (settings->transformed)
+                shader_addline(buffer, "    normal = i.normal;\n");
+            else
+                shader_addline(buffer, "    normal = mul((float3x3)c.modelview_matrices[1], i.normal);\n");
+        }
         else
-            shader_addline(buffer, "    normal = mul((float3x3)c.modelview_matrices[1], i.normal);\n");
+        {
+            for (unsigned int i = 0; i < settings->vertexblends + 1; ++i)
+            {
+                if (settings->transformed)
+                    shader_addline(buffer, "    normal += i.blend_weight[%u] * i.normal;\n", i);
+                else
+                    shader_addline(buffer, "    normal += i.blend_weight[%u]"
+                            " * mul((float3x3)c.modelview_matrices[%u], i.normal);\n", i, i);
+            }
+        }
 
         if (settings->normalize)
             shader_addline(buffer, "    normal = ffp_normalize(normal);\n");
@@ -349,6 +363,11 @@ static bool ffp_hlsl_generate_vertex_shader(const struct wined3d_ffp_vs_settings
                 shader_addline(buffer, "    o.fogcoord = abs(o.pos.z);\n");
             break;
     }
+
+    shader_addline(buffer, "    o.point_size = %s / sqrt(c.point_params.x"
+            " + c.point_params.y * length(ec_pos.xyz)"
+            " + c.point_params.z * dot(ec_pos.xyz, ec_pos.xyz));\n",
+            settings->per_vertex_point_size ? "i.point_size" : "c.point_params.w");
 
     shader_addline(buffer, "}\n");
 
@@ -600,9 +619,6 @@ static bool ffp_hlsl_generate_pixel_shader(const struct ffp_frag_settings *setti
     uint8_t tex_map = 0;
     unsigned int i;
 
-    if (settings->color_key_enabled)
-        FIXME("Ignoring color key.\n");
-
     /* Find out which textures are read. */
     for (i = 0; i < WINED3D_MAX_FFP_TEXTURES; ++i)
     {
@@ -682,6 +698,10 @@ static bool ffp_hlsl_generate_pixel_shader(const struct ffp_frag_settings *setti
     shader_addline(buffer, "    float4 texture_factor;\n");
     shader_addline(buffer, "    float4 specular_enable;\n");
     shader_addline(buffer, "    float4 color_key[2];\n");
+    /* Bumpenv constants are manually packed. */
+    shader_addline(buffer, "    float4 bumpenv_matrices[%u];\n", WINED3D_MAX_FFP_TEXTURES);
+    shader_addline(buffer, "    float4 bumpenv_lscale[2];\n");
+    shader_addline(buffer, "    float4 bumpenv_loffset[2];\n");
     shader_addline(buffer, "} c;\n");
 
     shader_addline(buffer, "struct input\n");
@@ -773,7 +793,37 @@ static bool ffp_hlsl_generate_pixel_shader(const struct ffp_frag_settings *setti
                 && (settings->op[i - 1].cop == WINED3D_TOP_BUMPENVMAP
                 || settings->op[i - 1].cop == WINED3D_TOP_BUMPENVMAP_LUMINANCE))
         {
-            FIXME("I could not speak, and my eyes failed.\n");
+            shader_addline(buffer, "ret.xy = mul(transpose((float2x2)c.bumpenv_matrices[%u]), tex%u.xy);\n", i - 1, i - 1);
+
+            /* With projective textures, texbem only divides the static texture
+             * coordinate, not the displacement, so multiply the displacement
+             * with the dividing parameter before sampling. */
+            if (settings->op[i].projected != WINED3D_PROJECTION_NONE)
+            {
+                if (settings->op[i].projected == WINED3D_PROJECTION_COUNT4)
+                {
+                    shader_addline(buffer, "ret.xy = (ret.xy * texcoord[%u].w) + texcoord[%u].xy;\n", i, i);
+                    shader_addline(buffer, "ret.zw = texcoord[%u].ww;\n", i);
+                }
+                else
+                {
+                    shader_addline(buffer, "ret.xy = (ret.xy * texcoord[%u].z) + texcoord[%u].xy;\n", i, i);
+                    shader_addline(buffer, "ret.zw = texcoord[%u].zz;\n", i);
+                }
+            }
+            else
+            {
+                shader_addline(buffer, "ret = texcoord[%u] + ret.xyxy;\n", i);
+            }
+
+            shader_addline(buffer, "tex%u = %s%s(ps_sampler%u, ret.%s);\n",
+                    i, texture_function, proj ? "proj" : "", i, coord_mask);
+
+            if (settings->op[i - 1].cop == WINED3D_TOP_BUMPENVMAP_LUMINANCE)
+            {
+                shader_addline(buffer, "tex%u *= saturate(tex%u.z * c.bumpenv_lscale[%u][%u] + c.bumpenv_loffset[%u][%u]);\n",
+                        i, i - 1, (i - 1) / 4, (i - 1) % 4, (i - 1) / 4, (i - 1) % 4);
+            }
         }
         else if (settings->op[i].projected == WINED3D_PROJECTION_COUNT3)
         {
@@ -785,6 +835,12 @@ static bool ffp_hlsl_generate_pixel_shader(const struct ffp_frag_settings *setti
             shader_addline(buffer, "    tex%u = %s%s(ps_sampler%u, texcoord[%u].%s);\n",
                     i, texture_function, proj ? "proj" : "", i, i, coord_mask);
         }
+    }
+
+    if (settings->color_key_enabled)
+    {
+        shader_addline(buffer, "    if (all(tex0 >= c.color_key[0]) && all(tex0 < c.color_key[1]))\n");
+        shader_addline(buffer, "        discard;\n");
     }
 
     shader_addline(buffer, "    ret = i.diffuse;\n");

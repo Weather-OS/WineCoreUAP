@@ -1285,8 +1285,8 @@ void wined3d_gl_texture_swizzle_from_color_fixup(GLint swizzle[4], struct color_
 }
 
 /* Context activation is done by the caller. */
-GLuint wined3d_texture_gl_prepare_gl_texture(struct wined3d_texture_gl *texture_gl,
-         struct wined3d_context_gl *context_gl, BOOL srgb)
+void wined3d_texture_gl_bind(struct wined3d_texture_gl *texture_gl,
+        struct wined3d_context_gl *context_gl, BOOL srgb)
 {
     const struct wined3d_format *format = texture_gl->t.resource.format;
     const struct wined3d_gl_info *gl_info = context_gl->gl_info;
@@ -1309,7 +1309,10 @@ GLuint wined3d_texture_gl_prepare_gl_texture(struct wined3d_texture_gl *texture_
     target = texture_gl->target;
 
     if (gl_tex->name)
-        return gl_tex->name;
+    {
+        wined3d_context_gl_bind_texture(context_gl, target, gl_tex->name);
+        return;
+    }
 
     gl_info->gl_ops.gl.p_glGenTextures(1, &gl_tex->name);
     checkGLcall("glGenTextures");
@@ -1318,7 +1321,7 @@ GLuint wined3d_texture_gl_prepare_gl_texture(struct wined3d_texture_gl *texture_
     if (!gl_tex->name)
     {
         ERR("Failed to generate a texture name.\n");
-        return 0;
+        return;
     }
 
     /* Initialise the state of the texture object to the OpenGL defaults, not
@@ -1396,8 +1399,6 @@ GLuint wined3d_texture_gl_prepare_gl_texture(struct wined3d_texture_gl *texture_
         gl_info->gl_ops.gl.p_glTexParameteriv(target, GL_TEXTURE_SWIZZLE_RGBA, swizzle);
         checkGLcall("set format swizzle");
     }
-
-    return gl_tex->name;
 }
 
 /* Context activation is done by the caller. */
@@ -1410,13 +1411,6 @@ void wined3d_texture_gl_bind_and_dirtify(struct wined3d_texture_gl *texture_gl,
     context_invalidate_state(&context_gl->c, STATE_GRAPHICS_SHADER_RESOURCE_BINDING);
 
     wined3d_texture_gl_bind(texture_gl, context_gl, srgb);
-}
-
-void wined3d_texture_gl_bind(struct wined3d_texture_gl *texture_gl,
-        struct wined3d_context_gl *context_gl, BOOL srgb)
-{
-    wined3d_context_gl_bind_texture(context_gl, texture_gl->target,
-            wined3d_texture_gl_prepare_gl_texture(texture_gl, context_gl, srgb));
 }
 
 /* Context activation is done by the caller (state handler). */
@@ -4975,10 +4969,44 @@ static void wined3d_texture_vk_download_data(struct wined3d_context *context,
         }
 
         dst_bo = &staging_bo;
+
+        region.bufferRowLength = (src_row_pitch / dst_format->block_byte_count) * dst_format->block_width;
+        if (src_row_pitch)
+            region.bufferImageHeight = (src_slice_pitch / src_row_pitch) * dst_format->block_height;
+        else
+            region.bufferImageHeight = 1;
+
+        if (src_row_pitch % dst_format->byte_count)
+        {
+            FIXME("Row pitch %u is not a multiple of byte count %u.\n", src_row_pitch, dst_format->byte_count);
+            return;
+        }
+        if (src_row_pitch && src_slice_pitch % src_row_pitch)
+        {
+            FIXME("Slice pitch %u is not a multiple of row pitch %u.\n", src_slice_pitch, src_row_pitch);
+            return;
+        }
     }
     else
     {
         dst_bo = wined3d_bo_vk(dst_bo_addr->buffer_object);
+
+        region.bufferRowLength = (dst_row_pitch / dst_format->block_byte_count) * dst_format->block_width;
+        if (dst_row_pitch)
+            region.bufferImageHeight = (dst_slice_pitch / dst_row_pitch) * dst_format->block_height;
+        else
+            region.bufferImageHeight = 1;
+
+        if (dst_row_pitch % dst_format->byte_count)
+        {
+            FIXME("Row pitch %u is not a multiple of byte count %u.\n", dst_row_pitch, dst_format->byte_count);
+            return;
+        }
+        if (dst_row_pitch && dst_slice_pitch % dst_row_pitch)
+        {
+            FIXME("Slice pitch %u is not a multiple of row pitch %u.\n", dst_slice_pitch, dst_row_pitch);
+            return;
+        }
 
         vk_barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
         vk_barrier.pNext = NULL;
@@ -5011,8 +5039,6 @@ static void wined3d_texture_vk_download_data(struct wined3d_context *context,
             src_texture_vk->image.vk_image, &vk_range);
 
     region.bufferOffset = dst_bo->b.buffer_offset + dst_offset;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = vk_range.aspectMask;
     region.imageSubresource.mipLevel = vk_range.baseMipLevel;
     region.imageSubresource.baseArrayLayer = vk_range.baseArrayLayer;

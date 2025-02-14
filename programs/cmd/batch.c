@@ -38,8 +38,11 @@ static RETURN_CODE WCMD_batch_main_loop(void)
             context->skip_rest = TRUE;
             break;
         case RPL_SUCCESS:
-            return_code = node_execute(node);
-            node_dispose_tree(node);
+            if (node)
+            {
+                return_code = node_execute(node);
+                node_dispose_tree(node);
+            }
             break;
         case RPL_SYNTAXERROR:
             return_code = RETURN_CODE_SYNTAX_ERROR;
@@ -90,7 +93,9 @@ RETURN_CODE WCMD_call_batch(const WCHAR *file, WCHAR *command)
     free(context);
     context = prev_context;
 
-    return return_code;
+    if (return_code != NO_ERROR && return_code != RETURN_CODE_ABORTED)
+        errorlevel = return_code;
+    return errorlevel;
 }
 
 /*******************************************************************
@@ -350,7 +355,7 @@ void WCMD_HandleTildeModifiers(WCHAR **start, BOOL atExecute)
   }
   if (lastModifier == firstModifier) return; /* Invalid syntax */
   /* put all modifiers in lowercase */
-  for (pos = firstModifier; pos < lastModifier; pos++)
+  for (pos = firstModifier; pos < lastModifier && *pos != L'$'; pos++)
       *pos = towlower(*pos);
 
   /* So now, firstModifier points to beginning of modifiers, lastModifier

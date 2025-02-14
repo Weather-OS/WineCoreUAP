@@ -822,7 +822,7 @@ static void create_bios_processor_values( HKEY system_key, const char *buf, UINT
 {
     const struct smbios_header *hdr;
     const struct smbios_processor *proc;
-    unsigned int pkg, core, offset, i;
+    unsigned int pkg, core, offset, i, thread_count;
     HKEY hkey, cpu_key, fpu_key = 0, env_key;
     SYSTEM_CPU_INFORMATION sci;
     PROCESSOR_POWER_INFORMATION* power_info;
@@ -855,6 +855,7 @@ static void create_bios_processor_values( HKEY system_key, const char *buf, UINT
             fpu_key = 0;
         break;
     }
+    set_reg_value( system_key, L"SystemBiosDate", L"01/01/70" );
 
     if (RegCreateKeyExW( system_key, L"CentralProcessor", 0, NULL, REG_OPTION_VOLATILE,
                          KEY_ALL_ACCESS, NULL, &cpu_key, NULL ))
@@ -863,6 +864,7 @@ static void create_bios_processor_values( HKEY system_key, const char *buf, UINT
     for (pkg = core = 0; ; pkg++)
     {
         if (!(hdr = find_smbios_entry( SMBIOS_TYPE_PROCESSOR, pkg, buf, len ))) break;
+        if (hdr->length < 0x28) break; /* version 2.5 is required */
         proc = (const struct smbios_processor *)hdr;
         offset = (const char *)proc - buf + proc->hdr.length;
         version = get_smbios_string( proc->version, buf, offset, len );
@@ -894,7 +896,8 @@ static void create_bios_processor_values( HKEY system_key, const char *buf, UINT
             break;
         }
 
-        for (i = 0; i < proc->thread_count2; i++, core++)
+        thread_count = (proc->hdr.length >= 0x30) ? proc->thread_count2 : proc->thread_count;
+        for (i = 0; i < thread_count; i++, core++)
         {
             swprintf( buffer, ARRAY_SIZE(buffer), L"%u", core );
             if (!RegCreateKeyExW( cpu_key, buffer, 0, NULL, REG_OPTION_VOLATILE,

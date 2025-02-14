@@ -75,45 +75,6 @@ static struct swapchain *swapchain_from_handle( VkSwapchainKHR handle )
     return CONTAINING_RECORD( obj, struct swapchain, obj );
 }
 
-static int window_surface_compare( const void *key, const struct rb_entry *entry )
-{
-    const struct surface *surface = RB_ENTRY_VALUE( entry, struct surface, window_entry );
-    HWND key_hwnd = (HWND)key;
-
-    if (key_hwnd < surface->hwnd) return -1;
-    if (key_hwnd > surface->hwnd) return 1;
-    return 0;
-}
-
-static pthread_mutex_t window_surfaces_lock = PTHREAD_MUTEX_INITIALIZER;
-static struct rb_tree window_surfaces = {.compare = window_surface_compare};
-
-static void window_surfaces_insert( struct surface *surface )
-{
-    struct surface *previous;
-    struct rb_entry *ptr;
-
-    pthread_mutex_lock( &window_surfaces_lock );
-
-    if (!(ptr = rb_get( &window_surfaces, surface->hwnd )))
-        rb_put( &window_surfaces, surface->hwnd, &surface->window_entry );
-    else
-    {
-        previous = RB_ENTRY_VALUE( ptr, struct surface, window_entry );
-        rb_replace( &window_surfaces, &previous->window_entry, &surface->window_entry );
-        previous->hwnd = 0; /* make sure previous surface becomes invalid */
-    }
-
-    pthread_mutex_unlock( &window_surfaces_lock );
-}
-
-static void window_surfaces_remove( struct surface *surface )
-{
-    pthread_mutex_lock( &window_surfaces_lock );
-    if (surface->hwnd) rb_remove( &window_surfaces, &surface->window_entry );
-    pthread_mutex_unlock( &window_surfaces_lock );
-}
-
 static VkResult win32u_vkCreateWin32SurfaceKHR( VkInstance client_instance, const VkWin32SurfaceCreateInfoKHR *create_info,
                                                 const VkAllocationCallbacks *allocator, VkSurfaceKHR *ret )
 {
@@ -156,13 +117,11 @@ static VkResult win32u_vkCreateWin32SurfaceKHR( VkInstance client_instance, cons
         release_win_ptr( win );
     }
 
-    surface->hwnd = create_info->hwnd;
     vulkan_object_init( &surface->obj.obj, host_surface );
     surface->obj.instance = instance;
     instance->p_insert_object( instance, &surface->obj.obj );
 
     if (dummy) NtUserDestroyWindow( dummy );
-    window_surfaces_insert( surface );
 
     *ret = surface->obj.client.surface;
     return VK_SUCCESS;
@@ -190,7 +149,6 @@ static void win32u_vkDestroySurfaceKHR( VkInstance client_instance, VkSurfaceKHR
     driver_funcs->p_vulkan_surface_destroy( surface->hwnd, surface->driver_private );
 
     instance->p_remove_object( instance, &surface->obj.obj );
-    window_surfaces_remove( surface );
 
     free( surface );
 }
@@ -481,7 +439,8 @@ static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentI
         struct surface *surface = swapchain->surface;
         RECT client_rect;
 
-        driver_funcs->p_vulkan_surface_presented( surface->hwnd, surface->driver_private, swapchain_res );
+        if (surface->hwnd)
+            driver_funcs->p_vulkan_surface_presented( surface->hwnd, surface->driver_private, swapchain_res );
 
         if (swapchain_res < VK_SUCCESS) continue;
         if (!NtUserGetClientRect( surface->hwnd, &client_rect, NtUserGetDpiForWindow( surface->hwnd ) ))
@@ -702,6 +661,7 @@ void vulkan_detach_surfaces( struct list *surfaces )
         driver_funcs->p_vulkan_surface_detach( surface->hwnd, surface->driver_private );
         list_remove( &surface->entry );
         list_init( &surface->entry );
+        surface->hwnd = NULL;
     }
 }
 

@@ -1094,6 +1094,7 @@ static void test_query_interrupt(void)
 
 static void test_time_adjustment(void)
 {
+    SYSTEM_LEAP_SECOND_INFORMATION leap;
     SYSTEM_TIME_ADJUSTMENT_QUERY query;
     SYSTEM_TIME_ADJUSTMENT adjust;
     NTSTATUS status;
@@ -1124,6 +1125,14 @@ static void test_time_adjustment(void)
     status = pNtSetSystemInformation( SystemTimeAdjustmentInformation, &adjust, sizeof(adjust)+1 );
     todo_wine
     ok( status == STATUS_INFO_LENGTH_MISMATCH, "got %08lx\n", status );
+
+    len = 0;
+    memset( &leap, 0xcc, sizeof(leap) );
+    status = pNtQuerySystemInformation( SystemLeapSecondInformation, &leap, sizeof(leap), &len );
+    ok( status == STATUS_SUCCESS, "got %08lx\n", status );
+    ok( len == sizeof(leap), "wrong len %lu\n", len );
+    ok( leap.Enabled == 1, "got %u\n", leap.Enabled );
+    ok( !leap.Flags, "got %lx\n", leap.Flags );
 }
 
 static void test_query_kerndebug(void)
@@ -2359,8 +2368,11 @@ static void test_query_process_image_file_name(void)
     ok( status == STATUS_INFO_LENGTH_MISMATCH, "Expected STATUS_INFO_LENGTH_MISMATCH, got %08lx\n", status);
 
     buffer = malloc(ReturnLength);
+    memset( buffer, 0xcc, ReturnLength );
     status = NtQueryInformationProcess( GetCurrentProcess(), ProcessImageFileName, buffer, ReturnLength, &ReturnLength);
     ok( status == STATUS_SUCCESS, "Expected STATUS_SUCCESS, got %08lx\n", status);
+    ok( buffer->MaximumLength == buffer->Length + sizeof(WCHAR), "got %u, %u.\n", buffer->Length, buffer->MaximumLength );
+    ok ( !buffer->Buffer[buffer->Length / sizeof(WCHAR)], "got %#x.\n", buffer->Buffer[buffer->Length / sizeof(WCHAR)] );
     todo_wine
     ok(!memcmp(buffer->Buffer, deviceW, sizeof(deviceW)),
         "Expected image name to begin with \\Device\\, got %s\n",
@@ -2382,8 +2394,11 @@ static void test_query_process_image_file_name(void)
     ok( status == STATUS_INFO_LENGTH_MISMATCH, "Expected STATUS_INFO_LENGTH_MISMATCH, got %08lx\n", status);
 
     buffer = malloc(ReturnLength);
+    memset( buffer, 0xcc, ReturnLength );
     status = NtQueryInformationProcess( GetCurrentProcess(), ProcessImageFileNameWin32, buffer, ReturnLength, &ReturnLength);
     ok( status == STATUS_SUCCESS, "Expected STATUS_SUCCESS, got %08lx\n", status);
+    ok( buffer->MaximumLength == buffer->Length + sizeof(WCHAR), "got %u, %u.\n", buffer->Length, buffer->MaximumLength );
+    ok ( !buffer->Buffer[buffer->Length / sizeof(WCHAR)], "got %#x.\n", buffer->Buffer[buffer->Length / sizeof(WCHAR)] );
     ok(memcmp(buffer->Buffer, deviceW, sizeof(deviceW)),
         "Expected image name not to begin with \\Device\\, got %s\n",
         wine_dbgstr_wn(buffer->Buffer, buffer->Length / sizeof(WCHAR)));

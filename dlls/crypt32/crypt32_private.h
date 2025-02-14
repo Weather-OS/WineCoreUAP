@@ -185,6 +185,7 @@ typedef struct {
 struct _context_t {
     const context_vtbl_t *vtbl;
     LONG ref;
+    BOOL deleted_from_store;
     struct WINE_CRYPTCERTSTORE *store;
     struct _context_t *linked;
     CONTEXT_PROPERTY_LIST *properties;
@@ -349,10 +350,12 @@ WINECRYPT_CERTSTORE *CRYPT_FileNameOpenStoreW(HCRYPTPROV hCryptProv,
  DWORD dwFlags, const void *pvPara);
 
 void CRYPT_ImportSystemRootCertsToReg(void);
-BOOL CRYPT_SerializeContextsToReg(HKEY key, DWORD flags, const WINE_CONTEXT_INTERFACE *contextInterface,
-    HCERTSTORE memStore);
+BOOL CRYPT_SerializeContextToReg(HKEY key, DWORD flags, const WINE_CONTEXT_INTERFACE *context_iface,
+    const void *context);
 void CRYPT_RegReadSerializedFromReg(HKEY key, DWORD contextType,
     HCERTSTORE store, DWORD disposition);
+void CRYPT_RegDeleteFromReg(HKEY key, const BYTE *sha1_hash);
+void CRYPT_HashToStr(const BYTE *hash, LPWSTR asciiHash);
 
 DWORD CRYPT_IsCertificateSelfSigned(const CERT_CONTEXT *cert);
 
@@ -414,6 +417,8 @@ context_t *Context_CreateDataContext(size_t contextSize, const context_vtbl_t *v
  * Free with Context_Release.
  */
 context_t *Context_CreateLinkContext(unsigned contextSize, context_t *linked, struct WINE_CRYPTCERTSTORE*);
+
+BOOL CRYPT_DeleteCertificateFromStore(PCCERT_CONTEXT pCertContext);
 
 /* Copies properties from fromContext to toContext. */
 void Context_CopyProperties(const void *to, const void *from);

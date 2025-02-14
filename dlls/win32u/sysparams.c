@@ -6882,7 +6882,19 @@ ULONG WINAPI NtUserGetProcessDpiAwarenessContext( HANDLE process )
     return context;
 }
 
-BOOL message_beep( UINT i )
+/***********************************************************************
+ *	     NtUserSetProcessDefaultLayout    (win32u.@)
+ */
+BOOL WINAPI NtUserSetProcessDefaultLayout( ULONG layout )
+{
+    process_layout = layout;
+    return TRUE;
+}
+
+/***********************************************************************
+ *	     NtUserMessageBeep    (win32u.@)
+ */
+BOOL WINAPI NtUserMessageBeep( UINT type )
 {
     BOOL active = TRUE;
     NtUserSystemParametersInfo( SPI_GETBEEP, 0, &active, FALSE );
@@ -6932,17 +6944,11 @@ ULONG_PTR WINAPI NtUserCallNoParam( ULONG code )
 {
     switch(code)
     {
-    case NtUserCallNoParam_DestroyCaret:
-        return destroy_caret();
-
     case NtUserCallNoParam_GetDesktopWindow:
         return HandleToUlong( get_desktop_window() );
 
     case NtUserCallNoParam_GetDialogBaseUnits:
         return get_dialog_base_units();
-
-    case NtUserCallNoParam_GetInputState:
-        return get_input_state();
 
     case NtUserCallNoParam_GetLastInputTime:
         return get_last_input_time();
@@ -6958,9 +6964,6 @@ ULONG_PTR WINAPI NtUserCallNoParam( ULONG code )
 
     case NtUserCallNoParam_GetTaskmanWindow:
         return HandleToUlong( get_taskman_window() );
-
-    case NtUserCallNoParam_ReleaseCapture:
-        return release_capture();
 
     case NtUserCallNoParam_DisplayModeChanged:
         display_mode_changed( FALSE );
@@ -6994,21 +6997,12 @@ ULONG_PTR WINAPI NtUserCallOneParam( ULONG_PTR arg, ULONG code )
     case NtUserCallOneParam_CreateCursorIcon:
         return HandleToUlong( alloc_cursoricon_handle( arg ));
 
-    case NtUserCallOneParam_CreateMenu:
-        return HandleToUlong( create_menu( arg ) );
-
     case NtUserCallOneParam_EnableDC:
         return set_dce_flags( UlongToHandle(arg), DCHF_ENABLEDC );
 
     case NtUserCallOneParam_EnableThunkLock:
         thunk_lock_callback = arg;
         return 0;
-
-    case NtUserCallOneParam_EnumClipboardFormats:
-        return enum_clipboard_formats( arg );
-
-    case NtUserCallOneParam_GetClipCursor:
-        return get_clip_cursor( (RECT *)arg, get_thread_dpi(), MDT_DEFAULT );
 
     case NtUserCallOneParam_GetCursorPos:
         return get_cursor_pos( (POINT *)arg );
@@ -7022,9 +7016,6 @@ ULONG_PTR WINAPI NtUserCallOneParam( ULONG_PTR arg, ULONG code )
     case NtUserCallOneParam_GetSysColor:
         return get_sys_color( arg );
 
-    case NtUserCallOneParam_RealizePalette:
-        return realize_palette( UlongToHandle(arg) );
-
     case NtUserCallOneParam_GetPrimaryMonitorRect:
         *(RECT *)arg = get_primary_monitor_rect( 0 );
         return 1;
@@ -7037,22 +7028,6 @@ ULONG_PTR WINAPI NtUserCallOneParam( ULONG_PTR arg, ULONG code )
 
     case NtUserCallOneParam_GetSystemMetrics:
         return get_system_metrics( arg );
-
-    case NtUserCallOneParam_MessageBeep:
-        return message_beep( arg );
-
-    case NtUserCallOneParam_PostQuitMessage:
-        return post_quit_message( arg );
-
-    case NtUserCallOneParam_ReplyMessage:
-        return reply_message_result( arg );
-
-    case NtUserCallOneParam_SetCaretBlinkTime:
-        return set_caret_blink_time( arg );
-
-    case NtUserCallOneParam_SetProcessDefaultLayout:
-        process_layout = arg;
-        return TRUE;
 
     case NtUserCallOneParam_SetKeyboardAutoRepeat:
         return set_keyboard_auto_repeat( arg );
@@ -7098,17 +7073,11 @@ ULONG_PTR WINAPI NtUserCallTwoParam( ULONG_PTR arg1, ULONG_PTR arg2, ULONG code 
     case NtUserCallTwoParam_MonitorFromRect:
         return HandleToUlong( monitor_from_rect( (const RECT *)arg1, arg2, get_thread_dpi() ));
 
-    case NtUserCallTwoParam_SetCaretPos:
-        return set_caret_pos( arg1, arg2 );
-
     case NtUserCallTwoParam_SetIconParam:
         return set_icon_param( UlongToHandle(arg1), UlongToHandle(arg2) );
 
     case NtUserCallTwoParam_SetIMECompositionRect:
         return set_ime_composition_rect( UlongToHandle(arg1), *(const RECT *)arg2 );
-
-    case NtUserCallTwoParam_UnhookWindowsHook:
-        return unhook_windows_hook( arg1, (HOOKPROC)arg2 );
 
     case NtUserCallTwoParam_AdjustWindowRect:
     {

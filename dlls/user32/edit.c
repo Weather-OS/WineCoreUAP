@@ -1804,7 +1804,7 @@ static void EDIT_SetCaretPos(EDITSTATE *es, INT pos,
 	{
 		res = EDIT_EM_PosFromChar(es, pos, after_wrap);
 		TRACE("%d - %dx%d\n", pos, (short)LOWORD(res), (short)HIWORD(res));
-		SetCaretPos((short)LOWORD(res), (short)HIWORD(res));
+		NtUserSetCaretPos((short)LOWORD(res), (short)HIWORD(res));
 		EDIT_UpdateImmCompositionWindow(es, (short)LOWORD(res), (short)HIWORD(res));
 	}
 }
@@ -3572,7 +3572,7 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 static LRESULT EDIT_WM_KillFocus(EDITSTATE *es)
 {
 	es->flags &= ~EF_FOCUSED;
-	DestroyCaret();
+	NtUserDestroyCaret();
 	if(!(es->style & ES_NOHIDESEL))
 		EDIT_InvalidateText(es, es->selection_start, es->selection_end);
 	if (!notify_parent(es, EN_KILLFOCUS)) return 0;
@@ -3643,7 +3643,7 @@ static LRESULT EDIT_WM_LButtonDown(EDITSTATE *es, DWORD keys, INT x, INT y)
 static LRESULT EDIT_WM_LButtonUp(EDITSTATE *es)
 {
 	if (es->bCaptureState) {
-		if (GetCapture() == es->hwndSelf) ReleaseCapture();
+		if (GetCapture() == es->hwndSelf) NtUserReleaseCapture();
 	}
 	es->bCaptureState = FALSE;
 	return 0;
@@ -3892,7 +3892,7 @@ static void EDIT_WM_SetFont(EDITSTATE *es, HFONT font, BOOL redraw)
 	if (redraw)
 		EDIT_UpdateText(es, NULL, TRUE);
 	if (es->flags & EF_FOCUSED) {
-		DestroyCaret();
+		NtUserDestroyCaret();
 		NtUserCreateCaret( es->hwndSelf, 0, 1, es->line_height );
 		EDIT_SetCaretPos(es, es->selection_end,
 				 es->flags & EF_AFTER_WRAP);

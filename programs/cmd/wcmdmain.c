@@ -514,6 +514,13 @@ WCHAR *WCMD_strip_quotes(WCHAR *cmd) {
   return lastquote;
 }
 
+static inline int read_int_in_range(const WCHAR *from, WCHAR **after, int low, int high)
+{
+    int val = wcstol(from, after, 10);
+    val += (val < 0) ? high : low;
+    return val <= low ? low : (val >= high ? high : val);
+}
+
 /*************************************************************************
  * WCMD_expand_envvar
  *
@@ -598,34 +605,21 @@ static WCHAR *WCMD_expand_envvar(WCHAR *start)
      */
 
     /* ~ is substring manipulation */
-    if (colonpos[1] == L'~') {
+    if (colonpos[1] == L'~')
+    {
+        int   substr_beg, substr_end;
+        WCHAR *ptr;
 
-      int   substrposition, substrlength = 0;
-      WCHAR *commapos = wcschr(colonpos+2, L',');
-      WCHAR *startCopy;
-
-      substrposition = wcstol(colonpos+2, NULL, 10);
-      if (commapos) substrlength = wcstol(commapos+1, NULL, 10);
-
-      /* Check bounds */
-      if (substrposition >= 0) {
-        startCopy = &thisVarContents[min(substrposition, len - 1)];
-      } else {
-        startCopy = &thisVarContents[max(0, len + substrposition)];
-      }
-
-      if (commapos == NULL)
-        /* Copy the lot */
-        return WCMD_strsubstW(start, endOfVar + 1, startCopy, -1);
-      if (substrlength < 0) {
-
-        int copybytes = len + substrlength - (startCopy - thisVarContents);
-        if (copybytes >= len) copybytes = len - 1;
-        else if (copybytes < 0) copybytes = 0;
-        return WCMD_strsubstW(start, endOfVar + 1, startCopy, copybytes);
-      }
-      substrlength = min(substrlength, len - (startCopy - thisVarContents));
-      return WCMD_strsubstW(start, endOfVar + 1, startCopy, substrlength);
+        substr_beg = read_int_in_range(colonpos + 2, &ptr, 0, len);
+        if (*ptr == L',')
+            substr_end = read_int_in_range(ptr + 1, &ptr, substr_beg, len);
+        else
+            substr_end = len;
+        if (*ptr == L'\0')
+            return WCMD_strsubstW(start, endOfVar + 1, &thisVarContents[substr_beg], substr_end - substr_beg);
+        /* error, remove enclosing % pair (in place) */
+        memmove(start, start + 1, (endOfVar - start - 1) * sizeof(WCHAR));
+        return WCMD_strsubstW(endOfVar - 1, endOfVar + 1, NULL, 0);
     /* search and replace manipulation */
     } else {
       WCHAR *equalspos = wcschr(colonpos, L'=');
@@ -1324,8 +1318,6 @@ static RETURN_CODE run_full_path(const WCHAR *file, WCHAR *full_cmdline, BOOL ca
             TRACE("Batch completed, but was not 'called' so skipping outer batch too\n");
             context->skip_rest = TRUE;
         }
-        if (return_code != RETURN_CODE_ABORTED)
-            errorlevel = return_code;
         return return_code;
     }
 
@@ -1905,8 +1897,11 @@ RETURN_CODE WCMD_call_command(WCHAR *command)
   return_code = search_command(command, &sc, FALSE);
   if (return_code == NO_ERROR)
   {
+      unsigned old_echo_mode = echo_mode;
       if (!*sc.path) return NO_ERROR;
-      return run_full_path(sc.path, command, TRUE);
+      return_code = run_full_path(sc.path, command, TRUE);
+      if (interactive) echo_mode = old_echo_mode;
+      return return_code;
   }
 
   if (sc.cmd_index <= WCMD_EXIT)
@@ -2120,9 +2115,8 @@ static CMD_FOR_CONTROL *for_control_parse(WCHAR *opts_var)
             p[len - 1] = L'\0';
             p++;
         }
-        for ( ; *p; p = end)
+        for ( ; *(p = WCMD_skip_leading_spaces(p)); p = end)
         {
-            p = WCMD_skip_leading_spaces(p);
             /* Save End of line character (Ignore line if first token (based on delims) starts with it) */
             if ((end = for_fileset_option_split(p, L"eol=")))
             {
@@ -2539,6 +2533,11 @@ static BOOL node_builder_generate(struct node_builder *builder, CMD_NODE **node)
     }
     else
     {
+        if (!builder->num) /* line without tokens */
+        {
+            *node = NULL;
+            return TRUE;
+        }
         if (node_builder_parse(builder, 0, node) &&
             builder->pos + 1 >= builder->num) /* consumed all tokens? */
             return TRUE;
@@ -2625,8 +2624,20 @@ static void lexer_push_command(struct node_builder *builder,
 
             if (*p == L'<')
             {
-                filename = WCMD_parameter(p + 1, 0, NULL, FALSE, FALSE);
-                tkn_pmt.redirection = redirection_create_file(REDIR_READ_FROM, 0, filename);
+                unsigned fd = 0;
+
+                if (p > redirs && p[-1] >= L'0' && p[-1] <= L'9') fd = p[-1] - L'0';
+                p++;
+                if (*p == L'&' && (p[1] >= L'0' && p[1] <= L'9'))
+                {
+                    tkn_pmt.redirection = redirection_create_clone(fd, p[1] - L'0');
+                    p++;
+                }
+                else
+                {
+                    filename = WCMD_parameter(p + 1, 0, NULL, FALSE, FALSE);
+                    tkn_pmt.redirection = redirection_create_file(REDIR_READ_FROM, 0, filename);
+                }
             }
             else
             {
@@ -2982,7 +2993,7 @@ enum read_parse_line WCMD_ReadAndParseLine(const WCHAR *optionalcmd, CMD_NODE **
 
                 /* If a redirect is immediately followed by '&' (ie. 2>&1) then
                     do not process that ampersand as an AND operator */
-                if (thisChar == '>' && *(curPos+1) == '&') {
+                if ((thisChar == '>' || thisChar == '<') && *(curPos+1) == '&') {
                     curCopyTo[(*curLen)++] = *(curPos+1);
                     curPos++;
                 }

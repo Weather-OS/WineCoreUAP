@@ -658,15 +658,6 @@ BOOL WINAPI SendMessageCallbackW( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
 
 
 /***********************************************************************
- *		ReplyMessage  (USER32.@)
- */
-BOOL WINAPI ReplyMessage( LRESULT result )
-{
-    return NtUserReplyMessage( result );
-}
-
-
-/***********************************************************************
  *		InSendMessage  (USER32.@)
  */
 BOOL WINAPI InSendMessage(void)
@@ -712,29 +703,6 @@ BOOL WINAPI PostThreadMessageA( DWORD thread, UINT msg, WPARAM wparam, LPARAM lp
     return NtUserPostThreadMessage( thread, msg, wparam, lparam );
 }
 
-
-/***********************************************************************
- *		PostQuitMessage  (USER32.@)
- *
- * Posts a quit message to the current thread's message queue.
- *
- * PARAMS
- *  exit_code [I] Exit code to return from message loop.
- *
- * RETURNS
- *  Nothing.
- *
- * NOTES
- *  This function is not the same as calling:
- *|PostThreadMessage(GetCurrentThreadId(), WM_QUIT, exit_code, 0);
- *  It instead sets a flag in the message queue that signals it to generate
- *  a WM_QUIT message when there are no other pending sent or posted messages
- *  in the queue.
- */
-void WINAPI PostQuitMessage( INT exit_code )
-{
-    NtUserPostQuitMessage( exit_code );
-}
 
 /***********************************************************************
  *		PeekMessageW  (USER32.@)
@@ -970,7 +938,7 @@ DWORD WINAPI GetMessagePos(void)
  */
 LONG WINAPI GetMessageTime(void)
 {
-    return NtUserGetThreadInfo()->message_time;
+    return NtUserGetThreadState( UserThreadStateMessageTime );
 }
 
 
@@ -980,7 +948,7 @@ LONG WINAPI GetMessageTime(void)
  */
 LPARAM WINAPI GetMessageExtraInfo(void)
 {
-    return NtUserGetThreadInfo()->message_extra;
+    return NtUserGetThreadState( UserThreadStateExtraInfo );
 }
 
 
@@ -993,16 +961,6 @@ LPARAM WINAPI SetMessageExtraInfo(LPARAM lParam)
     LONG old_value = thread_info->message_extra;
     thread_info->message_extra = lParam;
     return old_value;
-}
-
-
-/***********************************************************************
- *		GetCurrentInputMessageSource (USER32.@)
- */
-BOOL WINAPI GetCurrentInputMessageSource( INPUT_MESSAGE_SOURCE *source )
-{
-    *source = NtUserGetThreadInfo()->msg_source;
-    return TRUE;
 }
 
 
@@ -1230,15 +1188,6 @@ BOOL WINAPI SetMessageQueue( INT size )
 {
     /* now obsolete the message queue will be expanded dynamically as necessary */
     return TRUE;
-}
-
-
-/***********************************************************************
- *		MessageBeep (USER32.@)
- */
-BOOL WINAPI MessageBeep( UINT i )
-{
-    return NtUserMessageBeep( i );
 }
 
 

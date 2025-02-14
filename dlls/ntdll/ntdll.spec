@@ -170,6 +170,7 @@
 @ stdcall -syscall NtConnectPort(ptr ptr ptr ptr ptr ptr ptr ptr)
 @ stdcall -syscall NtContinue(ptr long)
 @ stdcall -syscall NtContinueEx(ptr ptr)
+@ stdcall -syscall NtConvertBetweenAuxiliaryCounterAndPerformanceCounter(long ptr ptr ptr)
 @ stdcall -syscall NtCreateDebugObject(ptr long ptr long)
 @ stdcall -syscall NtCreateDirectoryObject(ptr long ptr)
 @ stdcall -syscall NtCreateEvent(ptr long ptr long long)
@@ -609,15 +610,15 @@
 @ stdcall RtlDecompressBuffer(long ptr long ptr long ptr)
 @ stdcall RtlDecompressFragment(long ptr long ptr long long ptr ptr)
 @ stdcall RtlDefaultNpAcl(ptr)
-@ stub RtlDelete
+@ stdcall RtlDelete(ptr)
 @ stdcall RtlDeleteAce(ptr long)
 @ stdcall RtlDeleteAtomFromAtomTable(ptr long)
 @ stdcall RtlDeleteCriticalSection(ptr)
 @ stdcall -arch=!i386 RtlDeleteGrowableFunctionTable(ptr)
-@ stub RtlDeleteElementGenericTable
+@ stdcall RtlDeleteElementGenericTable(ptr ptr)
 @ stub RtlDeleteElementGenericTableAvl
 @ cdecl -arch=!i386 RtlDeleteFunctionTable(ptr)
-@ stub RtlDeleteNoSplay
+@ stdcall RtlDeleteNoSplay(ptr ptr)
 @ stub RtlDeleteOwnersRanges
 @ stub RtlDeleteRange
 @ stdcall RtlDeleteRegistryValue(long ptr wstr)
@@ -658,7 +659,7 @@
 @ stdcall -arch=win32 -ret64 RtlEnlargedUnsignedMultiply(long long)
 @ stdcall RtlEnterCriticalSection(ptr)
 @ stub RtlEnumProcessHeaps
-@ stub RtlEnumerateGenericTable
+@ stdcall RtlEnumerateGenericTable(ptr long)
 # @ stub RtlEnumerateGenericTableAvl
 # @ stub RtlEnumerateGenericTableLikeADirectory
 @ stdcall RtlEnumerateGenericTableWithoutSplaying(ptr ptr)
@@ -818,7 +819,7 @@
 @ stdcall RtlInitializeSRWLock(ptr)
 @ stdcall RtlInitializeSid(ptr ptr long)
 # @ stub RtlInitializeStackTraceDataBase
-@ stub RtlInsertElementGenericTable
+@ stdcall RtlInsertElementGenericTable(ptr ptr long ptr)
 @ stdcall RtlInsertElementGenericTableAvl(ptr ptr long ptr)
 @ cdecl -arch=!i386 RtlInstallFunctionTableCallback(long long long ptr ptr wstr)
 @ stdcall RtlInt64ToUnicodeString(int64 long ptr)
@@ -854,7 +855,7 @@
 @ stdcall RtlIsCurrentThread(long)
 @ stdcall RtlIsDosDeviceName_U(wstr)
 @ stdcall -arch=x86_64 -norelay RtlIsEcCode(ptr)
-@ stub RtlIsGenericTableEmpty
+@ stdcall RtlIsGenericTableEmpty(ptr)
 # @ stub RtlIsGenericTableEmptyAvl
 @ stdcall RtlIsNameLegalDOS8Dot3(ptr ptr ptr)
 @ stdcall RtlIsNormalizedString(long wstr long ptr)
@@ -967,8 +968,8 @@
 @ stdcall RtlReAllocateHeap(long long ptr long)
 @ stub RtlReadMemoryStream
 @ stub RtlReadOutOfProcessMemoryStream
-@ stub RtlRealPredecessor
-@ stub RtlRealSuccessor
+@ stdcall RtlRealPredecessor(ptr)
+@ stdcall RtlRealSuccessor(ptr)
 @ stub RtlRegisterSecureMemoryCacheCallback
 @ stdcall RtlRegisterWait(ptr ptr ptr ptr long long)
 @ stdcall RtlReleaseActivationContext(ptr)
@@ -1042,14 +1043,14 @@
 @ stdcall RtlSizeHeap(long long ptr)
 @ stdcall RtlSleepConditionVariableCS(ptr ptr ptr)
 @ stdcall RtlSleepConditionVariableSRW(ptr ptr ptr long)
-@ stub RtlSplay
+@ stdcall RtlSplay(ptr)
 @ stub RtlStartRXact
 # @ stub RtlStatMemoryStream
 @ stdcall RtlStringFromGUID(ptr ptr)
 @ stdcall RtlSubAuthorityCountSid(ptr)
 @ stdcall RtlSubAuthoritySid(ptr long)
-@ stub RtlSubtreePredecessor
-@ stub RtlSubtreeSuccessor
+@ stdcall RtlSubtreePredecessor(ptr)
+@ stdcall RtlSubtreeSuccessor(ptr)
 @ stdcall RtlSystemTimeToLocalTime(ptr ptr)
 @ stdcall RtlTimeFieldsToTime(ptr ptr)
 @ stdcall RtlTimeToElapsedTimeFields(ptr ptr)

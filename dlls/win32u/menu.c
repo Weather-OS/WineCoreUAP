@@ -596,7 +596,7 @@ HMENU get_menu( HWND hwnd )
 }
 
 /* see CreateMenu and CreatePopupMenu */
-HMENU create_menu( BOOL is_popup )
+static HMENU create_menu( BOOL is_popup )
 {
     struct menu *menu;
     HMENU handle;
@@ -610,6 +610,22 @@ HMENU create_menu( BOOL is_popup )
 
     TRACE( "return %p\n", handle );
     return handle;
+}
+
+/**********************************************************************
+ *         NtUserCreateMenu   (win32u.@)
+ */
+HMENU WINAPI NtUserCreateMenu(void)
+{
+    return create_menu( FALSE );
+}
+
+/**********************************************************************
+ *         NtUserCreatePopupMenu   (win32u.@)
+ */
+HMENU WINAPI NtUserCreatePopupMenu(void)
+{
+    return create_menu( TRUE );
 }
 
 /**********************************************************************
@@ -765,8 +781,10 @@ BOOL WINAPI NtUserEnableMenuItem( HMENU handle, UINT id, UINT flags )
     return oldflags;
 }
 
-/* see DrawMenuBar */
-BOOL draw_menu_bar( HWND hwnd )
+/**********************************************************************
+ *           NtUserDrawMenuBar    (win32u.@)
+ */
+BOOL WINAPI NtUserDrawMenuBar( HWND hwnd )
 {
     HMENU handle;
 
@@ -1489,7 +1507,7 @@ static HMENU get_sys_menu( HWND hwnd, HMENU popup_menu )
     HMENU handle;
 
     TRACE("loading system menu, hwnd %p, popup_menu %p\n", hwnd, popup_menu);
-    if (!(handle = create_menu( FALSE )))
+    if (!(handle = NtUserCreateMenu()))
     {
         ERR("failed to load system menu!\n");
         return 0;
@@ -4286,7 +4304,7 @@ static BOOL track_menu( HMENU hmenu, UINT flags, int x, int y, HWND hwnd, const 
                     pos = find_item_by_key( mt.hOwnerWnd, mt.hCurrentMenu,
                                             LOWORD( msg.wParam ), FALSE );
                     if (pos == -2) exit_menu = TRUE;
-                    else if (pos == -1) message_beep( 0 );
+                    else if (pos == -1) NtUserMessageBeep( 0 );
                     else
                     {
                         select_item( mt.hOwnerWnd, mt.hCurrentMenu, pos, TRUE, 0 );
@@ -4451,7 +4469,7 @@ void track_keyboard_menu_bar( HWND hwnd, UINT wparam, WCHAR ch )
         item = find_item_by_key( hwnd, menu, ch, wparam & HTSYSMENU );
         if (item >= -2)
         {
-            if (item == -1) message_beep( 0 );
+            if (item == -1) NtUserMessageBeep( 0 );
             /* schedule end of menu tracking */
             flags |= TF_ENDMENU;
             goto track_menu;

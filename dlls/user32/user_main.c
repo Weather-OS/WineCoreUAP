@@ -35,15 +35,6 @@ HMODULE user32_module = 0;
 extern void WDML_NotifyThreadDetach(void);
 
 
-/***********************************************************************
- *             UserRealizePalette (USER32.@)
- */
-UINT WINAPI UserRealizePalette( HDC hdc )
-{
-    return NtUserRealizePalette( hdc );
-}
-
-
 static NTSTATUS WINAPI User32CopyImage( void *args, ULONG size )
 {
     const struct copy_image_params *params = args;
@@ -235,10 +226,10 @@ static KERNEL_CALLBACK_PROC kernel_callback_table[NtUserCallCount] =
 static BOOL process_attach(void)
 {
     NtCurrentTeb()->Peb->KernelCallbackTable = kernel_callback_table;
+    RegisterWaitForInputIdle( WaitForInputIdle );
 
     winproc_init();
     SYSPARAMS_Init();
-
     return TRUE;
 }
 

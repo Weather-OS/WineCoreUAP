@@ -2731,7 +2731,6 @@ void find_vs_compile_args(const struct wined3d_state *state, const struct wined3
     args->clip_enabled = state->render_states[WINED3D_RS_CLIPPING]
             && state->render_states[WINED3D_RS_CLIPPLANEENABLE];
     args->point_size = state->primitive_type == WINED3D_PT_POINTLIST;
-    args->per_vertex_point_size = shader->reg_maps.point_size;
     args->next_shader_type = hull_shader ? WINED3D_SHADER_TYPE_HULL
             : geometry_shader ? WINED3D_SHADER_TYPE_GEOMETRY : WINED3D_SHADER_TYPE_PIXEL;
     if (shader->reg_maps.shader_version.major >= 4)
@@ -3070,21 +3069,6 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
             switch (state->render_states[WINED3D_RS_FOGTABLEMODE])
             {
                 case WINED3D_FOG_NONE:
-                    if (position_transformed || (vs && !vs->is_ffp_vs))
-                    {
-                        args->fog = WINED3D_FFP_PS_FOG_LINEAR;
-                        break;
-                    }
-
-                    switch (state->render_states[WINED3D_RS_FOGVERTEXMODE])
-                    {
-                        case WINED3D_FOG_NONE: /* Fall through. */
-                        case WINED3D_FOG_LINEAR: args->fog = WINED3D_FFP_PS_FOG_LINEAR; break;
-                        case WINED3D_FOG_EXP:    args->fog = WINED3D_FFP_PS_FOG_EXP;    break;
-                        case WINED3D_FOG_EXP2:   args->fog = WINED3D_FFP_PS_FOG_EXP2;   break;
-                    }
-                    break;
-
                 case WINED3D_FOG_LINEAR: args->fog = WINED3D_FFP_PS_FOG_LINEAR; break;
                 case WINED3D_FOG_EXP:    args->fog = WINED3D_FFP_PS_FOG_EXP;    break;
                 case WINED3D_FOG_EXP2:   args->fog = WINED3D_FFP_PS_FOG_EXP2;   break;

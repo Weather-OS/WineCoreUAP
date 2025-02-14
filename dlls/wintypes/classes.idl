@@ -28,3 +28,4 @@
 #define _WINTYPES
 #include "windows.foundation.idl"
 #include "windows.foundation.metadata.idl"
+#include "windows.storage.streams.idl"

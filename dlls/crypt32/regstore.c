@@ -45,7 +45,7 @@ typedef struct _WINE_REGSTOREINFO
     struct list      ctlsToDelete;
 } WINE_REGSTOREINFO;
 
-static void CRYPT_HashToStr(const BYTE *hash, LPWSTR asciiHash)
+void CRYPT_HashToStr(const BYTE *hash, LPWSTR asciiHash)
 {
     DWORD i;
 
@@ -197,7 +197,36 @@ static BOOL CRYPT_WriteSerializedToReg(HKEY key, DWORD flags, const BYTE *hash, 
     return ret;
 }
 
-BOOL CRYPT_SerializeContextsToReg(HKEY key, DWORD flags,
+BOOL CRYPT_SerializeContextToReg(HKEY key, DWORD flags, const WINE_CONTEXT_INTERFACE *context_iface,
+ const void *context)
+{
+    BYTE hash[20];
+    DWORD hash_size = sizeof(hash);
+    DWORD size = 0;
+    BYTE *buf;
+    BOOL ret;
+
+    if (!context_iface->getProp(context, CERT_HASH_PROP_ID, hash,  &hash_size))
+        return FALSE;
+
+    context_iface->serialize(context, 0, NULL, &size);
+    if (!size)
+        return FALSE;
+
+    if (!(buf = CryptMemAlloc(size)))
+        return FALSE;
+
+    if (!(context_iface->serialize(context, 0, buf, &size)))
+    {
+        CryptMemFree(buf);
+        return FALSE;
+    }
+    ret = CRYPT_WriteSerializedToReg(key, flags, hash, buf, size);
+    CryptMemFree(buf);
+    return ret;
+}
+
+static BOOL CRYPT_SerializeContextsToReg(HKEY key, DWORD flags,
  const WINE_CONTEXT_INTERFACE *contextInterface, HCERTSTORE memStore)
 {
     const void *context = NULL;
@@ -205,36 +234,20 @@ BOOL CRYPT_SerializeContextsToReg(HKEY key, DWORD flags,
 
     do {
         context = contextInterface->enumContextsInStore(memStore, context);
-        if (context)
-        {
-            BYTE hash[20];
-            DWORD hashSize = sizeof(hash);
-
-            ret = contextInterface->getProp(context, CERT_HASH_PROP_ID, hash,
-             &hashSize);
-            if (ret)
-            {
-                DWORD size = 0;
-                LPBYTE buf = NULL;
-
-                ret = contextInterface->serialize(context, 0, NULL, &size);
-                if (size)
-                    buf = CryptMemAlloc(size);
-                if (buf)
-                {
-                    ret = contextInterface->serialize(context, 0, buf, &size);
-                    if (ret)
-                        ret = CRYPT_WriteSerializedToReg(key, flags, hash, buf, size);
-                }
-                CryptMemFree(buf);
-            }
-        }
-        else
-            ret = TRUE;
+        ret = !context || CRYPT_SerializeContextToReg(key, flags, contextInterface, context);
     } while (ret && context != NULL);
     if (context)
         Context_Release(context_from_ptr(context));
     return ret;
+}
+
+void CRYPT_RegDeleteFromReg(HKEY key, const BYTE *sha1_hash)
+{
+    WCHAR hash[20 * 2 + 1];
+
+    CRYPT_HashToStr(sha1_hash, hash);
+    TRACE("Removing %s\n", debugstr_w(hash));
+    RegDeleteKeyW(key, hash);
 }
 
 static BOOL CRYPT_RegWriteToReg(WINE_REGSTOREINFO *store)
@@ -258,22 +271,12 @@ static BOOL CRYPT_RegWriteToReg(WINE_REGSTOREINFO *store)
             if (listToDelete[i])
             {
                 WINE_HASH_TO_DELETE *toDelete, *next;
-                WCHAR asciiHash[20 * 2 + 1];
 
                 EnterCriticalSection(&store->cs);
                 LIST_FOR_EACH_ENTRY_SAFE(toDelete, next, listToDelete[i],
                  WINE_HASH_TO_DELETE, entry)
                 {
-                    LONG rc;
-
-                    CRYPT_HashToStr(toDelete->hash, asciiHash);
-                    TRACE("Removing %s\n", debugstr_w(asciiHash));
-                    rc = RegDeleteKeyW(key, asciiHash);
-                    if (rc != ERROR_SUCCESS && rc != ERROR_FILE_NOT_FOUND)
-                    {
-                        SetLastError(rc);
-                        ret = FALSE;
-                    }
+                    CRYPT_RegDeleteFromReg(key, toDelete->hash);
                     list_remove(&toDelete->entry);
                     CryptMemFree(toDelete);
                 }

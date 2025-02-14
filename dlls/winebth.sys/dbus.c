@@ -391,7 +391,7 @@ void *bluez_dbus_init( void )
     connection = p_dbus_bus_get_private ( DBUS_BUS_SYSTEM, &error );
     if (!connection)
     {
-        ERR( "Failed to get system dbus connection: %s: %s\n", debugstr_a( error.name ), debugstr_a( error.message ) );
+        WARN( "Failed to get system dbus connection: %s: %s\n", debugstr_a( error.name ), debugstr_a( error.message ) );
         p_dbus_error_free( &error );
         return NULL;
     }
@@ -443,7 +443,7 @@ static BOOL bluez_event_list_queue_new_event_with_call(
     event_entry->event_type = event_type;
     event_entry->event = event;
     event_entry->pending_call = call;
-    if (!call)
+    if (call && callback)
         p_dbus_pending_call_set_notify( call, callback, &event_entry->event, NULL );
     list_add_tail( event_list, &event_entry->entry );
 
@@ -949,8 +949,8 @@ NTSTATUS bluez_dbus_loop( void *c, void *watcher,
             p_dbus_error_init( &error );
             if (p_dbus_set_error_from_message( &error, reply ))
             {
-                ERR( "Error getting object list from BlueZ: '%s': '%s'\n", error.name,
-                     error.message );
+                WARN( "Error getting object list from BlueZ: '%s': '%s'\n", error.name,
+                      error.message );
                 p_dbus_error_free( &error );
                 p_dbus_message_unref( reply );
                 p_dbus_connection_unref( connection );
@@ -960,7 +960,7 @@ NTSTATUS bluez_dbus_loop( void *c, void *watcher,
             p_dbus_message_unref( reply );
             if (status != STATUS_SUCCESS)
             {
-                ERR( "Error building initial bluetooth devices list: %#x\n", (int)status );
+                WARN( "Error building initial bluetooth devices list: %#x\n", (int)status );
                 p_dbus_connection_unref( connection );
                 return status;
             }

@@ -679,11 +679,6 @@ BOOL WINAPI PathQualifyAW(LPCVOID pszPath)
 	return PathQualifyA(pszPath);
 }
 
-BOOL WINAPI PathFindOnPathExA(LPSTR,LPCSTR *,DWORD);
-BOOL WINAPI PathFindOnPathExW(LPWSTR,LPCWSTR *,DWORD);
-BOOL WINAPI PathFileExistsDefExtA(LPSTR,DWORD);
-BOOL WINAPI PathFileExistsDefExtW(LPWSTR,DWORD);
-
 static BOOL PathResolveA(char *path, const char **dirs, DWORD flags)
 {
     BOOL is_file_spec = PathIsFileSpecA(path);
@@ -719,7 +714,7 @@ static BOOL PathResolveA(char *path, const char **dirs, DWORD flags)
     return TRUE;
 }
 
-static BOOL PathResolveW(WCHAR *path, const WCHAR **dirs, DWORD flags)
+BOOL WINAPI PathResolveW(WCHAR *path, const WCHAR **dirs, DWORD flags)
 {
     BOOL is_file_spec = PathIsFileSpecW(path);
     DWORD dwWhich = flags & PRF_DONTFINDLNK ? 0xf : 0xbf;
