@@ -36,6 +36,7 @@
 #include "winbase.h"
 #include "winstring.h"
 #include "shellapi.h"
+#include "roapi.h"
 
 #include "activation.h"
 
@@ -71,6 +72,15 @@ struct vector_iids
     const GUID *iterator;
 };
 
+struct map_iids
+{
+    const GUID *observableMap;
+    const GUID *map;
+    const GUID *view;
+    const GUID *iterable;
+    const GUID *iterator;
+};
+
 struct async_operation_iids
 {
     const GUID *operation;
@@ -98,6 +108,8 @@ extern IActivationFactory *random_access_stream_reference_factory;
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 typedef HRESULT (WINAPI *async_operation_with_progress_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress );
+
+typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );
 
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
@@ -127,11 +139,43 @@ extern HRESULT observable_vector_create( const struct vector_iids *iids, void **
 
 extern HRESULT hstring_vector_create( IVector_HSTRING **out );
 
+extern HRESULT hstring_map_create( const struct map_iids *iids, void **out );
+
+extern HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out );
+
+extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
+
+extern HRESULT property_set_create( const struct map_iids *iids, IPropertySet **out );
+
 extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
                                               IAsyncOperation_BasicProperties **out );
 
 #define DEFINE_VECTOR_IIDS( interface ) \
     struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };
+
+#define DEFINE_HSTRING_MAP_IIDS( interface ) \
+    struct map_iids interface##_iids = {.iterable = &IID_IIterable_IKeyValuePair_HSTRING_##interface, .iterator = &IID_IIterator_IKeyValuePair_HSTRING_##interface, .map = &IID_IMap_HSTRING_##interface, .view = &IID_IMapView_HSTRING_##interface, .observableMap = &IID_IObservableMap_HSTRING_##interface };
+
+#define DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )                 \
+    static inline impl_type *impl_from( iface_type *iface )                                        \
+    {                                                                                              \
+        return CONTAINING_RECORD( iface, impl_type, iface_mem );                                   \
+    }                                                                                              \
+    static HRESULT WINAPI pfx##_QueryInterface( iface_type *iface, REFIID iid, void **out )        \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_QueryInterface( (IInspectable *)(expr), iid, out );                    \
+    }                                                                                              \
+    static ULONG WINAPI pfx##_AddRef( iface_type *iface )                                          \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_AddRef( (IInspectable *)(expr) );                                      \
+    }                                                                                              \
+    static ULONG WINAPI pfx##_Release( iface_type *iface )                                         \
+    {                                                                                              \
+        impl_type *impl = impl_from( iface );                                                      \
+        return IInspectable_Release( (IInspectable *)(expr) );                                     \
+    }
 
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     impl_type *impl_from( iface_type *iface )                                        \
@@ -168,6 +212,9 @@ extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnkn
         impl_type *impl = impl_from( iface );                                                      \
         return IInspectable_GetTrustLevel( (IInspectable *)(expr), trust_level );                  \
     }
+
+#define DEFINE_IUNKNOWN( pfx, iface_type, impl_type, base_iface )                                  \
+    DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
 #define DEFINE_IINSPECTABLE( pfx, iface_type, impl_type, base_iface )                              \
     DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
 #define DEFINE_IINSPECTABLE_OUTER( pfx, iface_type, impl_type, outer_iface )                       \
@@ -254,5 +301,14 @@ extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnkn
                                                                                                     \
         return ret;                                                                                 \
     }
+
+#define ACTIVATE_INSTANCE( instance_name, instance_object, instance_iid )                                               \
+    HSTRING _str;                                                                                                       \
+    HRESULT _hr;                                                                                                        \
+    _hr = WindowsCreateString( instance_name, wcslen( instance_name ), &_str );                                         \
+                                                                                                                        \
+    _hr = RoGetActivationFactory( _str, &instance_iid, (void **)&instance_object );                                     \
+    WindowsDeleteString( _str );                                                                                        \
+    if (_hr == REGDB_E_CLASSNOTREG) return E_ABORT;                                                                     \
 
 #endif

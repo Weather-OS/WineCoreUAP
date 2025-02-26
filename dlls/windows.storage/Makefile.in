@@ -1,5 +1,5 @@
 MODULE  = windows.storage.dll
-IMPORTS = $(APPX_PE_LIBS) $(XML2_PE_LIBS) shell32 user32 combase ole32 advapi32 shlwapi rpcrt4 urlmon
+IMPORTS = $(APPX_PE_LIBS) $(XML2_PE_LIBS) shell32 user32 propsys combase ole32 advapi32 shlwapi rpcrt4 urlmon
 EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
 
 SOURCES = \
@@ -39,8 +39,12 @@ SOURCES = \
 	WineCoreUAP/Vector/IWineVector.c \
 	WineCoreUAP/Vector/HSTRINGVector.c \
 	\
+	WineCoreUAP/Map/IWineMap.c \
+	\
 	WineCoreUAP/FileProperties/BasicProperties.c \
 	WineCoreUAP/FileProperties/StorageItemContentProperties.c \
+	WineCoreUAP/FileProperties/StorageItemExtraProperties.c \
+	WineCoreUAP/FileProperties/StorageItemExtraPropertiesInternal.c \
 	\
 	WineCoreUAP/FileProperties/AsyncOperation/BasicPropertiesAsync.c \
 	\

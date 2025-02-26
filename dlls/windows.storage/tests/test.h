@@ -58,6 +58,11 @@
         HANDLE event;                                                                               \
     };                                                                                              \
                                                                                                     \
+    struct name *impl_from_##name( iface_type *iface )                                              \
+    {                                                                                               \
+        return CONTAINING_RECORD( iface, struct name, iface_type##_iface );                         \
+    }                                                                                               \
+                                                                                                    \
     static HRESULT WINAPI name##_QueryInterface( iface_type *iface, REFIID iid, void **out )        \
     {                                                                                               \
         if (IsEqualGUID( iid, &IID_IUnknown ) || IsEqualGUID( iid, &IID_IAgileObject ) ||           \

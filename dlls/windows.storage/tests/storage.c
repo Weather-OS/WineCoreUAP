@@ -22,38 +22,14 @@
 #include "initguid.h"
 #include "test.h"
 
+DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( basic_properties_handler, IAsyncOperationCompletedHandler_BasicProperties, IAsyncOperation_BasicProperties )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_StorageFolder, IAsyncOperation_IVectorView_StorageFolder )
-DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_StorageFile, IAsyncOperation_IVectorView_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_item_handler, IAsyncOperationCompletedHandler_IStorageItem, IAsyncOperation_IStorageItem )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_item_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_IStorageItem, IAsyncOperation_IVectorView_IStorageItem )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_action_handler, IAsyncActionCompletedHandler, IAsyncAction );
-
-LPCSTR HSTRINGToLPCSTR( HSTRING hstr ) {
-    int requiredSize;
-    char* pszString;
-    int convertedSize;
-    const wchar_t* wszString;
-    UINT32 length;
-    wszString = WindowsGetStringRawBuffer( hstr, &length );
-    requiredSize = WideCharToMultiByte(CP_UTF8, 0, wszString, length, NULL, 0, NULL, NULL);
-    if (requiredSize == 0) {
-        return NULL;
-    }
-    pszString = (char*)malloc(requiredSize + 1);
-    if (!pszString) {
-        return NULL;
-    }
-    convertedSize = WideCharToMultiByte(CP_UTF8, 0, wszString, length, pszString, requiredSize, NULL, NULL);
-    if (convertedSize == 0) {
-        free(pszString);
-        return NULL;
-    }
-    pszString[convertedSize] = '\0';
-    return pszString;
-}
 
 void check_interface_( unsigned int line, void *obj, const IID *iid )
 {
@@ -103,7 +79,7 @@ void test_AppDataPathsStatics( const wchar_t** pathStr )
      * ABI::Windows::Storage::IAppDataPaths::LocalAppData
      */
     IAppDataPaths_get_LocalAppData( app_data_paths, &localAppDataPath );
-    trace( "Windows::Storage::IAppDataPaths::LocalAppData for %p is %s\n", &app_data_paths, HSTRINGToLPCSTR( localAppDataPath ) );
+    trace( "Windows::Storage::IAppDataPaths::LocalAppData for %p is %s\n", &app_data_paths, debugstr_hstring( localAppDataPath ) );
 
     *pathStr = WindowsGetStringRawBuffer(localAppDataPath, NULL);
 
@@ -127,7 +103,7 @@ void test_StorageItem( IStorageItem *item )
 
     IStorageProvider *provider = NULL;
     IStorageItemProperties *item_properties = NULL;
-    IStorageItemPropertiesWithProvider *item_properites_with_provider = NULL;
+    IStorageItemPropertiesWithProvider *item_properties_with_provider = NULL;
 
     IBasicProperties *properties = NULL;
     IAsyncOperation_BasicProperties *properties_operation = NULL;
@@ -159,13 +135,13 @@ void test_StorageItem( IStorageItem *item )
      * ABI::Windows::Storage::IStorageItem::Name
      */
     IStorageItem_get_Name( item, &origName );
-    trace( "Windows::Storage::IStorageItem::Name for %p is %s\n", &item, HSTRINGToLPCSTR( origName ) );
+    trace( "Windows::Storage::IStorageItem::Name for %p is %s\n", &item, debugstr_hstring( origName ) );
 
     /**
      * ABI::Windows::Storage::IStorageItem::Path
      */
     IStorageItem_get_Path( item, &path );
-    trace( "Windows::Storage::IStorageItem::Path for %p is %s\n", &item, HSTRINGToLPCSTR( path ) );
+    trace( "Windows::Storage::IStorageItem::Path for %p is %s\n", &item, debugstr_hstring( path ) );
 
     /**
      * ABI::Windows::Storage::IStorageItem::DateCreated
@@ -265,43 +241,43 @@ void test_StorageItem( IStorageItem *item )
      * ABI::Windows::Storage::IStorageItemProperties::DisplayName
      */
     IStorageItemProperties_get_DisplayName( item_properties, &origName );
-    trace( "Windows::Storage::IStorageItemProperties::DisplayName for %p is %s\n", &item_properties, HSTRINGToLPCSTR( origName ) );
+    trace( "Windows::Storage::IStorageItemProperties::DisplayName for %p is %s\n", &item_properties, debugstr_hstring( origName ) );
 
     /**
      * ABI::Windows::Storage::IStorageItemProperties::DisplayType
      */
     IStorageItemProperties_get_DisplayType( item_properties, &displaytype );
-    trace( "Windows::Storage::IStorageItemProperties::DisplayType for %p is %s\n", &item_properties, HSTRINGToLPCSTR( displaytype ) );
+    trace( "Windows::Storage::IStorageItemProperties::DisplayType for %p is %s\n", &item_properties, debugstr_hstring( displaytype ) );
 
     /**
      * ABI::Windows::Storage::IStorageItemProperties::FolderRelativeId
      */
     IStorageItemProperties_get_FolderRelativeId( item_properties, &folderRelativeId );
-    trace( "Windows::Storage::IStorageItemProperties::FolderRelativeId for %p is %s\n", &item_properties, HSTRINGToLPCSTR( folderRelativeId ) );
+    trace( "Windows::Storage::IStorageItemProperties::FolderRelativeId for %p is %s\n", &item_properties, debugstr_hstring( folderRelativeId ) );
 
     /**
      * ABI::Windows::Storage::IStorageItemPropertiesWithProvider
      */
-    hr = IStorageItem_QueryInterface( item, &IID_IStorageItemPropertiesWithProvider, (void **)&item_properites_with_provider );
+    hr = IStorageItem_QueryInterface( item, &IID_IStorageItemPropertiesWithProvider, (void **)&item_properties_with_provider );
     CHECK_HR( hr );
 
     /**
      * ABI::Windows::Storage::IStorageItemPropertiesWithProvider::Provider
      */
-    hr = IStorageItemPropertiesWithProvider_get_Provider( item_properites_with_provider, &provider );
+    hr = IStorageItemPropertiesWithProvider_get_Provider( item_properties_with_provider, &provider );
     CHECK_HR( hr );
 
     /**
-     * ABI::Windows::Storage::IStorageItemPropertiesWithProvider::Id
+     * ABI::Windows::Storage::IStorageProvider::Id
      */
     IStorageProvider_get_Id( provider, &itemId );
-    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::Id for %p is %s\n", &provider, HSTRINGToLPCSTR( itemId ) );
+    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::Id for %p is %s\n", &provider, debugstr_hstring( itemId ) );
 
     /**
-     * ABI::Windows::Storage::IStorageItemPropertiesWithProvider::DisplayName
+     * ABI::Windows::Storage::IStorageProvider::DisplayName
      */
     IStorageProvider_get_DisplayName( provider, &origName );
-    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::DisplayName for %p is %s\n", &provider, HSTRINGToLPCSTR( origName ) );
+    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::DisplayName for %p is %s\n", &provider, debugstr_hstring( origName ) );
 }
 
 /**
@@ -684,11 +660,9 @@ void test_StorageFile( const wchar_t* path )
     DWORD asyncRes;
     INT32 comparisonResult;
 
-    LONG ref;
-
     ACTIVATE_INSTANCE( storage_file_statics_name, storage_file_statics, IID_IStorageFileStatics );
 
-    pathStr = (LPWSTR)malloc( wcslen( path ) * sizeof( WCHAR ) );
+    pathStr = (LPWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
     wcscpy( pathStr, path );
 
     /**
@@ -725,7 +699,7 @@ void test_StorageFile( const wchar_t* path )
      */
 
     check_interface( storage_file, &IID_IStorageFile );
-    stubbed_interface( storage_file, &IID_IRandomAccessStreamReference );
+    check_interface( storage_file, &IID_IRandomAccessStreamReference );
     //notimpl: check_interface( storage_file, &IID_IInputStreamReference );
     check_interface( storage_file, &IID_IStorageItem );
     check_interface( storage_file, &IID_IStorageItemProperties );
