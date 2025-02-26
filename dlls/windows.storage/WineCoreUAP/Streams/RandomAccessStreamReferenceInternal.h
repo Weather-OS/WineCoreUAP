@@ -27,6 +27,8 @@
 
 #include "wine/debug.h"
 
+#include <shlwapi.h>
+
 extern const struct IRandomAccessStreamReferenceVtbl random_access_stream_reference_vtbl;
 
 struct random_access_stream_reference_statics
@@ -51,5 +53,6 @@ struct random_access_stream_reference
 struct random_access_stream_reference *impl_from_IRandomAccessStreamReference( IRandomAccessStreamReference *iface );
 
 HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, IRandomAccessStreamReference *value );
 
 #endif

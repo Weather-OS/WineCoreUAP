@@ -30,24 +30,80 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
 {
     HRESULT status = S_OK;
     DWORD asyncResult;
+    UINT32 bytesReadInSegment = BUFFER_SIZE;
+    UINT32 bytesRead = 0;
+    BYTE *byteBuffer;
+    BYTE *tmpByteBuffer;
 
     IBuffer *buffer;
     IBuffer *readBuffer;
+    IBuffer *segmentBuffer;
+    IBufferByteAccess *segmentBufferByteAccess;
+    IBufferByteAccess *readBufferByteAccess;
     IAsyncOperationWithProgress_IBuffer_UINT32 *buffer_uint32_async_with_progress_operation;
 
     TRACE( "source %p, destination %p\n", source, destination );
 
-    buffer_Create( bytesToCopy, &buffer );
+    byteBuffer = (BYTE *)malloc(BUFFER_SIZE);
 
-    status = IInputStream_ReadAsync( source, buffer, bytesToCopy, InputStreamOptions_None, &buffer_uint32_async_with_progress_operation );
-    if( FAILED( status ) ) return status;
+    if ( bytesToCopy )
+    {
+        buffer_Create( bytesToCopy, &buffer );
 
-    asyncResult = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_uint32_async_with_progress_operation, INFINITE );
-    if ( !asyncResult ) return E_ABORT;
+        status = IInputStream_ReadAsync( source, buffer, bytesToCopy, InputStreamOptions_None, &buffer_uint32_async_with_progress_operation );
+        if( FAILED( status ) ) goto _FAIL;
 
-    status = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_uint32_async_with_progress_operation, &readBuffer );
-    if( FAILED( status ) ) return status;
+        asyncResult = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_uint32_async_with_progress_operation, INFINITE );
+        if ( !asyncResult ) goto _FAIL;
 
-    //This is not a good idea but it works.
+        status = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_uint32_async_with_progress_operation, &readBuffer );
+        if( FAILED( status ) ) goto _FAIL;
+    } else
+    {
+        //Copy in 4096 byte segments until we bytes read is not 4096.
+        while ( bytesReadInSegment == BUFFER_SIZE )
+        {
+            buffer_Create( BUFFER_SIZE, &buffer );
+
+            status = IInputStream_ReadAsync( source, buffer, BUFFER_SIZE, InputStreamOptions_None, &buffer_uint32_async_with_progress_operation );
+            if( FAILED( status ) ) goto _FAIL;
+
+            asyncResult = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_uint32_async_with_progress_operation, INFINITE );
+            if ( !asyncResult ) goto _FAIL;
+
+            status = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_uint32_async_with_progress_operation, &segmentBuffer );
+            if( FAILED( status ) ) goto _FAIL;
+
+            IBuffer_get_Length( segmentBuffer, &bytesReadInSegment );
+
+            if ( bytesReadInSegment == 0 ) break;
+
+            status = IBuffer_QueryInterface( segmentBuffer, &IID_IBufferByteAccess, (void **)&segmentBufferByteAccess );
+            if( FAILED( status ) ) goto _FAIL;;
+
+            IBufferByteAccess_get_Buffer( segmentBufferByteAccess, &tmpByteBuffer );
+
+            byteBuffer = (BYTE *)realloc(byteBuffer, bytesRead + bytesReadInSegment);
+            memcpy( byteBuffer + bytesRead, tmpByteBuffer, bytesReadInSegment );
+            bytesRead += bytesReadInSegment;
+        }
+
+        buffer_Create( bytesRead, &readBuffer );
+
+        status = IBuffer_QueryInterface( readBuffer, &IID_IBufferByteAccess, (void **)&readBufferByteAccess );
+        if( FAILED( status ) ) goto _FAIL;
+
+        IBufferByteAccess_get_Buffer( readBufferByteAccess, &tmpByteBuffer );
+        memcpy( tmpByteBuffer, byteBuffer, bytesRead );
+
+        IBuffer_put_Length( readBuffer, bytesRead );
+    }
+
+    CoTaskMemFree( byteBuffer );
+
     return IOutputStream_WriteAsync( destination, readBuffer, (IAsyncOperationWithProgress_UINT32_UINT32 **)operation );
+
+    _FAIL:
+        CoTaskMemFree( byteBuffer );
+        return status;
 }

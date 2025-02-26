@@ -175,6 +175,13 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IRandomAccessStreamReference ))
+    {
+        *out = &impl->IRandomAccessStreamReference_iface;
+        IInspectable_AddRef( *out );        
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
@@ -495,7 +502,7 @@ static HRESULT WINAPI storage_file_statics_GetFileFromPathAsync( IStorageFileSta
 {
     HRESULT hr;
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
-    TRACE( "iface %p, path %p, result %p\n", iface, path, result );
+    TRACE( "iface %p, result %p\n", iface, result );
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
     return hr;

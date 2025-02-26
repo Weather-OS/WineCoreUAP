@@ -71,6 +71,9 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
     if ( SUCCEEDED(status) )
         status = storage_item_properties_AssignProperties( &file->IStorageItem_iface, &file->IStorageItemProperties_iface );
 
+    if ( SUCCEEDED(status) )
+        status = random_access_stream_reference_CreateStreamReference( path, &file->IRandomAccessStreamReference_iface );
+
     IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
     if ( !isFile )
         status = E_INVALIDARG;
@@ -86,7 +89,7 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result
         bytesRead = (DWORD)fread( buffer, 1, BUFFER_SIZE, fileData );
         fclose( fileData );
 
-        FindMimeFromData ( NULL, WindowsGetStringRawBuffer( path, NULL ), buffer, bytesRead, NULL, 0, &pwsMimeOut, 0 );
+        FindMimeFromData( NULL, WindowsGetStringRawBuffer( path, NULL ), buffer, bytesRead, NULL, 0, &pwsMimeOut, 0 );
         if (pwsMimeOut != NULL)
             WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->ContentType );
 

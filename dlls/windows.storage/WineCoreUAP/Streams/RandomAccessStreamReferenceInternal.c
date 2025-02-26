@@ -24,6 +24,39 @@
 
 _ENABLE_DEBUGGING_
 
+HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, IRandomAccessStreamReference *value )
+{
+    HANDLE stream;
+
+    struct random_access_stream_reference *reference = impl_from_IRandomAccessStreamReference( value );
+
+    reference->IRandomAccessStreamReference_iface.lpVtbl = &random_access_stream_reference_vtbl;
+
+    //Readability
+    stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+
+    if ( stream != INVALID_HANDLE_VALUE ) {
+        reference->canRead = TRUE;
+        CloseHandle(stream);
+    }
+
+    // Check writability
+    stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+
+    if ( stream != INVALID_HANDLE_VALUE ) {
+        reference->canWrite = TRUE;
+        CloseHandle(stream);
+    }
+
+    reference->streamSize = GetFileSize( stream, NULL );
+    CloseHandle( stream );
+    reference->ref = 1;
+
+    WindowsDuplicateString( path, &reference->handlePath );
+    
+    return S_OK;
+}
+
 HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
@@ -37,7 +70,6 @@ HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, I
 
     stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
     stream->IClosable_iface.lpVtbl = &closable_stream_vtbl;
-    stream->streamSize = reference->streamSize;
     stream->closableRef = 1;
     stream->Position = 0;
     stream->CanRead = reference->canRead;
@@ -46,13 +78,13 @@ HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, I
 
     if ( reference->canRead && reference->canWrite )
     {
-        stream->stream = CreateFileW( WindowsGetStringRawBuffer( reference->handlePath, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READWRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
     } else if ( reference->canRead )
     {
-        stream->stream = CreateFileW( WindowsGetStringRawBuffer( reference->handlePath, NULL ), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
     } else if ( reference->canWrite )
     {
-        stream->stream = CreateFileW( WindowsGetStringRawBuffer( reference->handlePath, NULL ), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_WRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
     }
 
     if ( SUCCEEDED( status ) ) 

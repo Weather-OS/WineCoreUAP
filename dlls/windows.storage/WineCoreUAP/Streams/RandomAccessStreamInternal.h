@@ -31,6 +31,8 @@
 
 extern const struct IRandomAccessStreamVtbl random_access_stream_vtbl;
 
+#define BUFFER_SIZE 4096
+
 struct random_access_stream_statics
 {
     //Derivatives
@@ -46,10 +48,10 @@ struct random_access_stream
 
     //IClosable Derivatives
     IClosable IClosable_iface;
-        HANDLE stream;
-        UINT64 streamSize;
+        IStream *stream;
         LONG closableRef;
 
+    UINT64 streamSize;
     UINT64 Position;
     BOOLEAN CanRead;
     BOOLEAN CanWrite;

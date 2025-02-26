@@ -109,14 +109,14 @@ static HRESULT WINAPI closable_stream_Close( IClosable *iface )
 
     if ( inheritedInput->IInputStream_iface.lpVtbl == &input_stream_vtbl )
     {
-        CloseHandle( inheritedInput->stream );
+        IStream_Release( inheritedInput->stream );
         IInputStream_Release( &inheritedInput->IInputStream_iface );
         return S_OK;
     }
 
     if ( inheritedOutput->IOutputStream_iface.lpVtbl == &output_stream_vtbl )
     {
-        CloseHandle( inheritedOutput->stream );
+        IStream_Release( inheritedOutput->stream );
         IOutputStream_Release( &inheritedOutput->IOutputStream_iface );
         return S_OK;
     }

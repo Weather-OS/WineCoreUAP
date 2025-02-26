@@ -25,13 +25,14 @@ DEFINE_ASYNC_COMPLETED_HANDLER( currentOperation_async, IAsyncOperationWithProgr
 
 HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
 {
+    STATSTG stat;
     HRESULT status = S_OK;    
     UINT32 totalBytesRead = 0;
     UINT32 bufferCapacity;
-    DWORD bytesRead;    
+    UINT64 streamSize;
+    ULONG bytesRead;    
     BYTE *buffer;
     BYTE tmpBuffer[BUFFER_SIZE];
-    BOOL readResult;
 
     IBufferByteAccess *bufferByteAccess;
 
@@ -42,10 +43,12 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
      */
     struct input_stream_options *options = (struct input_stream_options *)result;
 
-    if ( stream->streamSize <= 0 )
-        return E_BOUNDS;
+    status = IStream_Stat( stream->stream, &stat, STATFLAG_NONAME );
+    if ( FAILED( status ) ) return status;
 
-    if ( options->count >= stream->streamSize )
+    streamSize = stat.cbSize.QuadPart;
+
+    if ( streamSize <= 0 )
         return E_BOUNDS;
 
     IBuffer_get_Capacity( options->buffer, &bufferCapacity );
@@ -58,12 +61,10 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     IBufferByteAccess_get_Buffer( bufferByteAccess, &buffer );
 
-    while ( totalBytesRead < stream->streamSize )
+    while ( totalBytesRead < streamSize )
     {
-        readResult = ReadFile( stream->stream, tmpBuffer, BUFFER_SIZE, &bytesRead, NULL );
-
-        if ( !readResult )
-            return E_ABORT;
+        status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, BUFFER_SIZE, &bytesRead );
+        if ( FAILED( status ) ) return status;
 
         if ( bytesRead == 0 ) break;
 
@@ -89,11 +90,11 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
 {
     HRESULT status = S_OK;
-    UINT32 totalBytesWritten = 0;
+    UINT64 totalBytesWritten = 0;
+    ULARGE_INTEGER uli;
     UINT32 totalBytesToWrite = 0;
-    DWORD bytesWritten;
+    ULONG bytesWritten;
     BYTE *buffer;
-    BOOL writeResult;
 
     IBuffer *bufferToWrite = (IBuffer *)param;
     IBufferByteAccess *bufferByteAccess;
@@ -109,10 +110,8 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
 
     while ( totalBytesWritten < totalBytesToWrite )
     {
-        writeResult = WriteFile( stream->stream, buffer + totalBytesWritten, BUFFER_SIZE, &bytesWritten, NULL );
-
-        if ( !writeResult )
-            return E_ABORT;
+        status = IStream_Write( stream->stream, (LPCVOID)(buffer + totalBytesWritten), BUFFER_SIZE, &bytesWritten );
+        if ( FAILED( status ) ) return status;
 
         if ( bytesWritten == 0 ) break;
 
@@ -122,7 +121,9 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
         if ( FAILED( status ) ) return status;
     }
 
-    stream->streamSize = totalBytesWritten;
+    uli.QuadPart = totalBytesWritten;
+
+    IStream_SetSize( stream->stream, uli );
 
     if ( SUCCEEDED( status ) )
     {

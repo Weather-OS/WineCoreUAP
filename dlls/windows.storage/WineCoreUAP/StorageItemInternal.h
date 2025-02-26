@@ -53,8 +53,8 @@ struct storage_item
     IStorageItem2 IStorageItem2_iface;
 
     DateTime DateCreated;    
+    HSTRING Name;    
     HSTRING Path;
-    HSTRING Name;
     FileAttributes Attributes;
     LONG IStorageItemRef;
 };

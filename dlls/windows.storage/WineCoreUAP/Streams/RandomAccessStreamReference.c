@@ -115,44 +115,23 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
 {
     HRESULT hr;
     HSTRING path;
-    HANDLE stream;
     IStorageItem *item;
 
     struct random_access_stream_reference *reference;
 
-    if (!(reference = calloc( 1, sizeof(*reference) ))) return E_OUTOFMEMORY;
+    TRACE( "iface %p, file %p, stream_reference %p.\n", iface, file, stream_reference );
 
-    reference->IRandomAccessStreamReference_iface.lpVtbl = &random_access_stream_reference_vtbl;
+    if (!(reference = calloc( 1, sizeof(*reference) ))) return E_OUTOFMEMORY;
 
     hr = IStorageFile_QueryInterface( file, &IID_IStorageItem, (void **)&item );
     if ( FAILED( hr ) ) return hr;
 
     IStorageItem_get_Path( item, &path );
 
-    //Readability
-    stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-    if ( stream != INVALID_HANDLE_VALUE ) reference->canRead = TRUE;
-
-    //Writability
-    if ( reference->canRead )
-    {
-        stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-        if ( stream != INVALID_HANDLE_VALUE ) reference->canWrite = TRUE;
-    } else
-    {
-        stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-        if ( stream != INVALID_HANDLE_VALUE ) reference->canWrite = TRUE;
-    }
-
-    reference->streamSize = GetFileSize( stream, NULL );
-    CloseHandle( stream );
-    reference->ref = 1;
-
-    WindowsDuplicateString( path, &reference->handlePath );
-
+    hr = random_access_stream_reference_CreateStreamReference( path, &reference->IRandomAccessStreamReference_iface );
     *stream_reference = &reference->IRandomAccessStreamReference_iface;
 
-    return S_OK;
+    return hr;
 }
 
 static HRESULT WINAPI random_access_stream_reference_statics_CreateFromUri( IRandomAccessStreamReferenceStatics *iface, IUriRuntimeClass *uri, IRandomAccessStreamReference **stream_reference )

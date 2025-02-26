@@ -37,8 +37,7 @@ struct closable_stream
 {
     //Derivates
     IClosable IClosable_iface;
-    HANDLE stream;
-    UINT64 streamSize;
+    IStream *stream;
 
     LONG ref;
 };
@@ -50,8 +49,7 @@ struct input_stream
 
     //IClosable Derivatives
     IClosable IClosable_iface;
-        HANDLE stream;
-        UINT64 streamSize;
+        IStream *stream;
         LONG closableRef;
 
     LONG ref;
@@ -64,8 +62,7 @@ struct output_stream
 
     //IClosable Derivatives
     IClosable IClosable_iface;
-        HANDLE stream;
-        UINT64 streamSize;
+        IStream *stream;
         LONG closableRef;
 
     IAsyncOperationWithProgress_UINT32_UINT32 *currentOperation; //Flushing purposes

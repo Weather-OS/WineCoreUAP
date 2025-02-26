@@ -25,6 +25,7 @@
 #include "StorageFileInternal.h"
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
+#include "Streams/RandomAccessStreamReferenceInternal.h"
 
 #include "AppInternalPaths.h"
 
@@ -51,8 +52,8 @@ struct storage_file
     IStorageItem IStorageItem_iface;
         IStorageItem2 IStorageItem2_iface;
         DateTime DateCreated;    
+        HSTRING Name;        
         HSTRING Path;
-        HSTRING Name;
         FileAttributes Attributes;
         LONG IStorageItemRef;
 
@@ -64,6 +65,14 @@ struct storage_file
         HSTRING DisplayName;
         HSTRING FolderRelativeId;
         LONG IStorageItemPropertiesRef;
+
+    //IRandomAccessStreamReference Derivatives
+    IRandomAccessStreamReference IRandomAccessStreamReference_iface;
+        BOOLEAN canRead;
+        BOOLEAN canWrite;
+        HSTRING handlePath;
+        UINT64 streamSize;
+        LONG IRandomAccessStreamRef;
 
     LONG ref;
 };
