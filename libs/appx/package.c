@@ -92,11 +92,11 @@ assignAppxIdentity( xmlNode * manifest, struct appx_identity *Identity )
     Identity->Name = charToWChar( Name );
     Identity->Publisher = charToWChar( Publisher );
 
-    if ( xmlStrcmp( ProcArchitecture, (const xmlChar*)"x86" ) )
+    if ( !xmlStrcmp( ProcArchitecture, (const xmlChar*)"x86" ) )
         Identity->Architecture = PROCESSOR_X86;
-    else if ( xmlStrcmp( ProcArchitecture, (const xmlChar*)"x64" ) )
+    else if ( !xmlStrcmp( ProcArchitecture, (const xmlChar*)"x64" ) )
         Identity->Architecture = PROCESSOR_X64;
-    else if ( xmlStrcmp( ProcArchitecture, (const xmlChar*)"arm64" ) )
+    else if ( !xmlStrcmp( ProcArchitecture, (const xmlChar*)"arm64" ) )
         Identity->Architecture = PROCESSOR_ARM64;
     else 
     {
