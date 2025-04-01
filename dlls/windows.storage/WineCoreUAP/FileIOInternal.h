@@ -25,7 +25,6 @@
 #include "Streams/BufferInternal.h"
 #include "StorageFileInternal.h"
 
-
 #include "../private.h"
 #include "wine/debug.h"
 

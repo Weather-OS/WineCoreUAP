@@ -157,24 +157,17 @@ DEFINE_IINSPECTABLE( known_folders_statics, IKnownFoldersStatics, struct known_f
 
 static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MusicLibrary, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MusicLibrary, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -182,24 +175,17 @@ static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStati
 
 static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_PicturesLibrary, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_PicturesLibrary, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -207,24 +193,17 @@ static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersSt
 
 static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_VideosLibrary, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_VideosLibrary, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -232,24 +211,17 @@ static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStat
 
 static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_DocumentsLibrary, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_DocumentsLibrary, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -257,24 +229,17 @@ static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersS
 
 static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_HomeGroup, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_HomeGroup, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -282,24 +247,17 @@ static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics 
 
 static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RemovableDevices, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RemovableDevices, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -307,24 +265,17 @@ static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersS
 
 static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFoldersStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MediaServerDevices, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_MediaServerDevices, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -353,24 +304,17 @@ DEFINE_IINSPECTABLE( known_folders_statics2, IKnownFoldersStatics2, struct known
 
 static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics2 *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Objects3D, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Objects3D, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -378,24 +322,17 @@ static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics
 
 static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStatics2 *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_AppCaptures, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_AppCaptures, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -403,24 +340,17 @@ static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStati
 
 static HRESULT WINAPI known_folders_statics2_get_RecordedCalls( IKnownFoldersStatics2 *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RecordedCalls, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_RecordedCalls, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -445,23 +375,14 @@ DEFINE_IINSPECTABLE( known_folders_statics3, IKnownFoldersStatics3, struct known
 
 static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFoldersStatics3 *iface, IUser *user, KnownFolderId folder_id, IAsyncOperation_StorageFolder **operation )
 {
-    //User is not used.
     HRESULT hr;
-    HSTRING path;
 
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
-    struct storage_folder *folder;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
-    
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
-    hr = known_folders_statics_GetKnownFolder( folder_id, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
-    }
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_GetKnownFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
 
     return hr;
 }
@@ -505,21 +426,13 @@ static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFo
 static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
-    HSTRING path;
 
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
-    struct storage_folder *folder;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
-    
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
 
-    hr = known_folders_statics_GetKnownFolder( folder_id, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
-        TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
-    }
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_GetKnownFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
+    TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
 
     return hr;
 }
@@ -543,24 +456,17 @@ DEFINE_IINSPECTABLE( known_folders_camera_roll_statics, IKnownFoldersCameraRollS
 
 static HRESULT WINAPI known_folders_camera_roll_statics_get_CameraRoll( IKnownFoldersCameraRollStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_CameraRoll, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_CameraRoll, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -583,24 +489,17 @@ DEFINE_IINSPECTABLE( known_folders_playlists_statics, IKnownFoldersPlaylistsStat
 
 static HRESULT WINAPI known_folders_playlists_statics_get_Playlists( IKnownFoldersPlaylistsStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
-    
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Playlists, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_Playlists, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;
@@ -623,24 +522,17 @@ DEFINE_IINSPECTABLE( known_folders_saved_pictures_statics, IKnownFoldersSavedPic
 
 static HRESULT WINAPI known_folders_saved_pictures_statics_get_SavedPictures( IKnownFoldersSavedPicturesStatics *iface, IStorageFolder **value )
 {
-    HRESULT hr;
-    HSTRING path;
+    IStorageFolder *folder = NULL;
 
-    struct storage_folder *folder;
+    HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
     
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
-
-    hr = known_folders_statics_GetKnownFolder( KnownFolderId_SavedPictures, &path );
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
-    }
+    hr = known_folders_statics_GetKnownFolder( KnownFolderId_SavedPictures, &folder );
 
     if ( SUCCEEDED( hr ) )
     {
-        *value = &folder->IStorageFolder_iface;
+        *value = folder;
     }
 
     return hr;

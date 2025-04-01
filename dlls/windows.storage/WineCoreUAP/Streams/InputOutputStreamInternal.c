@@ -63,8 +63,16 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     while ( totalBytesRead < streamSize )
     {
-        status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, BUFFER_SIZE, &bytesRead );
-        if ( FAILED( status ) ) return status;
+        //IStream_Read is supposed to break after "tmpBuffer" reaches null,
+        //but apparently this isn't implemented in wine.
+        if ( (streamSize - totalBytesRead) < BUFFER_SIZE )
+        {
+            status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, streamSize - totalBytesRead, &bytesRead );
+            if ( FAILED( status ) ) return status;
+        } else {
+            status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, BUFFER_SIZE, &bytesRead );
+            if ( FAILED( status ) ) return status;
+        }
 
         if ( bytesRead == 0 ) break;
 
@@ -72,8 +80,12 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
         totalBytesRead += bytesRead;
 
-        status = IWineAsyncOperationProgressHandler_Invoke( progress, (IInspectable *)invoker, totalBytesRead );
-        if ( FAILED( status ) ) return status;
+        //Progress handlers are optional.
+        if ( progress )
+        {
+            status = IWineAsyncOperationProgressHandler_Invoke( progress, (IInspectable *)invoker, totalBytesRead );
+            if ( FAILED( status ) ) return status;
+        }
     }
 
     IBuffer_put_Length( options->buffer, totalBytesRead );
@@ -110,20 +122,32 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
 
     while ( totalBytesWritten < totalBytesToWrite )
     {
-        status = IStream_Write( stream->stream, (LPCVOID)(buffer + totalBytesWritten), BUFFER_SIZE, &bytesWritten );
-        if ( FAILED( status ) ) return status;
+        //IStream_Write is supposed to break after "tmpBuffer" reaches null,
+        //but apparently this isn't implemented in wine.
+        if ( (totalBytesToWrite - totalBytesWritten) < BUFFER_SIZE )
+        {
+            status = IStream_Write( stream->stream, (LPCVOID)(buffer + totalBytesWritten), totalBytesToWrite - totalBytesWritten, &bytesWritten );
+            if ( FAILED( status ) ) return status;
+        } else {
+            status = IStream_Write( stream->stream, (LPCVOID)(buffer + totalBytesWritten), BUFFER_SIZE, &bytesWritten );
+            if ( FAILED( status ) ) return status;
+        }
 
         if ( bytesWritten == 0 ) break;
 
         totalBytesWritten += bytesWritten;
 
-        status = IWineAsyncOperationProgressHandler_Invoke( progress, (IInspectable *)invoker, totalBytesWritten );
-        if ( FAILED( status ) ) return status;
+        //Progress handlers are optional.
+        if ( progress )
+        {
+            status = IWineAsyncOperationProgressHandler_Invoke( progress, (IInspectable *)invoker, totalBytesWritten );
+            if ( FAILED( status ) ) return status;
+        }
     }
 
     uli.QuadPart = totalBytesWritten;
 
-    IStream_SetSize( stream->stream, uli );
+    status = IStream_SetSize( stream->stream, uli );
 
     if ( SUCCEEDED( status ) )
     {

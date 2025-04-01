@@ -73,11 +73,7 @@ static ULONG WINAPI async_action_Release(IAsyncAction *iface)
     TRACE("iface %p, refcount %lu.\n", iface, refcount);
 
     if (!refcount)
-    {
-        InterlockedIncrement( &action->refcount );
-        IWineAsyncInfoImpl_Release( action->IWineAsyncInfoImpl_inner );
         free( action );
-    }
 
     return refcount;
 }

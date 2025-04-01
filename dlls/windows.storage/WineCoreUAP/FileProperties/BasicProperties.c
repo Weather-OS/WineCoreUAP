@@ -116,6 +116,7 @@ DEFINE_IINSPECTABLE( basic_properties, IBasicProperties, struct basic_properties
 static HRESULT WINAPI basic_properties_get_Size( IBasicProperties *iface, UINT64 *value )
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
+    TRACE( "iface %p value %p.\n", iface, value );
     *value = impl->size;
     return S_OK;
 }
@@ -123,6 +124,7 @@ static HRESULT WINAPI basic_properties_get_Size( IBasicProperties *iface, UINT64
 static HRESULT WINAPI basic_properties_get_DateModified( IBasicProperties *iface, DateTime *value )
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
+    TRACE( "iface %p value %p.\n", iface, value );
     *value = impl->DateModified;
     return S_OK;
 }
@@ -130,6 +132,7 @@ static HRESULT WINAPI basic_properties_get_DateModified( IBasicProperties *iface
 static HRESULT WINAPI basic_properties_get_TimeDate( IBasicProperties *iface, DateTime *value )
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
+    TRACE( "iface %p value %p.\n", iface, value );
     *value = impl->ItemDate;
     return S_OK;
 }

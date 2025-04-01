@@ -27,7 +27,6 @@
 #include "StorageItemInternal.h"
 #include "StorageFileInternal.h"
 
-
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -38,7 +37,6 @@ extern struct IStorageItem2Vtbl storage_item2_vtbl;
 extern struct IStorageFileVtbl storage_file_vtbl;
 extern struct IStorageFilePropertiesWithAvailabilityVtbl storage_file_properties_with_availability_vtbl;
 extern struct IStorageFolderQueryOperationsVtbl storage_folder_query_operations_vtbl;
-
 
 struct storage_folder
 {
@@ -92,7 +90,7 @@ struct storage_folder_creation_options
 struct storage_folder *impl_from_IStorageFolder( IStorageFolder *iface );
 struct storage_folder *impl_from_IStorageFolder2( IStorageFolder2 *iface );
 
-HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder *value );
+HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder **value );
 HRESULT WINAPI storage_folder_AssignFolderAsync( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );

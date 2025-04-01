@@ -31,11 +31,13 @@ import "windows.storage.streams.idl";
 
 namespace Windows.Storage.FileProperties {
     typedef enum PropertyPrefetchOptions PropertyPrefetchOptions;
+    typedef enum ThumbnailType ThumbnailType;
     typedef enum ThumbnailMode ThumbnailMode;
     typedef enum ThumbnailOptions ThumbnailOptions;
     typedef enum PhotoOrientation PhotoOrientation;
     typedef enum VideoOrientation VideoOrientation;
 
+    interface IThumbnailProperties;
     interface IMusicProperties;
     interface IVideoProperties;
     interface IImageProperties;
@@ -44,6 +46,7 @@ namespace Windows.Storage.FileProperties {
     interface IStorageItemContentProperties;
     interface IStorageItemExtraProperties;
 
+    runtimeclass StorageItemThumbnail;
     runtimeclass BasicProperties;
     runtimeclass MusicProperties;
     runtimeclass VideoProperties;
@@ -56,12 +59,14 @@ namespace Windows.Storage.FileProperties {
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.MusicProperties *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.VideoProperties *>;
         interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.ImageProperties *>;
-        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.DocumentProperties *>;        
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.DocumentProperties *>;   
+        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Storage.FileProperties.StorageItemThumbnail*>;     
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.BasicProperties *>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.MusicProperties*>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.VideoProperties*>;
         interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.ImageProperties*>;
-        interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.DocumentProperties*>;        
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.DocumentProperties*>;     
+        interface Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.StorageItemThumbnail*>;
     }
 
     [
@@ -75,6 +80,13 @@ namespace Windows.Storage.FileProperties {
         ImageProperties    = 0x4,
         DocumentProperties = 0x8,
         BasicProperties    = 0x10
+    };
+
+    [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+    enum ThumbnailType
+    {
+        Image = 0,
+        Icon  = 1
     };
 
     [contract(Windows.Foundation.UniversalApiContract, 1.0)]
@@ -125,6 +137,19 @@ namespace Windows.Storage.FileProperties {
         Rotate180 = 180,
         Rotate270 = 270
     };
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        exclusiveto(Windows.Storage.FileProperties.StorageItemThumbnail),
+        uuid(693DD42F-DBE7-49B5-B3B3-2893AC5D3423)
+    ]
+    interface IThumbnailProperties : IInspectable
+    {
+        [propget] HRESULT OriginalWidth([out] [retval] UINT32* value);
+        [propget] HRESULT OriginalHeight([out] [retval] UINT32* value);
+        [propget] HRESULT ReturnedSmallerCachedSize([out] [retval] boolean* value);
+        [propget] HRESULT Type([out] [retval] Windows.Storage.FileProperties.ThumbnailType* value);
+    }
 
     [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
@@ -299,6 +324,20 @@ namespace Windows.Storage.FileProperties {
     {
         [default] interface Windows.Storage.FileProperties.IMusicProperties;
         interface Windows.Storage.FileProperties.IStorageItemExtraProperties;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0)
+    ]
+    runtimeclass StorageItemThumbnail
+    {
+        [default] interface Windows.Storage.Streams.IRandomAccessStreamWithContentType;
+        interface Windows.Storage.Streams.IContentTypeProvider;
+        interface Windows.Storage.Streams.IRandomAccessStream;
+        interface Windows.Storage.Streams.IOutputStream;
+        interface Windows.Foundation.IClosable;
+        interface Windows.Storage.Streams.IInputStream;
+        interface Windows.Storage.FileProperties.IThumbnailProperties;
     }
 
     [

@@ -25,17 +25,18 @@ _ENABLE_DEBUGGING_
 
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
-    HANDLE fileHandle;
-    LPCSTR fileBufferChar;
-    LPWSTR fileBufferWChar;
-    LPWSTR outputBuffer;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
+    LPSTR fileBufferChar = NULL;
+    LPWSTR fileBufferWChar = NULL;
+    LPWSTR outputBuffer = NULL;
     DWORD fileSize;
     DWORD bytesRead;
     ULONG i;
     BOOL readResult;
+
+    IStorageItem *item = NULL;
 
     struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
 
@@ -52,31 +53,25 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
 
     if ( fileSize == INVALID_FILE_SIZE )
     {
-        CloseHandle( fileHandle );
         status = E_INVALIDARG;
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     outputBuffer = (LPWSTR)malloc( fileSize );
 
     if ( !outputBuffer )
     {
-        CloseHandle( fileHandle );
         status = E_OUTOFMEMORY;
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     if ( unicodeEncoding == UnicodeEncoding_Utf8 )
     {
-        fileBufferChar = (LPCSTR)malloc( fileSize );
+        fileBufferChar = (LPSTR)malloc( fileSize );
         if ( !fileBufferChar )
         {
-            CloseHandle( fileHandle );
             status = E_OUTOFMEMORY;
+            goto _CLEANUP;
         }
         readResult = ReadFile( fileHandle, (LPVOID)fileBufferChar, fileSize, &bytesRead, NULL );
     } else
@@ -84,31 +79,26 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
         fileBufferWChar = (LPWSTR)malloc( fileSize );
         if ( !fileBufferWChar )
         {
-            CloseHandle( fileHandle );
             status = E_OUTOFMEMORY;
+            goto _CLEANUP;
         }
         readResult = ReadFile( fileHandle, (LPVOID)fileBufferWChar, fileSize, &bytesRead, NULL );
     }
 
     if ( !readResult || bytesRead != fileSize )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( unicodeEncoding != UnicodeEncoding_Utf8 )
     {
         if ( fileSize % 2 != 0 )
         {
-            CloseHandle( fileHandle );
             status = E_INVALIDARG;
+            goto _CLEANUP;
         }
     }
-
-    if ( FAILED( status ) )
-        return status;
-
-    CloseHandle( fileHandle );
 
     switch ( unicodeEncoding )
     {
@@ -141,22 +131,35 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
         result->pwszVal = outputBuffer;
     }
 
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( fileBufferChar )
+        free( fileBufferChar );
+    if ( fileBufferWChar )
+        free( fileBufferWChar );
+    if ( FAILED(status) && outputBuffer )
+        free( outputBuffer );
+    if ( item )
+        IStorageItem_Release(item);
+
     return status;
 }
 
 HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING contents;
     HANDLE fileHandle;
-    LPSTR writeBufferChar;
-    LPWSTR contentsBE;
+    LPSTR writeBufferChar = NULL;
+    LPWSTR contentsBE = NULL;
     DWORD bytesWritten;
     ULONG i;
     BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
     BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
+
+    IStorageItem *item = NULL;
 
     struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
 
@@ -172,18 +175,15 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( !SetEndOfFile( fileHandle ) ) 
     {
-        CloseHandle( fileHandle );
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     switch ( unicodeEncoding )
     {
@@ -191,34 +191,31 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
             writeBufferChar = (LPSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
             if ( !writeBufferChar )
             {
-                CloseHandle( fileHandle );
                 status = E_OUTOFMEMORY;
+                goto _CLEANUP;
             }
 
             WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( contents, NULL ), -1, writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), NULL, NULL );
             
             if ( !WriteFile( fileHandle, (LPCVOID)writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
         case UnicodeEncoding_Utf16LE:
             if ( !WriteFile( fileHandle, (LPCVOID)UTF16LEBOM, sizeof( UTF16LEBOM ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-               status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
-
-            if ( FAILED( status ) )
-                return status;
 
             if ( !WriteFile( fileHandle, (LPCVOID)WindowsGetStringRawBuffer( contents, NULL ), 
                         ( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
@@ -227,24 +224,22 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
             if ( !contentsBE )
             {
                 status = E_OUTOFMEMORY;
+                goto _CLEANUP;
             }
 
             if ( !WriteFile( fileHandle, (LPCVOID)UTF16BEBOM, sizeof( UTF16BEBOM ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
-
-            if ( FAILED( status ) )
-                return status;
 
             for ( i = 0; i < wcslen( WindowsGetStringRawBuffer( contents, NULL ) ); i++ ) 
                 contentsBE[i] = ( WindowsGetStringRawBuffer( contents, NULL )[i] >> 8) | ( WindowsGetStringRawBuffer( contents, NULL )[i] << 8 );
 
             if ( !WriteFile( fileHandle, (LPCVOID)contentsBE, 
                         ( wcslen( contentsBE ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) ) {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
@@ -252,24 +247,34 @@ HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PR
             status = E_INVALIDARG;
     }
 
-    CloseHandle( fileHandle );
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( writeBufferChar )
+        free( writeBufferChar );
+    if ( contentsBE )
+        free( contentsBE );
+    if ( item )
+        IStorageItem_Release( item );
+    WindowsDeleteString( contents );
 
     return status;
 }
 
 HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING contents;
-    HANDLE fileHandle;
-    LPSTR writeBufferChar;
-    LPWSTR contentsBE;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
+    LPSTR writeBufferChar = NULL;
+    LPWSTR contentsBE = NULL;
     DWORD bytesWritten;
     ULONG i;
     BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
     BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
+    
+    IStorageItem *item = NULL;
 
     struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
 
@@ -289,34 +294,31 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
             writeBufferChar = (LPSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
             if ( !writeBufferChar )
             {
-                CloseHandle( fileHandle );
                 status = E_OUTOFMEMORY;
+                goto _CLEANUP;
             }
 
             WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( contents, NULL ), -1, writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), NULL, NULL );
             
             if ( !WriteFile( fileHandle, (LPCVOID)writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
         case UnicodeEncoding_Utf16LE:
             if ( !WriteFile( fileHandle, (LPCVOID)UTF16LEBOM, sizeof( UTF16LEBOM ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-               status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
-
-            if ( FAILED( status ) )
-                return status;
 
             if ( !WriteFile( fileHandle, (LPCVOID)WindowsGetStringRawBuffer( contents, NULL ), 
                         ( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
@@ -325,32 +327,40 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
             if ( !contentsBE )
             {
                 status = E_OUTOFMEMORY;
+                goto _CLEANUP;
             }
 
             if ( !WriteFile( fileHandle, (LPCVOID)UTF16BEBOM, sizeof( UTF16BEBOM ), &bytesWritten, NULL ) )
             {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
-
-            if ( FAILED( status ) )
-                return status;
 
             for ( i = 0; i < wcslen( WindowsGetStringRawBuffer( contents, NULL ) ); i++ ) 
                 contentsBE[i] = ( WindowsGetStringRawBuffer( contents, NULL )[i] >> 8) | ( WindowsGetStringRawBuffer( contents, NULL )[i] << 8 );
 
             if ( !WriteFile( fileHandle, (LPCVOID)contentsBE, 
                         ( wcslen( contentsBE ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) ) {
-                CloseHandle( fileHandle );
-                status = E_UNEXPECTED;
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                goto _CLEANUP;
             }
             break;
 
         default:
             status = E_INVALIDARG;
+            goto _CLEANUP;
     }
 
-    CloseHandle( fileHandle );
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( writeBufferChar )
+        free( writeBufferChar );
+    if ( contentsBE )
+        free( contentsBE );
+    if ( item )
+        IStorageItem_Release( item );
+    WindowsDeleteString( contents );
 
     return status;
 }
@@ -359,22 +369,23 @@ HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, P
 
 HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IVector_HSTRING *vector = NULL;
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING vectorElement;
-    HANDLE fileHandle;
-    LPCSTR fileBufferChar;
-    LPWSTR fileBufferWChar;
-    LPWSTR outputBuffer;
-    LPWSTR tmpBuffer;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
+    LPSTR fileBufferChar = NULL;
+    LPWSTR fileBufferWChar = NULL;
+    LPWSTR outputBuffer = NULL;
+    LPWSTR tmpBuffer = NULL;
     DWORD fileSize;
     DWORD bytesRead;
     ULONG i;
     ULONG currChar;
     BOOL readResult;
-    size_t INITIAL_BUFFER_SIZE = 100;
+    size_t INITIAL_BUFFER_SIZE = 100;    
+    
+    IVector_HSTRING *vector = NULL;
+    IStorageItem *item = NULL;
 
     struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
 
@@ -386,7 +397,7 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     TRACE( "iface %p, value %p\n", invoker, result );
 
     status = hstring_vector_create( &vector );
-    if ( FAILED( status ) ) return status;
+    if ( FAILED( status ) ) goto _CLEANUP;
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -394,39 +405,33 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
     if ( fileSize == INVALID_FILE_SIZE )
     {
-        CloseHandle( fileHandle );
         status = E_INVALIDARG;
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     outputBuffer = (LPWSTR)malloc( fileSize );
 
     if ( !outputBuffer )
     {
-        CloseHandle( fileHandle );
         status = E_OUTOFMEMORY;
+        goto _CLEANUP;
     }
 
     tmpBuffer = (LPWSTR)malloc( sizeof(wchar_t) * INITIAL_BUFFER_SIZE );
 
     if ( !tmpBuffer )
     {
-        CloseHandle( fileHandle );
         status = E_OUTOFMEMORY;
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     if ( unicodeEncoding == UnicodeEncoding_Utf8 )
     {
-        fileBufferChar = (LPCSTR)malloc( fileSize );
+        fileBufferChar = (LPSTR)malloc( fileSize );
         if ( !fileBufferChar )
         {
-            CloseHandle( fileHandle );
             status = E_OUTOFMEMORY;
+            goto _CLEANUP;
         }
         readResult = ReadFile( fileHandle, (LPVOID)fileBufferChar, fileSize, &bytesRead, NULL );
     } else
@@ -434,38 +439,36 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
         fileBufferWChar = (LPWSTR)malloc( fileSize );
         if ( !fileBufferWChar )
         {
-            CloseHandle( fileHandle );
             status = E_OUTOFMEMORY;
+            goto _CLEANUP;
         }
         readResult = ReadFile( fileHandle, (LPVOID)fileBufferWChar, fileSize, &bytesRead, NULL );
     }
 
     if ( !readResult || bytesRead != fileSize )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( unicodeEncoding != UnicodeEncoding_Utf8 )
     {
         if ( fileSize % 2 != 0 )
         {
-            CloseHandle( fileHandle );
             status = E_INVALIDARG;
+            goto _CLEANUP;
         }
     }
-
-    if ( FAILED( status ) )
-        return status;
-
-    CloseHandle( fileHandle );
 
     switch ( unicodeEncoding )
     {
         case UnicodeEncoding_Utf8:
             MultiByteToWideChar( CP_UTF8, 0, fileBufferChar, -1, outputBuffer, fileSize );
             if ( !outputBuffer )
+            {
                 status = E_OUTOFMEMORY;
+                goto _CLEANUP;
+            }
             break;
 
         case UnicodeEncoding_Utf16LE:
@@ -481,6 +484,7 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
         default:
             status = E_INVALIDARG;
+            goto _CLEANUP;
     }
 
     outputBuffer[ fileSize ] = L'\0';
@@ -515,24 +519,42 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
     if ( SUCCEEDED ( status ) )
     {
+        IVector_HSTRING_AddRef( vector );
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)vector;
     }
+
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( fileBufferChar )
+        free( fileBufferChar );
+    if ( fileBufferWChar )
+        free( fileBufferWChar );
+    if ( outputBuffer )
+        free( outputBuffer );
+    if ( tmpBuffer )
+        free( tmpBuffer );
+    if ( item )
+        IStorageItem_Release( item );
+    if ( FAILED( status ) && vector )
+        IVector_HSTRING_Release( vector );
 
     return status;
 }
 
 HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *item = NULL;
-    IBuffer *buffer;
     HRESULT status = S_OK;
     HSTRING filePath;
-    HANDLE fileHandle;
-    BYTE *outputBuffer;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
+    BYTE *outputBuffer = NULL;
     DWORD fileSize;
     DWORD bytesRead;
-    BOOL readResult;
+    BOOL readResult;    
+    
+    IStorageItem *item = NULL;
+    IBuffer *buffer = NULL;
 
     //Parameters
     IStorageFile_QueryInterface( (IStorageFile *)param, &IID_IStorageItem, (void **)&item );
@@ -546,14 +568,14 @@ HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
 
     if ( fileSize == INVALID_FILE_SIZE )
     {
-        CloseHandle( fileHandle );
-        return E_INVALIDARG;
+        status = E_INVALIDARG;
+        goto _CLEANUP;
     }
 
     status = buffer_Create( fileSize, &buffer );
 
     if ( FAILED( status ) )
-        return status;
+        goto _CLEANUP;
     
     outputBuffer = impl_from_IBuffer( buffer )->Buffer;
     
@@ -561,30 +583,41 @@ HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
 
     if ( !readResult || bytesRead != fileSize )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( SUCCEEDED ( status ) )
     {
+        IBuffer_AddRef( buffer );
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)buffer;
     }
 
-    CloseHandle( fileHandle );
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( outputBuffer && FAILED(status) )
+        free( outputBuffer );
+    if ( item )
+        IStorageItem_Release( item );
+    if ( buffer && FAILED(status) )
+        IBuffer_Release( buffer );
 
     return status;
 }
 
 HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IBufferByteAccess *bufferByteAccess = NULL;
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
+    UINT32 bufferLength;
     BYTE *contents;
-    HANDLE fileHandle;
-    DWORD bytesWritten;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
+    DWORD bytesWritten;    
+    
+    IBufferByteAccess *bufferByteAccess = NULL;
+    IStorageItem *item = NULL;
 
     struct file_io_write_buffer_options *write_buffer_options = (struct file_io_write_buffer_options *)param;
 
@@ -601,37 +634,44 @@ HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( !SetEndOfFile( fileHandle ) ) 
     {
-        CloseHandle( fileHandle );
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
 
-    if ( FAILED( status ) )
-        return status;
+    IBuffer_get_Length( write_buffer_options->buffer, &bufferLength );
 
-    if ( !WriteFile( fileHandle, (LPCVOID)contents, impl_from_IBuffer( write_buffer_options->buffer )->Length, &bytesWritten, NULL ) )
+    if ( !WriteFile( fileHandle, (LPCVOID)contents, bufferLength, &bytesWritten, NULL ) )
     {
-        CloseHandle( fileHandle );
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
-    
-    CloseHandle( fileHandle );
+
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( item )
+        IStorageItem_Release( item );
+    if ( bufferByteAccess )
+        IBufferByteAccess_Release( bufferByteAccess );
+
     return status;
 }
 
 HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *item = NULL;
     HRESULT status = S_OK;
     HSTRING filePath;
     BYTE *contents;
-    HANDLE fileHandle;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;
     DWORD bytesWritten;
+    
+    IStorageItem *item = NULL;
 
     struct file_io_write_bytes_options *write_bytes_options = (struct file_io_write_bytes_options *)param;
 
@@ -647,25 +687,27 @@ HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, P
     //Clear the file
     if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
     {
-        CloseHandle( fileHandle );
         status = E_UNEXPECTED;
+        goto _CLEANUP;
     }
 
     if ( !SetEndOfFile( fileHandle ) ) 
     {
-        CloseHandle( fileHandle );
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
-
-    if ( FAILED( status ) )
-        return status;
 
     if ( !WriteFile( fileHandle, (LPCVOID)contents, write_bytes_options->bufferSize, &bytesWritten, NULL ) )
     {
-        CloseHandle( fileHandle );
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
-    
-    CloseHandle( fileHandle );
+
+_CLEANUP:
+    if ( fileHandle != INVALID_HANDLE_VALUE )
+        CloseHandle( fileHandle );
+    if ( item )
+        IStorageItem_Release( item );
+
     return status;
 }

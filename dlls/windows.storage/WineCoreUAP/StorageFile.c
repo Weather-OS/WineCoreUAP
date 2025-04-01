@@ -164,7 +164,7 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
     if (IsEqualGUID( iid, &IID_IStorageItemProperties ))
     {
         *out = &impl->IStorageItemProperties_iface;
-        IInspectable_AddRef( *out );        
+        IInspectable_AddRef( *out );
         return S_OK;
     }
 
@@ -232,22 +232,23 @@ static HRESULT WINAPI storage_file_get_FileType( IStorageFile *iface, HSTRING *v
 {
     struct storage_file *impl = impl_from_IStorageFile( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->FileType;
-    return S_OK;
+    return WindowsDuplicateString( impl->FileType, value );
 }
 
 static HRESULT WINAPI storage_file_get_ContentType( IStorageFile *iface, HSTRING *value )
 {
     struct storage_file *impl = impl_from_IStorageFile( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->ContentType;
-    return S_OK;
+    return WindowsDuplicateString( impl->ContentType, value );
 }
 
 static HRESULT WINAPI storage_file_OpenAsync( IStorageFile *iface, FileAccessMode mode, IAsyncOperation_IRandomAccessStream **operation )
 {
-    FIXME( "iface %p, operation %p stub!\n", iface, operation );
-    return E_NOTIMPL;
+    HRESULT hr;    
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IRandomAccessStream };
+    TRACE( "iface %p, mode %d value %p\n", iface, mode, operation );
+    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)mode, storage_file_Open, iids, (IAsyncOperation_IInspectable **)operation );
+    return hr;
 }
 
 static HRESULT WINAPI storage_file_OpenTransactedWriteAsync( IStorageFile *iface, IAsyncOperation_StorageStreamTransaction **operation )
@@ -277,6 +278,9 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultNameAndOptions( IStorageFi
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
     
+    free( copy_options );
+    WindowsDeleteString( name );
+
     return hr;
 }
 
@@ -297,6 +301,8 @@ static HRESULT WINAPI storage_file_CopyOverloadDefaultOptions( IStorageFile *ifa
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
     
+    free( copy_options );
+
     return hr;
 }
 
@@ -316,6 +322,8 @@ static HRESULT WINAPI storage_file_CopyOverload( IStorageFile *iface, IStorageFo
     copy_options->option = option;
     
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)copy_options, storage_file_Copy, iids, (IAsyncOperation_IInspectable **)operation );
+
+    free( copy_options );
 
     return hr;
 }
@@ -347,8 +355,11 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultNameAndOptions( IStorageFi
     move_options->name = name;
     move_options->option = NameCollisionOption_FailIfExists;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation );
     
+    free( move_options );
+    WindowsDeleteString( name );
+
     return hr;
 }
 
@@ -365,8 +376,10 @@ static HRESULT WINAPI storage_file_MoveOverloadDefaultOptions( IStorageFile *ifa
     move_options->name = name;
     move_options->option = NameCollisionOption_FailIfExists;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
-    
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation );
+
+    free( move_options );
+
     return hr;
 }
 
@@ -383,7 +396,9 @@ static HRESULT WINAPI storage_file_MoveOverload( IStorageFile *iface, IStorageFo
     move_options->name = name;
     move_options->option = option;
     
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation  );
+    hr = async_action_create( (IUnknown *)iface, (IUnknown *)move_options, storage_file_Move, operation );
+
+    free( move_options );
 
     return hr;
 }
@@ -510,47 +525,58 @@ static HRESULT WINAPI storage_file_statics_GetFileFromPathAsync( IStorageFileSta
 
 static HRESULT WINAPI storage_file_statics_GetFileFromApplicationUriAsync( IStorageFileStatics *iface, IUriRuntimeClass *uri, IAsyncOperation_StorageFile **result )
 {
-    HRESULT hr;
+    HRESULT hr = S_OK;
     HSTRING uriScheme;
     HSTRING uriPath;
     HSTRING appDataPath;
     HSTRING path;
-    LPCWSTR uriSchemeStr;
-    LPCWSTR uriPathStr;
-    LPCWSTR appDataPathStr;
     WCHAR pathStr[MAX_PATH];
+
+    IAppDataPathsStatics *app_data_paths_statics = NULL;
+    IAppDataPaths *app_data_paths = NULL;
 
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
 
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_AppDataPaths, app_data_paths_statics, IID_IAppDataPathsStatics );
+
     TRACE( "iface %p, path %p, result %p\n", iface, uri, result );
 
-    app_data_paths_GetKnownFolder( NULL, "localappdata", &appDataPath );
+    hr = IAppDataPathsStatics_GetDefault( app_data_paths_statics, &app_data_paths );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+    IAppDataPaths_get_LocalAppData( app_data_paths, &appDataPath );
+
     IUriRuntimeClass_get_SchemeName( uri, &uriScheme );
     IUriRuntimeClass_get_Domain( uri, &uriPath );
-
-    uriSchemeStr = WindowsGetStringRawBuffer( uriScheme, NULL );
-    uriPathStr = WindowsGetStringRawBuffer( uriPath, NULL );
-    appDataPathStr = WindowsGetStringRawBuffer( appDataPath, NULL );
     
     //ms-appx: appx install path
     //ms-appdata: appx app data
 
-    if ( !wcscmp( uriSchemeStr, L"ms-appx" ) )
+    if ( !wcscmp( WindowsGetStringRawBuffer( uriScheme, NULL ), L"ms-appx" ) )
     {
         GetModuleFileNameW(NULL, pathStr, MAX_PATH);
-        PathAppendW( pathStr, uriPathStr );
-    } else if ( !wcscmp( uriSchemeStr, L"ms-appdata" ) )
+        PathAppendW( pathStr, WindowsGetStringRawBuffer( uriPath, NULL ) );
+    } else if ( !wcscmp( WindowsGetStringRawBuffer( uriScheme, NULL ), L"ms-appdata" ) )
     {
-        wcscpy( pathStr, appDataPathStr );
-        PathAppendW( pathStr, uriPathStr );
+        wcscpy( pathStr, WindowsGetStringRawBuffer( appDataPath, NULL ) );
+        PathAppendW( pathStr, WindowsGetStringRawBuffer( uriPath, NULL ) );
     } else {
-        return E_INVALIDARG;
+        hr = E_INVALIDARG;
+        goto _CLEANUP;
     }
 
-    WindowsCreateString( pathStr, wcslen( pathStr ), &path );
+    if ( SUCCEEDED( hr ) )
+    {
+        WindowsCreateString( pathStr, wcslen( pathStr ), &path );
+        hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
+        TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
+    }
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_file_AssignFileAsync, iids, (IAsyncOperation_IInspectable **)result );
-    TRACE( "created IAsyncOperation_StorageFile %p.\n", *result );
+_CLEANUP:
+    if ( app_data_paths_statics )
+        IAppDataPathsStatics_Release( app_data_paths_statics );
+    if ( app_data_paths )
+        IAppDataPaths_Release( app_data_paths );
+    
     return hr;
 }
 

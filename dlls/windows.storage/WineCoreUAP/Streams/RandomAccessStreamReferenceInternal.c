@@ -34,22 +34,19 @@ HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING pat
 
     //Readability
     stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-
+    reference->streamSize = GetFileSize( stream, NULL );
     if ( stream != INVALID_HANDLE_VALUE ) {
         reference->canRead = TRUE;
-        CloseHandle(stream);
     }
+    CloseHandle(stream);
 
     // Check writability
     stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-
     if ( stream != INVALID_HANDLE_VALUE ) {
         reference->canWrite = TRUE;
-        CloseHandle(stream);
     }
+    CloseHandle(stream);
 
-    reference->streamSize = GetFileSize( stream, NULL );
-    CloseHandle( stream );
     reference->ref = 1;
 
     WindowsDuplicateString( path, &reference->handlePath );
@@ -85,12 +82,53 @@ HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, I
     } else if ( reference->canWrite )
     {
         status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_WRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+    } else {
+        status = E_ACCESSDENIED;
     }
 
     if ( SUCCEEDED( status ) ) 
     {
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)&stream->IRandomAccessStream_iface;
+    } else {
+        free( stream );
+    }
+
+    return status;
+}
+
+HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    HRESULT status = S_OK;
+
+    struct random_access_stream *stream;
+    struct random_access_stream_reference *reference = impl_from_IRandomAccessStreamReference( (IRandomAccessStreamReference *)invoker );
+
+    TRACE( "invoker %p, result %p\n", invoker, result );
+
+    if (!(stream = calloc( 1, sizeof(*stream) ))) return E_OUTOFMEMORY;
+
+    stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
+    stream->IClosable_iface.lpVtbl = &closable_stream_vtbl;
+    stream->closableRef = 1;
+    stream->Position = 0;
+    stream->CanRead = reference->canRead;
+    stream->CanWrite = FALSE;
+    stream->ref = 1;
+
+    if ( reference->canRead )
+    {
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+    } else {
+        status = E_ACCESSDENIED;
+    }
+
+    if ( SUCCEEDED( status ) ) 
+    {
+        result->vt = VT_UNKNOWN;
+        result->punkVal = (IUnknown *)&stream->IRandomAccessStream_iface;
+    } else {
+        free( stream );
     }
 
     return status;

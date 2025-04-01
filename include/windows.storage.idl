@@ -922,6 +922,9 @@ namespace Windows.Storage {
     ]
     interface IStorageItemProperties : IInspectable
     {
+        [overload("GetThumbnailAsync")] HRESULT GetThumbnailAsyncOverloadDefaultSizeDefaultOptions([in] Windows.Storage.FileProperties.ThumbnailMode mode, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.StorageItemThumbnail*>** operation);
+        [overload("GetThumbnailAsync")] HRESULT GetThumbnailAsyncOverloadDefaultOptions([in] Windows.Storage.FileProperties.ThumbnailMode mode, [in] UINT32 requestedSize, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.StorageItemThumbnail*>** operation);
+        [overload("GetThumbnailAsync")] HRESULT GetThumbnailAsync([in] Windows.Storage.FileProperties.ThumbnailMode mode, [in] UINT32 requestedSize, [in] Windows.Storage.FileProperties.ThumbnailOptions options, [out] [retval] Windows.Foundation.IAsyncOperation<Windows.Storage.FileProperties.StorageItemThumbnail*>** operation);
         [propget] HRESULT DisplayName([out] [retval] HSTRING* value);
         [propget] HRESULT DisplayType([out] [retval] HSTRING* value);
         [propget] HRESULT FolderRelativeId([out] [retval] HSTRING* value);

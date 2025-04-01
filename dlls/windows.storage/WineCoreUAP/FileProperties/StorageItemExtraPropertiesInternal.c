@@ -89,9 +89,9 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
     IIterator_IKeyValuePair_HSTRING_IInspectable *propertyKeyIterator;
     IIterable_IKeyValuePair_HSTRING_IInspectable *propertyKeyIterable;
 
+    IPropertyStore *propertyStore = NULL;    
+    IInspectable *boxedPropertyValue;
     PROPVARIANT itemPropertyValue;
-    IInspectable *boxedPropertyValue;    
-    IPropertyStore *propertyStore = NULL;
     IShellItem2 *shellItem = NULL;
     HRESULT status = S_OK;
     HSTRING key;
@@ -99,14 +99,15 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
     HSTRING itemPath;
     HSTRING systemPropertyString;
     HSTRING tempPropertyString;
-    HSTRING *tempPropertyStringArray;
+    HSTRING *tempPropertyStringArray;    
+    BOOLEAN isFile;
+    BOOLEAN keyExists;
     LPWSTR fileContentTypeStr;
     UINT16 tempPropertyUINT16;
     UINT32 arraySize;
-    UINT32 iterator;
+    UINT32 iterator;   
+
     INT32 comparisonResult;
-    boolean isFile;
-    boolean keyExists;
 
     // Possible File Content Types.
     boolean isImage = FALSE;
@@ -131,14 +132,14 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
     {
         IStorageItem_get_Path( extra_properties->Item, &itemPath );
         status = SHCreateItemFromParsingName( WindowsGetStringRawBuffer( itemPath, NULL ), NULL, &IID_IShellItem2, (void **)&shellItem );
-        if ( FAILED( status ) ) return status;
+        if ( FAILED( status ) ) goto _CLEANUP;
         status = IShellItem2_GetPropertyStore( shellItem, GPS_READWRITE, &IID_IPropertyStore, (void **)&propertyStore );
-        if ( FAILED( status ) ) return status;
+        if ( FAILED( status ) ) goto _CLEANUP;
 
         if( isFile )
         {
             status = IStorageItem_QueryInterface( extra_properties->Item, &IID_IStorageFile, (void **)&file );
-            if ( FAILED( status ) ) return status;
+            if ( FAILED( status ) ) goto _CLEANUP;
             IStorageFile_get_ContentType( file, &fileContentType );
             fileContentTypeStr = (LPWSTR)malloc( WindowsGetStringLen( fileContentType ) * sizeof(WCHAR) );
             wcscpy( fileContentTypeStr, WindowsGetStringRawBuffer( fileContentType, NULL ) );
@@ -167,14 +168,14 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
         {
             //Unsubmitted properties are ignored if we were called from SavePropertiesAsync
             status = IIterable_IKeyValuePair_HSTRING_IInspectable_First( (IIterable_IKeyValuePair_HSTRING_IInspectable *)param, &propertyKeyIterator );
-            if ( FAILED( status ) ) return status;
+            if ( FAILED( status ) ) goto _CLEANUP;
         } else
         {
             //Unsubmitted properties are submitted if we were called from SavePropertiesAsyncOverloadDefault
             status = IMap_HSTRING_IInspectable_QueryInterface( extra_properties->Properties, &IID_IIterable_IKeyValuePair_HSTRING_IInspectable, (void **)&propertyKeyIterable );
-            if ( FAILED( status ) ) return status;
+            if ( FAILED( status ) ) goto _CLEANUP;
             status = IIterable_IKeyValuePair_HSTRING_IInspectable_First( propertyKeyIterable, &propertyKeyIterator );
-            if ( FAILED( status ) ) return status;
+            if ( FAILED( status ) ) goto _CLEANUP;
         }
 
         IIterator_IKeyValuePair_HSTRING_IInspectable_get_HasCurrent( propertyKeyIterator, &keyExists );
@@ -182,12 +183,13 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
         {
             PropVariantInit( &itemPropertyValue );
 
-            IIterator_IKeyValuePair_HSTRING_IInspectable_get_Current( propertyKeyIterator, &propertyKey );
+            IIterator_IKeyValuePair_HSTRING_IInspectable_get_Current( propertyKeyIterator, &propertyKey );            
+            IIterator_IKeyValuePair_HSTRING_IInspectable_MoveNext( propertyKeyIterator, &keyExists );
             IKeyValuePair_HSTRING_IInspectable_get_Key( propertyKey, &key );
             IKeyValuePair_HSTRING_IInspectable_get_Value( propertyKey, &boxedPropertyValue );
 
             status = IInspectable_QueryInterface( boxedPropertyValue, &IID_IPropertyValue, (void **)&propertyValue );
-            if ( FAILED( status ) ) return E_UNEXPECTED;
+            if ( FAILED( status ) ) goto _CLEANUP;
 
             // The behavior calls for not submitting anything if even one of
             // the provided values is incorrect. For compatibility reasons,
@@ -202,26 +204,26 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( supportsGeoTagging )
                 {
                     ISystemGPSProperties_get_LatitudeDecimal( systemGPSProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_GPS_LatitudeDecimal, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemGPSProperties_get_LongitudeDecimal( systemGPSProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_GPS_LongitudeDecimal, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -230,19 +232,19 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isMusic || isVideo )
                 {
                     ISystemMediaProperties_get_Duration( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UI8;
                         status = IPropertyValue_GetUInt64( propertyValue, &itemPropertyValue.uhVal.QuadPart );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_Duration, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMediaProperties_get_Producer( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -257,42 +259,42 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_Producer, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMediaProperties_get_Publisher( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_Publisher, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMediaProperties_get_SubTitle( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( WindowsGetStringLen( tempPropertyString ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_SubTitle, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMediaProperties_get_Writer( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -307,21 +309,21 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_Writer, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMediaProperties_get_Year( systemMediaProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Media_Year, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -330,35 +332,35 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isMusic )
                 {  
                     ISystemMusicProperties_get_AlbumArtist( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_AlbumArtist, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_AlbumTitle( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_AlbumTitle, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_Composer( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -373,14 +375,14 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_Composer, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_Conductor( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -395,28 +397,28 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_Conductor, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_DisplayArtist( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_DisplayArtist, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_Genre( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -431,21 +433,21 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_Genre, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemMusicProperties_get_TrackNumber( systemMusicProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Music_TrackNumber, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -454,61 +456,61 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isImage )
                 {
                     ISystemPhotoProperties_get_CameraManufacturer( systemPhotoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Photo_CameraManufacturer, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemPhotoProperties_get_CameraModel( systemPhotoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Photo_CameraModel, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemPhotoProperties_get_DateTaken( systemPhotoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_DATE;
                         status = IPropertyValue_GetDateTime( propertyValue, &time );
                         itemPropertyValue.date = (DATE)time.UniversalTime;
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Photo_DateTaken, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemPhotoProperties_get_Orientation( systemPhotoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UI2;
                         status = IPropertyValue_GetUInt16( propertyValue, &tempPropertyUINT16 );
                         itemPropertyValue.uiVal = tempPropertyUINT16;
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Photo_Orientation, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemPhotoProperties_get_PeopleNames( systemPhotoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -523,9 +525,9 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Photo_PeopleNames, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -534,7 +536,7 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isVideo )
                 {
                     ISystemVideoProperties_get_Director( systemVideoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -549,58 +551,58 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Video_Director, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemVideoProperties_get_FrameHeight( systemVideoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Video_FrameHeight, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemVideoProperties_get_FrameWidth( systemVideoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Video_FrameWidth, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemVideoProperties_get_Orientation( systemVideoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UI2;
                         status = IPropertyValue_GetUInt16( propertyValue, &tempPropertyUINT16 );
                         itemPropertyValue.uiVal = tempPropertyUINT16;
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Video_Orientation, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemVideoProperties_get_TotalBitrate( systemVideoProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Video_TotalBitrate, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -609,26 +611,26 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isImage )
                 {
                     ISystemImageProperties_get_HorizontalSize( systemImageProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Image_HorizontalSize, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemImageProperties_get_VerticalSize( systemImageProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_UINT;
                         status = IPropertyValue_GetUInt32( propertyValue, (UINT32 *)&itemPropertyValue.ulVal );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Image_VerticalSize, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
@@ -637,7 +639,7 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                 if ( isDocument )
                 {
                     ISystemProperties_get_Author( systemProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -652,42 +654,42 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Author, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemProperties_get_Comment( systemProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Comment, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemProperties_get_ItemNameDisplay( systemProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_LPWSTR;
                         status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                         itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                         wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                        if ( FAILED( status ) ) return status;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_ItemNameDisplay, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
 
                     ISystemProperties_get_Keywords( systemProperties, &systemPropertyString );
-                    WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                    WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                     if ( !comparisonResult )
                     {
                         itemPropertyValue.vt = VT_VECTOR | VT_LPWSTR;
@@ -702,35 +704,50 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
                                 wcscpy( itemPropertyValue.calpwstr.pElems[iterator], WindowsGetStringRawBuffer( tempPropertyStringArray[iterator], NULL ) );
                             }
                         } else
-                            return status;
+                            goto _CLEANUP;
                         status = IPropertyStore_SetValue( propertyStore, &PKEY_Keywords, &itemPropertyValue );
-                        if ( FAILED( status ) ) return E_UNEXPECTED;
+                        if ( FAILED( status ) ) goto _CLEANUP;
                         continue;
                     }
                 }
 
                 //Every file has System.Title.
                 ISystemProperties_get_Title( systemProperties, &systemPropertyString );
-                WindowsCompareStringOrdinal( fileContentType, systemPropertyString, &comparisonResult );
+                WindowsCompareStringOrdinal( key, systemPropertyString, &comparisonResult );
                 if ( !comparisonResult )
                 {
                     itemPropertyValue.vt = VT_LPWSTR;
                     status = IPropertyValue_GetString( propertyValue, &tempPropertyString );
                     itemPropertyValue.pwszVal = (LPWSTR)malloc( ( WindowsGetStringLen( tempPropertyString ) + 1 ) * sizeof(WCHAR) );
                     wcscpy( itemPropertyValue.pwszVal, WindowsGetStringRawBuffer( tempPropertyString, NULL ) );
-                    if ( FAILED( status ) ) return status;
+                    if ( FAILED( status ) ) goto _CLEANUP;
                     status = IPropertyStore_SetValue( propertyStore, &PKEY_Title, &itemPropertyValue );
-                    if ( FAILED( status ) ) return E_UNEXPECTED;
+                    if ( FAILED( status ) ) goto _CLEANUP;
                     continue;
                 }
             }
 
             PropVariantClear( &itemPropertyValue );
+            WindowsDeleteString( systemPropertyString );
+            WindowsDeleteString( key );
+            WindowsDeleteString( tempPropertyString );
+            free( tempPropertyStringArray );
+            IInspectable_Release( boxedPropertyValue );
         }
-
         status = IPropertyStore_Commit( propertyStore );
-        if ( FAILED( status ) ) return status;
+        if ( FAILED( status ) ) goto _CLEANUP;
     }
+
+_CLEANUP:
+    free( fileContentTypeStr );
+    WindowsDeleteString( itemPath );
+    ISystemProperties_Release( systemProperties );
+    ISystemGPSProperties_Release( systemGPSProperties );
+    ISystemMediaProperties_Release( systemMediaProperties );
+    ISystemMusicProperties_Release( systemMusicProperties );
+    ISystemPhotoProperties_Release( systemPhotoProperties );
+    ISystemVideoProperties_Release( systemVideoProperties );
+    ISystemImageProperties_Release( systemImageProperties );
 
     return status;
 }

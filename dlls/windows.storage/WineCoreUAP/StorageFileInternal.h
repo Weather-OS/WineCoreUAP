@@ -22,13 +22,9 @@
 #ifndef STORAGE_FILE_INTERNAL_H
 #define STORAGE_FILE_INTERNAL_H
 
-#include "StorageFileInternal.h"
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
 #include "Streams/RandomAccessStreamReferenceInternal.h"
-
-#include "AppInternalPaths.h"
-
 
 #include "../private.h"
 #include "wine/debug.h"
@@ -107,12 +103,13 @@ struct storage_file_copy_options
 
 struct storage_file *impl_from_IStorageFile( IStorageFile *iface );
 
-HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile * result );
+HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile ** result );
 HRESULT WINAPI storage_file_AssignFileAsync ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_Copy ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_CopyAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_Move ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_MoveAndReplace ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+HRESULT WINAPI storage_file_Open ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_file_properties_with_availability_IsAvailable ( IStorageItem *fileItem, boolean *value );
 
 #endif

@@ -47,6 +47,8 @@ extern struct IStorageItem2Vtbl storage_item2_vtbl;
 extern struct IStorageFolderVtbl storage_folder_vtbl;
 extern struct IBasicPropertiesVtbl basic_properties_vtbl;
 
+// This volatile struct is ordered with padding in mind.
+// Do not change the order of this struct.
 struct storage_item
 {
     IStorageItem IStorageItem_iface;
@@ -86,12 +88,12 @@ struct storage_item *impl_from_IStorageItem( IStorageItem *iface );
 struct storage_item_properties *impl_from_IStorageItemProperties( IStorageItemProperties *iface );
 struct storage_item_properties *impl_from_IStorageItemPropertiesWithProvider( IStorageItemPropertiesWithProvider *iface );
 
-HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result );
+HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem ** result );
 HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type );
 HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties *result );
+HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties ** result );
 HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value );
 
 #endif

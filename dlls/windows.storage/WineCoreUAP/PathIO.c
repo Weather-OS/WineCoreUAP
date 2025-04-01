@@ -127,6 +127,8 @@ static HRESULT WINAPI path_io_statics_ReadTextAsync( IPathIOStatics *iface, HSTR
     read_text_options->absolutePath = absolutePath;
 
     hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
+    
+    free( read_text_options );
     return hr;
 }
 
@@ -143,6 +145,8 @@ static HRESULT WINAPI path_io_statics_ReadTextWithEncodingAsync( IPathIOStatics 
     read_text_options->absolutePath = absolutePath;
 
     hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
+    
+    free( read_text_options );
     return hr;
 }
 
@@ -160,6 +164,8 @@ static HRESULT WINAPI path_io_statics_WriteTextAsync( IPathIOStatics *iface, HST
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
+    
+    free( write_text_options );
     return hr;
 }
 
@@ -177,6 +183,8 @@ static HRESULT WINAPI path_io_statics_WriteTextWithEncodingAsync( IPathIOStatics
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
+    
+    free( write_text_options );
     return hr;
 }
 
@@ -193,6 +201,8 @@ static HRESULT WINAPI path_io_statics_AppendTextAsync( IPathIOStatics *iface, HS
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
+    
+    free( write_text_options );
     return hr;
 }
 
@@ -209,6 +219,8 @@ static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatic
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
+    
+    free( write_text_options );
     return hr;
 }
 
@@ -225,6 +237,8 @@ static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HST
     read_text_options->absolutePath = absolutePath;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+    
+    free( read_text_options );
     return hr;
 }
 
@@ -241,6 +255,8 @@ static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics
     read_text_options->absolutePath = absolutePath;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+    
+    free( read_text_options );
     return hr;
 }
 
@@ -255,6 +271,7 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
     UINT32 totalSize = 0;
     UINT32 i;
     boolean strExists;
+    
     IIterator_HSTRING *hstringIterator;
 
     struct path_io_write_text_options *write_text_options;
@@ -296,7 +313,11 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -308,7 +329,21 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
@@ -363,7 +398,11 @@ static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatic
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -375,7 +414,21 @@ static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatic
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+    
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, IAsyncAction **operation )
@@ -430,7 +483,11 @@ static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, H
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -442,7 +499,21 @@ static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, H
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
@@ -497,7 +568,11 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -509,7 +584,21 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
@@ -535,6 +624,8 @@ static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, H
     write_buffer_options->absolutePath = absolutePath;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_buffer_options, path_io_statics_WriteBuffer, operation );
+
+    free( write_buffer_options );
     return hr;
 }
 
@@ -552,6 +643,8 @@ static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HS
     write_bytes_options->bufferSize = __bufferSize;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_bytes_options, path_io_statics_WriteBytes, operation );
+
+    free( write_bytes_options );
     return hr;
 }
 

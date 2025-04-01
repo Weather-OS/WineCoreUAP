@@ -78,12 +78,7 @@ static ULONG WINAPI uint32_async_Release( IAsyncOperation_UINT32 *iface )
     TRACE( "iface %p, ref %lu.\n", iface, ref );
 
     if (!ref)
-    {
-        /* guard against re-entry if inner releases an outer iface */
-        InterlockedIncrement( &impl->ref );
-        IWineAsyncInfoImpl_Release( impl->IWineAsyncInfoImpl_inner );
         free( impl );
-    }
 
     return ref;
 }

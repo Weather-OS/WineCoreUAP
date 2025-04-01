@@ -228,7 +228,7 @@ static HRESULT WINAPI random_access_stream_reference_OpenReadAsync( IRandomAcces
 {
     HRESULT hr;
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IRandomAccessStream };
-    hr = async_operation_create( (IUnknown *)iface, NULL, random_access_stream_reference_CreateStream, iids, (IAsyncOperation_IInspectable **)operation );
+    hr = async_operation_create( (IUnknown *)iface, NULL, random_access_stream_reference_CreateReadOnlyStream, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IRandomAccessStream %p.\n", *operation );
     return hr;
 }

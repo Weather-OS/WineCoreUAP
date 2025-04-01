@@ -36,48 +36,48 @@ HRESULT WINAPI system_data_paths_GetKnownFolder( ISystemDataPaths *iface, const 
 
     path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
-    if (!strcmp(FOLDERID, "fonts")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Fonts, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "programdata")) {
-        status = SHGetKnownFolderPath(&FOLDERID_ProgramData, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "public")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Public, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicdesktop")) {
+    if ( !strcmp( FOLDERID, "fonts" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Fonts, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "programdata" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_ProgramData, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "public" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Public, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "publicdesktop" ) ) {
         status = SHGetKnownFolderPath(&FOLDERID_PublicDesktop, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicdocuments")) {
-        status = SHGetKnownFolderPath(&FOLDERID_PublicDocuments, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicdownloads")) {
-        status = SHGetKnownFolderPath(&FOLDERID_PublicDownloads, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicmusic")) {
-        status = SHGetKnownFolderPath(&FOLDERID_PublicMusic, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicpictures")) {
-        status = SHGetKnownFolderPath(&FOLDERID_PublicPictures, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "publicvideos")) {
-        status = SHGetKnownFolderPath(&FOLDERID_PublicVideos, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "system")) {
-        status = SHGetKnownFolderPath(&FOLDERID_System, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "systemhost")) {
-        status = SHGetKnownFolderPath(&FOLDERID_System, 0, NULL, &path);
+    } else if ( !strcmp( FOLDERID, "publicdocuments" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_PublicDocuments, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "publicdownloads" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_PublicDownloads, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "publicmusic" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_PublicMusic, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "publicpictures" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_PublicPictures, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "publicvideos" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_PublicVideos, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "system" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_System, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "systemhost" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_System, 0, NULL, &path );
     } else if (!strcmp(FOLDERID, "systemx86")) {
-        status = SHGetKnownFolderPath(&FOLDERID_SystemX86, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "systemx64")) {
-        status = SHGetKnownFolderPath(&FOLDERID_SystemX86, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "systemarm")) {
-        status = SHGetKnownFolderPath(&FOLDERID_SystemX86, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "userprofiles")) {
-        status = SHGetKnownFolderPath(&FOLDERID_UserProfiles, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "windows")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Windows, 0, NULL, &path);
+        status = SHGetKnownFolderPath( &FOLDERID_SystemX86, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "systemx64" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_SystemX86, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "systemarm" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_SystemX86, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "userprofiles" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_UserProfiles, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "windows" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Windows, 0, NULL, &path );
     } else {
         status = E_NOTIMPL;
     }
 
-    if (FAILED(status))
-        return status;
-
-    if (WindowsCreateString( path, wcslen(path), value ) != S_OK) {
-        return E_UNEXPECTED;
+    if ( SUCCEEDED( status ) )
+    {
+        status = WindowsCreateString( path, wcslen( path ), value );
     }
+
+    free( path );
     
     return S_OK;
 }

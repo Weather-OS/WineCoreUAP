@@ -31,7 +31,9 @@
 
 _ENABLE_DEBUGGING_
 
-HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HSTRING *value ) 
+DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
+
+HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, IStorageFolder **value ) 
 {    
     HRESULT status = S_OK;
     BOOLEAN musicLibraryAllowed = FALSE;
@@ -41,14 +43,21 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
     BOOLEAN homeGroupAllowed = TRUE;
     BOOLEAN removableDevicesAllowed = FALSE;
     BOOLEAN mediaServerAllowed = FALSE;
-    PWSTR path;
+    PWSTR pathStr = NULL;
+    DWORD asyncRes;
+    HSTRING path = NULL;
     WCHAR manifestPath[MAX_PATH];
+
+    IStorageFolderStatics *storageFolderStatics = NULL;
+    IAsyncOperation_StorageFolder *storageFolderOperation = NULL;
 
     struct appx_package package;
 
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_StorageFolder, storageFolderStatics, IID_IStorageFolderStatics );
+    
     TRACE( "folderid %d, value %p\n", folderId, value );
 
-    path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
+    pathStr = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
     GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
     PathRemoveFileSpecW(manifestPath);
@@ -56,7 +65,8 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
 
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
-        status = E_UNEXPECTED;
+        IStorageFolderStatics_Release( storageFolderStatics );
+        return E_UNEXPECTED;
     }
 
     for ( xmlNode *capabilityNode = package.Package.Capabilities; capabilityNode; capabilityNode = capabilityNode->next )
@@ -93,42 +103,42 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_Music, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_Music, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_PicturesLibrary:
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_Pictures, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_Pictures, 0, NULL, &pathStr);
                 break;
             
             case KnownFolderId_VideosLibrary:
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_Videos, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_Videos, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_DocumentsLibrary:
                 if ( !documentsLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_Documents, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_Documents, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_RemovableDevices:
                 if ( !removableDevicesAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    wcscpy( path, L"\\\\.\\" );
+                    wcscpy( pathStr, L"\\\\.\\" );
                 break;
 
             case KnownFolderId_HomeGroup:
                 if ( !homeGroupAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_HomeGroup, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_HomeGroup, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_MediaServerDevices:
@@ -139,15 +149,15 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 break;
 
             case KnownFolderId_Objects3D:
-                status = SHGetKnownFolderPath(&FOLDERID_Objects3D, 0, NULL, &path);
-                CreateDirectoryW( path, NULL );
+                status = SHGetKnownFolderPath(&FOLDERID_Objects3D, 0, NULL, &pathStr);
+                CreateDirectoryW( pathStr, NULL );
                 break;
 
             case KnownFolderId_AppCaptures:
                 if ( !videosLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_AppCaptures, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_AppCaptures, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_RecordedCalls:
@@ -158,25 +168,25 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_CameraRoll, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_CameraRoll, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_Playlists:
                 if ( !musicLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_Playlists, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_Playlists, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_SavedPictures:
                 if ( !picturesLibraryAllowed )
                     status = E_ACCESSDENIED;
                 else
-                    status = SHGetKnownFolderPath(&FOLDERID_SavedPictures, 0, NULL, &path);
+                    status = SHGetKnownFolderPath(&FOLDERID_SavedPictures, 0, NULL, &pathStr);
                 break;
 
             case KnownFolderId_DownloadsFolder:
-                status = SHGetKnownFolderPath(&FOLDERID_Downloads, 0, NULL, &path);
+                status = SHGetKnownFolderPath(&FOLDERID_Downloads, 0, NULL, &pathStr);
                 break;
 
             default:
@@ -186,7 +196,43 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
 
     if ( SUCCEEDED( status ) )
     {
-        status = WindowsCreateString( path, wcslen( path ), value );
+        WindowsCreateString( pathStr, wcslen ( pathStr ), &path );
+        status = IStorageFolderStatics_GetFolderFromPathAsync( storageFolderStatics, path, &storageFolderOperation );
+        if ( SUCCEEDED( status ) )
+        {
+            asyncRes = await_IAsyncOperation_StorageFolder( storageFolderOperation, INFINITE );
+            if ( !asyncRes )
+            {
+                status = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, value );
+                IStorageFolder_AddRef( *value );
+            }
+        }
+    }
+
+    if ( pathStr )
+        free( pathStr );
+    if ( path ) 
+        WindowsDeleteString( path );
+    IStorageFolderStatics_Release( storageFolderStatics );
+    if ( storageFolderOperation )
+        IAsyncOperation_StorageFolder_Release( storageFolderOperation );
+    
+    return status;
+}
+
+HRESULT WINAPI known_folders_statics_GetKnownFolderAsync( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
+{
+    //Must be called from an asynchronous context.
+    IStorageFolder *folder = NULL;
+
+    HRESULT status = S_OK;
+
+    status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &folder );
+
+    if ( SUCCEEDED( status ) ) 
+    {
+        result->vt = VT_UNKNOWN;
+        result->punkVal = (IUnknown *)folder;
     }
 
     return status;
@@ -194,13 +240,15 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, HST
 
 HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    IStorageItem *knownFolderItem = NULL;
+    IStorageFolder *knownFolder = NULL;
+
+    HSTRING knownFolderPath;
     HRESULT status = S_OK;
-    HSTRING KnownFolderPath;
     INT promptResult;
     WCHAR title[MAX_BUFFER];
     WCHAR message[MAX_BUFFER];
     WCHAR manifestPath[MAX_PATH];
-    DWORD attributes;
 
     struct appx_package package;
 
@@ -215,22 +263,12 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
         status = E_UNEXPECTED;
     }
 
-    status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &KnownFolderPath );
+    status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &knownFolder );
     if ( status == E_ACCESSDENIED )
     {
         result->vt = VT_UI4;
         result->ulVal = (ULONG)KnownFoldersAccessStatus_NotDeclaredByApp;
         return status;
-    }
-
-    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( KnownFolderPath, NULL ) );
-    if ( attributes == INVALID_FILE_ATTRIBUTES )
-    {
-        if ( GetLastError() == ERROR_ACCESS_DENIED )
-        {
-            result->vt = VT_UI4;
-            result->ulVal = (ULONG)KnownFoldersAccessStatus_DeniedBySystem;
-        }
     }
 
     if ( SUCCEEDED( status ) )
@@ -243,7 +281,10 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
             swprintf( title, MAX_BUFFER, L"Let this app access the following file location?" );
         }
 
-        swprintf( message, MAX_BUFFER, L"%s\n%s", title, WindowsGetStringRawBuffer( KnownFolderPath, NULL ) );
+        IStorageFolder_QueryInterface( knownFolder, &IID_IStorageItem, (void **)&knownFolderItem );
+        IStorageItem_get_Path( knownFolderItem, &knownFolderPath );
+
+        swprintf( message, MAX_BUFFER, L"%s\n%s", title, WindowsGetStringRawBuffer( knownFolderPath, NULL ) );
         
         promptResult = MessageBoxW (
             NULL,

@@ -19,13 +19,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-
-
 #ifndef KNOWN_FOLDERS_INTERNAL_H
 #define KNOWN_FOLDERS_INTERNAL_H
 
 #include "../private.h"
-
 
 #include "StorageFolderInternal.h"
 
@@ -47,7 +44,8 @@ struct known_folders_statics
     LONG ref;
 };
 
-HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId , HSTRING *value );
+HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, IStorageFolder **value );
+HRESULT WINAPI known_folders_statics_GetKnownFolderAsync( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

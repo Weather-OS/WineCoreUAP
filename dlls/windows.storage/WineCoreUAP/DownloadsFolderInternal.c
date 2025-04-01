@@ -23,25 +23,35 @@
 
 _ENABLE_DEBUGGING_
 
-HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, CreationCollisionOption creationOption, IStorageFolder *outFolder )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
+
+HRESULT WINAPI downloads_folder_GetDownloadsFolder( IStorageFolder **outFolder )
 {
     HRESULT status = S_OK;
-    HSTRING path;
+    DWORD asyncRes;
 
-    struct storage_folder *folder;
+    IAsyncOperation_StorageFolder *storageFolderOperation = NULL;
+    IKnownFoldersStatics4 *knownFoldersStatics4 = NULL;
 
-    TRACE( "folderName %p, outFolder %p\n", folderName, outFolder );
-    
-    if (!(folder = calloc( 1, sizeof(*folder) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_KnownFolders, knownFoldersStatics4, IID_IKnownFoldersStatics4 );
 
-    folder = impl_from_IStorageFolder( outFolder );
+    TRACE( "outFolder %p\n", outFolder );
 
-    status = known_folders_statics_GetKnownFolder( KnownFolderId_DownloadsFolder, &path );
+    status = IKnownFoldersStatics4_GetFolderAsync( knownFoldersStatics4, KnownFolderId_DownloadsFolder, &storageFolderOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    if ( FAILED( status ) )
-        return status;
+    asyncRes = await_IAsyncOperation_StorageFolder( storageFolderOperation, INFINITE );
+    if ( asyncRes ) {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
 
-    status = storage_folder_AssignFolder( path, &folder->IStorageFolder_iface );
+    status = IAsyncOperation_StorageFolder_GetResults( storageFolderOperation, outFolder );
 
+_CLEANUP:
+    if ( knownFoldersStatics4 ) 
+        IKnownFoldersStatics4_Release( knownFoldersStatics4 );
+    if ( storageFolderOperation ) 
+        IAsyncOperation_StorageFolder_Release( storageFolderOperation );
     return status;
 }

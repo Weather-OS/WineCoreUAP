@@ -22,9 +22,6 @@
 #ifndef DOWNLOADS_FOLDER_INTERNAL_H
 #define DOWNLOADS_FOLDER_INTERNAL_H
 
-#include "StorageFolderInternal.h"
-#include "KnownFoldersInternal.h"
-
 #include "../private.h"
 #include "wine/debug.h"
 
@@ -37,6 +34,6 @@ struct downloads_folder_statics
     LONG ref;
 };
 
-HRESULT WINAPI downloads_folder_GetDownloadsFolder( HSTRING folderName, CreationCollisionOption creationOption, IStorageFolder *outFolder );
+HRESULT WINAPI downloads_folder_GetDownloadsFolder( IStorageFolder **outFolder );
 
 #endif

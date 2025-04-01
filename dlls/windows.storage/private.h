@@ -235,7 +235,7 @@ extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnkn
         if (IsEqualGUID( iid, &IID_IUnknown ) || IsEqualGUID( iid, &IID_IAgileObject ) ||           \
             IsEqualGUID( iid, &IID_##iface_type ))                                                  \
         {                                                                                           \
-            IUnknown_AddRef( iface );                                                               \
+            IInspectable_AddRef( (IInspectable *)iface );                                           \
             *out = iface;                                                                           \
             return S_OK;                                                                            \
         }                                                                                           \

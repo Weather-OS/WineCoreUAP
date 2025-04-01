@@ -117,7 +117,7 @@ static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface,
 {    
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->DisplayName;
+    WindowsDuplicateString( impl->DisplayName, value );
     return S_OK;
 }
 
@@ -125,7 +125,7 @@ static HRESULT WINAPI storage_provider_get_Id( IStorageProvider *iface, HSTRING 
 {
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->Id;
+    WindowsDuplicateString( impl->Id, value );
     return S_OK;
 }
 

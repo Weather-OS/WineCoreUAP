@@ -165,7 +165,7 @@ static HRESULT WINAPI storage_item_get_Name( IStorageItem *iface, HSTRING *value
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->Name;
+    WindowsDuplicateString( impl->Name, value );
     return S_OK;
 }
 
@@ -173,7 +173,7 @@ static HRESULT WINAPI storage_item_get_Path( IStorageItem *iface, HSTRING *value
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->Path;
+    WindowsDuplicateString( impl->Path, value );
     return S_OK;
 }
 
@@ -446,11 +446,29 @@ static HRESULT WINAPI storage_item_properties_GetTrustLevel( IStorageItemPropert
  * COM Oriented, WinRT Implementation: winrt::Windows::Storage::StorageItemProperties
 */
 
+static HRESULT WINAPI storage_item_properties_GetThumbnailAsyncOverloadDefaultSizeDefaultOptions( IStorageItemProperties *iface, ThumbnailMode mode, IAsyncOperation_StorageItemThumbnail **operation )
+{
+    FIXME( "iface %p, mode %d stub!\n", iface, mode );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_GetThumbnailAsyncOverloadDefaultOptions( IStorageItemProperties *iface, ThumbnailMode mode, UINT32 requestedSize, IAsyncOperation_StorageItemThumbnail **operation )
+{
+    FIXME( "iface %p, requestedSize %d, mode %d, stub!\n", iface, requestedSize, mode );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI storage_item_properties_GetThumbnailAsync( IStorageItemProperties *iface, ThumbnailMode mode, UINT32 requestedSize, ThumbnailOptions options, IAsyncOperation_StorageItemThumbnail **operation )
+{
+    FIXME( "iface %p, requestedSize %d, mode %d, options %d, stub!\n", iface, requestedSize, mode, options );
+    return E_NOTIMPL;
+}
+
 static HRESULT WINAPI storage_item_properties_get_DisplayName( IStorageItemProperties *iface, HSTRING *value )
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->DisplayName;
+    WindowsDuplicateString( impl->DisplayName, value );
     return S_OK;    
 }
 
@@ -458,7 +476,7 @@ static HRESULT WINAPI storage_item_properties_get_DisplayType( IStorageItemPrope
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->DisplayType;
+    WindowsDuplicateString( impl->DisplayType, value );
     return S_OK;    
 }
 
@@ -466,7 +484,7 @@ static HRESULT WINAPI storage_item_properties_get_FolderRelativeId( IStorageItem
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->FolderRelativeId;
+    WindowsDuplicateString( impl->FolderRelativeId, value );
     return S_OK;    
 }
 
@@ -488,6 +506,9 @@ struct IStorageItemPropertiesVtbl storage_item_properties_vtbl =
     storage_item_properties_GetRuntimeClassName,
     storage_item_properties_GetTrustLevel,
     /* IStorageItemProperties methods */
+    storage_item_properties_GetThumbnailAsyncOverloadDefaultSizeDefaultOptions,
+    storage_item_properties_GetThumbnailAsyncOverloadDefaultOptions,
+    storage_item_properties_GetThumbnailAsync,
     storage_item_properties_get_DisplayName,
     storage_item_properties_get_DisplayType,
     storage_item_properties_get_FolderRelativeId,

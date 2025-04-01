@@ -241,6 +241,9 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFile, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+
+    free( creation_options );
+
     return hr;
 }
 
@@ -259,6 +262,9 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFile, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+
+    free( creation_options );
+
     return hr;
 }
 
@@ -277,6 +283,9 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFolder, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+
+    free( creation_options );
+
     return hr;
 }
 
@@ -295,6 +304,9 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)creation_options, storage_folder_CreateFolder, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+
+    free( creation_options );
+
     return hr;
 }
 

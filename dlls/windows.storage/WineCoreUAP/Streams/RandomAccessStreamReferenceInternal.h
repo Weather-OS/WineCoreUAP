@@ -54,5 +54,6 @@ struct random_access_stream_reference *impl_from_IRandomAccessStreamReference( I
 
 HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, IRandomAccessStreamReference *value );
+HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

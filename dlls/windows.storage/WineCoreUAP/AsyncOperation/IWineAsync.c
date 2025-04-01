@@ -410,12 +410,7 @@ static ULONG WINAPI async_bool_Release( IAsyncOperation_boolean *iface )
     TRACE( "iface %p, ref %lu.\n", iface, ref );
 
     if (!ref)
-    {
-        /* guard against re-entry if inner releases an outer iface */
-        InterlockedIncrement( &impl->ref );
-        IWineAsyncInfoImpl_Release( impl->IWineAsyncInfoImpl_inner );
         free( impl );
-    }
 
     return ref;
 }
@@ -538,12 +533,7 @@ static ULONG WINAPI async_inspectable_Release( IAsyncOperation_IInspectable *ifa
     TRACE( "iface %p, ref %lu.\n", iface, ref );
 
     if (!ref)
-    {
-        /* guard against re-entry if inner releases an outer iface */
-        InterlockedIncrement( &impl->ref );
-        IWineAsyncInfoImpl_Release( impl->IWineAsyncInfoImpl_inner );
         free( impl );
-    }
 
     return ref;
 }

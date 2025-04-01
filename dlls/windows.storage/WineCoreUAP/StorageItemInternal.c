@@ -91,30 +91,35 @@ static INT64 FileTimeToUnixTime( const FILETIME *ft ) {
     return ( ull.QuadPart / WINDOWS_TICK ) - SEC_TO_UNIX_EPOCH;
 }
 
-HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem * result ) 
+HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem ** result ) 
 {
+    FILETIME itemFileCreatedTime;
+    HSTRING tempName;
+    HRESULT status;    
+    HANDLE itemFile;
     WCHAR itemName[MAX_PATH];
     DWORD attributes;
-    HANDLE itemFile;
-    HSTRING tempName;
-    HRESULT status;
-    FILETIME itemFileCreatedTime;
-
+    
     struct storage_item *item;
 
     TRACE( "iface %p, value %p\n", itemPath, result );
-    if (!result) return E_INVALIDARG;
+
     if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
 
-    item = impl_from_IStorageItem( result );
+    item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+    item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
 
     if ( PathIsURLW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
+    {
         status = E_INVALIDARG;
+        goto _CLEANUP;
+    }
     
     attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 
     {
         status = E_INVALIDARG;
+        goto _CLEANUP;
     } else 
     {
         //File Time
@@ -122,13 +127,14 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (itemFile == INVALID_HANDLE_VALUE) 
         {
-            return E_ABORT;
+            status = E_ABORT;
+            goto _CLEANUP;
         }
 
         if ( !GetFileTime( itemFile, &itemFileCreatedTime, NULL, NULL ) ) 
         {
-            CloseHandle( itemFile );
-            return E_ABORT;
+            status = HRESULT_FROM_WIN32( GetLastError() );
+            goto _CLEANUP;
         }
 
         item->DateCreated.UniversalTime = FileTimeToUnixTime( &itemFileCreatedTime );
@@ -162,33 +168,46 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
         wcscpy( itemName, wcsrchr( WindowsGetStringRawBuffer( itemPath, NULL ), '\\' ) );
         WindowsCreateString( itemName + 1, wcslen( itemName + 1 ), &tempName );
         WindowsDuplicateString( tempName, &item->Name );
+        WindowsDeleteString( tempName );
 
         CloseHandle( itemFile );
 
         status = S_OK;
     }
 
+    *result = &item->IStorageItem_iface;
+
+_CLEANUP:
+    if ( FAILED( status ) )
+        free( item );
+
     return status;
 }
 
 HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
-    DWORD attributes;
+{    
+    BOOLEAN isFolder = TRUE;
     HRESULT status = S_OK;
     HSTRING itemPath;
+    DWORD attributes;
     WCHAR newItemPath[MAX_PATH];
     WCHAR uuidName[MAX_PATH];
 
-    struct storage_item *item;
+    IStorageFolder *reassignedFolder = NULL;
+    IStorageFolder *folderToReassign = NULL;
+    IStorageFile *reassignedFile = NULL;
+    IStorageFile *fileToReassign = NULL;
+
     struct storage_item_rename_options *rename_options = (struct storage_item_rename_options *)param;
+
+    //Parameters
     NameCollisionOption collisionOption = rename_options->option;
     HSTRING name = rename_options->name;
 
     TRACE( "iface %p, value %p\n", invoker, name );
     if (!name) return E_INVALIDARG;
 
-    item = impl_from_IStorageItem( (IStorageItem *)invoker );
-    WindowsDuplicateString( item->Path, &itemPath );
+    IStorageItem_get_Path( (IStorageItem *)invoker, &itemPath );
 
     wcscpy( newItemPath, WindowsGetStringRawBuffer( itemPath, NULL ) );
     *wcsrchr( newItemPath, L'\\' ) = '\0';
@@ -207,7 +226,7 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
 
                 attributes = GetFileAttributesW( newItemPath );
                 if ( attributes != INVALID_FILE_ATTRIBUTES ) 
-                    status = E_INVALIDARG;
+                    return E_INVALIDARG;
                 else
                     status = S_OK;
                 break;
@@ -238,35 +257,52 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
                     status = S_OK;
                 break;
         }
+
+        IStorageItem_IsOfType( (IStorageItem *)invoker, StorageItemTypes_Folder, &isFolder );
+
+        if ( !MoveFileW( WindowsGetStringRawBuffer( itemPath, NULL ), newItemPath ) )
+        {
+            status = E_ABORT;
+        }
+
+        //The behavior calls for reassigning properties.
+        if ( SUCCEEDED( status ) )
+        {
+            WindowsCreateString( newItemPath, wcslen( newItemPath ), &itemPath );
+            if ( isFolder )
+            {
+                status = storage_folder_AssignFolder( itemPath, &reassignedFolder );
+                if ( FAILED( status ) ) return status;
+                IStorageItem_QueryInterface( (IStorageItem *)invoker, &IID_IStorageFolder, (void **)&folderToReassign );
+                memcpy( folderToReassign, reassignedFolder, sizeof(struct storage_folder) );
+                IStorageFolder_Release( reassignedFolder );
+            } else
+            {
+                status = storage_file_AssignFile( itemPath, &reassignedFile );
+                IStorageItem_QueryInterface( (IStorageItem *)invoker, &IID_IStorageFile, (void **)&fileToReassign );
+                memcpy( fileToReassign, reassignedFile, sizeof(struct storage_file) );
+                IStorageFile_Release( reassignedFile );
+            }
+        }
     }
 
-    if ( !MoveFileW( WindowsGetStringRawBuffer( item->Path, NULL ), newItemPath ) )
-    {
-        status = E_ABORT;
-    }
+    WindowsDeleteString( itemPath );
 
-    if ( SUCCEEDED( status ) )
-    {
-        WindowsCreateString( newItemPath, wcslen( newItemPath ), &item->Path );
-        WindowsDuplicateString( name, &item->Name );
-    }
     return status;
 }
 
 HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    DWORD attributes;
+    //The delete operation doesn't release the file/folder.
     HRESULT status = S_OK;
     HSTRING itemPath;
-
-    struct storage_item *item;
+    DWORD attributes;
 
     StorageDeleteOption deleteOption = (StorageDeleteOption)param;
 
     TRACE( "iface %p\n", invoker );
 
-    item = impl_from_IStorageItem( (IStorageItem *)invoker );
-    WindowsDuplicateString( item->Path, &itemPath );
+    IStorageItem_get_Path( (IStorageItem *)invoker, &itemPath );
 
     //Perform delete
     attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
@@ -292,68 +328,74 @@ HRESULT WINAPI storage_item_Delete( IUnknown *invoker, IUnknown *param, PROPVARI
         }
     }
 
-    if ( SUCCEEDED( status ) )
-    {
-        free( item );
-    }
+    WindowsDeleteString( itemPath );
+
     return status;
 }
 
 HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
+{    
+    FILETIME lastWrite;
+    HSTRING itemPath;
     HRESULT status = S_OK;
     HANDLE file;
-    FILETIME lastWrite;
     DWORD fileSize;
     
     struct basic_properties *properties;
-    struct storage_item *item;
-    
-    item = impl_from_IStorageItem( (IStorageItem *)invoker );
 
-    file = CreateFileW( WindowsGetStringRawBuffer( item->Path, NULL ), GENERIC_READ, FILE_SHARE_READ, NULL,
+    TRACE( "iface %p, value %p\n", invoker, result );
+   
+    IStorageItem_get_Path( (IStorageItem *)invoker, &itemPath );
+
+    file = CreateFileW( WindowsGetStringRawBuffer( itemPath, NULL ), GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
+
+    if ( file == INVALID_HANDLE_VALUE )
+    {
+        return E_ABORT;
+    }
 
     fileSize = GetFileSize( file, NULL );
 
+    if ( fileSize == INVALID_FILE_SIZE )
+    {
+        CloseHandle( file );
+        return E_UNEXPECTED;
+    }
+
     GetFileTime(file, NULL, NULL, &lastWrite);
 
-    TRACE( "iface %p, value %p\n", invoker, result );
-    if (!result) return E_INVALIDARG;
     if (!(properties = calloc( 1, sizeof(*properties) ))) return E_OUTOFMEMORY;
 
     properties->IActivationFactory_iface.lpVtbl = basic_properties_factory->lpVtbl;
     properties->IBasicProperties_iface.lpVtbl = &basic_properties_vtbl;
 
     properties->DateModified.UniversalTime = FileTimeToUnixTime( &lastWrite );
-    properties->ItemDate = item->DateCreated;
+    IStorageItem_get_DateCreated( (IStorageItem *)invoker, &properties->ItemDate );
     properties->size = fileSize;
     properties->ref = 1;
 
     result->vt = VT_UNKNOWN;
     result->punkVal = (IUnknown *)&properties->IBasicProperties_iface;
     
+    CloseHandle( file );
+    WindowsDeleteString( itemPath );
+
     return status;
 
 }
 
 HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * type )
-{
-    DWORD attributes;
+{    
     HRESULT status = S_OK;
     HSTRING itemPath;
-    WCHAR path[MAX_PATH];
-
-    struct storage_item *item;
+    DWORD attributes;
 
     TRACE( "iface %p, type %p\n", iface, type );
     
-    item = impl_from_IStorageItem( iface );
-    WindowsDuplicateString( item->Path, &itemPath );
-    
-    wcscpy( path, WindowsGetStringRawBuffer( itemPath, NULL ) );
+    IStorageItem_get_Path( iface, &itemPath );
 
-    attributes = GetFileAttributesW( path );
+    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
     if ( attributes == INVALID_FILE_ATTRIBUTES )
     {
         status = E_INVALIDARG;
@@ -368,32 +410,38 @@ HRESULT WINAPI storage_item_GetType( IStorageItem * iface, StorageItemTypes * ty
         }
     }
 
+    WindowsDeleteString( itemPath );
     return status;
 }
 
-HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties *result )
+HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IStorageItemProperties ** result )
 {
-    LPWSTR pathParts[MAX_PATH];
-    WCHAR id[MAX_PATH];
-    INT partCount = 0;
-    LPWSTR token;
+    SHFILEINFOW shFileInfo = { 0 };    
     HRESULT status = S_OK;
-    SHFILEINFOW shFileInfo = { 0 };
+    HSTRING itemPath;
+    LPWSTR pathParts[MAX_PATH];
+    LPWSTR token;
+    WCHAR id[ 23 + MAX_PATH ];
+    INT partCount = 0;
 
-    struct storage_item_properties *properties = impl_from_IStorageItemProperties( result );
+    struct storage_item_properties *properties;
 
     TRACE( "iface %p, result %p\n", iface, result );
+
+    if (!(properties = calloc( 1, sizeof(*properties) ))) return E_OUTOFMEMORY;
 
     properties->IStorageItemProperties_iface.lpVtbl = &storage_item_properties_vtbl;
     properties->IStorageItemPropertiesWithProvider_iface.lpVtbl = &storage_item_properties_with_provider_vtbl;
 
-    WindowsDuplicateString( impl_from_IStorageItem( iface )->Name, &properties->DisplayName );
+    //Item name is used for DisplayName.
+    IStorageItem_get_Name( iface, &properties->DisplayName );
 
-    if ( SHGetFileInfoW( WindowsGetStringRawBuffer( impl_from_IStorageItem( iface )->Path, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
+    IStorageItem_get_Path( iface, &itemPath );
+    if ( SHGetFileInfoW( WindowsGetStringRawBuffer( itemPath, NULL ), 0, &shFileInfo, sizeof( shFileInfo ), SHGFI_TYPENAME ) ) {
         WindowsCreateString( shFileInfo.szTypeName, wcslen( shFileInfo.szTypeName ), &properties->DisplayType );
     }
 
-    wcscpy( id, WindowsGetStringRawBuffer( impl_from_IStorageItem( iface )->Path, NULL ) );
+    wcscpy( id, WindowsGetStringRawBuffer( itemPath, NULL ) );
 
     token = wcstok( id, L"\\", NULL );
     while ( token != NULL ) 
@@ -403,11 +451,13 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
     }
 
     if ( partCount >= 2 ) 
-    {
         wnsprintfW( id, 23 + MAX_PATH, L"System.ItemPathDisplay:%s\\%s", pathParts[partCount - 2], pathParts[partCount - 1] );
-    }
 
     WindowsCreateString( id, wcslen( id ), &properties->FolderRelativeId );
+
+    *result = &properties->IStorageItemProperties_iface;
+
+    free( token );
 
     return status;
 }
@@ -415,9 +465,8 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
 HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
 {
     HRESULT status = S_OK;
-    IStorageItem *storageItem;
+    IStorageItem *storageItem = NULL;
 
-    struct storage_item *item;
     struct storage_provider *provider;
 
     TRACE( "iface %p, value %p\n", iface, value );
@@ -425,11 +474,11 @@ HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPr
     if (!(provider = calloc( 1, sizeof(*provider) ))) return E_OUTOFMEMORY;
 
     IStorageItemPropertiesWithProvider_QueryInterface( iface, &IID_IStorageItem, (void **)&storageItem );
-    item = impl_from_IStorageItem( storageItem );
 
     provider->IStorageProvider_iface.lpVtbl = &storage_provider_vtbl;
 
-    WindowsDuplicateString( item->Name, &provider->DisplayName );
+    //Item name is used for DisplayName.
+    IStorageItem_get_Name( storageItem, &provider->DisplayName );
     WindowsCreateString( L"Local", wcslen( L"Local" ), &provider->Id );
 
     *value = &provider->IStorageProvider_iface;

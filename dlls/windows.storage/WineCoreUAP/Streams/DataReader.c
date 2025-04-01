@@ -682,7 +682,7 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     impl->buffer = returnedBuffer;
     hr = IBuffer_get_Length( returnedBuffer, &impl->UnconsumedBufferLength );
 
-    if ( SUCCEEDED(hr) )
+    if ( SUCCEEDED( hr ) )
     {
         result->vt = VT_UI4;
         result->ulVal = (UINT64)impl->UnconsumedBufferLength;

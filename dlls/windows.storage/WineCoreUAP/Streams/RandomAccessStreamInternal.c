@@ -29,9 +29,9 @@ DEFINE_ASYNC_COMPLETED_HANDLER( buffer_uint32_async_with_progress, IAsyncOperati
 HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputStream *destination, UINT64 bytesToCopy, IAsyncOperationWithProgress_UINT64_UINT64 **operation )
 {
     HRESULT status = S_OK;
-    DWORD asyncResult;
     UINT32 bytesReadInSegment = BUFFER_SIZE;
-    UINT32 bytesRead = 0;
+    UINT32 bytesRead = 0;    
+    DWORD asyncResult;
     BYTE *byteBuffer;
     BYTE *tmpByteBuffer;
 
@@ -60,7 +60,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         if( FAILED( status ) ) goto _FAIL;
     } else
     {
-        //Copy in 4096 byte segments until we bytes read is not 4096.
+        //Copy in 4096 byte segments until bytes read is not 4096.
         while ( bytesReadInSegment == BUFFER_SIZE )
         {
             buffer_Create( BUFFER_SIZE, &buffer );
@@ -99,11 +99,13 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         IBuffer_put_Length( readBuffer, bytesRead );
     }
 
-    CoTaskMemFree( byteBuffer );
-
-    return IOutputStream_WriteAsync( destination, readBuffer, (IAsyncOperationWithProgress_UINT32_UINT32 **)operation );
+    status = IOutputStream_WriteAsync( destination, readBuffer, (IAsyncOperationWithProgress_UINT32_UINT32 **)operation );
 
     _FAIL:
+        IBuffer_Release( buffer );
+        IBuffer_Release( readBuffer );
+        IBuffer_Release( segmentBuffer );
+        CoTaskMemFree( tmpByteBuffer );
         CoTaskMemFree( byteBuffer );
         return status;
 }

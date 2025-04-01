@@ -39,52 +39,52 @@ HRESULT WINAPI user_data_paths_GetKnownFolder( IUserDataPaths *iface, const char
 
     path = (PWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
-    if (!strcmp(FOLDERID, "cameraroll")) {
-        status = SHGetKnownFolderPath(&FOLDERID_CameraRoll, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "cookies")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Cookies, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "desktop")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Desktop, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "documents")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Documents, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "favorites")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Favorites, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "history")) {
-        status = SHGetKnownFolderPath(&FOLDERID_History, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "internetcache")) {
-        status = SHGetKnownFolderPath(&FOLDERID_InternetCache, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "localappdata")) {
-        status = SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "localappdatalow")) {
-        status = SHGetKnownFolderPath(&FOLDERID_LocalAppDataLow, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "music")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Music, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "pictures")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Pictures, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "profile")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Profile, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "recent")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Recent, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "roamingappdata")) {
-        status = SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "savedpictures")) {
-        status = SHGetKnownFolderPath(&FOLDERID_SavedPictures, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "screenshots")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Screenshots, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "templates")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Templates, 0, NULL, &path);
-    } else if (!strcmp(FOLDERID, "videos")) {
-        status = SHGetKnownFolderPath(&FOLDERID_Videos, 0, NULL, &path);
+    if ( !strcmp( FOLDERID, "cameraroll" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_CameraRoll, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "cookies" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Cookies, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "desktop" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Desktop, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "documents" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Documents, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "favorites" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Favorites, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "history" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_History, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "internetcache" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_InternetCache, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "localappdata ") ) {
+        status = SHGetKnownFolderPath( &FOLDERID_LocalAppData, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "localappdatalow" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_LocalAppDataLow, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "music" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Music, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "pictures" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Pictures, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "profile" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Profile, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "recent" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Recent, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "roamingappdata" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_RoamingAppData, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "savedpictures" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_SavedPictures, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "screenshots" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Screenshots, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "templates" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Templates, 0, NULL, &path );
+    } else if ( !strcmp( FOLDERID, "videos" ) ) {
+        status = SHGetKnownFolderPath( &FOLDERID_Videos, 0, NULL, &path );
     } else {
         status = E_NOTIMPL;
     }
 
-    if (FAILED(status))
-        return status;
-
-    if (WindowsCreateString( path, wcslen(path), value ) != S_OK) {
-        return E_UNEXPECTED;
+    if ( SUCCEEDED( status ) )
+    {
+        status = WindowsCreateString( path, wcslen( path ), value );
     }
+
+    free( path );
     
     return S_OK;
 }

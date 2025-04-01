@@ -354,7 +354,7 @@ static HRESULT WINAPI random_access_stream_GetInputStreamAt( IRandomAccessStream
 
     input->IInputStream_iface.lpVtbl = &input_stream_vtbl;
     input->IClosable_iface.lpVtbl = &closable_stream_vtbl;
-    IStream_Clone( impl->stream, &input->stream );
+    input->stream = input->stream;
     input->closableRef = 1;
     input->ref = 1;
 
@@ -383,7 +383,7 @@ static HRESULT WINAPI random_access_stream_GetOutputStreamAt( IRandomAccessStrea
 
     output->IOutputStream_iface.lpVtbl = &output_stream_vtbl;
     output->IClosable_iface.lpVtbl = &closable_stream_vtbl;
-    IStream_Clone( impl->stream, &output->stream );
+    output->stream = impl->stream;
     output->closableRef = 1;
     output->ref = 1;
     output->currentOperation = NULL;

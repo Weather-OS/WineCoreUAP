@@ -127,6 +127,8 @@ static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, ISto
     read_text_options->file = file;
 
     hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
+
+    free( read_text_options );
     return hr;
 }
 
@@ -143,6 +145,8 @@ static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics 
     read_text_options->file = file;
 
     hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
+    
+    free( read_text_options );
     return hr;
 }
 
@@ -160,6 +164,8 @@ static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, ISt
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+
+    free( write_text_options );
     return hr;
 }
 
@@ -177,6 +183,8 @@ static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+
+    free( write_text_options );
     return hr;
 }
 
@@ -194,6 +202,8 @@ static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IS
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+
+    free( write_text_options );
     return hr;
 }
 
@@ -211,6 +221,8 @@ static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatic
     write_text_options->contents = contents;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+
+    free( write_text_options );
     return hr;
 }
 
@@ -229,6 +241,8 @@ static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, ISt
     read_text_options->file = file;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+
+    free( read_text_options );
     return hr;
 }
 
@@ -246,6 +260,8 @@ static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics
     read_text_options->file = file;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+
+    free( read_text_options );
     return hr;
 }
 
@@ -255,11 +271,12 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
     HRESULT hr;
     HSTRING *strings;
     LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
+    LPWSTR tmpStr = NULL;
     UINT32 vectorSize = 0;
     UINT32 totalSize = 0;
     UINT32 i;
     boolean strExists;
+
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
@@ -301,7 +318,11 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -313,7 +334,21 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
@@ -322,11 +357,12 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
     HRESULT hr;
     HSTRING *strings;
     LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
+    LPWSTR tmpStr = NULL;
     UINT32 vectorSize = 0;
     UINT32 totalSize = 0;
     UINT32 i;
     boolean strExists;
+
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
@@ -368,7 +404,11 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -380,7 +420,21 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
@@ -389,11 +443,12 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
     HRESULT hr;
     HSTRING *strings;
     LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
+    LPWSTR tmpStr = NULL;
     UINT32 vectorSize = 0;
     UINT32 totalSize = 0;
     UINT32 i;
     boolean strExists;
+
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
@@ -435,7 +490,11 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -447,7 +506,21 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
@@ -456,11 +529,12 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
     HRESULT hr;
     HSTRING *strings;
     LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
+    LPWSTR tmpStr = NULL;
     UINT32 vectorSize = 0;
     UINT32 totalSize = 0;
     UINT32 i;
     boolean strExists;
+
     IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
@@ -502,7 +576,11 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            free( tmpStr );
         }
+    } else {
+        free( write_text_options );
+        return hr;
     }
 
     //Remove trailing nextspace
@@ -514,7 +592,21 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
         WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
-    return S_OK;
+
+    free( write_text_options );
+    if ( combinedString ) 
+        free( combinedString );
+    IIterator_HSTRING_Release( hstringIterator );
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        if ( strings[i] != NULL )
+        {
+            WindowsDeleteString( strings[i] );
+        }
+    }
+    free( strings );
+
+    return hr;
 }
 
 static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
@@ -540,6 +632,8 @@ static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, I
     write_buffer_options->file = file;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_buffer_options, file_io_statics_WriteBuffer, operation );
+
+    free( write_buffer_options );
     return hr;
 }
 
@@ -557,6 +651,8 @@ static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IS
     write_bytes_options->bufferSize = __bufferSize;
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_bytes_options, file_io_statics_WriteBytes, operation );
+
+    free( write_bytes_options );
     return hr;
 }
 

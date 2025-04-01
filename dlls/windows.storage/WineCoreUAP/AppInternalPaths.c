@@ -28,6 +28,8 @@ _ENABLE_DEBUGGING_
 
 HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
 {    
+    HRESULT status = S_OK;
+
     WCHAR path[MAX_PATH] = L"C:\\users\\";
     WCHAR username[256];
     WCHAR manifestPath[MAX_PATH];
@@ -47,7 +49,8 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * 
     AppName = package.Package.Identity.Name;
 
     if (!GetUserNameW(username, &username_len)) {
-        return E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        goto _CLEANUP;
     }
 
     PathAppendW(path, username);
@@ -74,9 +77,8 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * 
         PathAppendW(path, L"RoamingState");
     }
 
-    if (WindowsCreateString( path, wcslen(path), value ) != S_OK) {
-        return E_UNEXPECTED;
-    }
-    
-    return S_OK;
+    status = WindowsCreateString( path, wcslen(path), value );
+
+_CLEANUP:
+    return status;
 }

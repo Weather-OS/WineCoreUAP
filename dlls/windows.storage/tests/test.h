@@ -154,23 +154,25 @@ void stubbed_interface_( unsigned int line, void *obj, const IID *iid );
 #define CHECK_HR( hr )                      \
     ok( hr == S_OK, "got hr %#lx.\n", hr ); \
 
-#define ACTIVATE_INSTANCE( instance_name, instance_object, instance_iid )                                               \
-    HSTRING _str;                                                                                                       \
-    HRESULT _hr;                                                                                                        \
-    _hr = WindowsCreateString( instance_name, wcslen( instance_name ), &_str );                                         \
-    ok( _hr == S_OK, "got hr %#lx.\n", _hr );                                                                           \
-                                                                                                                        \
-    _hr = RoGetActivationFactory( _str, &instance_iid, (void **)&instance_object );                                     \
-    WindowsDeleteString( _str );                                                                                        \
-    ok( _hr == S_OK || broken( _hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", _hr );                                   \
-    if (_hr == REGDB_E_CLASSNOTREG)                                                                                     \
-    {                                                                                                                   \
-        win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( instance_name ) );                \
-    }                                                                                                                   \
-    check_interface( instance_object, &IID_IUnknown );                                                                  \
-    check_interface( instance_object, &IID_IInspectable );                                                              \
-    check_interface( instance_object, &IID_IAgileObject );                                                              \
-                                                                                                                        \
-    CHECK_HR( _hr );
+#define ACTIVATE_INSTANCE( instance_name, instance_object, instance_iid )                                                   \
+    {                                                                                                                       \
+        HSTRING _str;                                                                                                       \
+        HRESULT _hr;                                                                                                        \
+        _hr = WindowsCreateString( instance_name, wcslen( instance_name ), &_str );                                         \
+        ok( _hr == S_OK, "got hr %#lx.\n", _hr );                                                                           \
+                                                                                                                            \
+        _hr = RoGetActivationFactory( _str, &instance_iid, (void **)&instance_object );                                     \
+        WindowsDeleteString( _str );                                                                                        \
+        ok( _hr == S_OK || broken( _hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", _hr );                                   \
+        if (_hr == REGDB_E_CLASSNOTREG)                                                                                     \
+        {                                                                                                                   \
+            win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( instance_name ) );                \
+        }                                                                                                                   \
+        check_interface( instance_object, &IID_IUnknown );                                                                  \
+        check_interface( instance_object, &IID_IInspectable );                                                              \
+        check_interface( instance_object, &IID_IAgileObject );                                                              \
+                                                                                                                            \
+        CHECK_HR( _hr );                                                                                                    \
+    }
 
 #endif
