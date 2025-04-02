@@ -100,6 +100,7 @@ extern IActivationFactory *buffer_factory;
 extern IActivationFactory *system_properties_factory;
 extern IActivationFactory *system_data_paths_factory;
 extern IActivationFactory *data_reader_factory;
+extern IActivationFactory *data_writer_factory;
 extern IActivationFactory *storage_library_statics_factory;
 extern IActivationFactory *query_options_activatable_factory;
 extern IActivationFactory *random_access_stream_factory;
