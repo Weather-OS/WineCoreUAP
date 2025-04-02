@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.Streams.DataReader Implementation
+/* WinRT Windows.Storage.Streams.DataWriter Implementation
  *
  * Written by Weather
  *
@@ -19,38 +19,31 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef DATA_READER_INTERNAL_H
-#define DATA_READER_INTERNAL_H
+#ifndef DATA_WRITER_INTERNAL_H
+#define DATA_WRITER_INTERNAL_H
 
 #include "../../private.h"
 #include "wine/debug.h"
 
-extern struct IDataReaderVtbl data_reader_vtbl;
+extern struct IDataWriterVtbl data_writer_vtbl;
 
-struct data_reader
+struct data_writer
 {
-    IDataReader IDataReader_iface;    
-    UINT32 UnconsumedBufferLength;
+    IDataWriter IDataWriter_iface;    
+    UINT32 UnstoredBufferLength;
     UnicodeEncoding Encoding;
     ByteOrder Order;
-    InputStreamOptions StreamOptions;
-    IInputStream *inputStream;
+    IOutputStream *outputStream;
     IBuffer *buffer;
     LONG ref;
 };
 
-struct data_reader_statics
+struct data_writer_statics
 {
     //Derivatives
     IActivationFactory IActivationFactory_iface;    
-    IDataReaderFactory IDataReaderFactory_iface;
-    IDataReaderStatics IDataReaderStatics_iface;
+    IDataWriterFactory IDataWriterFactory_iface;
     LONG ref;
-};
-
-struct load_arguments
-{
-    UINT32 count;
 };
 
 #endif

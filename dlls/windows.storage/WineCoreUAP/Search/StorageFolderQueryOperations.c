@@ -34,7 +34,7 @@ static HRESULT WINAPI storage_folder_query_operations_QueryInterface( IStorageFo
 {
     struct storage_folder_query_operations *impl = impl_from_IStorageFolderQueryOperations( iface );
 
-    // Inheritence 
+    // Inheritance 
     struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageFolderQueryOperations_iface, struct storage_folder, IStorageFolderQueryOperations_iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );

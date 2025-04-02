@@ -34,7 +34,7 @@ static HRESULT WINAPI storage_item_QueryInterface( IStorageItem *iface, REFIID i
 {
     struct storage_item *impl = impl_from_IStorageItem( iface );
 
-    // Inheritence 
+    // Inheritance 
     struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItem_iface, struct storage_folder, IStorageItem_iface );
     struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItem_iface, struct storage_file, IStorageItem_iface );
 
@@ -242,7 +242,7 @@ static HRESULT WINAPI storage_item2_QueryInterface( IStorageItem2 *iface, REFIID
 {
     struct storage_item *impl = impl_from_IStorageItem2( iface );
 
-    // Inheritence 
+    // Inheritance 
     struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItem2_iface, struct storage_folder, IStorageItem2_iface );
     struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItem2_iface, struct storage_file, IStorageItem2_iface );
 
@@ -374,7 +374,7 @@ static HRESULT WINAPI storage_item_properties_QueryInterface( IStorageItemProper
 {
     struct storage_item_properties *impl = impl_from_IStorageItemProperties( iface );
 
-    // Inheritence 
+    // Inheritance 
     struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_folder, IStorageItemProperties_iface );
     struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_file, IStorageItemProperties_iface );
 
@@ -524,7 +524,7 @@ static HRESULT WINAPI storage_item_properties_with_provider_QueryInterface( ISto
 {
     struct storage_item_properties *impl = impl_from_IStorageItemPropertiesWithProvider( iface );
 
-    // Inheritence 
+    // Inheritance 
     struct storage_folder *inheritedFolder = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_folder, IStorageItemProperties_iface );
     struct storage_file *inheritedFile = CONTAINING_RECORD( &impl->IStorageItemProperties_iface, struct storage_file, IStorageItemProperties_iface );
 

@@ -188,6 +188,7 @@ static HRESULT WINAPI data_reader_GetTrustLevel( IDataReader *iface, TrustLevel 
 static HRESULT WINAPI data_reader_get_UnconsumedBufferLength( IDataReader *iface, UINT32* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->UnconsumedBufferLength;
     return S_OK;
 }
@@ -195,6 +196,7 @@ static HRESULT WINAPI data_reader_get_UnconsumedBufferLength( IDataReader *iface
 static HRESULT WINAPI data_reader_get_UnicodeEncoding( IDataReader *iface, UnicodeEncoding* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Encoding;
     return S_OK;
 }
@@ -202,6 +204,7 @@ static HRESULT WINAPI data_reader_get_UnicodeEncoding( IDataReader *iface, Unico
 static HRESULT WINAPI data_reader_put_UnicodeEncoding( IDataReader *iface, UnicodeEncoding value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %d\n", iface, value );
     impl->Encoding = value;
     return S_OK;
 }
@@ -209,6 +212,7 @@ static HRESULT WINAPI data_reader_put_UnicodeEncoding( IDataReader *iface, Unico
 static HRESULT WINAPI data_reader_get_ByteOrder( IDataReader *iface, ByteOrder* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Order;
     return S_OK;
 }
@@ -216,6 +220,7 @@ static HRESULT WINAPI data_reader_get_ByteOrder( IDataReader *iface, ByteOrder* 
 static HRESULT WINAPI data_reader_put_ByteOrder( IDataReader *iface, ByteOrder value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %d\n", iface, value );
     impl->Order = value;
     return S_OK;
 }
@@ -223,6 +228,7 @@ static HRESULT WINAPI data_reader_put_ByteOrder( IDataReader *iface, ByteOrder v
 static HRESULT WINAPI data_reader_get_InputStreamOptions( IDataReader *iface, InputStreamOptions* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->StreamOptions;
     return S_OK;
 }
@@ -230,6 +236,7 @@ static HRESULT WINAPI data_reader_get_InputStreamOptions( IDataReader *iface, In
 static HRESULT WINAPI data_reader_put_InputStreamOptions( IDataReader *iface, InputStreamOptions value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, value %d\n", iface, value );
     impl->StreamOptions = value;
     return S_OK;
 }
@@ -244,16 +251,23 @@ static HRESULT WINAPI data_reader_ReadByte( IDataReader *iface, BYTE* value )
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
+    TRACE( "iface %p, value %p\n", iface, value );
+
     if ( impl->UnconsumedBufferLength < 1 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    *value = returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ];
-    impl->UnconsumedBufferLength--;
+    if ( SUCCEEDED( hr ) ) 
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        *value = returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ];
+        impl->UnconsumedBufferLength--;
+
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -268,18 +282,23 @@ static HRESULT WINAPI data_reader_ReadBytes( IDataReader *iface, UINT32 __valueS
 
     struct data_reader *impl = impl_from_IDataReader( iface );  
     
+    TRACE( "iface %p, __valueSize %d, value %p\n", iface, __valueSize, value );
+
     if ( impl->UnconsumedBufferLength < __valueSize )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], __valueSize );
-    if ( FAILED( hr ) ) return hr;
+    if ( SUCCEEDED( hr ) ) 
+    {    
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], __valueSize );
+        impl->UnconsumedBufferLength -= __valueSize;
 
-    impl->UnconsumedBufferLength -= __valueSize;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -295,6 +314,8 @@ static HRESULT WINAPI data_reader_ReadBuffer( IDataReader *iface, UINT32 length,
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
+    TRACE( "iface %p, length %d, buffer %p\n", iface, length, buffer );
+
     if ( impl->UnconsumedBufferLength < length )
         return E_BOUNDS;
 
@@ -305,13 +326,18 @@ static HRESULT WINAPI data_reader_ReadBuffer( IDataReader *iface, UINT32 length,
     IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
     hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
     if ( FAILED(hr) ) return hr;
+    IBufferByteAccess_Release( returnedBufferByteAccess );
 
-    IBuffer_QueryInterface( *buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
+    hr = IBuffer_QueryInterface( *buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( bufferBytes, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], length );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
+        memcpy( bufferBytes, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], length );
+        impl->UnconsumedBufferLength -= length;
 
-    impl->UnconsumedBufferLength -= length;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -326,22 +352,28 @@ static HRESULT WINAPI data_reader_ReadBoolean( IDataReader *iface, boolean* valu
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
+    TRACE( "iface %p, value %p\n", iface, value );
+
     if ( impl->UnconsumedBufferLength < 1 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    if ( !returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ] )
-    {
-        *value = FALSE;
-    } else {
-        *value = TRUE;
+    if ( SUCCEEDED( hr ) ) 
+    {    
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        if ( !returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ] )
+        {
+            *value = FALSE;
+        } else {
+            *value = TRUE;
+        }
+        impl->UnconsumedBufferLength--;
+
+        IBufferByteAccess_Release( returnedBufferByteAccess );
     }
-
-    impl->UnconsumedBufferLength--;
 
     return hr;
 }
@@ -356,20 +388,26 @@ static HRESULT WINAPI data_reader_ReadGuid( IDataReader *iface, GUID *value )
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
+    TRACE( "iface %p, value %p\n", iface, value );
+
     if ( impl->UnconsumedBufferLength < 16 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( &value->Data1, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
-    memcpy( &value->Data2, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 4 ], 2 );
-    memcpy( &value->Data3, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 6 ], 2 );
-    memcpy( &value->Data4, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 8 ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( &value->Data1, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+        memcpy( &value->Data2, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 4 ], 2 );
+        memcpy( &value->Data3, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 6 ], 2 );
+        memcpy( &value->Data4, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength + 8 ], 8 );
+        impl->UnconsumedBufferLength -= 16;
 
-    impl->UnconsumedBufferLength -= 16;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -382,19 +420,25 @@ static HRESULT WINAPI data_reader_ReadInt16( IDataReader *iface, INT16* value )
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 2 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 2 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 2 );
+        impl->UnconsumedBufferLength -= 2;
 
-    impl->UnconsumedBufferLength -= 2;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -408,18 +452,24 @@ static HRESULT WINAPI data_reader_ReadInt32( IDataReader *iface, INT32* value )
     IBufferByteAccess *returnedBufferByteAccess;
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+        impl->UnconsumedBufferLength -= 4;
 
-    impl->UnconsumedBufferLength -= 4;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -432,19 +482,25 @@ static HRESULT WINAPI data_reader_ReadInt64( IDataReader *iface, INT64* value )
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+        impl->UnconsumedBufferLength -= 8;
 
-    impl->UnconsumedBufferLength -= 8;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -459,17 +515,23 @@ static HRESULT WINAPI data_reader_ReadUInt16( IDataReader *iface, UINT16* value 
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
+    TRACE( "iface %p, value %p\n", iface, value );
+
     if ( impl->UnconsumedBufferLength < 2 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 2 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 2 );
+        impl->UnconsumedBufferLength -= 2;
 
-    impl->UnconsumedBufferLength -= 2;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -483,18 +545,24 @@ static HRESULT WINAPI data_reader_ReadUInt32( IDataReader *iface, UINT32* value 
     IBufferByteAccess *returnedBufferByteAccess;
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+        impl->UnconsumedBufferLength -= 4;
 
-    impl->UnconsumedBufferLength -= 4;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -508,18 +576,24 @@ static HRESULT WINAPI data_reader_ReadUInt64( IDataReader *iface, UINT64* value 
     IBufferByteAccess *returnedBufferByteAccess;
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+        impl->UnconsumedBufferLength -= 8;
 
-    impl->UnconsumedBufferLength -= 8;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -532,19 +606,25 @@ static HRESULT WINAPI data_reader_ReadSingle( IDataReader *iface, FLOAT* value )
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 4 );
+        impl->UnconsumedBufferLength -= 4;
 
-    impl->UnconsumedBufferLength -= 4;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -557,19 +637,25 @@ static HRESULT WINAPI data_reader_ReadDouble( IDataReader *iface, DOUBLE* value 
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( value, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+        impl->UnconsumedBufferLength -= 8;
 
-    impl->UnconsumedBufferLength -= 8;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -584,25 +670,31 @@ static HRESULT WINAPI data_reader_ReadString( IDataReader *iface, UINT32 codeUni
 
     struct data_reader *impl = impl_from_IDataReader( iface );  
 
+    TRACE( "iface %p, codeUnitCount %d, value %p\n", iface, codeUnitCount, value );
+
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    switch ( impl->Encoding )
+    if ( SUCCEEDED( hr ) )
     {
-        case UnicodeEncoding_Utf8:
-            if ( impl->UnconsumedBufferLength < codeUnitCount )
-                return E_BOUNDS;
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        switch ( impl->Encoding )
+        {
+            case UnicodeEncoding_Utf8:
+                if ( impl->UnconsumedBufferLength < codeUnitCount )
+                    return E_BOUNDS;
 
-        default:
-            if ( impl->UnconsumedBufferLength < codeUnitCount * 2 )
-                return E_BOUNDS;
+            default:
+                if ( impl->UnconsumedBufferLength < codeUnitCount * 2 )
+                    return E_BOUNDS;
+        }
+
+        hr = WindowsCreateString( (LPCWSTR)&returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], codeUnitCount, value );
+
+        impl->UnconsumedBufferLength -= codeUnitCount;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
     }
-
-    hr = WindowsCreateString( (LPCWSTR)&returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], codeUnitCount, value );
-
-    impl->UnconsumedBufferLength -= codeUnitCount;
 
     return hr;
 }
@@ -616,18 +708,25 @@ static HRESULT WINAPI data_reader_ReadDateTime( IDataReader *iface, DateTime* va
     IBufferByteAccess *returnedBufferByteAccess;
 
     struct data_reader *impl = impl_from_IDataReader( iface );    
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( &value->UniversalTime, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( &value->UniversalTime, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+        impl->UnconsumedBufferLength -= 8;
 
-    impl->UnconsumedBufferLength -= 8;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
+    
 
     return hr;
 }
@@ -640,19 +739,25 @@ static HRESULT WINAPI data_reader_ReadTimeSpan( IDataReader *iface, TimeSpan* va
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
-    IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-    hr = IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
-    memcpy( &value->Duration, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+    if ( SUCCEEDED( hr ) )
+    {
+        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        memcpy( &value->Duration, &returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], 8 );
+        impl->UnconsumedBufferLength -= 8;
 
-    impl->UnconsumedBufferLength -= 8;
+        IBufferByteAccess_Release( returnedBufferByteAccess );
+    }
 
     return hr;
 }
@@ -669,6 +774,8 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     struct load_arguments *arguments = (struct load_arguments *)param;
     struct data_reader *impl = impl_from_IDataReader( (IDataReader *)invoker );
     
+    TRACE( "iface %p, param %p, value %p\n", invoker, param, result );
+
     buffer_Create( arguments->count, &buffer );
     hr = IInputStream_ReadAsync( impl->inputStream, buffer, arguments->count, impl->StreamOptions, &operation );
     if ( FAILED(hr) ) return hr;
@@ -691,11 +798,14 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     return hr;
 }
 
-static HRESULT WINAPI data_reader_LoadAsync( IDataReader *iface, UINT32 count, IAsyncOperation_UINT32 **operation)
+static HRESULT WINAPI data_reader_LoadAsync( IDataReader *iface, UINT32 count, IAsyncOperation_UINT32 **operation )
 {
     HRESULT hr;
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_UINT32 };
     struct load_arguments *arguments;
+
+    TRACE( "iface %p, count %d, operation %p\n", iface, count, operation );
+
     if (!(arguments = calloc( 1, sizeof(*arguments) ))) return E_OUTOFMEMORY;
 
     arguments->count = count;
@@ -707,6 +817,7 @@ static HRESULT WINAPI data_reader_LoadAsync( IDataReader *iface, UINT32 count, I
 static HRESULT WINAPI data_reader_DetachBuffer( IDataReader *iface, IBuffer **buffer )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, buffer %p\n", iface, buffer );
 
     if (!buffer) return E_POINTER;
 
@@ -719,6 +830,7 @@ static HRESULT WINAPI data_reader_DetachBuffer( IDataReader *iface, IBuffer **bu
 static HRESULT WINAPI data_reader_DetachStream( IDataReader *iface, IInputStream **stream )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+    TRACE( "iface %p, stream %p\n", iface, stream );
 
     if (!stream) return E_POINTER;
 
@@ -773,6 +885,7 @@ static HRESULT WINAPI data_reader_statics_FromBuffer( IDataReaderStatics *iface,
 {
     HRESULT hr;
     struct data_reader *reader;
+    TRACE( "iface %p, buffer %p, dataReader %p\n", iface, buffer, dataReader );
 
     if (!(reader = calloc( 1, sizeof(*reader) ))) return E_OUTOFMEMORY;
 
@@ -879,6 +992,8 @@ static HRESULT WINAPI data_reader_factory_GetTrustLevel( IDataReaderFactory *ifa
 static HRESULT WINAPI data_reader_factory_CreateDataReader( IDataReaderFactory *iface, IInputStream *inputStream, IDataReader **dataReader )
 {
     struct data_reader *reader;
+
+    TRACE( "iface %p, inputStream %p, dataReader %p\n", iface, inputStream, dataReader );
 
     if (!(reader = calloc( 1, sizeof(*reader) ))) return E_OUTOFMEMORY;
 

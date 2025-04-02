@@ -913,7 +913,7 @@ struct property_set
 {
     IPropertySet IPropertySet_iface;
     struct map_iids iids;
-    //Inheritence tree
+    //Inheritance tree
         IObservableMap_HSTRING_IInspectable *map;
     LONG ref;
 };

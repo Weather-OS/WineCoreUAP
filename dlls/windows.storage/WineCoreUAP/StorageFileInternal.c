@@ -355,6 +355,8 @@ _CLEANUP:
         IStorageItem_Release( invokerFileItem );
     if ( destFolderItem )
         IStorageItem_Release( destFolderItem );
+    if ( movedFile )
+        IStorageFile_Release( movedFile );
 
     return status;
 }

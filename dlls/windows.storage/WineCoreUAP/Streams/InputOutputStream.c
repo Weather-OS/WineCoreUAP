@@ -32,7 +32,7 @@ static HRESULT WINAPI closable_stream_QueryInterface( IClosable *iface, REFIID i
 {
     struct closable_stream *impl = impl_from_IClosable( iface );
 
-    //Inheritence
+    //Inheritance
     struct input_stream *inheritedInput = CONTAINING_RECORD( &impl->IClosable_iface, struct input_stream, IClosable_iface );
     struct output_stream *inheritedOutput = CONTAINING_RECORD( &impl->IClosable_iface, struct output_stream, IClosable_iface );
 
