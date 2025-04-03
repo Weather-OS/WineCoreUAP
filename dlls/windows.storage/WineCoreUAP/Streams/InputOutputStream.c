@@ -309,21 +309,16 @@ static HRESULT WINAPI output_stream_GetTrustLevel( IOutputStream *iface, TrustLe
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI output_stream_Dispose( IOutputStream *iface )
-{
-    struct output_stream *impl = impl_from_IOutputStream( iface );
-
-    return IClosable_Close( &impl->IClosable_iface );;
-}
-
 static HRESULT WINAPI output_stream_WriteAsync( IOutputStream *iface, IBuffer *buffer, IAsyncOperationWithProgress_UINT32_UINT32 **operation )
 {
     IAsyncInfo *info;
 
     HRESULT hr;
     AsyncStatus status;
-    struct output_stream *impl = impl_from_IOutputStream( iface );
+    struct output_stream *impl = impl_from_IOutputStream( iface );    
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperationWithProgress_UINT32_UINT32 };
+    
+    TRACE( "iface %p, operation %p\n", iface, operation );
 
     if ( impl->currentOperation )
     {
@@ -334,11 +329,10 @@ static HRESULT WINAPI output_stream_WriteAsync( IOutputStream *iface, IBuffer *b
             return E_ILLEGAL_METHOD_CALL;
     }
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
-
     hr = async_operation_with_progress_uint32_create( (IUnknown *)iface, (IUnknown *)buffer, output_stream_Write, iids, operation );
     impl->currentOperation = *operation;
-    TRACE( "created IAsyncOperationWithProgress_IBuffer_UINT32 %p\n", operation );
+    
+    TRACE( "created IAsyncOperationWithProgress_UINT32_UINT32 %p\n", operation );
     return hr;
 }
 
@@ -363,7 +357,6 @@ const struct IOutputStreamVtbl output_stream_vtbl =
     output_stream_GetRuntimeClassName,
     output_stream_GetTrustLevel,
     /* IOutputStream methods */
-    output_stream_Dispose,
     output_stream_WriteAsync,
     output_stream_FlushAsync
 };

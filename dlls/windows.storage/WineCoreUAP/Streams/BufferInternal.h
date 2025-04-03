@@ -50,5 +50,6 @@ struct buffer_statics
 struct buffer *impl_from_IBuffer( IBuffer *iface );
 
 HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value );
+HRESULT WINAPI buffer_Grow( IBuffer *iface, UINT32 growSize );
 
 #endif

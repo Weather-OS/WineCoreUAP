@@ -21,6 +21,8 @@
 
 #include "InputOutputStreamInternal.h"
 
+_ENABLE_DEBUGGING_
+
 DEFINE_ASYNC_COMPLETED_HANDLER( currentOperation_async, IAsyncOperationWithProgressCompletedHandler_UINT32_UINT32, IAsyncOperationWithProgress_UINT32_UINT32 )
 
 HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
@@ -41,7 +43,9 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
     /**
      * Paramteres
      */
-    struct input_stream_options *options = (struct input_stream_options *)result;
+    struct input_stream_options *options = (struct input_stream_options *)param;
+
+    TRACE( "invoker %p, result %p\n", invoker, result );
 
     status = IStream_Stat( stream->stream, &stat, STATFLAG_NONAME );
     if ( FAILED( status ) ) return status;
@@ -53,9 +57,9 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     IBuffer_get_Capacity( options->buffer, &bufferCapacity );
 
-    if ( bufferCapacity <= options->count )
+    if ( bufferCapacity < options->count )
         return E_BOUNDS;
-    
+
     status = IBuffer_QueryInterface( options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
     if ( FAILED( status ) ) return status;
 
@@ -90,6 +94,9 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     IBuffer_put_Length( options->buffer, totalBytesRead );
 
+    if ( stream->headPosition )
+        *stream->headPosition += totalBytesRead;
+
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
@@ -103,7 +110,6 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
 {
     HRESULT status = S_OK;
     UINT64 totalBytesWritten = 0;
-    ULARGE_INTEGER uli;
     UINT32 totalBytesToWrite = 0;
     ULONG bytesWritten;
     BYTE *buffer;
@@ -112,6 +118,8 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
     IBufferByteAccess *bufferByteAccess;
 
     struct output_stream *stream = impl_from_IOutputStream( (IOutputStream *)invoker );
+
+    TRACE( "invoker %p, result %p\n", invoker, result );
 
     status = IBuffer_QueryInterface( bufferToWrite, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
     if ( FAILED( status ) ) return status;
@@ -145,15 +153,16 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
         }
     }
 
-    uli.QuadPart = totalBytesWritten;
-
-    status = IStream_SetSize( stream->stream, uli );
+    if ( stream->headPosition )
+        *stream->headPosition += totalBytesWritten;
 
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UI4;
         result->ulVal = totalBytesWritten;
     }
+
+    stream->currentOperation = NULL;
 
     return status;
 }
@@ -165,6 +174,8 @@ HRESULT WINAPI output_stream_Flush( IUnknown *invoker, IUnknown *param, PROPVARI
     AsyncStatus status;
 
     struct output_stream *stream = impl_from_IOutputStream( (IOutputStream *)invoker );
+
+    TRACE( "invoker %p, result %p\n", invoker, result );
 
     if ( stream->currentOperation )
     {

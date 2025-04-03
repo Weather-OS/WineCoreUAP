@@ -280,7 +280,6 @@ namespace Windows.Storage.Streams {
     interface IOutputStream : IInspectable
         requires Windows.Foundation.IClosable
     {
-        HRESULT Dispose();
         HRESULT WriteAsync(
             [in] Windows.Storage.Streams.IBuffer *buffer,
             [out, retval] Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32> **operation);

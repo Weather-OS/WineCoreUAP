@@ -97,7 +97,6 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    printf("why is this getting called?\n");
     FIXME( "iface %p, instance %p stub!\n", iface, instance );
     return E_NOTIMPL;
 }
@@ -221,7 +220,6 @@ static HRESULT WINAPI data_writer_put_ByteOrder( IDataWriter *iface, ByteOrder v
 static HRESULT WINAPI data_writer_WriteByte( IDataWriter *iface, BYTE value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -230,17 +228,15 @@ static HRESULT WINAPI data_writer_WriteByte( IDataWriter *iface, BYTE value )
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 1 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 1 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ] = value;
+        returnedBufferBytes[ impl->UnstoredBufferLength ] = value;
         impl->UnstoredBufferLength--;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
@@ -252,7 +248,6 @@ static HRESULT WINAPI data_writer_WriteByte( IDataWriter *iface, BYTE value )
 static HRESULT WINAPI data_writer_WriteBytes( IDataWriter *iface, UINT32 __valueSize, BYTE* value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -260,19 +255,17 @@ static HRESULT WINAPI data_writer_WriteBytes( IDataWriter *iface, UINT32 __value
     struct data_writer *impl = impl_from_IDataWriter( iface );
 
     TRACE( "iface %p, __valueSize %d, value %p\n", iface, __valueSize, value );
-    
-    if ( impl->UnstoredBufferLength < __valueSize )
-        return E_BOUNDS;
 
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, __valueSize );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {    
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], value, __valueSize );
-        impl->UnstoredBufferLength -= __valueSize;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], value, __valueSize );
+        impl->UnstoredBufferLength += __valueSize;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -284,7 +277,6 @@ static HRESULT WINAPI data_writer_WriteBuffer( IDataWriter *iface, IBuffer* buff
 {
     BYTE *returnedBufferBytes;
     BYTE *bufferBytes;
-    UINT32 writeAhead;
     UINT32 bufferLength;
     HRESULT hr;
 
@@ -296,11 +288,9 @@ static HRESULT WINAPI data_writer_WriteBuffer( IDataWriter *iface, IBuffer* buff
 
     hr = IBuffer_get_Length( buffer, &bufferLength );
     if ( FAILED( hr ) ) return hr;
-    
-    if ( impl->UnstoredBufferLength < bufferLength )
-        return E_BOUNDS;
 
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, bufferLength );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
     if ( FAILED( hr ) ) return hr;
@@ -312,8 +302,8 @@ static HRESULT WINAPI data_writer_WriteBuffer( IDataWriter *iface, IBuffer* buff
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], bufferBytes, bufferLength );
-        impl->UnstoredBufferLength -= bufferLength;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], bufferBytes, bufferLength );
+        impl->UnstoredBufferLength += bufferLength;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -325,7 +315,6 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
 {
     BYTE *returnedBufferBytes;
     BYTE *bufferBytes;
-    UINT32 writeAhead;
     UINT32 bufferLength;
     HRESULT hr;
 
@@ -341,11 +330,9 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
     //Checking if the range exceeds the given buffer boundries
     if ( bufferLength < start + count )
         return E_BOUNDS;
-    
-    if ( impl->UnstoredBufferLength < count )
-        return E_BOUNDS;
 
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, count );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
     if ( FAILED( hr ) ) return hr;
@@ -357,8 +344,8 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], bufferBytes + start, count );
-        impl->UnstoredBufferLength -= count;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], bufferBytes + start, count );
+        impl->UnstoredBufferLength += count;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -370,7 +357,6 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
 static HRESULT WINAPI data_writer_WriteBoolean( IDataWriter *iface, boolean value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -379,17 +365,15 @@ static HRESULT WINAPI data_writer_WriteBoolean( IDataWriter *iface, boolean valu
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 1 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 1 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {    
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ] = value;    
+        returnedBufferBytes[ impl->UnstoredBufferLength ] = value;    
         impl->UnstoredBufferLength--;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
@@ -401,7 +385,6 @@ static HRESULT WINAPI data_writer_WriteBoolean( IDataWriter *iface, boolean valu
 static HRESULT WINAPI data_writer_WriteGuid( IDataWriter *iface, GUID value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -409,11 +392,9 @@ static HRESULT WINAPI data_writer_WriteGuid( IDataWriter *iface, GUID value )
     struct data_writer *impl = impl_from_IDataWriter( iface );
 
     TRACE( "iface %p, value %p\n", iface, &value );
-    
-    if ( impl->UnstoredBufferLength < 16 )
-        return E_BOUNDS;
 
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 16 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
@@ -421,11 +402,11 @@ static HRESULT WINAPI data_writer_WriteGuid( IDataWriter *iface, GUID value )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
 
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value.Data1, 4 );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength + 4 ], &value.Data2, 2 );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength + 6 ], &value.Data3, 2 );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength + 8 ], &value.Data4, 8 );
-        impl->UnstoredBufferLength -= 16;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.Data1, 4 );
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength + 4 ], &value.Data2, 2 );
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength + 6 ], &value.Data3, 2 );
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength + 8 ], &value.Data4, 8 );
+        impl->UnstoredBufferLength += 16;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -436,7 +417,6 @@ static HRESULT WINAPI data_writer_WriteGuid( IDataWriter *iface, GUID value )
 static HRESULT WINAPI data_writer_WriteInt16( IDataWriter *iface, INT16 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -444,19 +424,17 @@ static HRESULT WINAPI data_writer_WriteInt16( IDataWriter *iface, INT16 value )
     struct data_writer *impl = impl_from_IDataWriter( iface );    
 
     TRACE( "iface %p, value %p\n", iface, &value );
+
+    hr = buffer_Grow( impl->buffer, 2 );
+    if ( FAILED( hr ) ) return hr;
     
-    if ( impl->UnstoredBufferLength < 2 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
-
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 2 );
-        impl->UnstoredBufferLength -= 2;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 2 );
+        impl->UnstoredBufferLength += 2;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -467,7 +445,6 @@ static HRESULT WINAPI data_writer_WriteInt16( IDataWriter *iface, INT16 value )
 static HRESULT WINAPI data_writer_WriteInt32( IDataWriter *iface, INT32 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -476,18 +453,16 @@ static HRESULT WINAPI data_writer_WriteInt32( IDataWriter *iface, INT32 value )
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 4 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 4 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 4 );
-        impl->UnstoredBufferLength -= 4;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
+        impl->UnstoredBufferLength += 4;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -498,7 +473,6 @@ static HRESULT WINAPI data_writer_WriteInt32( IDataWriter *iface, INT32 value )
 static HRESULT WINAPI data_writer_WriteInt64( IDataWriter *iface, INT64 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -507,18 +481,16 @@ static HRESULT WINAPI data_writer_WriteInt64( IDataWriter *iface, INT64 value )
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 8 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 8 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 8 );
-        impl->UnstoredBufferLength -= 8;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
+        impl->UnstoredBufferLength += 8;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -529,7 +501,6 @@ static HRESULT WINAPI data_writer_WriteInt64( IDataWriter *iface, INT64 value )
 static HRESULT WINAPI data_writer_WriteUInt16( IDataWriter *iface, UINT16 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -538,18 +509,16 @@ static HRESULT WINAPI data_writer_WriteUInt16( IDataWriter *iface, UINT16 value 
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 2 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 2 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 2 );
-        impl->UnstoredBufferLength -= 2;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 2 );
+        impl->UnstoredBufferLength += 2;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -560,7 +529,6 @@ static HRESULT WINAPI data_writer_WriteUInt16( IDataWriter *iface, UINT16 value 
 static HRESULT WINAPI data_writer_WriteUInt32( IDataWriter *iface, UINT32 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -569,18 +537,16 @@ static HRESULT WINAPI data_writer_WriteUInt32( IDataWriter *iface, UINT32 value 
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 4 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 4 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 4 );
-        impl->UnstoredBufferLength -= 4;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
+        impl->UnstoredBufferLength += 4;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -591,7 +557,6 @@ static HRESULT WINAPI data_writer_WriteUInt32( IDataWriter *iface, UINT32 value 
 static HRESULT WINAPI data_writer_WriteUInt64( IDataWriter *iface, UINT64 value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -600,18 +565,16 @@ static HRESULT WINAPI data_writer_WriteUInt64( IDataWriter *iface, UINT64 value 
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 8 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 8 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 8 );
-        impl->UnstoredBufferLength -= 8;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
+        impl->UnstoredBufferLength += 8;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -622,7 +585,6 @@ static HRESULT WINAPI data_writer_WriteUInt64( IDataWriter *iface, UINT64 value 
 static HRESULT WINAPI data_writer_WriteSingle( IDataWriter *iface, FLOAT value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -631,18 +593,16 @@ static HRESULT WINAPI data_writer_WriteSingle( IDataWriter *iface, FLOAT value )
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 4 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 4 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 4 );
-        impl->UnstoredBufferLength -= 4;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
+        impl->UnstoredBufferLength += 4;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -653,7 +613,6 @@ static HRESULT WINAPI data_writer_WriteSingle( IDataWriter *iface, FLOAT value )
 static HRESULT WINAPI data_writer_WriteDouble( IDataWriter *iface, DOUBLE value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -662,18 +621,16 @@ static HRESULT WINAPI data_writer_WriteDouble( IDataWriter *iface, DOUBLE value 
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 8 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 8 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value, 8 );
-        impl->UnstoredBufferLength -= 8;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
+        impl->UnstoredBufferLength += 8;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -684,7 +641,6 @@ static HRESULT WINAPI data_writer_WriteDouble( IDataWriter *iface, DOUBLE value 
 static HRESULT WINAPI data_writer_WriteDateTime( IDataWriter *iface, DateTime value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -693,18 +649,16 @@ static HRESULT WINAPI data_writer_WriteDateTime( IDataWriter *iface, DateTime va
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 8 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 8 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value.UniversalTime, 8 );
-        impl->UnstoredBufferLength -= 8;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.UniversalTime, 8 );
+        impl->UnstoredBufferLength += 8;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -715,7 +669,6 @@ static HRESULT WINAPI data_writer_WriteDateTime( IDataWriter *iface, DateTime va
 static HRESULT WINAPI data_writer_WriteTimeSpan( IDataWriter *iface, TimeSpan value )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -724,18 +677,16 @@ static HRESULT WINAPI data_writer_WriteTimeSpan( IDataWriter *iface, TimeSpan va
     
     TRACE( "iface %p, value %p\n", iface, &value );
 
-    if ( impl->UnstoredBufferLength < 8 )
-        return E_BOUNDS;
-
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    hr = buffer_Grow( impl->buffer, 8 );
+    if ( FAILED( hr ) ) return hr;
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
-        memcpy( &returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], &value.Duration, 8 );
-        impl->UnstoredBufferLength -= 8;
+        memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.Duration, 8 );
+        impl->UnstoredBufferLength += 8;
 
         IBufferByteAccess_Release( returnedBufferByteAccess );
     }
@@ -746,7 +697,8 @@ static HRESULT WINAPI data_writer_WriteTimeSpan( IDataWriter *iface, TimeSpan va
 static HRESULT WINAPI data_writer_WriteString( IDataWriter *iface, HSTRING value, UINT32 *codeUnitCount )
 {
     BYTE *returnedBufferBytes;
-    UINT32 writeAhead;
+    LPSTR convertedStr;
+    UINT32 strSize;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -755,7 +707,25 @@ static HRESULT WINAPI data_writer_WriteString( IDataWriter *iface, HSTRING value
 
     TRACE( "iface %p, value %p, codeUnitCount %p\n", iface, value, codeUnitCount );
 
-    IBuffer_get_Length( impl->buffer, &writeAhead );
+    switch ( impl->Encoding )
+    {
+        case UnicodeEncoding_Utf8:
+            hr = buffer_Grow( impl->buffer, WindowsGetStringLen( value ) );    
+            strSize = WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( value , NULL ), -1, NULL, 0, NULL, NULL );
+            convertedStr = (LPSTR)malloc( strSize );
+            WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer(value, NULL), -1, convertedStr, strSize, NULL, NULL );
+            if ( FAILED( hr ) ) return hr;
+            break;
+
+        default:
+            hr = buffer_Grow( impl->buffer, WindowsGetStringLen( value ) * 2 );
+            strSize = WideCharToMultiByte( CP_UTF7, 0, WindowsGetStringRawBuffer( value , NULL ), -1, NULL, 0, NULL, NULL );
+            convertedStr = (LPSTR)malloc( strSize );
+            WideCharToMultiByte( CP_UTF7, 0, WindowsGetStringRawBuffer(value, NULL), -1, convertedStr, strSize, NULL, NULL );
+            if ( FAILED( hr ) ) return hr;
+            break;
+    }
+
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
@@ -766,19 +736,15 @@ static HRESULT WINAPI data_writer_WriteString( IDataWriter *iface, HSTRING value
         switch ( impl->Encoding )
         {
             case UnicodeEncoding_Utf8:
-                if ( impl->UnstoredBufferLength < WindowsGetStringLen( value ) )
-                    return E_BOUNDS;
-                memcpy( (LPWSTR)&returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], WindowsGetStringRawBuffer( value , NULL ), WindowsGetStringLen( value ) );
-                impl->UnstoredBufferLength -= WindowsGetStringLen( value );
-                *codeUnitCount = WindowsGetStringLen( value );
+                memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], convertedStr, strSize );
+                impl->UnstoredBufferLength += strlen( convertedStr );
+                *codeUnitCount = strSize;
                 break;
 
             default:
-                if ( impl->UnstoredBufferLength < WindowsGetStringLen( value ) * 2 )
-                    return E_BOUNDS;
-                memcpy( (LPWSTR)&returnedBufferBytes[ writeAhead - impl->UnstoredBufferLength ], WindowsGetStringRawBuffer( value , NULL ), WindowsGetStringLen( value ) * 2 );
-                impl->UnstoredBufferLength -= WindowsGetStringLen( value ) * 2;
-                *codeUnitCount = WindowsGetStringLen( value ) * 2;
+                memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], convertedStr, strSize * 2 );
+                impl->UnstoredBufferLength += strSize * 2;
+                *codeUnitCount = strSize * 2;
                 break;
         }
     }
@@ -820,17 +786,26 @@ static HRESULT WINAPI data_writer_Store( IUnknown *invoker, IUnknown *param, PRO
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
+    // Setting the length of the buffer during submission saves some cpu cycles.
+    IBuffer_put_Length( impl->buffer, impl->UnstoredBufferLength );
+
     hr = IOutputStream_WriteAsync( impl->outputStream, impl->buffer, &operation );
-    if ( FAILED(hr) ) return hr;
+    if ( FAILED( hr ) ) return hr;
     
     res = await_IAsyncOperationWithProgress_UINT32_UINT32( operation, INFINITE );
     if ( res ) return E_ABORT;
 
     hr = IAsyncOperationWithProgress_UINT32_UINT32_GetResults( operation, &bytesWritten );
-    if ( FAILED(hr) ) return hr;
+    if ( FAILED( hr ) ) return hr;
+
+    //Buffer is cleared after each store operation.
+    //A new buffer is created afterwards.
+    IBuffer_Release( impl->buffer );
+    buffer_Create( 0, &impl->buffer );
 
     if ( SUCCEEDED( hr ) )
     {
+        impl->UnstoredBufferLength = 0;
         result->vt = VT_UI4;
         result->ulVal = (UINT64)bytesWritten;
     }
@@ -864,9 +839,11 @@ static HRESULT WINAPI data_writer_DetachBuffer( IDataWriter *iface, IBuffer **bu
     if ( !buffer ) return E_POINTER;
     if ( !impl->buffer ) return E_FAIL;
 
+    // Setting the length of the buffer during submission saves some cpu cycles.
+    IBuffer_put_Length( impl->buffer, impl->UnstoredBufferLength );
+
     *buffer = impl->buffer;
     IBuffer_AddRef( *buffer );
-    impl->buffer = NULL;
 
     return S_OK;
 }
@@ -881,7 +858,6 @@ static HRESULT WINAPI data_writer_DetachStream( IDataWriter *iface, IOutputStrea
 
     *stream = impl->outputStream;
     IOutputStream_AddRef( *stream );
-    impl->outputStream = NULL;
 
     return S_OK;
 }
@@ -993,11 +969,11 @@ static HRESULT WINAPI data_writer_factory_GetTrustLevel( IDataWriterFactory *ifa
     return E_NOTIMPL;
 }
 
-static HRESULT WINAPI data_writer_factory_CreateDataWriter( IDataWriterFactory *iface, IOutputStream *outputStream, IDataWriter **dataReader )
+static HRESULT WINAPI data_writer_factory_CreateDataWriter( IDataWriterFactory *iface, IOutputStream *outputStream, IDataWriter **dataWriter )
 {
     struct data_writer *writer;
 
-    TRACE( "iface %p, outputStream %p, dataReader %p\n", iface, outputStream, dataReader );
+    TRACE( "iface %p, outputStream %p, dataWriter %p\n", iface, outputStream, dataWriter );
 
     if (!(writer = calloc( 1, sizeof(*writer) ))) return E_OUTOFMEMORY;
 
@@ -1007,9 +983,10 @@ static HRESULT WINAPI data_writer_factory_CreateDataWriter( IDataWriterFactory *
     writer->outputStream = outputStream;
     writer->ref = 1;
 
-    *dataReader = &writer->IDataWriter_iface;
+    *dataWriter = &writer->IDataWriter_iface;
 
-    return S_OK;
+    //This buffer is dynamically reallocated 
+    return buffer_Create( 0, &writer->buffer );
 }
 
 

@@ -104,7 +104,6 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    printf("why is this getting called?\n");
     FIXME( "iface %p, instance %p stub!\n", iface, instance );
     return E_NOTIMPL;
 }
@@ -664,6 +663,7 @@ static HRESULT WINAPI data_reader_ReadString( IDataReader *iface, UINT32 codeUni
 {
     BYTE *returnedBufferBytes;
     UINT32 readAhead;
+    LPWSTR string;
     HRESULT hr;
 
     IBufferByteAccess *returnedBufferByteAccess;
@@ -675,7 +675,7 @@ static HRESULT WINAPI data_reader_ReadString( IDataReader *iface, UINT32 codeUni
     IBuffer_get_Length( impl->buffer, &readAhead );
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
-
+    
     if ( SUCCEEDED( hr ) )
     {
         IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
@@ -684,16 +684,22 @@ static HRESULT WINAPI data_reader_ReadString( IDataReader *iface, UINT32 codeUni
             case UnicodeEncoding_Utf8:
                 if ( impl->UnconsumedBufferLength < codeUnitCount )
                     return E_BOUNDS;
+                break;
 
             default:
                 if ( impl->UnconsumedBufferLength < codeUnitCount * 2 )
                     return E_BOUNDS;
+                break;
         }
 
-        hr = WindowsCreateString( (LPCWSTR)&returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], codeUnitCount, value );
+        string = (LPWSTR)malloc( codeUnitCount * sizeof( WCHAR ) );
+        MultiByteToWideChar( CP_UTF8, 0, (LPSTR)&returnedBufferBytes[ readAhead - impl->UnconsumedBufferLength ], -1, string, codeUnitCount );
+
+        hr = WindowsCreateString( string, codeUnitCount, value );
 
         impl->UnconsumedBufferLength -= codeUnitCount;
         IBufferByteAccess_Release( returnedBufferByteAccess );
+        free( string );
     }
 
     return hr;
@@ -776,10 +782,12 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     
     TRACE( "iface %p, param %p, value %p\n", invoker, param, result );
 
-    buffer_Create( arguments->count, &buffer );
+    hr = buffer_Create( arguments->count, &buffer );
+    if ( FAILED( hr ) ) return hr;
+
     hr = IInputStream_ReadAsync( impl->inputStream, buffer, arguments->count, impl->StreamOptions, &operation );
     if ( FAILED(hr) ) return hr;
-    
+
     res = await_IAsyncOperationWithProgress_IBuffer_UINT32( operation, INFINITE );
     if ( res ) return E_ABORT;
 

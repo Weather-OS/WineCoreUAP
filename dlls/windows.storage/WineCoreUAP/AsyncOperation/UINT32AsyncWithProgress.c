@@ -91,7 +91,7 @@ static HRESULT WINAPI uint32_async_with_progress_GetIids( IAsyncOperationWithPro
 
 static HRESULT WINAPI uint32_async_with_progress_GetRuntimeClassName( IAsyncOperationWithProgress_UINT32_UINT32 *iface, HSTRING *class_name )
 {
-    return WindowsCreateString( L"Windows.Foundation.IAsyncOperationWithProgress`1<UINT64, UINT64>",
+    return WindowsCreateString( L"Windows.Foundation.IAsyncOperationWithProgress`1<UINT32, UINT32>",
                                 ARRAY_SIZE(L"Windows.Foundation.IAsyncOperationWithProgress`1<UINT32, UINT32>"),
                                 class_name );
 }
@@ -177,6 +177,7 @@ HRESULT async_operation_with_progress_uint32_create( IUnknown *invoker, IUnknown
     impl->IAsyncOperationWithProgress_UINT32_UINT32_iface.lpVtbl = &uint32_async_with_progress_vtbl;
     impl->iids = iids;
     impl->ref = 1;
+
     if (FAILED(hr = async_info_with_progress_create( invoker, param, callback, (IInspectable *)&impl->IAsyncOperationWithProgress_UINT32_UINT32_iface, &impl->IWineAsyncInfoWithProgressImpl_inner )) ||
         FAILED(hr = IWineAsyncInfoWithProgressImpl_Start( impl->IWineAsyncInfoWithProgressImpl_inner )))
     {
@@ -184,7 +185,6 @@ HRESULT async_operation_with_progress_uint32_create( IUnknown *invoker, IUnknown
         free( impl );
         return hr;
     }
-    
 
     *out = &impl->IAsyncOperationWithProgress_UINT32_UINT32_iface;
     TRACE( "created IAsyncOperationWithProgress_UINT32_UINT32 %p\n", *out );

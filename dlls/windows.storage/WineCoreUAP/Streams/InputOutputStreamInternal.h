@@ -52,6 +52,8 @@ struct input_stream
         IStream *stream;
         LONG closableRef;
 
+    UINT64 *headPosition;
+
     LONG ref;
 };
 
@@ -64,6 +66,8 @@ struct output_stream
     IClosable IClosable_iface;
         IStream *stream;
         LONG closableRef;
+
+    UINT64 *headPosition;
 
     IAsyncOperationWithProgress_UINT32_UINT32 *currentOperation; //Flushing purposes
     

@@ -191,6 +191,7 @@ static HRESULT WINAPI buffer_GetTrustLevel( IBuffer *iface, TrustLevel *trust_le
 static HRESULT WINAPI buffer_get_Capactiy( IBuffer *iface, UINT32 *value )
 {
     struct buffer *impl = impl_from_IBuffer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Capacity;
     return S_OK;
 }
@@ -198,6 +199,7 @@ static HRESULT WINAPI buffer_get_Capactiy( IBuffer *iface, UINT32 *value )
 static HRESULT WINAPI buffer_get_Length( IBuffer *iface, UINT32 *value )
 {
     struct buffer *impl = impl_from_IBuffer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Length;
     return S_OK;
 }
@@ -205,6 +207,7 @@ static HRESULT WINAPI buffer_get_Length( IBuffer *iface, UINT32 *value )
 static HRESULT WINAPI buffer_put_Length( IBuffer *iface, UINT32 value )
 {
     struct buffer *impl = impl_from_IBuffer( iface );
+    TRACE( "iface %p, value %d\n", iface, value );
     impl->Length = value;
     return S_OK;
 }
@@ -328,6 +331,7 @@ static HRESULT WINAPI buffer_factory_GetTrustLevel( IBufferFactory *iface, Trust
 
 static HRESULT WINAPI buffer_factory_Create( IBufferFactory *iface, UINT32 capacity, IBuffer **value )
 {
+    TRACE( "iface %p, capacity %d, value %p\n", iface, capacity, value );
     return buffer_Create( capacity, value );
 }
 

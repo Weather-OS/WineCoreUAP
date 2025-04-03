@@ -51,7 +51,6 @@ struct random_access_stream
         IStream *stream;
         LONG closableRef;
 
-    UINT64 streamSize;
     UINT64 Position;
     BOOLEAN CanRead;
     BOOLEAN CanWrite;

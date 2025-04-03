@@ -185,23 +185,8 @@ static HRESULT WINAPI async_impl_put_Progress( IWineAsyncInfoWithProgressImpl *i
 
     EnterCriticalSection( &impl->cs );
     if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
-    else if (impl->progress != HANDLER_NOT_SET) hr = E_ILLEGAL_DELEGATE_ASSIGNMENT;
-    else if ((impl->progress = progress))
-    {
-        IWineAsyncOperationProgressHandler_AddRef( impl->progress );
-
-        if (impl->status > Started)
-        {
-            IInspectable *operation = impl->IInspectable_outer;
-            impl->progress = NULL; /* Prevent concurrent invoke. */
-            LeaveCriticalSection( &impl->cs );
-
-            IWineAsyncOperationProgressHandler_Invoke( progress, operation, impl->progressReport );
-            IWineAsyncOperationProgressHandler_Release( progress );
-
-            return S_OK;
-        }
-    } else
+    else if ( impl->progress ) hr = E_ILLEGAL_DELEGATE_ASSIGNMENT;
+    else
     {
         impl->progress = progress;
     }

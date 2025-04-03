@@ -132,8 +132,6 @@ static HRESULT WINAPI random_access_stream_statics_CopyAndCloseAsync( IRandomAcc
     HRESULT hr;
     hr = random_access_stream_statics_Copy( source, destination, 0, operation );
     TRACE( "created IAsyncOperationWithProgress_UINT64_UINT64 %p\n", operation );
-    if ( SUCCEEDED( hr ) )
-        hr = IOutputStream_Dispose( destination );
     return hr;
 }
 
@@ -267,6 +265,8 @@ static HRESULT WINAPI random_access_stream_QueryInterface( IRandomAccessStream *
     if (IsEqualGUID( iid, &IID_IInputStream ))
     {
         IRandomAccessStream_GetInputStreamAt( iface, impl->Position, (IInputStream **)out );
+        //Position can be controlled when queried.
+        impl_from_IInputStream( (IInputStream *)*out )->headPosition = &impl->Position;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -274,6 +274,8 @@ static HRESULT WINAPI random_access_stream_QueryInterface( IRandomAccessStream *
     if (IsEqualGUID( iid, &IID_IOutputStream ))
     {
         IRandomAccessStream_GetOutputStreamAt( iface, impl->Position, (IOutputStream **)out );
+        //Position can be controlled when queried.
+        impl_from_IOutputStream( (IOutputStream *)*out )->headPosition = &impl->Position;
         IInspectable_AddRef( *out );
         return S_OK;
     }
@@ -322,18 +324,41 @@ static HRESULT WINAPI random_access_stream_GetTrustLevel( IRandomAccessStream *i
 
 static HRESULT WINAPI random_access_stream_get_Size( IRandomAccessStream *iface, UINT64 *value )
 {
+    HRESULT hr;
+    LARGE_INTEGER endPosition = {.QuadPart = 0};
+    LARGE_INTEGER currentPosition = {0};
+    LARGE_INTEGER signedOriginalPosition;
+    ULARGE_INTEGER originalPosition;
+    ULARGE_INTEGER size;
+
     struct random_access_stream *impl = impl_from_IRandomAccessStream( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
-    *value = impl->streamSize;
-    return S_OK;
+
+    hr = IStream_Seek( impl->stream, currentPosition, STREAM_SEEK_CUR, &originalPosition );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IStream_Seek( impl->stream, endPosition, STREAM_SEEK_END, &size );
+    if ( FAILED( hr ) ) return hr;
+
+    *value = size.QuadPart;
+
+    signedOriginalPosition.QuadPart = (INT64)originalPosition.QuadPart;
+
+    return IStream_Seek( impl->stream, signedOriginalPosition, STREAM_SEEK_SET, NULL);
 }
 
 static HRESULT WINAPI random_access_stream_put_Size( IRandomAccessStream *iface, UINT64 value )
 {
+    ULARGE_INTEGER size;
+
     struct random_access_stream *impl = impl_from_IRandomAccessStream( iface );
+
     TRACE( "iface %p, value %llu\n", iface, value );
-    impl->streamSize = value;
-    return S_OK;
+
+    size.QuadPart = value;
+
+    return IStream_SetSize( impl->stream, size );
 }
 
 static HRESULT WINAPI random_access_stream_GetInputStreamAt( IRandomAccessStream *iface, UINT64 position, IInputStream **stream )
@@ -352,15 +377,20 @@ static HRESULT WINAPI random_access_stream_GetInputStreamAt( IRandomAccessStream
     
     hr = IStream_Seek( impl->stream, liMove, STREAM_SEEK_SET, NULL );
 
-    input->IInputStream_iface.lpVtbl = &input_stream_vtbl;
-    input->IClosable_iface.lpVtbl = &closable_stream_vtbl;
-    input->stream = input->stream;
-    input->closableRef = 1;
-    input->ref = 1;
+    if ( SUCCEEDED( hr ) )
+    {
+        input->IInputStream_iface.lpVtbl = &input_stream_vtbl;
+        input->IClosable_iface.lpVtbl = &closable_stream_vtbl;
+        input->stream = impl->stream;
+        input->closableRef = 1;
+        input->ref = 1;
 
-    impl->Position = position;
+        impl->Position = position;
 
-    *stream = &input->IInputStream_iface;
+        *stream = &input->IInputStream_iface;
+    } else {
+        free( stream );
+    }
 
     return hr;
 }
@@ -380,17 +410,21 @@ static HRESULT WINAPI random_access_stream_GetOutputStreamAt( IRandomAccessStrea
     liMove.QuadPart = position;
     
     hr = IStream_Seek( impl->stream, liMove, STREAM_SEEK_SET, NULL );
+    if ( SUCCEEDED( hr ) )
+    {
+        output->IOutputStream_iface.lpVtbl = &output_stream_vtbl;
+        output->IClosable_iface.lpVtbl = &closable_stream_vtbl;
+        output->stream = impl->stream;
+        output->closableRef = 1;
+        output->ref = 1;
+        output->currentOperation = NULL;
 
-    output->IOutputStream_iface.lpVtbl = &output_stream_vtbl;
-    output->IClosable_iface.lpVtbl = &closable_stream_vtbl;
-    output->stream = impl->stream;
-    output->closableRef = 1;
-    output->ref = 1;
-    output->currentOperation = NULL;
+        impl->Position = position;
 
-    impl->Position = position;
-
-    *stream = &output->IOutputStream_iface;
+        *stream = &output->IOutputStream_iface;        
+    } else {    
+        free( output );
+    }
 
     return hr;
 }
@@ -427,7 +461,6 @@ static HRESULT WINAPI random_access_stream_CloneStream( IRandomAccessStream *ifa
     cloned_stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
     cloned_stream->IClosable_iface.lpVtbl = &closable_random_access_stream_vtbl;
     IStream_Clone( impl->stream, &cloned_stream->stream );
-    cloned_stream->streamSize = impl->streamSize;
     cloned_stream->closableRef = impl->closableRef;
     cloned_stream->Position = 0;
     cloned_stream->CanRead = impl->CanRead;

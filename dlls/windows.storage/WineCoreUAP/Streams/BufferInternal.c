@@ -21,10 +21,16 @@
 
 #include "BufferInternal.h"
 
+_ENABLE_DEBUGGING_
+
 HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value )
 {
-    HRESULT hr = S_OK;
+    HRESULT status = S_OK;
+
     struct buffer *newBuffer;
+
+    TRACE( "capacity %d, value %p\n", capacity, value );
+
     if (!(newBuffer = calloc( 1, sizeof(*newBuffer) ))) return E_OUTOFMEMORY;
 
     newBuffer->IBuffer_iface.lpVtbl = &buffer_vtbl;
@@ -33,11 +39,32 @@ HRESULT WINAPI buffer_Create( UINT32 capacity, IBuffer **value )
     newBuffer->Buffer = (BYTE *)malloc( capacity );
 
     if ( capacity > 0x7fffffffu )
-        hr = E_INVALIDARG;
+        status = E_INVALIDARG;
     else
         newBuffer->Capacity = capacity;
 
     *value = &newBuffer->IBuffer_iface;
 
-    return hr;
+    return status;
+}
+
+//Dynamic Reallocation
+HRESULT WINAPI buffer_Grow( IBuffer *iface, UINT32 growSize )
+{    
+    HRESULT status = S_OK;
+    BYTE *grownBuffer;
+
+    struct buffer *buffer = impl_from_IBuffer( iface );
+
+    TRACE( "iface %p, growSize %d\n", iface, growSize );
+
+    buffer->Capacity += growSize;
+
+    grownBuffer = (BYTE*)realloc( buffer->Buffer, buffer->Capacity );
+    if ( !grownBuffer )
+        return E_OUTOFMEMORY;
+    
+    buffer->Buffer = grownBuffer;
+
+    return status;
 }

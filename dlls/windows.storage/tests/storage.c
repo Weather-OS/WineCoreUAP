@@ -22,6 +22,10 @@
 #include "initguid.h"
 #include "test.h"
 
+DEFINE_ASYNC_COMPLETED_HANDLER( async_uint_handler, IAsyncOperationCompletedHandler_UINT32, IAsyncOperation_UINT32 )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_boolean_handler, IAsyncOperationCompletedHandler_boolean, IAsyncOperation_boolean )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_uint_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_UINT32_UINT32, IAsyncOperationWithProgress_UINT32_UINT32 )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_buffer_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_IBuffer_UINT32, IAsyncOperationWithProgress_IBuffer_UINT32 )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
 DEFINE_ASYNC_COMPLETED_HANDLER( basic_properties_handler, IAsyncOperationCompletedHandler_BasicProperties, IAsyncOperation_BasicProperties )
@@ -301,6 +305,226 @@ void test_StorageItem( IStorageItem *item )
     IStorageProvider_get_DisplayName( provider, &origName );
     trace( "Windows::Storage::IStorageItemPropertiesWithProvider::DisplayName for %p is %s\n", &provider, debugstr_hstring( origName ) );
 }
+
+}
+
+/**
+ * ABI::Windows::Storage::Streams::RandomAccessStream
+ */
+void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
+{
+    //This tests various ways that a random access stream could write to and read from a file.
+
+    IBuffer *buffer = NULL;
+    IBuffer *read_buffer = NULL;
+    IBufferFactory *buffer_factory = NULL;
+
+    IDataWriter *data_writer = NULL;
+    IDataReader *data_reader = NULL;
+    IDataWriterFactory *data_writer_factory = NULL;
+    IDataReaderFactory *data_reader_factory = NULL;
+    IDataReaderStatics *data_reader_statics = NULL;
+
+    IOutputStream *output_stream = NULL;
+    IInputStream *input_stream = NULL;
+    IRandomAccessStream *cloned_stream = NULL;
+
+    IAsyncOperation_UINT32 *unit_operation = NULL;
+    IAsyncOperation_boolean *boolean_operation = NULL;
+    IAsyncOperationWithProgress_UINT32_UINT32 *uint_operation_with_progress = NULL;
+    IAsyncOperationWithProgress_IBuffer_UINT32 *buffer_operation_with_progress = NULL;
+
+    HSTRING tmpString;
+    HSTRING checkString;
+
+    INT32 comparisonResult;
+    DWORD asyncRes;
+    UINT64 position;
+    UINT64 size;
+    UINT32 code_unit_count;
+    HRESULT hr = S_OK;
+    BOOLEAN canRead = FALSE;
+    BOOLEAN canWrite = FALSE;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataWriter, data_writer_factory, IID_IDataWriterFactory );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, data_reader_factory, IID_IDataReaderFactory );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, data_reader_statics, IID_IDataReaderStatics );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_Buffer, buffer_factory, IID_IBufferFactory );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream
+     */
+{
+    hr = IRandomAccessStream_QueryInterface( stream, &IID_IRandomAccessStream, (void **)&stream );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::CanRead
+     */
+    IRandomAccessStream_get_CanRead( stream, &canRead );
+    if ( !canRead )
+    {
+        trace( "stream %p is unreadable. skipping tests...\n", &stream );
+        return;
+    }
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::CanWrite
+     */
+    IRandomAccessStream_get_CanWrite( stream, &canWrite );
+    if ( !canWrite )
+        trace( "stream %p is unwritable. write tests will be skipped.\n", &stream );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::Position
+     */
+    IRandomAccessStream_get_Position( stream, &position );
+    trace( "Windows::Storage::Streams::IRandomAccessStream::Position for %p is %lld\n", &stream, position );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::Size
+     */
+    IRandomAccessStream_get_Size( stream, &size );
+    trace( "Windows::Storage::Streams::IRandomAccessStream::Size for %p is %lld\n", &stream, size );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::CloneStream
+     */
+    hr = IRandomAccessStream_CloneStream( stream, &cloned_stream );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::GetInputStreamAt
+     */
+    hr = IRandomAccessStream_GetInputStreamAt( stream, position, &input_stream );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStream::GetOutputStreamAt
+     */
+    if ( canWrite )
+    {
+        hr = IRandomAccessStream_GetOutputStreamAt( stream, position, &output_stream );
+        CHECK_HR( hr );
+    }
+}
+
+    /**
+     * ABI::Windows::Storage::Streams::IOutputStream
+     */
+{
+    hr = IRandomAccessStream_QueryInterface( stream, &IID_IOutputStream, (void **)&output_stream );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IOutputStream::WriteAsync
+     */
+    if ( canWrite )
+    {    
+        // First pass using IDataWriter
+        hr = IDataWriterFactory_CreateDataWriter( data_writer_factory, output_stream, &data_writer );
+        CHECK_HR( hr );
+
+        WindowsCreateString( L"Hello, World!\n", wcslen(L"Hello, World!\n"), &tmpString );
+        hr = IDataWriter_WriteString( data_writer, tmpString, &code_unit_count );
+        CHECK_HR( hr );
+
+        hr = IDataWriter_StoreAsync( data_writer, &unit_operation );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncOperation_UINT32( unit_operation, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+        hr = IDataWriter_FlushAsync( data_writer, &boolean_operation );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncOperation_boolean( boolean_operation, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+        // Second pass using IBuffer
+        WindowsCreateString( L"Goodbye, World!\n", wcslen(L"Goodbye, World!\n"), &tmpString );
+        hr = IDataWriter_WriteString( data_writer, tmpString, &code_unit_count );
+        CHECK_HR( hr );
+
+        hr = IDataWriter_DetachBuffer( data_writer, &buffer );
+        CHECK_HR( hr );
+
+        hr = IOutputStream_WriteAsync( output_stream, buffer, &uint_operation_with_progress );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncOperationWithProgress_UINT32_UINT32( uint_operation_with_progress, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+    }
+
+    /**
+     * ABI::Windows::Storage::Streams::IOutputStream::FlushAsync
+     */
+    if ( canWrite )
+    {    
+        hr = IOutputStream_FlushAsync( output_stream, &boolean_operation );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncOperation_boolean( boolean_operation, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+    }
+}
+
+    /**
+     * ABI::Windows::Storage::Streams::IInputStream
+     */
+{
+    hr = IRandomAccessStream_GetInputStreamAt( stream, 0, &input_stream );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IInputStream::ReadAsync
+     */
+    //First pass using IDataReader
+    hr = IDataReaderFactory_CreateDataReader( data_reader_factory, input_stream, &data_reader );
+    CHECK_HR( hr );
+
+    IRandomAccessStream_get_Size( stream, &size );
+    
+    hr = IDataReader_LoadAsync( data_reader, size, &unit_operation );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncOperation_UINT32( unit_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IDataReader_ReadString( data_reader, size, &tmpString );
+    CHECK_HR( hr );
+
+    WindowsCreateString( L"Hello, World!\nGoodbye, World!\n", wcslen( L"Hello, World!\nGoodbye, World!\n" ), &checkString );
+    WindowsCompareStringOrdinal( tmpString, checkString, &comparisonResult );
+    ok ( !comparisonResult, "the 2 compared strings do not match!\n" ); 
+
+    //Second pass using IBuffer
+    hr = IBufferFactory_Create( buffer_factory, size, &read_buffer );
+    CHECK_HR( hr );
+
+    hr = IRandomAccessStream_GetInputStreamAt( stream, 0, &input_stream );
+    CHECK_HR( hr );
+
+    hr = IInputStream_ReadAsync( input_stream, read_buffer, size, InputStreamOptions_None, &buffer_operation_with_progress );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_operation_with_progress, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_operation_with_progress, &buffer );
+    CHECK_HR( hr );
+
+    hr = IDataReaderStatics_FromBuffer( data_reader_statics, buffer, &data_reader );
+    CHECK_HR( hr );
+
+    hr = IDataReader_ReadString( data_reader, size, &tmpString );
+    CHECK_HR( hr );
+
+    WindowsCreateString( L"Hello, World!\nGoodbye, World!\n", wcslen( L"Hello, World!\nGoodbye, World!\n" ), &checkString );
+    WindowsCompareStringOrdinal( tmpString, checkString, &comparisonResult );
+    ok ( !comparisonResult, "the 2 compared strings do not match!\n" ); 
+}
+
 
 }
 
@@ -887,6 +1111,8 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
 
     hr = IAsyncOperation_IRandomAccessStream_GetResults( random_access_stream_operation, &random_access_stream );
     CHECK_HR( hr );
+
+    test_Streams_RandomAccessStream( random_access_stream );
 }
 
 }
