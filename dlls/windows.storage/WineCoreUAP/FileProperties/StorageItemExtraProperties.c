@@ -91,8 +91,15 @@ static HRESULT WINAPI storage_item_extra_properties_GetTrustLevel( IStorageItemE
 static HRESULT WINAPI storage_item_extra_properties_RetrievePropertiesAsync( IStorageItemExtraProperties *iface, IIterable_HSTRING *propertiesToRetrieve, IAsyncOperation_IMap_HSTRING_IInspectable **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IMap_HSTRING_IInspectable };
+
     TRACE( "iface %p, propertiesToRetrieve %p, operation %p\n", iface, propertiesToRetrieve, operation );
+
+    // Arguments 
+    if ( !propertiesToRetrieve ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+    
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)propertiesToRetrieve, storage_item_extra_properties_FetchPropertiesAsync, iids, (IAsyncOperation_IInspectable **)operation );
     return hr;
 }
@@ -100,7 +107,13 @@ static HRESULT WINAPI storage_item_extra_properties_RetrievePropertiesAsync( ISt
 static HRESULT WINAPI storage_item_extra_properties_SavePropertiesAsync( IStorageItemExtraProperties *iface, IIterable_IKeyValuePair_HSTRING_IInspectable *propertiesToSave, IAsyncAction **operation )
 {
     HRESULT hr;
+
     TRACE( "iface %p, propertiesToSave %p, operation %p\n", iface, propertiesToSave, operation );
+
+    // Arguments
+    if ( !propertiesToSave ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)propertiesToSave, storage_item_extra_properties_SubmitPropertiesAsync, operation );
     return hr;
 }
@@ -108,7 +121,12 @@ static HRESULT WINAPI storage_item_extra_properties_SavePropertiesAsync( IStorag
 static HRESULT WINAPI storage_item_extra_properties_SavePropertiesAsyncOverloadDefault( IStorageItemExtraProperties *iface, IAsyncAction **operation )
 {
     HRESULT hr;
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_action_create( (IUnknown *)iface, NULL, storage_item_extra_properties_SubmitPropertiesAsync, operation );
     return hr;
 }

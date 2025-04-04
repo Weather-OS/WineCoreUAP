@@ -68,7 +68,11 @@ static ULONG WINAPI bufferaccess_impl_Release( IBufferByteAccess *iface )
 static HRESULT WINAPI bufferaccess_impl_get_Buffer( IBufferByteAccess *iface, BYTE **value )
 {
     struct buffer *impl = impl_from_IBufferByteAccess( iface );
+
     TRACE( "iface %p value %p \n", iface, value );
+
+    if ( !value ) return E_POINTER;
+
     *value = impl->Buffer;
     return S_OK;
 }

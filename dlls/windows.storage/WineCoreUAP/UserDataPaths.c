@@ -127,114 +127,133 @@ DEFINE_IINSPECTABLE( user_data_paths, IUserDataPaths, struct user_data_paths, IU
 static HRESULT WINAPI user_data_paths_get_CameraRoll( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "cameraroll", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Cookies( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Desktop( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "desktop", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Documents( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "documents", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Downloads( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "downloads", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Favorites( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "favorites", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_History( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "history", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_InternetCache( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "internetcache", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_LocalAppData( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "localappdata", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_LocalAppDataLow( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "localappdatalow", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Music( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "music", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Pictures( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "pictures", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Profile( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "profile", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Recent( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "recent", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_RoamingAppData( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "roamingappdata", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_SavedPictures( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "savedpictures", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Screenshots( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "screenshots", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Templates( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "templates", value);
 }
 
 static HRESULT WINAPI user_data_paths_get_Videos( IUserDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return user_data_paths_GetKnownFolder(iface, "videos", value);
 }
 
@@ -277,7 +296,9 @@ static HRESULT WINAPI user_data_paths_statics_GetForUser( IUserDataPathsStatics 
 
     TRACE( "iface %p, value %p\n", iface, result );
 
-    if (!result) return E_INVALIDARG;
+    // Arguments
+    if (!result) return E_POINTER;
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->IUserDataPaths_iface.lpVtbl = &user_data_paths_vtbl;
@@ -294,7 +315,9 @@ static HRESULT WINAPI user_data_paths_statics_GetDefault( IUserDataPathsStatics 
 
     TRACE( "iface %p, value %p\n", iface, result );
 
-    if (!result) return E_INVALIDARG;
+    // Arguments
+    if ( !result ) return E_POINTER;
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->IUserDataPaths_iface.lpVtbl = &user_data_paths_vtbl;

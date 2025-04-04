@@ -229,10 +229,15 @@ static HRESULT WINAPI storage_folder_GetTrustLevel( IStorageFolder *iface, Trust
 static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
     struct storage_folder_creation_options *creation_options;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
@@ -250,10 +255,15 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
 static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HSTRING name, CreationCollisionOption options, IAsyncOperation_StorageFile ** operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
     struct storage_folder_creation_options *creation_options;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
@@ -271,10 +281,15 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
 static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
     struct storage_folder_creation_options *creation_options;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
@@ -292,10 +307,15 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
 static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, HSTRING name, CreationCollisionOption options, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
     struct storage_folder_creation_options *creation_options;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
 
@@ -313,60 +333,105 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
 static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFile **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFile };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFile, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFile %p.\n", *operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_StorageFolder **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFolder, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IStorageItem };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchItem, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetFilesAsyncOverloadDefaultOptionsStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_StorageFile **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVectorView_StorageFile };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, NULL, storage_folder_FetchFilesAndCount, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IVectorView_StorageFile %p.\n", *operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetFoldersAsyncOverloadDefaultOptionsStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_StorageFolder **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVectorView_StorageFolder };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, NULL, storage_folder_FetchFoldersAndCount, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IVectorView_StorageFolder %p.\n", *operation );
+
     return hr;
 }
 
 static HRESULT WINAPI storage_folder_GetItemsAsyncOverloadDefaultStartAndCount( IStorageFolder *iface, IAsyncOperation_IVectorView_IStorageItem **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVectorView_IStorageItem };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, NULL, storage_folder_FetchItemsAndCount, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IVectorView_IStorageItem %p.\n", *operation );
+
     return hr;
 }
 
@@ -450,10 +515,18 @@ static HRESULT WINAPI storage_folder2_GetTrustLevel( IStorageFolder2 *iface, Tru
 static HRESULT WINAPI storage_folder2_TryGetItemAsync( IStorageFolder2 *iface, HSTRING name, IAsyncOperation_IStorageItem **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IStorageItem };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder2_TryFetchItem, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IStorageItem %p.\n", *operation );
+
     return hr;
 }
 
@@ -475,10 +548,18 @@ DEFINE_IINSPECTABLE( storage_folder_statics, IStorageFolderStatics, struct stora
 static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFolderStatics *iface, HSTRING path, IAsyncOperation_StorageFolder **result )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
+
     TRACE( "iface %p, operation %p\n", iface, result );
+
+    //Arguments
+    if ( !path || WindowsIsStringEmpty( path ) ) return E_INVALIDARG;
+    if ( !result ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
+
     return hr;
 }
 
@@ -501,10 +582,18 @@ static HRESULT WINAPI storage_folder_statics2_GetFolderFromPathForUserAsync( ISt
 {
     //IUser is not used
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
+
     TRACE( "iface %p, operation %p\n", iface, result );
+
+    //Arguments
+    if ( !path || WindowsIsStringEmpty( path ) ) return E_INVALIDARG;
+    if ( !result ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)result );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *result );
+
     return hr;
 }
 

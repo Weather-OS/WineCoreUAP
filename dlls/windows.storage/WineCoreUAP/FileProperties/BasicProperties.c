@@ -117,6 +117,7 @@ static HRESULT WINAPI basic_properties_get_Size( IBasicProperties *iface, UINT64
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
     TRACE( "iface %p value %p.\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->size;
     return S_OK;
 }
@@ -125,6 +126,7 @@ static HRESULT WINAPI basic_properties_get_DateModified( IBasicProperties *iface
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
     TRACE( "iface %p value %p.\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->DateModified;
     return S_OK;
 }
@@ -133,6 +135,7 @@ static HRESULT WINAPI basic_properties_get_TimeDate( IBasicProperties *iface, Da
 {
     struct basic_properties *impl = impl_from_IBasicProperties( iface );
     TRACE( "iface %p value %p.\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->ItemDate;
     return S_OK;
 }

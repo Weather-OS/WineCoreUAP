@@ -37,7 +37,6 @@ struct options_changed_event_handler
 {
     ITypedEventHandler_IStorageQueryResultBase_IInspectable *contentEventHandler;
     EventRegistrationToken token;
-    BOOL isStillAvailable;
 };
 
 struct query_result_base

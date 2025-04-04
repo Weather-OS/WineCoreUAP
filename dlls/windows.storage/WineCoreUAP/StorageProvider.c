@@ -113,19 +113,29 @@ static const struct IActivationFactoryVtbl factory_vtbl =
 
 DEFINE_IINSPECTABLE( storage_provider, IStorageProvider, struct storage_provider, IStorageProvider_iface )
 
-static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
-{    
-    struct storage_provider *impl = impl_from_IStorageProvider( iface );
-    TRACE( "iface %p, value %p\n", iface, value );
-    WindowsDuplicateString( impl->DisplayName, value );
-    return S_OK;
-}
-
 static HRESULT WINAPI storage_provider_get_Id( IStorageProvider *iface, HSTRING *value )
 {
     struct storage_provider *impl = impl_from_IStorageProvider( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
+
     WindowsDuplicateString( impl->Id, value );
+    return S_OK;
+}
+
+static HRESULT WINAPI storage_provider_get_DisplayName( IStorageProvider *iface, HSTRING *value )
+{    
+    struct storage_provider *impl = impl_from_IStorageProvider( iface );
+
+    TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
+
+    WindowsDuplicateString( impl->DisplayName, value );
     return S_OK;
 }
 

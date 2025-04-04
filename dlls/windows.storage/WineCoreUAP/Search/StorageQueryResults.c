@@ -91,9 +91,17 @@ static HRESULT WINAPI query_result_base_GetTrustLevel( IStorageQueryResultBase *
 static HRESULT WINAPI query_result_base_GetItemCountAsync( IStorageQueryResultBase *iface, IAsyncOperation_UINT32 **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_UINT32 };
+
+    TRACE( "iface %p, operation %p\n", iface, operation );
+
+    // Arguments 
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_uint32_create( (IUnknown *)iface, NULL, query_result_base_SearchCountAsync, iids, operation );
     TRACE( "created IAsyncOperation_UINT32 %p.\n", *operation );
+
     return hr;
 }
 
@@ -101,6 +109,7 @@ static HRESULT WINAPI query_result_base_get_Folder( IStorageQueryResultBase *ifa
 {
     struct query_result_base *impl = impl_from_IStorageQueryResultBase( iface );
     TRACE( "iface %p, container %p\n", iface, container );
+    if ( !container ) return E_POINTER;
     *container = impl->Folder;
     return S_OK;
 }
@@ -120,6 +129,7 @@ static HRESULT WINAPI query_result_base_remove_ContentsChanged( IStorageQueryRes
 static HRESULT WINAPI query_result_base_add_OptionsChanged( IStorageQueryResultBase *iface, ITypedEventHandler_IStorageQueryResultBase_IInspectable *handler, EventRegistrationToken *eventCookie )
 {
     EventRegistrationToken registeredToken;
+
     struct query_result_base *impl = impl_from_IStorageQueryResultBase( iface );
     struct options_changed_event_handler **tmp = impl->optionsChangedEventHandlers;
 
@@ -135,11 +145,19 @@ static HRESULT WINAPI query_result_base_add_OptionsChanged( IStorageQueryResultB
         }
     }
 
+    impl->optionsChangedEventHandlers[impl->handlerSize] = malloc( sizeof(*impl->optionsChangedEventHandlers[impl->handlerSize]) );
+    if (!impl->optionsChangedEventHandlers[impl->handlerSize])
+    {
+        impl->optionsChangedEventHandlers = tmp;
+        return E_OUTOFMEMORY;
+    }
+
+    ITypedEventHandler_IStorageQueryResultBase_IInspectable_AddRef( handler );
+
     registeredToken.value = impl->handlerSize;
 
     impl->optionsChangedEventHandlers[impl->handlerSize]->token = registeredToken;
     impl->optionsChangedEventHandlers[impl->handlerSize]->contentEventHandler = handler;
-    impl->optionsChangedEventHandlers[impl->handlerSize]->isStillAvailable = TRUE;
 
     *eventCookie = registeredToken;
 
@@ -156,7 +174,7 @@ static HRESULT WINAPI query_result_base_remove_OptionsChanged( IStorageQueryResu
 
     //Tokens remain catenated 
     ITypedEventHandler_IStorageQueryResultBase_IInspectable_Release( impl->optionsChangedEventHandlers[eventCookie.value]->contentEventHandler );
-    impl->optionsChangedEventHandlers[eventCookie.value]->isStillAvailable = FALSE;
+    free(impl->optionsChangedEventHandlers[eventCookie.value]);
     
     return S_OK;
 }
@@ -187,7 +205,7 @@ static HRESULT WINAPI query_result_base_ApplyNewQueryOptions( IStorageQueryResul
 
     for ( eventIterator = 0; eventIterator < impl->handlerSize; eventIterator++ )
     {
-        if ( impl->optionsChangedEventHandlers[eventIterator]->isStillAvailable )
+        if ( impl->optionsChangedEventHandlers[eventIterator] )
             ITypedEventHandler_IStorageQueryResultBase_IInspectable_Invoke( impl->optionsChangedEventHandlers[eventIterator]->contentEventHandler, iface, (IInspectable *)newQueryOptions );
     }
 

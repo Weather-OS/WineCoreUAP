@@ -98,8 +98,10 @@ static HRESULT WINAPI storage_folder_query_operations_GetTrustLevel( IStorageFol
 
 static HRESULT WINAPI storage_folder_query_operations_GetIndexedStateAsync( IStorageFolderQueryOperations *iface, IAsyncOperation_IndexedState **operation )
 {
+    HRESULT hr;    
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IndexedState };
-    HRESULT hr;
+    TRACE( "iface %p, operation %p\n", iface, operation );
+    if ( !operation ) return E_POINTER;
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)NULL, storage_folder_query_operations_GetIndexedState, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IndexedState %p.\n", operation );
     return hr;
@@ -114,6 +116,9 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFileQueryOverloadDef
     struct query_options_factory *queryOptionsFactory;
 
     TRACE( "iface %p, value %p.\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if (!(queryOptionsFactory = calloc( 1, sizeof(*queryOptionsFactory) ))) return E_OUTOFMEMORY;
 
@@ -134,7 +139,10 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFileQuery( IStorageF
 
     struct query_options_factory *queryOptionsFactory;
 
-    TRACE( "iface %p, value %p.\n", iface, value );
+    TRACE( "iface %p, query %d, value %p.\n", iface, query, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if (!(queryOptionsFactory = calloc( 1, sizeof(*queryOptionsFactory) ))) return E_OUTOFMEMORY;
 
@@ -149,7 +157,10 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFileQuery( IStorageF
 
 static HRESULT WINAPI storage_folder_query_operations_CreateFileQueryWithOptions( IStorageFolderQueryOperations *iface, IQueryOptions *queryOptions, IStorageFileQueryResult **value )
 {
-    TRACE( "iface %p, value %p.\n", iface, value );
+    TRACE( "iface %p, queryOptions %p, value %p.\n", iface, queryOptions, value );
+    // Arguments    
+    if ( !queryOptions ) return E_INVALIDARG;
+    if ( !value ) return E_POINTER;    
     return storage_folder_query_operations_FetchFileQuery( iface, queryOptions, value );
 }
 
@@ -162,6 +173,9 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFolderQueryOverloadD
     struct query_options_factory *queryOptionsFactory;
 
     TRACE( "iface %p, value %p.\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if (!(queryOptionsFactory = calloc( 1, sizeof(*queryOptionsFactory) ))) return E_OUTOFMEMORY;
 
@@ -182,7 +196,10 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFolderQuery( IStorag
 
     struct query_options_factory *queryOptionsFactory;
 
-    TRACE( "iface %p, value %p.\n", iface, value );
+    TRACE( "iface %p, query %d, value %p.\n", iface, query, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if (!(queryOptionsFactory = calloc( 1, sizeof(*queryOptionsFactory) ))) return E_OUTOFMEMORY;
 
@@ -197,7 +214,10 @@ static HRESULT WINAPI storage_folder_query_operations_CreateFolderQuery( IStorag
 
 static HRESULT WINAPI storage_folder_query_operations_CreateFolderQueryWithOptions( IStorageFolderQueryOperations *iface, IQueryOptions *queryOptions, IStorageFolderQueryResult **value )
 {
-    TRACE( "iface %p, value %p.\n", iface, value );
+    TRACE( "iface %p, queryOptions %p, value %p.\n", iface, queryOptions, value );
+    // Arguments
+    if ( !queryOptions ) return E_INVALIDARG;
+    if ( !value ) return E_POINTER;
     return storage_folder_query_operations_FetchFolderQuery( iface, queryOptions, value );
 }
 
@@ -213,6 +233,9 @@ static HRESULT WINAPI storage_folder_query_operations_CreateItemQuery( IStorageF
     #define SortEntry __x_ABI_CWindows_CStorage_CSearch_CSortEntry
 
     TRACE( "iface %p, value %p.\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if (!(queryOptions = calloc( 1, sizeof(*queryOptions) ))) return E_OUTOFMEMORY;
 
@@ -235,7 +258,10 @@ static HRESULT WINAPI storage_folder_query_operations_CreateItemQuery( IStorageF
 
 static HRESULT WINAPI storage_folder_query_operations_CreateItemQueryWithOptions( IStorageFolderQueryOperations *iface, IQueryOptions *queryOptions, IStorageItemQueryResult **value )
 {
-    TRACE( "iface %p, value %p.\n", iface, value );
+    TRACE( "iface %p, queryOptions %p, value %p.\n", iface, queryOptions, value );
+    // Arguments
+    if ( !queryOptions ) return E_INVALIDARG;
+    if ( !value ) return E_POINTER;
     return storage_folder_query_operations_FetchItemQuery( iface, queryOptions, value );
 }
 
@@ -245,7 +271,11 @@ static HRESULT WINAPI storage_folder_query_operations_GetFilesAsync( IStorageFol
 
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, operation %p.\n", iface, operation );
+    TRACE( "iface %p, query %d, startIndex %d, maxItemsToRetrieve %d, operation %p.\n", iface, query, startIndex, maxItemsToRetrieve, operation );
+
+    // Arguments
+    if ( !startIndex || !maxItemsToRetrieve ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = storage_folder_query_operations_CreateFileQuery( iface, query, &queryResult );
     if ( FAILED( hr ) ) return hr;
@@ -261,7 +291,10 @@ static HRESULT WINAPI storage_folder_query_operations_GetFilesAsyncOverloadDefau
 
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, operation %p.\n", iface, operation );
+    TRACE( "iface %p, query %d, operation %p.\n", iface, query, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
 
     hr = storage_folder_query_operations_CreateFileQuery( iface, query, &queryResult );
     if ( FAILED( hr ) ) return hr;
@@ -277,7 +310,11 @@ static HRESULT WINAPI storage_folder_query_operations_GetFoldersAsync( IStorageF
 
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, operation %p.\n", iface, operation );
+    TRACE( "iface %p, query %d, startIndex %d, maxItemsToRetrieve %d, operation %p.\n", iface, query, startIndex, maxItemsToRetrieve, operation );
+
+    // Arguments
+    if ( !startIndex || !maxItemsToRetrieve ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = storage_folder_query_operations_CreateFolderQuery( iface, query, &queryResult );
     if ( FAILED( hr ) ) return hr;
@@ -293,7 +330,10 @@ static HRESULT WINAPI storage_folder_query_operations_GetFoldersAsyncOverloadDef
 
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, operation %p.\n", iface, operation );
+    TRACE( "iface %p, query %d, operation %p.\n", iface, query, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
 
     hr = storage_folder_query_operations_CreateFolderQuery( iface, query, &queryResult );
     if ( FAILED( hr ) ) return hr;
@@ -309,7 +349,11 @@ static HRESULT WINAPI storage_folder_query_operations_GetItemsAsync( IStorageFol
 
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, operation %p.\n", iface, operation );
+    TRACE( "iface %p, startIndex %d, maxItemsToRetrieve %d, operation %p.\n", iface, startIndex, maxItemsToRetrieve, operation );
+
+    // Arguments
+    if ( !startIndex || !maxItemsToRetrieve ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = storage_folder_query_operations_CreateItemQuery( iface, &queryResult );
     if ( FAILED( hr ) ) return hr;
@@ -322,6 +366,7 @@ static HRESULT WINAPI storage_folder_query_operations_GetItemsAsync( IStorageFol
 static HRESULT WINAPI storage_folder_query_operations_AreQueryOptionsSupported( IStorageFolderQueryOperations *iface, IQueryOptions *queryOptions, boolean *value )
 {
     FIXME( "iface %p, options %p stub!\n", iface, queryOptions );
+    if ( !value ) return E_POINTER;
     *value = TRUE;
     return S_OK;
 }
@@ -329,6 +374,7 @@ static HRESULT WINAPI storage_folder_query_operations_AreQueryOptionsSupported( 
 static HRESULT WINAPI storage_folder_query_operations_IsCommonFolderQuerySupported( IStorageFolderQueryOperations *iface, CommonFolderQuery query, boolean *value )
 {
     FIXME( "iface %p, query %d stub!\n", iface, query );
+    if ( !value ) return E_POINTER;
     *value = TRUE;
     return S_OK;
 }
@@ -336,6 +382,7 @@ static HRESULT WINAPI storage_folder_query_operations_IsCommonFolderQuerySupport
 static HRESULT WINAPI storage_folder_query_operations_IsCommonFileQuerySupported( IStorageFolderQueryOperations *iface, CommonFileQuery query, boolean *value )
 {
     FIXME( "iface %p, query %d stub!\n", iface, query );
+    if ( !value ) return E_POINTER;
     *value = TRUE;
     return S_OK;
 }

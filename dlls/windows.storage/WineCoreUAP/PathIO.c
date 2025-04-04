@@ -121,6 +121,10 @@ static HRESULT WINAPI path_io_statics_ReadTextAsync( IPathIOStatics *iface, HSTR
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
+
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
@@ -138,6 +142,10 @@ static HRESULT WINAPI path_io_statics_ReadTextWithEncodingAsync( IPathIOStatics 
     struct path_io_read_text_options *read_text_options;
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
 
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
@@ -157,6 +165,10 @@ static HRESULT WINAPI path_io_statics_WriteTextAsync( IPathIOStatics *iface, HST
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
@@ -175,6 +187,10 @@ static HRESULT WINAPI path_io_statics_WriteTextWithEncodingAsync( IPathIOStatics
     struct path_io_write_text_options *write_text_options;
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
@@ -196,6 +212,10 @@ static HRESULT WINAPI path_io_statics_AppendTextAsync( IPathIOStatics *iface, HS
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
+
     write_text_options->encoding = UnicodeEncoding_Utf8;
     write_text_options->absolutePath = absolutePath;
     write_text_options->contents = contents;
@@ -213,6 +233,10 @@ static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatic
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !textOperation ) return E_POINTER;
 
     write_text_options->encoding = encoding;
     write_text_options->absolutePath = absolutePath;
@@ -233,6 +257,10 @@ static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HST
 
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !linesOperation ) return E_POINTER;
+
     read_text_options->encoding = UnicodeEncoding_Utf8;
     read_text_options->absolutePath = absolutePath;
 
@@ -250,6 +278,10 @@ static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !linesOperation ) return E_POINTER;
 
     read_text_options->encoding = encoding;
     read_text_options->absolutePath = absolutePath;
@@ -278,6 +310,10 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -297,22 +333,16 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
         {
             IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
             IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
 
-        for ( i = 0; i < vectorSize; i++ ) 
-        {
             totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-        }
-
-        combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-        combinedString[0] = L'\0';
-
-        for ( i = 0; i < vectorSize; i++ )
-        {
+            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+            combinedString[0] = L'\0';
             tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            
             free( tmpStr );
         }
     } else {
@@ -363,6 +393,10 @@ static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatic
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -382,22 +416,16 @@ static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatic
         {
             IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
             IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
 
-        for ( i = 0; i < vectorSize; i++ ) 
-        {
             totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-        }
-
-        combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-        combinedString[0] = L'\0';
-
-        for ( i = 0; i < vectorSize; i++ )
-        {
+            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+            combinedString[0] = L'\0';
             tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            
             free( tmpStr );
         }
     } else {
@@ -448,6 +476,10 @@ static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, H
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -467,22 +499,16 @@ static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, H
         {
             IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
             IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
 
-        for ( i = 0; i < vectorSize; i++ ) 
-        {
             totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-        }
-
-        combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-        combinedString[0] = L'\0';
-
-        for ( i = 0; i < vectorSize; i++ )
-        {
+            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+            combinedString[0] = L'\0';
             tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            
             free( tmpStr );
         }
     } else {
@@ -533,6 +559,10 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     hr = IIterable_HSTRING_First( lines, &hstringIterator );
@@ -552,22 +582,16 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
         {
             IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
             IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
 
-        for ( i = 0; i < vectorSize; i++ ) 
-        {
             totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-        }
-
-        combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-        combinedString[0] = L'\0';
-
-        for ( i = 0; i < vectorSize; i++ )
-        {
+            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+            combinedString[0] = L'\0';
             tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
+
             wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
             wcscat( tmpStr, L"\n" );
             wcscat( combinedString, tmpStr );
+            
             free( tmpStr );
         }
     } else {
@@ -604,10 +628,18 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
 static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IBuffer };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
+
     return hr;
 }
 
@@ -617,6 +649,10 @@ static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, H
     struct path_io_write_buffer_options *write_buffer_options;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !buffer ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     if (!(write_buffer_options = calloc( 1, sizeof(*write_buffer_options) ))) return E_OUTOFMEMORY;
 
@@ -637,6 +673,10 @@ static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HS
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     if (!(write_bytes_options = calloc( 1, sizeof(*write_bytes_options) ))) return E_OUTOFMEMORY;
+
+    //Arguments
+    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !buffer ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     write_bytes_options->buffer = buffer;
     write_bytes_options->absolutePath = absolutePath;

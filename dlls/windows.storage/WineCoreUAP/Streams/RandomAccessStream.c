@@ -114,24 +114,55 @@ DEFINE_IINSPECTABLE( random_access_stream_statics, IRandomAccessStreamStatics, s
 static HRESULT WINAPI random_access_stream_statics_CopyAsync( IRandomAccessStreamStatics *iface, IInputStream *source, IOutputStream *destination, IAsyncOperationWithProgress_UINT64_UINT64 **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, input %p, destination %p, operation %p\n", iface, source, destination, operation );
+
+    // Arguments    
+    if ( !source || !destination ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = random_access_stream_statics_Copy( source, destination, 0, operation );
     TRACE( "created IAsyncOperationWithProgress_UINT64_UINT64 %p\n", operation );
+    
     return hr;
 }
 
 static HRESULT WINAPI random_access_stream_statics_CopySizeAsync( IRandomAccessStreamStatics *iface, IInputStream *source, IOutputStream *destination, UINT64 bytesTocopy, IAsyncOperationWithProgress_UINT64_UINT64 **operation )
 {
     HRESULT hr;
+    TRACE( "iface %p, input %p, bytesTocopy %lld, destination %p, operation %p\n", iface, source, bytesTocopy, destination, operation );
+
+    // Arguments    
+    if ( !source || !destination || !bytesTocopy ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = random_access_stream_statics_Copy( source, destination, bytesTocopy, operation );
     TRACE( "created IAsyncOperationWithProgress_UINT64_UINT64 %p\n", operation );
+    
     return hr;
 }
 
 static HRESULT WINAPI random_access_stream_statics_CopyAndCloseAsync( IRandomAccessStreamStatics *iface, IInputStream *source, IOutputStream *destination, IAsyncOperationWithProgress_UINT64_UINT64 **operation )
 {
     HRESULT hr;
-    hr = random_access_stream_statics_Copy( source, destination, 0, operation );
+    IClosable *closable = NULL;
+    TRACE( "iface %p, input %p, destination %p, operation %p\n", iface, source, destination, operation );
+
+    // Arguments    
+    if ( !source || !destination ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
+    hr = random_access_stream_statics_Copy( source, destination, 0, operation );   
+    if ( FAILED( hr ) ) return hr;
+
+    hr = IInputStream_QueryInterface( source, &IID_IClosable, (void **)&closable );
+    if ( SUCCEEDED( hr ) )
+    {
+        IClosable_Close( closable );
+        IClosable_Release( closable );
+    }
+
     TRACE( "created IAsyncOperationWithProgress_UINT64_UINT64 %p\n", operation );
+
     return hr;
 }
 

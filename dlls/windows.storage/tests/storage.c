@@ -525,7 +525,7 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     ok ( !comparisonResult, "the 2 compared strings do not match!\n" ); 
 }
 
-
+    
 }
 
 /**

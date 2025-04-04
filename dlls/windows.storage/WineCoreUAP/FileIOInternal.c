@@ -27,10 +27,10 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
 {
     HRESULT status = S_OK;
     HSTRING filePath;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    LPSTR fileBufferChar = NULL;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;    
     LPWSTR fileBufferWChar = NULL;
     LPWSTR outputBuffer = NULL;
+    LPSTR fileBufferChar = NULL;
     DWORD fileSize;
     DWORD bytesRead;
     ULONG i;
@@ -87,7 +87,7 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
 
     if ( !readResult || bytesRead != fileSize )
     {
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
         goto _CLEANUP;
     }
 
@@ -95,7 +95,7 @@ HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PRO
     {
         if ( fileSize % 2 != 0 )
         {
-            status = E_INVALIDARG;
+            status = E_FAIL;
             goto _CLEANUP;
         }
     }
@@ -372,11 +372,11 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
     HRESULT status = S_OK;
     HSTRING filePath;
     HSTRING vectorElement;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    LPSTR fileBufferChar = NULL;
+    HANDLE fileHandle = INVALID_HANDLE_VALUE;    
     LPWSTR fileBufferWChar = NULL;
     LPWSTR outputBuffer = NULL;
     LPWSTR tmpBuffer = NULL;
+    LPSTR fileBufferChar = NULL;
     DWORD fileSize;
     DWORD bytesRead;
     ULONG i;
@@ -447,7 +447,7 @@ HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PR
 
     if ( !readResult || bytesRead != fileSize )
     {
-        status = E_UNEXPECTED;
+        status = HRESULT_FROM_WIN32( GetLastError() );
         goto _CLEANUP;
     }
 
@@ -664,12 +664,12 @@ _CLEANUP:
 }
 
 HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
+{    
     HRESULT status = S_OK;
-    HSTRING filePath;
-    BYTE *contents;
+    HSTRING filePath;    
     HANDLE fileHandle = INVALID_HANDLE_VALUE;
     DWORD bytesWritten;
+    BYTE *contents;
     
     IStorageItem *item = NULL;
 

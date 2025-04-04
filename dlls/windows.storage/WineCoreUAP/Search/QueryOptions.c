@@ -329,6 +329,7 @@ static HRESULT WINAPI query_options_get_FileTypeFilter( IQueryOptions *iface, IV
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->FileTypeFilters;
     return S_OK;
 }
@@ -337,6 +338,7 @@ static HRESULT WINAPI query_options_get_FolderDepth( IQueryOptions *iface, Folde
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->Depth;
     return S_OK;
 }
@@ -353,6 +355,7 @@ static HRESULT WINAPI query_options_get_ApplicationSearchFilter( IQueryOptions *
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( impl->ApplicationSearchFilter, value );
     return S_OK;
 }
@@ -360,7 +363,8 @@ static HRESULT WINAPI query_options_get_ApplicationSearchFilter( IQueryOptions *
 static HRESULT WINAPI query_options_put_ApplicationSearchFilter( IQueryOptions *iface, HSTRING value )
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
-    TRACE( "iface %p, value %p\n", iface, &value );
+    TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( value, &impl->ApplicationSearchFilter );
     return S_OK;
 }
@@ -368,7 +372,8 @@ static HRESULT WINAPI query_options_put_ApplicationSearchFilter( IQueryOptions *
 static HRESULT WINAPI query_options_get_UserSearchFilter( IQueryOptions *iface, HSTRING *value )
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
-    TRACE( "iface %p, value %p\n", iface,value );
+    TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( impl->UserSearchFilter, value );
     return S_OK;
 }
@@ -376,7 +381,8 @@ static HRESULT WINAPI query_options_get_UserSearchFilter( IQueryOptions *iface, 
 static HRESULT WINAPI query_options_put_UserSearchFilter( IQueryOptions *iface, HSTRING value )
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
-    TRACE( "iface %p, value %p\n", iface, &value );
+    TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( value, &impl->UserSearchFilter );
     return S_OK;
 }
@@ -385,6 +391,7 @@ static HRESULT WINAPI query_options_get_Language( IQueryOptions *iface, HSTRING 
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( impl->Language, value );
     return S_OK;
 }
@@ -392,7 +399,8 @@ static HRESULT WINAPI query_options_get_Language( IQueryOptions *iface, HSTRING 
 static HRESULT WINAPI query_options_put_Language( IQueryOptions *iface, HSTRING value )
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
-    TRACE( "iface %p, value %p\n", iface, &value );
+    TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( value, &impl->Language );
     return S_OK;
 }
@@ -401,6 +409,7 @@ static HRESULT WINAPI query_options_get_IndexerOption( IQueryOptions *iface, Ind
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->Indexer;
     return S_OK;
 }
@@ -417,6 +426,7 @@ static HRESULT WINAPI query_options_get_SortOrder( IQueryOptions *iface, IVector
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->SortOrders;
     return S_OK;
 }
@@ -425,6 +435,7 @@ static HRESULT WINAPI query_options_get_GroupPropertyName( IQueryOptions *iface,
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     WindowsDuplicateString( impl->GroupPropertyName, value );
     return S_OK;
 }
@@ -433,6 +444,7 @@ static HRESULT WINAPI query_options_get_DateStackOption( IQueryOptions *iface, D
 {
     struct query_options *impl = impl_from_IQueryOptions( iface );
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     *value = impl->DateStack;
     return S_OK;
 }

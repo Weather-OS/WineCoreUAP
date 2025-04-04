@@ -332,6 +332,7 @@ static HRESULT WINAPI buffer_factory_GetTrustLevel( IBufferFactory *iface, Trust
 static HRESULT WINAPI buffer_factory_Create( IBufferFactory *iface, UINT32 capacity, IBuffer **value )
 {
     TRACE( "iface %p, capacity %d, value %p\n", iface, capacity, value );
+    if ( !value ) return E_POINTER;
     return buffer_Create( capacity, value );
 }
 

@@ -121,6 +121,10 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
 
     TRACE( "iface %p, file %p, stream_reference %p.\n", iface, file, stream_reference );
 
+    // Arguments
+    if ( !file ) return E_INVALIDARG;
+    if ( !stream_reference ) return E_POINTER;
+
     if (!(reference = calloc( 1, sizeof(*reference) ))) return E_OUTOFMEMORY;
 
     hr = IStorageFile_QueryInterface( file, &IID_IStorageItem, (void **)&item );
@@ -227,9 +231,17 @@ static HRESULT WINAPI random_access_stream_reference_GetTrustLevel( IRandomAcces
 static HRESULT WINAPI random_access_stream_reference_OpenReadAsync( IRandomAccessStreamReference *iface, IAsyncOperation_IRandomAccessStreamWithContentType **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IRandomAccessStream };
+
+    TRACE( "iface %p, operation %p.\n", iface, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, NULL, random_access_stream_reference_CreateReadOnlyStream, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IRandomAccessStream %p.\n", *operation );
+    
     return hr;
 }
 

@@ -127,6 +127,10 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileAsync( IDownloadsFolder
 
     TRACE( "iface %p, value %p\n", iface, operation );
 
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
     {
@@ -146,6 +150,10 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderAsync( IDownloadsFold
     IStorageFolder *downloadsFolder = NULL;
 
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
@@ -167,6 +175,10 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsyn
 
     TRACE( "iface %p, value %p\n", iface, operation );
 
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
     {
@@ -186,6 +198,10 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderWithCollisionOptionAs
     IStorageFolder *downloadsFolder = NULL;
 
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
@@ -227,6 +243,10 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserAsync( IDownloa
 
     TRACE( "iface %p, value %p\n", iface, operation );
 
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
     {
@@ -246,6 +266,10 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserAsync( IDownl
     IStorageFolder *downloadsFolder = NULL;
 
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
@@ -267,6 +291,10 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFileForUserWithCollisionOp
 
     TRACE( "iface %p, value %p\n", iface, operation );
 
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
     {
@@ -286,6 +314,10 @@ static HRESULT WINAPI downloads_folder_statics2_CreateFolderForUserWithCollision
     IStorageFolder *downloadsFolder = NULL;
 
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    //Arguments
+    if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
 
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )

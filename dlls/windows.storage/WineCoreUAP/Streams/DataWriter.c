@@ -256,6 +256,9 @@ static HRESULT WINAPI data_writer_WriteBytes( IDataWriter *iface, UINT32 __value
 
     TRACE( "iface %p, __valueSize %d, value %p\n", iface, __valueSize, value );
 
+    // Arguments
+    if ( !value || !__valueSize ) return E_INVALIDARG;
+
     hr = buffer_Grow( impl->buffer, __valueSize );
     if ( FAILED( hr ) ) return hr;
 
@@ -285,6 +288,9 @@ static HRESULT WINAPI data_writer_WriteBuffer( IDataWriter *iface, IBuffer* buff
     struct data_writer *impl = impl_from_IDataWriter( iface );    
 
     TRACE( "iface %p, buffer %p\n", iface, buffer );
+
+    // Arguments
+    if ( !buffer ) return E_INVALIDARG;
 
     hr = IBuffer_get_Length( buffer, &bufferLength );
     if ( FAILED( hr ) ) return hr;
@@ -323,6 +329,9 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
     struct data_writer *impl = impl_from_IDataWriter( iface );    
 
     TRACE( "iface %p, buffer %p, start %d, count %d\n", iface, buffer, start, count );
+
+    // Arguments
+    if ( !buffer || !start || !count ) return E_INVALIDARG;
 
     hr = IBuffer_get_Length( buffer, &bufferLength );
     if ( FAILED( hr ) ) return hr;
@@ -452,7 +461,7 @@ static HRESULT WINAPI data_writer_WriteInt32( IDataWriter *iface, INT32 value )
     struct data_writer *impl = impl_from_IDataWriter( iface );    
     
     TRACE( "iface %p, value %p\n", iface, &value );
-
+    
     hr = buffer_Grow( impl->buffer, 4 );
     if ( FAILED( hr ) ) return hr;
 
@@ -707,6 +716,10 @@ static HRESULT WINAPI data_writer_WriteString( IDataWriter *iface, HSTRING value
 
     TRACE( "iface %p, value %p, codeUnitCount %p\n", iface, value, codeUnitCount );
 
+    // Arguments
+    if ( !value ) return E_INVALIDARG;
+    if ( !codeUnitCount ) return E_POINTER;
+
     switch ( impl->Encoding )
     {
         case UnicodeEncoding_Utf8:
@@ -759,6 +772,11 @@ static HRESULT WINAPI data_writer_MeasureString( IDataWriter *iface, HSTRING val
     struct data_writer *impl = impl_from_IDataWriter( iface );  
 
     TRACE( "iface %p, value %p, codeUnitCount %p\n", iface, value, codeUnitCount );
+
+    // Arguments
+    if ( !value ) return E_INVALIDARG;
+    if ( !codeUnitCount ) return E_POINTER;
+
 
     switch ( impl->Encoding )
     {
@@ -816,18 +834,32 @@ static HRESULT WINAPI data_writer_Store( IUnknown *invoker, IUnknown *param, PRO
 static HRESULT WINAPI data_writer_StoreAsync( IDataWriter *iface, IAsyncOperation_UINT32 **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_UINT32 };
+
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_uint32_create( (IUnknown *)iface, NULL, data_writer_Store, iids, operation );
+
     return hr;
 }
 
 static HRESULT WINAPI data_writer_FlushAsync( IDataWriter *iface, IAsyncOperation_boolean **operation )
 {
     HRESULT hr;
+
     struct data_writer *impl = impl_from_IDataWriter( (IDataWriter *)iface );
+
     TRACE( "iface %p, value %p\n", iface, operation );
+
+    // Arguments
+    if ( !operation ) return E_POINTER;
+    
     hr = IOutputStream_FlushAsync( impl->outputStream, operation );
+
     return hr;
 }
 
@@ -836,7 +868,9 @@ static HRESULT WINAPI data_writer_DetachBuffer( IDataWriter *iface, IBuffer **bu
     struct data_writer *impl = impl_from_IDataWriter( iface );
     TRACE( "iface %p, buffer %p\n", iface, buffer );
 
+    // Arguments
     if ( !buffer ) return E_POINTER;
+
     if ( !impl->buffer ) return E_FAIL;
 
     // Setting the length of the buffer during submission saves some cpu cycles.
@@ -853,7 +887,9 @@ static HRESULT WINAPI data_writer_DetachStream( IDataWriter *iface, IOutputStrea
     struct data_writer *impl = impl_from_IDataWriter( iface );
     TRACE( "iface %p, stream %p\n", iface, stream );
 
+    // Arguments
     if ( !stream ) return E_POINTER;
+
     if ( !impl->outputStream ) return E_FAIL;
 
     *stream = impl->outputStream;
@@ -974,6 +1010,10 @@ static HRESULT WINAPI data_writer_factory_CreateDataWriter( IDataWriterFactory *
     struct data_writer *writer;
 
     TRACE( "iface %p, outputStream %p, dataWriter %p\n", iface, outputStream, dataWriter );
+
+    // Arguments
+    if ( !outputStream ) return E_INVALIDARG;
+    if ( !dataWriter ) return E_POINTER;
 
     if (!(writer = calloc( 1, sizeof(*writer) ))) return E_OUTOFMEMORY;
 

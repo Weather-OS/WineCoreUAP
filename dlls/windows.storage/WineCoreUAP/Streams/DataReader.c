@@ -187,7 +187,12 @@ static HRESULT WINAPI data_reader_GetTrustLevel( IDataReader *iface, TrustLevel 
 static HRESULT WINAPI data_reader_get_UnconsumedBufferLength( IDataReader *iface, UINT32* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     *value = impl->UnconsumedBufferLength;
     return S_OK;
 }
@@ -195,7 +200,12 @@ static HRESULT WINAPI data_reader_get_UnconsumedBufferLength( IDataReader *iface
 static HRESULT WINAPI data_reader_get_UnicodeEncoding( IDataReader *iface, UnicodeEncoding* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     *value = impl->Encoding;
     return S_OK;
 }
@@ -203,7 +213,12 @@ static HRESULT WINAPI data_reader_get_UnicodeEncoding( IDataReader *iface, Unico
 static HRESULT WINAPI data_reader_put_UnicodeEncoding( IDataReader *iface, UnicodeEncoding value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %d\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     impl->Encoding = value;
     return S_OK;
 }
@@ -211,7 +226,12 @@ static HRESULT WINAPI data_reader_put_UnicodeEncoding( IDataReader *iface, Unico
 static HRESULT WINAPI data_reader_get_ByteOrder( IDataReader *iface, ByteOrder* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     *value = impl->Order;
     return S_OK;
 }
@@ -219,7 +239,12 @@ static HRESULT WINAPI data_reader_get_ByteOrder( IDataReader *iface, ByteOrder* 
 static HRESULT WINAPI data_reader_put_ByteOrder( IDataReader *iface, ByteOrder value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %d\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     impl->Order = value;
     return S_OK;
 }
@@ -227,7 +252,12 @@ static HRESULT WINAPI data_reader_put_ByteOrder( IDataReader *iface, ByteOrder v
 static HRESULT WINAPI data_reader_get_InputStreamOptions( IDataReader *iface, InputStreamOptions* value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     *value = impl->StreamOptions;
     return S_OK;
 }
@@ -235,7 +265,12 @@ static HRESULT WINAPI data_reader_get_InputStreamOptions( IDataReader *iface, In
 static HRESULT WINAPI data_reader_put_InputStreamOptions( IDataReader *iface, InputStreamOptions value )
 {
     struct data_reader *impl = impl_from_IDataReader( iface );
+
     TRACE( "iface %p, value %d\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     impl->StreamOptions = value;
     return S_OK;
 }
@@ -251,6 +286,9 @@ static HRESULT WINAPI data_reader_ReadByte( IDataReader *iface, BYTE* value )
     struct data_reader *impl = impl_from_IDataReader( iface );    
     
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
 
     if ( impl->UnconsumedBufferLength < 1 )
         return E_BOUNDS;
@@ -280,6 +318,9 @@ static HRESULT WINAPI data_reader_ReadBytes( IDataReader *iface, UINT32 __valueS
     IBufferByteAccess *returnedBufferByteAccess;
 
     struct data_reader *impl = impl_from_IDataReader( iface );  
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     TRACE( "iface %p, __valueSize %d, value %p\n", iface, __valueSize, value );
 
@@ -311,7 +352,10 @@ static HRESULT WINAPI data_reader_ReadBuffer( IDataReader *iface, UINT32 length,
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );   
+    
+    // Arguments
+    if ( !buffer ) return E_POINTER;
     
     TRACE( "iface %p, length %d, buffer %p\n", iface, length, buffer );
 
@@ -349,7 +393,10 @@ static HRESULT WINAPI data_reader_ReadBoolean( IDataReader *iface, boolean* valu
 
     IBufferByteAccess *returnedBufferByteAccess;
 
-    struct data_reader *impl = impl_from_IDataReader( iface );    
+    struct data_reader *impl = impl_from_IDataReader( iface );   
+    
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     TRACE( "iface %p, value %p\n", iface, value );
 
@@ -389,6 +436,9 @@ static HRESULT WINAPI data_reader_ReadGuid( IDataReader *iface, GUID *value )
     
     TRACE( "iface %p, value %p\n", iface, value );
 
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     if ( impl->UnconsumedBufferLength < 16 )
         return E_BOUNDS;
 
@@ -422,6 +472,9 @@ static HRESULT WINAPI data_reader_ReadInt16( IDataReader *iface, INT16* value )
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 2 )
         return E_BOUNDS;
@@ -453,6 +506,9 @@ static HRESULT WINAPI data_reader_ReadInt32( IDataReader *iface, INT32* value )
     struct data_reader *impl = impl_from_IDataReader( iface );    
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
@@ -484,6 +540,9 @@ static HRESULT WINAPI data_reader_ReadInt64( IDataReader *iface, INT64* value )
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
@@ -516,6 +575,9 @@ static HRESULT WINAPI data_reader_ReadUInt16( IDataReader *iface, UINT16* value 
     
     TRACE( "iface %p, value %p\n", iface, value );
 
+    // Arguments
+    if ( !value ) return E_POINTER;
+
     if ( impl->UnconsumedBufferLength < 2 )
         return E_BOUNDS;
 
@@ -546,6 +608,9 @@ static HRESULT WINAPI data_reader_ReadUInt32( IDataReader *iface, UINT32* value 
     struct data_reader *impl = impl_from_IDataReader( iface );    
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
@@ -577,6 +642,9 @@ static HRESULT WINAPI data_reader_ReadUInt64( IDataReader *iface, UINT64* value 
     struct data_reader *impl = impl_from_IDataReader( iface );    
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
@@ -608,6 +676,9 @@ static HRESULT WINAPI data_reader_ReadSingle( IDataReader *iface, FLOAT* value )
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 4 )
         return E_BOUNDS;
@@ -639,6 +710,9 @@ static HRESULT WINAPI data_reader_ReadDouble( IDataReader *iface, DOUBLE* value 
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
@@ -671,6 +745,10 @@ static HRESULT WINAPI data_reader_ReadString( IDataReader *iface, UINT32 codeUni
     struct data_reader *impl = impl_from_IDataReader( iface );  
 
     TRACE( "iface %p, codeUnitCount %d, value %p\n", iface, codeUnitCount, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
+    if ( !codeUnitCount ) return E_INVALIDARG;
 
     IBuffer_get_Length( impl->buffer, &readAhead );
 
@@ -716,6 +794,9 @@ static HRESULT WINAPI data_reader_ReadDateTime( IDataReader *iface, DateTime* va
     struct data_reader *impl = impl_from_IDataReader( iface );    
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
@@ -748,6 +829,9 @@ static HRESULT WINAPI data_reader_ReadTimeSpan( IDataReader *iface, TimeSpan* va
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    // Arguments
+    if ( !value ) return E_POINTER;
     
     if ( impl->UnconsumedBufferLength < 8 )
         return E_BOUNDS;
@@ -782,6 +866,9 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     
     TRACE( "iface %p, param %p, value %p\n", invoker, param, result );
 
+    // Arguments
+    if ( !result ) return E_POINTER;
+
     hr = buffer_Create( arguments->count, &buffer );
     if ( FAILED( hr ) ) return hr;
 
@@ -814,6 +901,9 @@ static HRESULT WINAPI data_reader_LoadAsync( IDataReader *iface, UINT32 count, I
 
     TRACE( "iface %p, count %d, operation %p\n", iface, count, operation );
 
+    // Arguments
+    if ( !operation ) return E_POINTER;
+
     if (!(arguments = calloc( 1, sizeof(*arguments) ))) return E_OUTOFMEMORY;
 
     arguments->count = count;
@@ -827,7 +917,7 @@ static HRESULT WINAPI data_reader_DetachBuffer( IDataReader *iface, IBuffer **bu
     struct data_reader *impl = impl_from_IDataReader( iface );
     TRACE( "iface %p, buffer %p\n", iface, buffer );
 
-    if (!buffer) return E_POINTER;
+    if ( !buffer ) return E_POINTER;
 
     *buffer = impl->buffer;
     impl->buffer = NULL;

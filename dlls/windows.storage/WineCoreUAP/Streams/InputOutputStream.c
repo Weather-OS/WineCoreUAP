@@ -215,6 +215,10 @@ static HRESULT WINAPI input_stream_ReadAsync( IInputStream *iface, IBuffer *buff
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    // Arguments    
+    if ( !buffer || !count ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if (!(input_stream_options = calloc( 1, sizeof(*input_stream_options) ))) return E_OUTOFMEMORY;
 
     input_stream_options->buffer = buffer;
@@ -320,6 +324,10 @@ static HRESULT WINAPI output_stream_WriteAsync( IOutputStream *iface, IBuffer *b
     
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    // Arguments    
+    if ( !buffer ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
     if ( impl->currentOperation )
     {
         IAsyncOperationWithProgress_UINT32_UINT32_QueryInterface( impl->currentOperation, &IID_IAsyncInfo, (void **)&info );
@@ -341,6 +349,9 @@ static HRESULT WINAPI output_stream_FlushAsync( IOutputStream *iface, IAsyncOper
     HRESULT hr;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    // Arguments    
+    if ( !operation ) return E_POINTER;
 
     hr = async_operation_boolean_create( (IUnknown *)iface, NULL, output_stream_Flush, operation );
     TRACE( "created IAsyncOperation_boolean %p\n", operation );

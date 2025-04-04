@@ -127,96 +127,112 @@ DEFINE_IINSPECTABLE( system_data_paths, ISystemDataPaths, struct system_data_pat
 static HRESULT WINAPI system_data_paths_get_Fonts( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "fonts", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_ProgramData( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "programdata", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_Public( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "public", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicDesktop( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicdesktop", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicDocuments( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicdocuments", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicDownloads( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicdownloads", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicMusic( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicmusic", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicPictures( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicpictures", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_PublicVideos( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "publicvideos", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_System( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "system", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_SystemHost( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "systemhost", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_SystemX86( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "systemx86", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_SystemX64( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "systemx64", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_SystemARM( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "systemarm", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_UserProfiles( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "userprofiles", value);
 }
 
 static HRESULT WINAPI system_data_paths_get_Windows( ISystemDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    if ( !value ) return E_POINTER;
     return system_data_paths_GetKnownFolder(iface, "windows", value);
 }
 
@@ -256,7 +272,9 @@ static HRESULT WINAPI system_data_paths_statics_GetDefault( ISystemDataPathsStat
 
     TRACE( "iface %p, value %p\n", iface, result );
 
-    if (!result) return E_INVALIDARG;
+    // Arguments
+    if ( !result ) return E_POINTER;
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->ISystemDataPaths_iface.lpVtbl = &system_data_paths_vtbl;

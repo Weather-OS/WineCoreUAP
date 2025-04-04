@@ -40,12 +40,12 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, ISt
     BOOLEAN picturesLibraryAllowed = FALSE;
     BOOLEAN videosLibraryAllowed = FALSE;
     BOOLEAN documentsLibraryAllowed = FALSE;
-    BOOLEAN homeGroupAllowed = TRUE;
+    BOOLEAN homeGroupAllowed = FALSE;
     BOOLEAN removableDevicesAllowed = FALSE;
-    BOOLEAN mediaServerAllowed = FALSE;
+    BOOLEAN mediaServerAllowed = FALSE;    
+    HSTRING path = NULL;
     PWSTR pathStr = NULL;
     DWORD asyncRes;
-    HSTRING path = NULL;
     WCHAR manifestPath[MAX_PATH];
 
     IStorageFolderStatics *storageFolderStatics = NULL;
@@ -63,10 +63,18 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, ISt
     PathRemoveFileSpecW(manifestPath);
     PathAppendW(manifestPath, L"AppxManifest.xml");
 
+    if ( !PathFileExistsW( manifestPath ) )
+    {
+        IStorageFolderStatics_Release( storageFolderStatics );
+        free( pathStr );
+        return APPX_E_MISSING_REQUIRED_FILE;
+    }
+
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
         IStorageFolderStatics_Release( storageFolderStatics );
-        return E_UNEXPECTED;
+        free( pathStr );
+        return APPX_E_INVALID_MANIFEST;
     }
 
     for ( xmlNode *capabilityNode = package.Package.Capabilities; capabilityNode; capabilityNode = capabilityNode->next )
@@ -244,11 +252,11 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     IStorageFolder *knownFolder = NULL;
 
     HSTRING knownFolderPath;
-    HRESULT status = S_OK;
-    INT promptResult;
+    HRESULT status = S_OK;    
     WCHAR title[MAX_BUFFER];
     WCHAR message[MAX_BUFFER];
     WCHAR manifestPath[MAX_PATH];
+    INT promptResult;
 
     struct appx_package package;
 
@@ -258,9 +266,12 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
     PathRemoveFileSpecW(manifestPath);
     PathAppendW(manifestPath, L"AppxManifest.xml");
 
+    if ( !PathFileExistsW( manifestPath ) )
+        return APPX_E_MISSING_REQUIRED_FILE;
+
     if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
     {
-        status = E_UNEXPECTED;
+        return APPX_E_INVALID_MANIFEST;
     }
 
     status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &knownFolder );

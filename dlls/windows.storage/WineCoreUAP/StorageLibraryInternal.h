@@ -38,7 +38,6 @@ struct definition_changed_handler
 {
     ITypedEventHandler_StorageLibrary_IInspectable ITypedEventHandler_StorageLibrary_IInspectable_iface;
     EventRegistrationToken token;
-    BOOL isStillAvailable;
 };
 
 struct storage_library

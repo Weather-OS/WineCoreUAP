@@ -39,7 +39,6 @@ static inline struct app_data_paths_statics *impl_from_IActivationFactory( IActi
 
 static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
 {
-
     struct app_data_paths_statics *impl = impl_from_IActivationFactory( iface );
 
     TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
@@ -197,54 +196,72 @@ static HRESULT WINAPI app_data_paths_GetTrustLevel( IAppDataPaths *iface, TrustL
 static HRESULT WINAPI app_data_paths_get_Cookies( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "cookies", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Desktop( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "desktop", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Documents( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "documents", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_Favorites( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "favorites", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_History( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "history", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_InternetCache( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "internet_cache", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_LocalAppData( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "localappdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_ProgramData( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "programdata", value);
 }
 
 static HRESULT WINAPI app_data_paths_get_RoamingAppData( IAppDataPaths *iface, HSTRING *value )
 {
     TRACE( "iface %p, value %p\n", iface, value );
+    // Arguments
+    if ( !value ) return E_POINTER;
     return app_data_paths_GetKnownFolder(iface, "roamingappdata", value);
 }
 
@@ -273,12 +290,14 @@ DEFINE_IINSPECTABLE( app_data_paths_statics, IAppDataPathsStatics, struct app_da
 
 static HRESULT WINAPI app_data_paths_statics_GetForUser( IAppDataPathsStatics *iface, IUser *user, IAppDataPaths **result )
 {
-    //I couldn't find a difference between GetForUser and GetDefault.
+    //User is not used
     struct app_data_paths *impl;
 
     TRACE( "iface %p, value %p\n", iface, result );
 
-    if (!result) return E_INVALIDARG;
+    // Arguments
+    if ( !result ) return E_POINTER;
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->IAppDataPaths_iface.lpVtbl = &app_data_paths_vtbl;
@@ -295,7 +314,9 @@ static HRESULT WINAPI app_data_paths_statics_GetDefault( IAppDataPathsStatics *i
 
     TRACE( "iface %p, value %p\n", iface, result );
 
-    if (!result) return E_INVALIDARG;
+    // Arguments
+    if ( !result ) return E_POINTER;
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
 
     impl->IAppDataPaths_iface.lpVtbl = &app_data_paths_vtbl;

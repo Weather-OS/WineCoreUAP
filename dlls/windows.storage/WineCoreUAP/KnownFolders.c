@@ -162,6 +162,9 @@ static HRESULT WINAPI known_folders_statics_get_MusicLibrary( IKnownFoldersStati
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_MusicLibrary, &folder );
 
@@ -180,6 +183,9 @@ static HRESULT WINAPI known_folders_statics_get_PicturesLibrary( IKnownFoldersSt
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_PicturesLibrary, &folder );
 
@@ -198,6 +204,9 @@ static HRESULT WINAPI known_folders_statics_get_VideosLibrary( IKnownFoldersStat
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_VideosLibrary, &folder );
 
@@ -216,6 +225,9 @@ static HRESULT WINAPI known_folders_statics_get_DocumentsLibrary( IKnownFoldersS
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_DocumentsLibrary, &folder );
 
@@ -234,6 +246,9 @@ static HRESULT WINAPI known_folders_statics_get_HomeGroup( IKnownFoldersStatics 
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_HomeGroup, &folder );
 
@@ -252,6 +267,9 @@ static HRESULT WINAPI known_folders_statics_get_RemovableDevices( IKnownFoldersS
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_RemovableDevices, &folder );
 
@@ -270,6 +288,9 @@ static HRESULT WINAPI known_folders_statics_get_MediaServerDevices( IKnownFolder
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_MediaServerDevices, &folder );
 
@@ -309,6 +330,9 @@ static HRESULT WINAPI known_folders_statics2_get_Objects3D( IKnownFoldersStatics
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_Objects3D, &folder );
 
@@ -327,6 +351,9 @@ static HRESULT WINAPI known_folders_statics2_get_AppCaptures( IKnownFoldersStati
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_AppCaptures, &folder );
 
@@ -345,6 +372,9 @@ static HRESULT WINAPI known_folders_statics2_get_RecordedCalls( IKnownFoldersSta
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_RecordedCalls, &folder );
 
@@ -381,6 +411,9 @@ static HRESULT WINAPI known_folders_statics3_GetFolderForUserAsync( IKnownFolder
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_GetKnownFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
 
@@ -405,10 +438,17 @@ DEFINE_IINSPECTABLE( known_folders_statics4, IKnownFoldersStatics4, struct known
 static HRESULT WINAPI known_folders_statics4_RequestAccessAsync( IKnownFoldersStatics4 *iface, KnownFolderId folder_id, IAsyncOperation_KnownFoldersAccessStatus **operation )
 {
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_KnownFoldersAccessStatus };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, iids, (IAsyncOperation_UINT32 **)operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
+
     return hr;
 }
 
@@ -416,10 +456,17 @@ static HRESULT WINAPI known_folders_statics4_RequestAccessForUserAsync( IKnownFo
 {
     //User is not used. 
     HRESULT hr;
+
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_KnownFoldersAccessStatus };
+
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
+
     hr = async_operation_uint32_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_RequestAccess, iids, (IAsyncOperation_UINT32 **)operation );
     TRACE( "created IAsyncOperation_KnownFoldersAccessStatus %p.\n", *operation );
+
     return hr;
 }
 
@@ -430,6 +477,9 @@ static HRESULT WINAPI known_folders_statics4_GetFolderAsync( IKnownFoldersStatic
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_StorageFolder };
 
     TRACE( "iface %p, operation %p\n", iface, operation );
+
+    //Arguments
+    if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)folder_id, known_folders_statics_GetKnownFolderAsync, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_StorageFolder %p.\n", *operation );
@@ -461,6 +511,9 @@ static HRESULT WINAPI known_folders_camera_roll_statics_get_CameraRoll( IKnownFo
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_CameraRoll, &folder );
 
@@ -494,6 +547,9 @@ static HRESULT WINAPI known_folders_playlists_statics_get_Playlists( IKnownFolde
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_Playlists, &folder );
 
@@ -527,6 +583,9 @@ static HRESULT WINAPI known_folders_saved_pictures_statics_get_SavedPictures( IK
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    //Arguments
+    if ( !value ) return E_POINTER;
     
     hr = known_folders_statics_GetKnownFolder( KnownFolderId_SavedPictures, &folder );
 

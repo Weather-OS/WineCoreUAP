@@ -41,7 +41,8 @@ HRESULT WINAPI downloads_folder_GetDownloadsFolder( IStorageFolder **outFolder )
     if ( FAILED( status ) ) goto _CLEANUP;
 
     asyncRes = await_IAsyncOperation_StorageFolder( storageFolderOperation, INFINITE );
-    if ( asyncRes ) {
+    if ( asyncRes ) 
+    {
         status = E_UNEXPECTED;
         goto _CLEANUP;
     }
@@ -53,5 +54,8 @@ _CLEANUP:
         IKnownFoldersStatics4_Release( knownFoldersStatics4 );
     if ( storageFolderOperation ) 
         IAsyncOperation_StorageFolder_Release( storageFolderOperation );
+    if ( FAILED( status ) ) 
+        if ( *outFolder )
+            IStorageFolder_Release( *outFolder );
     return status;
 }
