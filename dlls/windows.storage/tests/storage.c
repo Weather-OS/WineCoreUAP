@@ -1,7 +1,7 @@
 /*
  * Written by Weather
  *
- * This is a reverse engineered implementation of Microsoft's OneCoreUAP binaries.
+ * This is an implementation of Microsoft's OneCoreUAP binaries.
  *
  *
  * This library is free software; you can redistribute it and/or
