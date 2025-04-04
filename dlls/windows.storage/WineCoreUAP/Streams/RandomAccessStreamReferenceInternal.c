@@ -66,7 +66,7 @@ HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, I
     if (!(stream = calloc( 1, sizeof(*stream) ))) return E_OUTOFMEMORY;
 
     stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
-    stream->IClosable_iface.lpVtbl = &closable_stream_vtbl;
+    stream->IClosable_iface.lpVtbl = &closable_random_access_stream_vtbl;
     stream->closableRef = 1;
     stream->Position = 0;
     stream->CanRead = reference->canRead;
@@ -101,15 +101,16 @@ HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *in
 {
     HRESULT status = S_OK;
 
-    struct random_access_stream *stream;
+    struct random_access_stream_with_content_type *stream;
     struct random_access_stream_reference *reference = impl_from_IRandomAccessStreamReference( (IRandomAccessStreamReference *)invoker );
 
     TRACE( "invoker %p, result %p\n", invoker, result );
 
     if (!(stream = calloc( 1, sizeof(*stream) ))) return E_OUTOFMEMORY;
 
+    stream->IRandomAccessStreamWithContentType_iface.lpVtbl = &random_access_stream_with_content_type_vtbl;
     stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
-    stream->IClosable_iface.lpVtbl = &closable_stream_vtbl;
+    stream->IClosable_iface.lpVtbl = &closable_random_access_stream_vtbl;
     stream->closableRef = 1;
     stream->Position = 0;
     stream->CanRead = reference->canRead;
@@ -126,7 +127,7 @@ HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *in
     if ( SUCCEEDED( status ) ) 
     {
         result->vt = VT_UNKNOWN;
-        result->punkVal = (IUnknown *)&stream->IRandomAccessStream_iface;
+        result->punkVal = (IUnknown *)&stream->IRandomAccessStreamWithContentType_iface;
     } else {
         free( stream );
     }

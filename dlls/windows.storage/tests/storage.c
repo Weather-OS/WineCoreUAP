@@ -28,6 +28,7 @@ DEFINE_ASYNC_COMPLETED_HANDLER( async_uint_with_progress_handler, IAsyncOperatio
 DEFINE_ASYNC_COMPLETED_HANDLER( async_buffer_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_IBuffer_UINT32, IAsyncOperationWithProgress_IBuffer_UINT32 )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_random_access_stream_with_content_type_handler, IAsyncOperationCompletedHandler_IRandomAccessStreamWithContentType, IAsyncOperation_IRandomAccessStreamWithContentType )
 DEFINE_ASYNC_COMPLETED_HANDLER( basic_properties_handler, IAsyncOperationCompletedHandler_BasicProperties, IAsyncOperation_BasicProperties )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_StorageFolder, IAsyncOperation_IVectorView_StorageFolder )
@@ -325,6 +326,7 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     IDataReaderFactory *data_reader_factory = NULL;
     IDataReaderStatics *data_reader_statics = NULL;
 
+    IClosable *closable = NULL;
     IOutputStream *output_stream = NULL;
     IInputStream *input_stream = NULL;
     IRandomAccessStream *cloned_stream = NULL;
@@ -525,7 +527,17 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     ok ( !comparisonResult, "the 2 compared strings do not match!\n" ); 
 }
 
-    
+    /**
+     * ABI::Windows::Foundation::IClosable
+     */
+{
+    hr = IRandomAccessStream_QueryInterface( stream, &IID_IClosable, (void **)&closable );
+    CHECK_HR( hr );
+
+    hr = IClosable_Close( closable );
+    CHECK_HR( hr );
+}
+
 }
 
 /**
@@ -915,8 +927,11 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
 
     IAsyncOperation_StorageFile *storage_file_operation = NULL;
     IAsyncOperation_IRandomAccessStream *random_access_stream_operation = NULL;
+    IAsyncOperation_IRandomAccessStreamWithContentType *random_access_stream_with_content_type_operation = NULL;
 
     IRandomAccessStream *random_access_stream = NULL;
+    IRandomAccessStreamReference *random_access_stream_reference = NULL;
+    IRandomAccessStreamWithContentType *random_access_stream_with_content_type = NULL;
 
     IAsyncAction *action = NULL;
 
@@ -1103,6 +1118,7 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     /**
      * ABI::Windows::Storage::IStorageFile::OpenAsync
      */
+    // OpenAsync opens with write access.
     hr = IStorageFile_OpenAsync( storage_file, FileAccessMode_ReadWrite, &random_access_stream_operation );
     CHECK_HR( hr );
 
@@ -1115,6 +1131,28 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     test_Streams_RandomAccessStream( random_access_stream );
 }
 
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStreamReference
+     */
+    hr = IStorageFile_QueryInterface( storage_file, &IID_IRandomAccessStreamReference, (void **)&random_access_stream_reference );
+    CHECK_HR( hr );
+
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStreamReference::OpenReadAsync
+     */
+    hr = IRandomAccessStreamReference_OpenReadAsync( random_access_stream_reference, &random_access_stream_with_content_type_operation );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncOperation_IRandomAccessStreamWithContentType( random_access_stream_with_content_type_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_IRandomAccessStreamWithContentType_GetResults( random_access_stream_with_content_type_operation, &random_access_stream_with_content_type );
+    CHECK_HR( hr );
+    
+    hr = IRandomAccessStreamWithContentType_QueryInterface( random_access_stream_with_content_type, &IID_IRandomAccessStream, (void **)&random_access_stream );
+    CHECK_HR( hr );
+
+    test_Streams_RandomAccessStream( random_access_stream );
 }
 
 START_TEST(storage)

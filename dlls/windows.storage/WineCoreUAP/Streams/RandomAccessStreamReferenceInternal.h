@@ -29,7 +29,9 @@
 
 #include <shlwapi.h>
 
+extern const struct IRandomAccessStreamWithContentTypeVtbl random_access_stream_with_content_type_vtbl;
 extern const struct IRandomAccessStreamReferenceVtbl random_access_stream_reference_vtbl;
+extern const struct IClosableVtbl closable_random_access_stream_vtbl;
 
 struct random_access_stream_reference_statics
 {

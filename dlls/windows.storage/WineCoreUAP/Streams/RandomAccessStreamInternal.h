@@ -58,6 +58,27 @@ struct random_access_stream
     LONG ref;
 };
 
+
+struct random_access_stream_with_content_type
+{
+    //Derivatives
+    IRandomAccessStreamWithContentType IRandomAccessStreamWithContentType_iface;
+
+    //IRandomAccessStream Derivatives
+    IRandomAccessStream IRandomAccessStream_iface;
+        //IClosable Derivatives
+        IClosable IClosable_iface;
+            IStream *stream;
+            LONG closableRef;
+
+        UINT64 Position;
+        BOOLEAN CanRead;
+        BOOLEAN CanWrite;
+        LONG randomAccessStreamRef;
+
+    LONG ref;
+};
+
 HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputStream *destination, UINT64 bytesToCopy, IAsyncOperationWithProgress_UINT64_UINT64 **operation );
 
 
