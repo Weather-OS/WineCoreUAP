@@ -369,11 +369,17 @@ HRESULT WINAPI storage_item_GetProperties( IUnknown *invoker, IUnknown *param, P
 
     properties->IActivationFactory_iface.lpVtbl = basic_properties_factory->lpVtbl;
     properties->IBasicProperties_iface.lpVtbl = &basic_properties_vtbl;
+    properties->IStorageItemExtraProperties_iface.lpVtbl = &storage_item_extra_properties_vtbl;
 
     properties->DateModified.UniversalTime = FileTimeToUnixTime( &lastWrite );
     IStorageItem_get_DateCreated( (IStorageItem *)invoker, &properties->ItemDate );
     properties->size = fileSize;
     properties->ref = 1;
+
+    properties->Item = (IStorageItem *)invoker;
+
+    // To be fetched
+    // properties->Properties = storage_item_extra_properties_CacheProperties();
 
     result->vt = VT_UNKNOWN;
     result->punkVal = (IUnknown *)&properties->IBasicProperties_iface;
@@ -465,7 +471,6 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
 HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
 {
     HRESULT status = S_OK;
-    IStorageItem *storageItem = NULL;
 
     struct storage_provider *provider;
 
@@ -473,13 +478,11 @@ HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPr
 
     if (!(provider = calloc( 1, sizeof(*provider) ))) return E_OUTOFMEMORY;
 
-    IStorageItemPropertiesWithProvider_QueryInterface( iface, &IID_IStorageItem, (void **)&storageItem );
-
     provider->IStorageProvider_iface.lpVtbl = &storage_provider_vtbl;
 
-    //Item name is used for DisplayName.
-    IStorageItem_get_Name( storageItem, &provider->DisplayName );
-    WindowsCreateString( L"Local", wcslen( L"Local" ), &provider->Id );
+    //"This PC" is used for Display Name
+    WindowsCreateString( L"This PC", wcslen( L"This PC" ), &provider->DisplayName );
+    WindowsCreateString( L"computer", wcslen( L"computer" ), &provider->Id );
 
     *value = &provider->IStorageProvider_iface;
 

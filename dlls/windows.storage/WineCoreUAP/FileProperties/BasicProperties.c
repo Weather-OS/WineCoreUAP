@@ -162,6 +162,10 @@ static struct basic_properties basic_properties =
     {0},
     {0},
     0,
+    {&storage_item_extra_properties_vtbl},
+    NULL,
+    NULL,
+    1,
     1,
 };
 

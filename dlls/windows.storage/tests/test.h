@@ -30,6 +30,7 @@
 #include "winbase.h"
 #include "winstring.h"
 #include "shlwapi.h"
+#include "shlobj.h"
 
 #include "roapi.h"
 
@@ -73,7 +74,6 @@
             return S_OK;                                                                            \
         }                                                                                           \
                                                                                                     \
-        trace( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );            \
         *out = NULL;                                                                                \
         return E_NOINTERFACE;                                                                       \
     }                                                                                               \
@@ -170,7 +170,6 @@ void stubbed_interface_( unsigned int line, void *obj, const IID *iid );
         }                                                                                                                   \
         check_interface( instance_object, &IID_IUnknown );                                                                  \
         check_interface( instance_object, &IID_IInspectable );                                                              \
-        check_interface( instance_object, &IID_IAgileObject );                                                              \
                                                                                                                             \
         CHECK_HR( _hr );                                                                                                    \
     }

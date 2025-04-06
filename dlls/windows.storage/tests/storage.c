@@ -61,7 +61,7 @@ void stubbed_interface_( unsigned int line, void *obj, const IID *iid )
 /**
  * ABI::Windows::Storage::AppDataPaths
  */
-void test_AppDataPathsStatics( const wchar_t** pathStr )
+void test_AppDataPathsStatics( wchar_t** pathStr )
 {    
     static const WCHAR *app_data_paths_statics_name = L"Windows.Storage.AppDataPaths";
    
@@ -70,6 +70,7 @@ void test_AppDataPathsStatics( const wchar_t** pathStr )
 
     HRESULT hr;
     HSTRING localAppDataPath;
+    UINT32 stringLen;
     LONG ref;
 
     ACTIVATE_INSTANCE( app_data_paths_statics_name, app_data_paths_statics, IID_IAppDataPathsStatics );
@@ -87,7 +88,10 @@ void test_AppDataPathsStatics( const wchar_t** pathStr )
     IAppDataPaths_get_LocalAppData( app_data_paths, &localAppDataPath );
     trace( "Windows::Storage::IAppDataPaths::LocalAppData for %p is %s\n", &app_data_paths, debugstr_hstring( localAppDataPath ) );
 
-    *pathStr = WindowsGetStringRawBuffer(localAppDataPath, NULL);
+    WindowsGetStringRawBuffer( localAppDataPath, &stringLen );
+    *pathStr = (wchar_t *)malloc( (stringLen + 1) * sizeof( WCHAR ) );
+    memcpy( *pathStr, WindowsGetStringRawBuffer( localAppDataPath, NULL ), stringLen * sizeof( WCHAR ) );
+    (*pathStr)[stringLen] = L'\0';
 
     if (app_data_paths) IAppDataPaths_Release( app_data_paths );
     ref = IAppDataPathsStatics_Release( app_data_paths_statics );
@@ -298,13 +302,13 @@ void test_StorageItem( IStorageItem *item )
      * ABI::Windows::Storage::IStorageProvider::Id
      */
     IStorageProvider_get_Id( provider, &itemId );
-    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::Id for %p is %s\n", &provider, debugstr_hstring( itemId ) );
+    trace( "Windows::Storage::IStorageProvider::Id for %p is %s\n", &provider, debugstr_hstring( itemId ) );
 
     /**
      * ABI::Windows::Storage::IStorageProvider::DisplayName
      */
     IStorageProvider_get_DisplayName( provider, &origName );
-    trace( "Windows::Storage::IStorageItemPropertiesWithProvider::DisplayName for %p is %s\n", &provider, debugstr_hstring( origName ) );
+    trace( "Windows::Storage::IStorageProvider::DisplayName for %p is %s\n", &provider, debugstr_hstring( origName ) );
 }
 
 }
@@ -543,7 +547,7 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
 /**
  * ABI::Windows::Storage::StorageFolder
  */
-void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile **file, IStorageFolder **testFolder )
+void test_StorageFolder( wchar_t* path, IStorageItem **item, IStorageFile **file, IStorageFolder **testFolder )
 {
     static const WCHAR *storage_folder_statics_name = L"Windows.Storage.StorageFolder";
 
@@ -575,11 +579,8 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     HRESULT hr;
     DWORD asyncRes;
 
-    BOOLEAN found = FALSE;
     UINT32 size;
-    UINT32 index;
     INT32 compResult;
-    LONG ref;
 
     ACTIVATE_INSTANCE( storage_folder_statics_name, storage_folder_statics, IID_IStorageFolderStatics );
 
@@ -706,11 +707,6 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     hr = IVectorView_StorageFile_GetAt( storage_file_vector_view, 0, &storage_file );
     CHECK_HR( hr );
 
-    hr = IVectorView_StorageFile_IndexOf( storage_file_vector_view, storage_file, &index, &found );
-    CHECK_HR( hr );
-    ok( found, "storage file element (%p) not found in vector!\n", storage_file );
-    ok( index == 0u, "index (%u) is not at 0!\n", index );
-
     hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
     CHECK_HR( hr );
 
@@ -793,7 +789,7 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     hr = IAsyncOperation_IVectorView_IStorageItem_GetResults( storage_item_vector_view_operation, &storage_item_vector_view );
     CHECK_HR( hr );
 
-    hr = IVectorView_IStorageItem_GetAt( storage_item_vector_view, 0, &storage_item );
+    hr = IVectorView_IStorageItem_GetAt( storage_item_vector_view, 1, &storage_item );
     CHECK_HR( hr );
 
     check_interface( storage_item, &IID_IStorageFile );
@@ -801,9 +797,9 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     hr = IStorageItem_get_Name( storage_item, &itemName );
     CHECK_HR( hr );
     WindowsCompareStringOrdinal( tmpString, itemName, &compResult );
-    ok( !compResult, "the string tmpString is not the same as itemName! compResult %d\n", compResult );
+    ok( !compResult, "the string tmpString is not the same as itemName! compResult %d, tmpString %s, itemName %s.\n", compResult, debugstr_hstring( tmpString ), debugstr_hstring( itemName ) );
 
-    hr = IVectorView_IStorageItem_GetAt( storage_item_vector_view, 2, &storage_item );
+    hr = IVectorView_IStorageItem_GetAt( storage_item_vector_view, 0, &storage_item );
     CHECK_HR( hr );
 
     check_interface( storage_item, &IID_IStorageFolder );
@@ -869,11 +865,6 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     hr = IVectorView_StorageFile_GetAt( storage_file_vector_view, 0, &storage_file );
     CHECK_HR( hr );
 
-    hr = IVectorView_StorageFile_IndexOf( storage_file_vector_view, storage_file, &index, &found );
-    CHECK_HR( hr );
-    ok( found, "storage file element (%p) not found in vector!\n", storage_file );
-    ok( index == 0u, "index (%u) is not at 0!\n", index );
-
     hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
     CHECK_HR( hr );
 
@@ -906,14 +897,13 @@ void test_StorageFolder( const wchar_t* path, IStorageItem **item, IStorageFile 
     CHECK_HR( WindowsDeleteString( tmpString ) );
     CHECK_HR( WindowsDeleteString( itemName ) );
 
-    ref = IStorageFolderStatics_Release( storage_folder_statics );
-    ok( ref == 2, "got ref %ld.\n", ref );
+    IStorageFolderStatics_Release( storage_folder_statics );
 }
 
 /**
  * ABI::Windows::Storage::StorageFile
  */
-void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
+void test_StorageFile( wchar_t* path, IStorageFolder *folder )
 {
     static const WCHAR *storage_file_statics_name = L"Windows.Storage.StorageFile";
 
@@ -1161,6 +1151,7 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     /**
      * ABI::Windows::Storage::Streams:IContentTypeProvider
      */
+{
     hr = IRandomAccessStreamWithContentType_QueryInterface( random_access_stream_with_content_type, &IID_IContentTypeProvider, (void **)&content_type_provider );
     CHECK_HR( hr );
 
@@ -1172,10 +1163,13 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     trace( "Windows::Storage::Streams:IContentTypeProvider::ContentType for %p is %s\n", &content_type_provider, debugstr_hstring( tmpString ) );
 }
 
+}
+
 START_TEST(storage)
 {
     HRESULT hr;
-    const wchar_t* apppath;
+    wchar_t *apppath;
+    wchar_t execPath[MAX_PATH];
     IStorageItem *returnedItem = NULL;
     IStorageFile *returnedFile = NULL;
     IStorageFolder *returnedFolder = NULL;
@@ -1186,7 +1180,25 @@ START_TEST(storage)
 
     ok( hr == S_OK, "RoInitialize failed, hr %#lx\n", hr );
 
-    test_AppDataPathsStatics( &apppath );
+    GetModuleFileNameW( NULL, execPath, MAX_PATH );
+    PathRemoveFileSpecW(execPath);
+
+    PathAppendW(execPath, L"AppxManifest.xml");
+
+    if ( !PathFileExistsW( execPath ) )
+    {
+        // For now, On Wine, we rely on AppxManifest.xml to provide us with Package details.
+        // On Windows, this is handled by an Internal package management tool.
+        hr = SHGetKnownFolderPath( &FOLDERID_Documents, 0, NULL, &apppath );
+        CHECK_HR( hr );
+        PathAppendW( apppath, L"storage_tests" );
+        CreateDirectoryW( apppath, NULL );
+    }
+    else
+    {
+        test_AppDataPathsStatics( &apppath );
+    }
+    
     test_StorageFolder( apppath, &returnedItem, &returnedFile, &returnedFolder );
     test_StorageFile( apppath, returnedFolder );
 

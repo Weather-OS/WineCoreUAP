@@ -131,7 +131,7 @@ static HRESULT WINAPI storage_item_extra_properties_SavePropertiesAsyncOverloadD
     return hr;
 }
 
-static const struct IStorageItemExtraPropertiesVtbl storage_item_extra_properties_vtbl =
+const struct IStorageItemExtraPropertiesVtbl storage_item_extra_properties_vtbl =
 {
     storage_item_extra_properties_QueryInterface,
     storage_item_extra_properties_AddRef,

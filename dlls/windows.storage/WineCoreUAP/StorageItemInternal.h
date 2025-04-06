@@ -41,6 +41,7 @@
 
 extern struct IStorageItemPropertiesVtbl storage_item_properties_vtbl;
 extern struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl;
+extern struct IStorageItemExtraPropertiesVtbl storage_item_extra_properties_vtbl;
 extern struct IStorageProviderVtbl storage_provider_vtbl;
 extern struct IStorageItemVtbl storage_item_vtbl;
 extern struct IStorageItem2Vtbl storage_item2_vtbl;

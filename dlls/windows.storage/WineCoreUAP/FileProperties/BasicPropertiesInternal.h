@@ -25,6 +25,8 @@
 #include "../../private.h"
 #include "wine/debug.h"
 
+extern struct IStorageItemExtraPropertiesVtbl storage_item_extra_properties_vtbl;
+
 struct basic_properties
 {
     //Derivatives
@@ -34,6 +36,12 @@ struct basic_properties
     DateTime ItemDate;
     DateTime DateModified;
     UINT64 size;
+
+    //IStorageItemExtraProperties Derivatives
+    IStorageItemExtraProperties IStorageItemExtraProperties_iface;
+        IMap_HSTRING_IInspectable *Properties;
+        IStorageItem *Item;
+        LONG extrapropertiesRef;
 
     LONG ref;
 };

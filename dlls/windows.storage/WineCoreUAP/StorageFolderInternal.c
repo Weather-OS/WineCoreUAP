@@ -440,6 +440,9 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
         return E_ABORT;
     } 
 
+    // This is quite weird. FindNextFileW on Windows first iterates through 
+    // Folders and then Files. but somehow on Wine, it's the exact inverse.
+    // For conformance sake, this loop had to be written twice.
     do
     {
         if ( wcscmp( findFileData.cFileName, L"." ) != 0 
@@ -458,7 +461,33 @@ HRESULT WINAPI storage_folder_FetchItemsAndCount( IUnknown *invoker, IUnknown *p
                     storage_folder_AssignFolder( itemPath, &newFolder );
                     IStorageFolder_QueryInterface( newFolder, &IID_IStorageItem, (void **)&newFolderItem );
                     IVector_IStorageItem_Append( vector, newFolderItem );
-                } else
+                }
+            } else
+                break;
+
+            WindowsDeleteString( itemPath );
+            if ( item )
+                IStorageItem_Release( item );
+            SecureZeroMemory( fullItemPath, sizeof( fullItemPath ) );
+        }
+    } while ( FindNextFileW( hFind, &findFileData ) != 0 );
+
+    hFind = FindFirstFileW( searchPath, &findFileData );
+
+    do
+    {
+        if ( wcscmp( findFileData.cFileName, L"." ) != 0 
+          && wcscmp( findFileData.cFileName, L".." ) != 0 ) 
+        {
+            PathAppendW( fullItemPath, WindowsGetStringRawBuffer( Path, NULL ) );
+            PathAppendW( fullItemPath, findFileData.cFileName );
+            WindowsCreateString( fullItemPath, wcslen( fullItemPath ), &itemPath);
+
+            status = storage_item_Internal_CreateNew( itemPath, &item );
+            if ( SUCCEEDED( status ) )
+            {
+                IStorageItem_IsOfType( item, StorageItemTypes_Folder, &isFolder );
+                if ( !isFolder )
                 {
                     storage_file_AssignFile( itemPath, &newFile );
                     IStorageFile_QueryInterface( newFile, &IID_IStorageItem, (void **)&newFileItem );

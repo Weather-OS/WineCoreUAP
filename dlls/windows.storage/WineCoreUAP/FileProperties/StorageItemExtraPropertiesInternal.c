@@ -61,6 +61,7 @@ HRESULT WINAPI storage_item_extra_properties_FetchPropertiesAsync( IUnknown *inv
                 if ( FAILED( status ) ) return status; 
             }
             IIterator_HSTRING_MoveNext( propertiesRequested, &strExists );
+            WindowsDeleteString( currentString );
         }
     }
 
@@ -68,6 +69,9 @@ HRESULT WINAPI storage_item_extra_properties_FetchPropertiesAsync( IUnknown *inv
     {
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)propertiesRetrieved;
+    } else 
+    {
+        IMap_HSTRING_IInspectable_Release( propertiesRetrieved );
     }
 
     return status;
@@ -740,7 +744,11 @@ HRESULT WINAPI storage_item_extra_properties_SubmitPropertiesAsync( IUnknown *in
 
 _CLEANUP:
     free( fileContentTypeStr );
+    PropVariantClear( &itemPropertyValue );
     WindowsDeleteString( itemPath );
+    WindowsDeleteString( systemPropertyString );
+    WindowsDeleteString( key );
+    WindowsDeleteString( tempPropertyString );
     ISystemProperties_Release( systemProperties );
     ISystemGPSProperties_Release( systemGPSProperties );
     ISystemMediaProperties_Release( systemMediaProperties );
