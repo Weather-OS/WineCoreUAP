@@ -34,6 +34,7 @@ namespace Windows.Storage.Streams {
     typedef enum ByteOrder ByteOrder;
     typedef enum UnicodeEncoding UnicodeEncoding;
     typedef enum InputStreamOptions InputStreamOptions;
+
     interface IBuffer;
     interface IBufferFactory;
     interface IBufferStatics;
@@ -284,6 +285,15 @@ namespace Windows.Storage.Streams {
             [in] Windows.Storage.Streams.IBuffer *buffer,
             [out, retval] Windows.Foundation.IAsyncOperationWithProgress<UINT32, UINT32> **operation);
         HRESULT FlushAsync([out, retval] Windows.Foundation.IAsyncOperation<boolean> **operation);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        uuid(97D098A5-3B99-4DE9-88A5-E11D2F50C795)
+    ]
+    interface IContentTypeProvider : IInspectable
+    {
+        [propget] HRESULT ContentType([out] [retval] HSTRING* value);
     }
 
     [

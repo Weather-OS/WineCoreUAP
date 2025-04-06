@@ -67,6 +67,7 @@ struct storage_file
         BOOLEAN canRead;
         BOOLEAN canWrite;
         HSTRING handlePath;
+        HSTRING streamContentType;
         UINT64 streamSize;
         LONG IRandomAccessStreamRef;
 

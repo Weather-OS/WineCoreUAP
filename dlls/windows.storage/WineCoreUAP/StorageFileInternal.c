@@ -102,7 +102,11 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile ** resul
 
         FindMimeFromData( NULL, WindowsGetStringRawBuffer( path, NULL ), buffer, bytesRead, NULL, 0, &pwsMimeOut, 0 );
         if (pwsMimeOut != NULL)
+        {
             WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->ContentType );
+            // For Stream Content Type.
+            WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->streamContentType );
+        }
 
         CoTaskMemFree( pwsMimeOut );
 

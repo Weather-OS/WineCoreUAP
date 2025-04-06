@@ -51,6 +51,7 @@ SOURCES = \
 	WineCoreUAP/Streams/Buffer.c \
 	WineCoreUAP/Streams/BufferByteAccess.c \
 	WineCoreUAP/Streams/BufferInternal.c \
+	WineCoreUAP/Streams/ContentTypeProvider.c \
 	WineCoreUAP/Streams/DataReader.c \
 	WineCoreUAP/Streams/DataWriter.c \
 	WineCoreUAP/Streams/InputOutputStream.c \

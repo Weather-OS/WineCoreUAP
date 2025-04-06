@@ -76,6 +76,11 @@ struct random_access_stream_with_content_type
         BOOLEAN CanWrite;
         LONG randomAccessStreamRef;
 
+    //IContentTypeProvider Derivatives
+    IContentTypeProvider IContentTypeProvider_iface;
+        HSTRING ContentType;
+        LONG contentTypeRef;
+
     LONG ref;
 };
 

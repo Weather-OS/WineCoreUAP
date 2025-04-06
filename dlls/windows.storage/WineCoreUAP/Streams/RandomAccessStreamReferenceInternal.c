@@ -47,6 +47,9 @@ HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING pat
     }
     CloseHandle(stream);
 
+    // Content Type
+    
+
     reference->ref = 1;
 
     WindowsDuplicateString( path, &reference->handlePath );
@@ -75,13 +78,13 @@ HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, I
 
     if ( reference->canRead && reference->canWrite )
     {
-        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READWRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READWRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream );
     } else if ( reference->canRead )
     {
-        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream );
     } else if ( reference->canWrite )
     {
-        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_WRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_WRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream );
     } else {
         status = E_ACCESSDENIED;
     }
@@ -110,16 +113,20 @@ HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *in
 
     stream->IRandomAccessStreamWithContentType_iface.lpVtbl = &random_access_stream_with_content_type_vtbl;
     stream->IRandomAccessStream_iface.lpVtbl = &random_access_stream_vtbl;
+    stream->IContentTypeProvider_iface.lpVtbl = &content_type_provider_vtbl;
+    stream->ContentType = reference->contentType;
     stream->IClosable_iface.lpVtbl = &closable_random_access_stream_vtbl;
     stream->closableRef = 1;
     stream->Position = 0;
     stream->CanRead = reference->canRead;
     stream->CanWrite = FALSE;
     stream->ref = 1;
+    stream->randomAccessStreamRef = 1;
+    stream->contentTypeRef = 1;
 
     if ( reference->canRead )
     {
-        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream);
+        status = SHCreateStreamOnFileEx( WindowsGetStringRawBuffer( reference->handlePath, NULL ), STGM_READ, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &stream->stream );
     } else {
         status = E_ACCESSDENIED;
     }

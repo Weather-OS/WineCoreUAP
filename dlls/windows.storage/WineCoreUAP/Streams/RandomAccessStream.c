@@ -569,6 +569,13 @@ static HRESULT WINAPI random_access_stream_with_content_type_QueryInterface( IRa
         return S_OK;
     }
 
+    if (IsEqualGUID( iid, &IID_IContentTypeProvider ))
+    {
+        *out = &impl->IContentTypeProvider_iface;
+        IInspectable_AddRef( *out );
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return IRandomAccessStream_QueryInterface( &impl->IRandomAccessStream_iface, iid, out );

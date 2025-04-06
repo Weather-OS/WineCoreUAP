@@ -925,6 +925,8 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     IStorageFile *dummy_file = NULL;
     IStorageFile *copied_file = NULL;
 
+    IContentTypeProvider *content_type_provider = NULL;
+
     IAsyncOperation_StorageFile *storage_file_operation = NULL;
     IAsyncOperation_IRandomAccessStream *random_access_stream_operation = NULL;
     IAsyncOperation_IRandomAccessStreamWithContentType *random_access_stream_with_content_type_operation = NULL;
@@ -1134,6 +1136,7 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
     /**
      * ABI::Windows::Storage::Streams::IRandomAccessStreamReference
      */
+{
     hr = IStorageFile_QueryInterface( storage_file, &IID_IRandomAccessStreamReference, (void **)&random_access_stream_reference );
     CHECK_HR( hr );
 
@@ -1148,11 +1151,25 @@ void test_StorageFile( const wchar_t* path, IStorageFolder *folder )
 
     hr = IAsyncOperation_IRandomAccessStreamWithContentType_GetResults( random_access_stream_with_content_type_operation, &random_access_stream_with_content_type );
     CHECK_HR( hr );
-    
+
     hr = IRandomAccessStreamWithContentType_QueryInterface( random_access_stream_with_content_type, &IID_IRandomAccessStream, (void **)&random_access_stream );
     CHECK_HR( hr );
 
     test_Streams_RandomAccessStream( random_access_stream );
+}
+
+    /**
+     * ABI::Windows::Storage::Streams:IContentTypeProvider
+     */
+    hr = IRandomAccessStreamWithContentType_QueryInterface( random_access_stream_with_content_type, &IID_IContentTypeProvider, (void **)&content_type_provider );
+    CHECK_HR( hr );
+
+
+    /**
+     * ABI::Windows::Storage::Streams:IContentTypeProvider::ContentType
+     */
+    IContentTypeProvider_get_ContentType( content_type_provider, &tmpString );
+    trace( "Windows::Storage::Streams:IContentTypeProvider::ContentType for %p is %s\n", &content_type_provider, debugstr_hstring( tmpString ) );
 }
 
 START_TEST(storage)
