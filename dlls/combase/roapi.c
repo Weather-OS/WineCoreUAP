@@ -472,15 +472,6 @@ HRESULT WINAPI RoRegisterActivationFactories(HSTRING *classes, PFNGETACTIVATIONF
 }
 
 /***********************************************************************
- *      GetRestrictedErrorInfo (combase.@)
- */
-HRESULT WINAPI GetRestrictedErrorInfo(IRestrictedErrorInfo **info)
-{
-    FIXME( "(%p)\n", info );
-    return E_NOTIMPL;
-}
-
-/***********************************************************************
  *      RoOriginateLanguageException (combase.@)
  */
 BOOL WINAPI RoOriginateLanguageException(HRESULT error, HSTRING message, IUnknown *language_exception)

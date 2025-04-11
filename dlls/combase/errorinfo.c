@@ -22,6 +22,7 @@
 #define WINOLEAUTAPI
 
 #include "oleauto.h"
+#include "restrictederrorinfo.h"
 
 #include "combase_private.h"
 
@@ -33,13 +34,20 @@ struct error_info
 {
     IErrorInfo IErrorInfo_iface;
     ICreateErrorInfo ICreateErrorInfo_iface;
-    ISupportErrorInfo ISupportErrorInfo_iface;
+    ISupportErrorInfo ISupportErrorInfo_iface;    
+    IRestrictedErrorInfo IRestrictedErrorInfo_iface;
     LONG refcount;
 
     GUID guid;
+    // IErrorInfo Section
     WCHAR *source;
     WCHAR *description;
     WCHAR *help_file;
+    // IRestrictedErrorInfo Section
+    HRESULT hresult_error;
+    BSTR restricted_description;
+    BSTR capability_sid;
+    BSTR reference;
     DWORD help_context;
 };
 
@@ -56,6 +64,11 @@ static struct error_info *impl_from_ICreateErrorInfo(ICreateErrorInfo *iface)
 static struct error_info *impl_from_ISupportErrorInfo(ISupportErrorInfo *iface)
 {
     return CONTAINING_RECORD(iface, struct error_info, ISupportErrorInfo_iface);
+}
+
+static struct error_info *impl_from_IRestrictedErrorInfo_iface(IRestrictedErrorInfo *iface)
+{
+    return CONTAINING_RECORD(iface, struct error_info, IRestrictedErrorInfo_iface); 
 }
 
 static HRESULT WINAPI errorinfo_QueryInterface(IErrorInfo *iface, REFIID riid, void **obj)
@@ -77,6 +90,10 @@ static HRESULT WINAPI errorinfo_QueryInterface(IErrorInfo *iface, REFIID riid, v
     else if (IsEqualIID(riid, &IID_ISupportErrorInfo))
     {
         *obj = &error_info->ISupportErrorInfo_iface;
+    }
+    else if (IsEqualIID(riid, &IID_IRestrictedErrorInfo))
+    {
+        *obj = &error_info->IRestrictedErrorInfo_iface;
     }
 
     if (*obj)
@@ -312,6 +329,50 @@ static const ISupportErrorInfoVtbl support_errorinfo_vtbl =
     support_errorinfo_InterfaceSupportsErrorInfo
 };
 
+static HRESULT WINAPI restricted_errorinfo_QueryInterface(IRestrictedErrorInfo *iface, REFIID riid, void **obj)
+{
+    struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
+    return IErrorInfo_QueryInterface(&error_info->IErrorInfo_iface, riid, obj);
+}
+
+static ULONG WINAPI restricted_errorinfo_AddRef(IRestrictedErrorInfo *iface)
+{
+    struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
+    return IErrorInfo_AddRef(&error_info->IErrorInfo_iface);
+}
+
+static ULONG WINAPI restricted_errorinfo_Release(IRestrictedErrorInfo *iface)
+{
+    struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
+    return IErrorInfo_Release(&error_info->IErrorInfo_iface);
+}
+
+static HRESULT WINAPI restricted_errorinfo_GetErrorDetails(IRestrictedErrorInfo *iface, BSTR *description, HRESULT *error, BSTR *restrictedDescription, BSTR *capabilitySid)
+{
+    struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
+    *description = SysAllocString(error_info->description);
+    *restrictedDescription = SysAllocString(error_info->restricted_description);
+    *capabilitySid = SysAllocString(error_info->capability_sid);
+    *error = error_info->hresult_error;
+    return S_OK;
+}
+
+static HRESULT WINAPI restricted_errorinfo_GetReference(IRestrictedErrorInfo *iface, BSTR *reference)
+{
+    struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
+    *reference = SysAllocString(error_info->reference);
+    return S_OK;
+}
+
+static const IRestrictedErrorInfoVtbl restricted_errorinfo_vtbl =
+{
+    restricted_errorinfo_QueryInterface,
+    restricted_errorinfo_AddRef,
+    restricted_errorinfo_Release,
+    restricted_errorinfo_GetErrorDetails,
+    restricted_errorinfo_GetReference
+};
+
 /***********************************************************************
  *                CreateErrorInfo (combase.@)
  */
@@ -329,10 +390,15 @@ HRESULT WINAPI CreateErrorInfo(ICreateErrorInfo **ret)
     error_info->IErrorInfo_iface.lpVtbl = &errorinfo_vtbl;
     error_info->ICreateErrorInfo_iface.lpVtbl = &create_errorinfo_vtbl;
     error_info->ISupportErrorInfo_iface.lpVtbl = &support_errorinfo_vtbl;
+    error_info->IRestrictedErrorInfo_iface.lpVtbl = &restricted_errorinfo_vtbl;
     error_info->refcount = 1;
     error_info->source = NULL;
     error_info->description = NULL;
     error_info->help_file = NULL;
+    error_info->hresult_error = S_OK;
+    error_info->restricted_description = NULL;
+    error_info->capability_sid = NULL;
+    error_info->reference = NULL;
     error_info->help_context = 0;
 
     *ret = &error_info->ICreateErrorInfo_iface;
@@ -392,4 +458,68 @@ HRESULT WINAPI SetErrorInfo(ULONG reserved, IErrorInfo *error_info)
         IErrorInfo_AddRef(error_info);
 
     return S_OK;
+}
+
+
+/***********************************************************************
+ *       GetRestrictedErrorInfo    (combase.@)
+ */
+HRESULT WINAPI GetRestrictedErrorInfo(IRestrictedErrorInfo **info)
+{
+    struct tlsdata *tlsdata;
+    HRESULT hr;
+
+    TRACE("%p\n", info);
+
+    if (!info)
+        return E_INVALIDARG;
+
+    if (FAILED(hr = com_get_tlsdata(&tlsdata)))
+        return hr;
+
+    if (!tlsdata->errorinfo)
+    {
+        *info = NULL;
+        return S_FALSE;
+    }
+
+    hr = IErrorInfo_QueryInterface( tlsdata->errorinfo, &IID_IRestrictedErrorInfo, (void **)info );
+    if (FAILED(hr))
+        return hr;
+    tlsdata->errorinfo = NULL;
+
+    return S_OK;
+}
+
+/***********************************************************************
+ *       SetRestrictedErrorInfo    (combase.@)
+ */
+HRESULT WINAPI SetRestrictedErrorInfo(IRestrictedErrorInfo *restricted_error_info)
+{
+    struct error_info *error_info;
+
+    HRESULT hr;
+    IErrorInfo *errorInfo = NULL;
+    ICreateErrorInfo *createErrorInfo = NULL;
+
+    TRACE("%p\n", restricted_error_info);
+
+    if (!restricted_error_info) 
+        return E_INVALIDARG;
+
+    CreateErrorInfo(&createErrorInfo);
+    error_info = impl_from_ICreateErrorInfo(createErrorInfo);
+
+    hr = IRestrictedErrorInfo_GetErrorDetails(restricted_error_info, &error_info->description, 
+                                              &error_info->hresult_error, &error_info->restricted_description,
+                                              &error_info->capability_sid);
+    if (FAILED(hr)) 
+        return hr;
+    hr = IRestrictedErrorInfo_GetReference(restricted_error_info, &error_info->reference);
+    if (FAILED(hr)) 
+        return hr;
+
+    ICreateErrorInfo_QueryInterface( createErrorInfo, &IID_IErrorInfo, (void **)&errorInfo );
+
+    return SetErrorInfo( 0, errorInfo );;
 }
