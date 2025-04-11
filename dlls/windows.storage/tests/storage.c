@@ -314,6 +314,46 @@ void test_StorageItem( IStorageItem *item )
 }
 
 /**
+ * ABI::Windows::Storage::DownloadsFolder
+ */
+void test_DownloadsFolder( void )
+{
+    static const WCHAR *downloads_folder_statics_name = L"Windows.Storage.DownloadsFolder";
+
+    IDownloadsFolderStatics *downloads_folder_statics = NULL;
+
+    IStorageItem *storage_item = NULL;
+
+    IStorageFile *storage_file = NULL;
+    IAsyncOperation_StorageFile *storage_file_operation = NULL;
+
+    HRESULT hr;
+    HSTRING tmpString;
+
+    DWORD asyncRes;
+
+    ACTIVATE_INSTANCE( downloads_folder_statics_name, downloads_folder_statics, IID_IDownloadsFolderStatics );
+
+    /**
+     * ABI::Windows::Storage::IDownloadsFolderStatics::CreateFileAsync
+     */
+    WindowsCreateString( L"TempDownloadFile.tmp", wcslen( L"TempDownloadFile.tmp" ), &tmpString );
+    hr = IDownloadsFolderStatics_CreateFileWithCollisionOptionAsync( downloads_folder_statics, tmpString, CreationCollisionOption_ReplaceExisting, &storage_file_operation );
+    CHECK_HR( hr )
+
+    asyncRes = await_IAsyncOperation_StorageFile( storage_file_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_StorageFile_GetResults( storage_file_operation, &storage_file );
+    CHECK_HR( hr );
+
+    hr = IStorageFile_QueryInterface( storage_file, &IID_IStorageItem, (void **)&storage_item );
+    CHECK_HR( hr );
+
+    test_StorageItem( storage_item );
+}
+
+/**
  * ABI::Windows::Storage::Streams::RandomAccessStream
  */
 void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
@@ -1002,6 +1042,7 @@ void test_StorageFile( wchar_t* path, IStorageFolder *folder )
     hr = IAsyncOperation_StorageFile_GetResults( storage_file_operation, &dummy_file );
     CHECK_HR( hr );
 
+
     /**
      * ABI::Windows::Storage::IStorageFile
      */
@@ -1200,6 +1241,7 @@ START_TEST(storage)
     }
     
     test_StorageFolder( apppath, &returnedItem, &returnedFile, &returnedFolder );
+    test_DownloadsFolder();
     test_StorageFile( apppath, returnedFolder );
 
     RoUninitialize();
