@@ -69,26 +69,32 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile ** resul
         free( file );
         return status;
     }
-    IStorageItem_AddRef( fileItem );
+
     // This copies each corresponding field of storage_item to their respective values in storage_file.
     // Any changes in either of the structs needs to be reflected on the other.
     memcpy( &file->IStorageItem_iface, fileItem, sizeof(struct storage_item) );
-   
+
     file->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
     file->IStorageFilePropertiesWithAvailability_iface.lpVtbl = &storage_file_properties_with_availability_vtbl;
+
+    IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
+    if ( !isFile )
+    {
+        status = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_ISNOTFILE ) ) ) )
+            return E_UNEXPECTED;
+        return status;
+    }
 
     if ( SUCCEEDED(status) )
         status = storage_item_properties_AssignProperties( &file->IStorageItem_iface, &fileItemProperties );
 
-    memcpy( &file->IStorageItemProperties_iface, fileItemProperties, sizeof(struct storage_item_properties) );
-
-    if ( SUCCEEDED(status) )
+    if ( SUCCEEDED( status ) )
+    {
+        memcpy( &file->IStorageItemProperties_iface, fileItemProperties, sizeof(struct storage_item_properties) );
         status = random_access_stream_reference_CreateStreamReference( path, &file->IRandomAccessStreamReference_iface );
-
-    IStorageItem_IsOfType( &file->IStorageItem_iface, StorageItemTypes_File, &isFile );
-    if ( !isFile )
-        status = E_INVALIDARG;
-
+    }
+    
     if ( SUCCEEDED( status ) )
     {
         fileExtension = wcsrchr( WindowsGetStringRawBuffer( path, NULL ), '.' );

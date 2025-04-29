@@ -215,6 +215,13 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, ISt
                 IStorageFolder_AddRef( *value );
             }
         }
+    } else {
+        if ( status == E_ACCESSDENIED )
+        {
+            status = SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_PATHNOTALLOWED ), pathStr );
+            if ( FAILED( status ) ) 
+                status = E_FAIL;
+        }
     }
 
     if ( pathStr )

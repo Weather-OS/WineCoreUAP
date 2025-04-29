@@ -41,6 +41,7 @@ struct async_info
     IUnknown *param;
 
     CRITICAL_SECTION cs;
+    IErrorInfo *errorInfo; //A necessary hack to preserve IRestrictedErrorInfo
     IWineAsyncOperationCompletedHandler *handler;
     PROPVARIANT result;
     AsyncStatus status;
@@ -167,6 +168,10 @@ static HRESULT WINAPI async_impl_get_Result( IWineAsyncInfoImpl *iface, PROPVARI
         PropVariantCopy( result, &impl->result );
         hr = impl->hr;
     }
+    // This is where we resubmit the IRestrictedErrorInfo that we received upon AsyncStatus::Error
+    if (impl->status == Error && impl->errorInfo)
+        SetErrorInfo( 0, impl->errorInfo );
+
     LeaveCriticalSection( &impl->cs );
 
     return hr;
@@ -310,6 +315,8 @@ static void CALLBACK async_info_callback( TP_CALLBACK_INSTANCE *instance, void *
 
     EnterCriticalSection( &impl->cs );
     if (impl->status != Closed) impl->status = FAILED(hr) ? Error : Completed;
+    if ( impl->status == Error )
+        GetErrorInfo( 0, &impl->errorInfo );
     PropVariantCopy( &impl->result, &result );
     impl->hr = hr;
 

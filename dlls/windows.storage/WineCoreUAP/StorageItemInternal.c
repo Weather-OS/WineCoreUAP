@@ -21,6 +21,10 @@
 
 #include "StorageItemInternal.h"
 
+#include <initguid.h>
+#include <propkey.h>
+#include <shobjidl.h>
+
 _ENABLE_DEBUGGING_
 
 extern struct IActivationFactoryVtbl factory_vtbl;
@@ -94,36 +98,62 @@ static INT64 FileTimeToUnixTime( const FILETIME *ft ) {
 HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem ** result ) 
 {
     FILETIME itemFileCreatedTime;
-    HSTRING tempName;
-    HRESULT status;    
+    HRESULT status; 
+    LPCWSTR itemPathStr;
     HANDLE itemFile;
     WCHAR itemName[MAX_PATH];
     DWORD attributes;
     
-    struct storage_item *item;
+    struct storage_item *item = NULL;
 
     TRACE( "iface %p, value %p\n", itemPath, result );
 
-    if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
+    itemPathStr = WindowsGetStringRawBuffer( itemPath, NULL );
 
-    item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
-    item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
+    if ( PathIsURLW( itemPathStr ) )
+        return E_INVALIDARG;
 
-    if ( PathIsURLW( WindowsGetStringRawBuffer( itemPath, NULL ) ) )
+    if ( WindowsIsStringEmpty( itemPath ) )
     {
         status = E_INVALIDARG;
-        goto _CLEANUP;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_PATHISSHORT ) ) ) )
+            return E_UNEXPECTED;
+        return status;
     }
-    
-    attributes = GetFileAttributesW( WindowsGetStringRawBuffer( itemPath, NULL ) );
+
+    attributes = GetFileAttributesW( itemPathStr );
     if ( attributes == INVALID_FILE_ATTRIBUTES ) 
     {
-        status = E_INVALIDARG;
-        goto _CLEANUP;
+        status = HRESULT_FROM_WIN32( GetLastError() );
+        switch ( GetLastError() )
+        {
+            case ERROR_FILE_NOT_FOUND:
+                if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_FILENOTFOUND ), itemPathStr ) ) )
+                    return E_UNEXPECTED;
+                return status;
+            
+            case ERROR_INVALID_NAME:
+            case ERROR_BAD_PATHNAME:
+                if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_INVALIDPATH ), itemPathStr ) ) )
+                    return E_UNEXPECTED;
+                return status;
+
+            case ERROR_FILENAME_EXCED_RANGE:
+                if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_PATHTOOLONG ), itemPathStr ) ) )
+                    return E_UNEXPECTED;
+                return status;
+
+            default: 
+                return status;
+        }
     } else 
-    {
+    {    
+        if (!(item = calloc( 1, sizeof(*item) ))) return E_OUTOFMEMORY;
+
+        item->IStorageItem_iface.lpVtbl = &storage_item_vtbl;
+        item->IStorageItem2_iface.lpVtbl = &storage_item2_vtbl;
         //File Time
-        itemFile = CreateFileW( WindowsGetStringRawBuffer( itemPath, NULL ), GENERIC_READ, FILE_SHARE_READ, NULL,
+        itemFile = CreateFileW( itemPathStr, GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL );
         if (itemFile == INVALID_HANDLE_VALUE) 
         {
@@ -165,21 +195,20 @@ HRESULT WINAPI storage_item_Internal_CreateNew( HSTRING itemPath, IStorageItem *
         WindowsDuplicateString( itemPath, &item->Path );
 
         //File Name
-        wcscpy( itemName, wcsrchr( WindowsGetStringRawBuffer( itemPath, NULL ), '\\' ) );
-        WindowsCreateString( itemName + 1, wcslen( itemName + 1 ), &tempName );
-        WindowsDuplicateString( tempName, &item->Name );
-        WindowsDeleteString( tempName );
+        wcscpy( itemName, wcsrchr( itemPathStr, '\\' ) );
+        WindowsCreateString( itemName + 1, wcslen( itemName + 1 ), &item->Name );
 
         CloseHandle( itemFile );
 
-        status = S_OK;
+        status = S_OK;    
+        
+        *result = &item->IStorageItem_iface;
     }
-
-    *result = &item->IStorageItem_iface;
 
 _CLEANUP:
     if ( FAILED( status ) )
-        free( item );
+        if ( item )
+            free( item );
 
     return status;
 }
@@ -471,18 +500,66 @@ HRESULT WINAPI storage_item_properties_AssignProperties( IStorageItem* iface, IS
 HRESULT WINAPI storage_item_properties_with_provider_GetProvider( IStorageItemPropertiesWithProvider *iface, IStorageProvider **value )
 {
     HRESULT status = S_OK;
+    HSTRING itemPath;
+    PROPVARIANT prop;
+    IShellItem2 *shellItem = NULL;
+
+    IStorageItem *item = NULL;
 
     struct storage_provider *provider;
 
     TRACE( "iface %p, value %p\n", iface, value );
 
+    IStorageItemPropertiesWithProvider_QueryInterface( iface, &IID_IStorageItem, (void **)&item );
+    IStorageItem_get_Path( item, &itemPath );
+
     if (!(provider = calloc( 1, sizeof(*provider) ))) return E_OUTOFMEMORY;
 
     provider->IStorageProvider_iface.lpVtbl = &storage_provider_vtbl;
 
-    //"This PC" is used for Display Name
+    status = SHCreateItemFromParsingName( WindowsGetStringRawBuffer( itemPath , NULL ), NULL, &IID_IShellItem2, (void **)&shellItem );
+    if ( SUCCEEDED( status ) ) 
+    {
+        PropVariantInit( &prop );
+
+        status = IShellItem2_GetProperty( shellItem, &PKEY_StorageProviderId, &prop );
+        if ( SUCCEEDED( status ) )
+            WindowsCreateString( prop.pwszVal, wcslen( prop.pwszVal ), &provider->Id );
+        else
+        {
+            //ShellItem2_GetProperty is stubbed
+            if ( status != E_NOTIMPL )
+            {
+                PropVariantClear( &prop );
+                IShellItem2_Release( shellItem );
+                IStorageItem_Release( item );
+                WindowsDeleteString( itemPath );
+                if ( status == E_ACCESSDENIED )
+                {
+                    if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_NOPROVIDERACCESS ) ) ) )
+                        return E_UNEXPECTED;
+                    return status;
+                } else {
+                    if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_PROVIDERFAILED ) ) ) )
+                        return E_UNEXPECTED;
+                    return status;
+                }
+            }
+            else
+            {
+                //"computer" is used instead until the functionality is implemented
+                WindowsCreateString( L"computer", wcslen( L"computer" ), &provider->Id );
+            }
+        }
+    }
+
+    PropVariantClear( &prop );
+    IShellItem2_Release( shellItem );
+    IStorageItem_Release( item );
+    WindowsDeleteString( itemPath );
+
+    // "This PC" is used for Provider Name
     WindowsCreateString( L"This PC", wcslen( L"This PC" ), &provider->DisplayName );
-    WindowsCreateString( L"computer", wcslen( L"computer" ), &provider->Id );
 
     *value = &provider->IStorageProvider_iface;
 

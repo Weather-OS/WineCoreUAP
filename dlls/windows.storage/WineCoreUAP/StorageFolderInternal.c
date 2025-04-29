@@ -106,26 +106,28 @@ HRESULT WINAPI storage_folder_AssignFolder ( HSTRING path, IStorageFolder **valu
         free( folder );
         return status;
     }     
-    IStorageItem_AddRef( folderItem );
     // This copies each corresponding field of storage_item to their respective values in storage_folder.
     // Any changes in either of the structs needs to be reflected on the other.
     memcpy( &folder->IStorageItem_iface, folderItem, sizeof(struct storage_item) );
-
-    status = storage_item_properties_AssignProperties( folderItem, &folderItemProperties );
-    memcpy( &folder->IStorageItemProperties_iface, folderItemProperties, sizeof(struct storage_item_properties) );
-    if ( FAILED( status ) )
-    {
-        free( folder );
-        return status;
-    } 
 
     IStorageItem_IsOfType( &folder->IStorageItem_iface, StorageItemTypes_Folder, &isFolder );
 
     if ( !isFolder )
     {
         free( folder );
+        status = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_ISNOTFOLDER ) ) ) )
+            return E_UNEXPECTED;
         return status;
     }
+
+    status = storage_item_properties_AssignProperties( folderItem, &folderItemProperties );
+    if ( FAILED( status ) )
+    {
+        free( folder );
+        return status;
+    } 
+    memcpy( &folder->IStorageItemProperties_iface, folderItemProperties, sizeof(struct storage_item_properties) );
 
     *value = &folder->IStorageFolder_iface;
 
@@ -178,6 +180,14 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
+    if ( WindowsIsStringEmpty( Name ) )
+    {
+        status = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_NAMEISSHORT ) ) ) )
+            return E_UNEXPECTED;
+        return status;
+    }
+
     status = IStorageFolder_QueryInterface( (IStorageFolder *)invoker, &IID_IStorageItem, (void **)&invokerFolderItem );
     IStorageItem_get_Path( invokerFolderItem, &Path );
 
@@ -223,14 +233,33 @@ HRESULT WINAPI storage_folder_CreateFolder( IUnknown *invoker, IUnknown *param, 
     if ( SUCCEEDED( status ) )
     {
         if ( Replace )
-        {
             DeleteDirectoryRecursively( fullPath );
-        }
         if ( !Exists )
         {
             if ( !CreateDirectoryW( fullPath, NULL ) )
             {
-                return HRESULT_FROM_WIN32( GetLastError() );
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                switch( GetLastError() )
+                {
+                    case ERROR_INVALID_NAME:
+                    case ERROR_BAD_PATHNAME:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_INVALIDNAME ), Name ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+
+                    case ERROR_FILENAME_EXCED_RANGE:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_NAMETOOLONG ), Name ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+                    
+                    case ERROR_ACCESS_DENIED:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_SUBNOTALLOWED ) ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+
+                    default: 
+                        return status;
+                }
             }
         } 
 
@@ -253,6 +282,7 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
 {
     HRESULT status = S_OK;
     HSTRING Path;
+    HANDLE createdFileHandle;
     DWORD attrib;
     WCHAR fullPath[MAX_PATH];
     WCHAR uuidName[MAX_PATH];
@@ -268,6 +298,14 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     HSTRING Name = creation_options->name;
 
     TRACE( "iface %p, value %p\n", invoker, result );
+
+    if ( WindowsIsStringEmpty( Name ) )
+    {
+        status = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_NAMEISSHORT ) ) ) )
+            return E_UNEXPECTED;
+        return status;
+    }
 
     WindowsDuplicateString( impl_from_IStorageFolder( (IStorageFolder *)invoker )->Path, &Path );
 
@@ -320,7 +358,35 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
         }
         if ( !Exists )
         {
-            CloseHandle( CreateFileW( fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL) );
+            createdFileHandle = CreateFileW( fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if ( createdFileHandle == INVALID_HANDLE_VALUE )
+            {
+                status = HRESULT_FROM_WIN32( GetLastError() );
+                switch( GetLastError() )
+                {
+                    case ERROR_INVALID_NAME:
+                    case ERROR_BAD_PATHNAME:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_INVALIDNAME ), Name ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+
+                    case ERROR_FILENAME_EXCED_RANGE:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_NAMETOOLONG ), Name ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+
+                    case ERROR_ACCESS_DENIED:
+                        if ( FAILED( SetLastRestrictedErrorWithMessageW( status, GetResourceW( IDS_FILENOTALLOWED ) ) ) )
+                            return E_UNEXPECTED;
+                        return status;
+
+                    default: 
+                        return status;
+                }
+            } else
+            {
+                CloseHandle( createdFileHandle );
+            }
         }
         WindowsCreateString( fullPath, wcslen( fullPath ), &Path );
         status = storage_file_AssignFile( Path, &resultFile );
@@ -330,8 +396,6 @@ HRESULT WINAPI storage_folder_CreateFile( IUnknown *invoker, IUnknown *param, PR
     {
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)resultFile;
-    } else {
-        IStorageFile_Release( resultFile );
     }
 
     return status;
@@ -381,6 +445,15 @@ HRESULT WINAPI storage_folder_FetchItem( IUnknown *invoker, IUnknown *param, PRO
             IStorageFile_QueryInterface( newFile, &IID_IStorageItem, (void **)&newFileItem );
             result->vt = VT_UNKNOWN;
             result->punkVal = (IUnknown *)newFileItem;
+        }
+    } else 
+    {
+        if ( status == HRESULT_FROM_WIN32( ERROR_FILE_NOT_FOUND ) )
+        {
+            WindowsDeleteString( itemPath );
+            if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_NAMENOTFOUND ), (HSTRING)param ) ) )
+                return E_UNEXPECTED;
+            return status;
         }
     }
         
@@ -521,11 +594,9 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     HRESULT status;
     HSTRING Path;
     HSTRING folderPath;
-    BOOLEAN isFolder = FALSE;
     WCHAR fullPath[MAX_PATH];
 
     IStorageFolder *folderToFetch = NULL;
-    IStorageItem *folderItemToFetch = NULL;
     IStorageItem *invokerFolderItem = NULL;
 
     TRACE( "iface %p, value %p\n", invoker, result );
@@ -542,13 +613,11 @@ HRESULT WINAPI storage_folder_FetchFolder( IUnknown *invoker, IUnknown *param, P
     if ( FAILED( status ) )
     {
         WindowsDeleteString( folderPath );
+        if ( status == HRESULT_FROM_WIN32( ERROR_FILE_NOT_FOUND ) )
+            if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_NAMENOTFOUND ), (HSTRING)param ) ) )
+                return E_UNEXPECTED;
         return status;
     }
-    IStorageFolder_QueryInterface( folderToFetch, &IID_IStorageItem, (void **)&folderItemToFetch );
-    IStorageItem_IsOfType( folderItemToFetch, StorageItemTypes_Folder, &isFolder );
-
-    if ( !isFolder )
-        status = E_INVALIDARG;
     
     if ( SUCCEEDED( status ) )
     {

@@ -236,7 +236,7 @@ static HRESULT WINAPI storage_folder_CreateFileAsyncOverloadDefaultOptions( ISto
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
@@ -262,7 +262,7 @@ static HRESULT WINAPI storage_folder_CreateFileAsync( IStorageFolder *iface, HST
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
@@ -288,7 +288,7 @@ static HRESULT WINAPI storage_folder_CreateFolderAsyncOverloadDefaultOptions( IS
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
@@ -314,7 +314,7 @@ static HRESULT WINAPI storage_folder_CreateFolderAsync( IStorageFolder *iface, H
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(creation_options = calloc( 1, sizeof(*creation_options) ))) return E_OUTOFMEMORY;
@@ -339,7 +339,7 @@ static HRESULT WINAPI storage_folder_GetFileAsync( IStorageFolder *iface, HSTRIN
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFile, iids, (IAsyncOperation_IInspectable **)operation );
@@ -357,7 +357,7 @@ static HRESULT WINAPI storage_folder_GetFolderAsync( IStorageFolder *iface, HSTR
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchFolder, iids, (IAsyncOperation_IInspectable **)operation );
@@ -375,7 +375,7 @@ static HRESULT WINAPI storage_folder_GetItemAsync( IStorageFolder *iface, HSTRIN
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder_FetchItem, iids, (IAsyncOperation_IInspectable **)operation );
@@ -521,7 +521,7 @@ static HRESULT WINAPI storage_folder2_TryGetItemAsync( IStorageFolder2 *iface, H
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !name || WindowsIsStringEmpty( name ) ) return E_INVALIDARG;
+    if ( !name ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)name, storage_folder2_TryFetchItem, iids, (IAsyncOperation_IInspectable **)operation );
@@ -554,7 +554,7 @@ static HRESULT WINAPI storage_folder_statics_GetFolderFromPathAsync( IStorageFol
     TRACE( "iface %p, operation %p\n", iface, result );
 
     //Arguments
-    if ( !path || WindowsIsStringEmpty( path ) ) return E_INVALIDARG;
+    if ( !path ) return E_INVALIDARG;
     if ( !result ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)result );
@@ -588,7 +588,7 @@ static HRESULT WINAPI storage_folder_statics2_GetFolderFromPathForUserAsync( ISt
     TRACE( "iface %p, operation %p\n", iface, result );
 
     //Arguments
-    if ( !path || WindowsIsStringEmpty( path ) ) return E_INVALIDARG;
+    if ( !path ) return E_INVALIDARG;
     if ( !result ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)path, storage_folder_AssignFolderAsync, iids, (IAsyncOperation_IInspectable **)result );

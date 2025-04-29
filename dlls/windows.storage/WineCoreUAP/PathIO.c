@@ -122,7 +122,7 @@ static HRESULT WINAPI path_io_statics_ReadTextAsync( IPathIOStatics *iface, HSTR
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
@@ -144,7 +144,7 @@ static HRESULT WINAPI path_io_statics_ReadTextWithEncodingAsync( IPathIOStatics 
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
@@ -166,7 +166,7 @@ static HRESULT WINAPI path_io_statics_WriteTextAsync( IPathIOStatics *iface, HST
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !absolutePath || !contents ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -189,7 +189,7 @@ static HRESULT WINAPI path_io_statics_WriteTextWithEncodingAsync( IPathIOStatics
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !absolutePath || !contents ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -213,7 +213,7 @@ static HRESULT WINAPI path_io_statics_AppendTextAsync( IPathIOStatics *iface, HS
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !absolutePath || !contents ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
@@ -235,7 +235,7 @@ static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatic
     TRACE( "iface %p, operation %p\n", iface, textOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !contents ) return E_INVALIDARG;
+    if ( !absolutePath || !contents ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
     write_text_options->encoding = encoding;
@@ -258,7 +258,7 @@ static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HST
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !linesOperation ) return E_POINTER;
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
@@ -280,7 +280,7 @@ static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics
     TRACE( "iface %p, operation %p\n", iface, linesOperation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !linesOperation ) return E_POINTER;
 
     read_text_options->encoding = encoding;
@@ -311,7 +311,7 @@ static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HS
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !absolutePath || !lines ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -394,7 +394,7 @@ static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatic
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !absolutePath || !lines ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -477,7 +477,7 @@ static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, H
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !absolutePath || !lines ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -560,7 +560,7 @@ static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStati
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !lines ) return E_INVALIDARG;
+    if ( !absolutePath || !lines ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
@@ -634,7 +634,7 @@ static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HS
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
@@ -651,7 +651,7 @@ static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, H
     TRACE( "iface %p, operation %p\n", iface, operation );
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !buffer ) return E_INVALIDARG;
+    if ( !absolutePath || !buffer ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     if (!(write_buffer_options = calloc( 1, sizeof(*write_buffer_options) ))) return E_OUTOFMEMORY;
@@ -675,7 +675,7 @@ static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HS
     if (!(write_bytes_options = calloc( 1, sizeof(*write_bytes_options) ))) return E_OUTOFMEMORY;
 
     //Arguments
-    if ( !absolutePath || WindowsIsStringEmpty( absolutePath ) || !buffer ) return E_INVALIDARG;
+    if ( !absolutePath || !buffer ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
     write_bytes_options->buffer = buffer;

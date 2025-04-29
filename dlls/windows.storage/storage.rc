@@ -1,0 +1,49 @@
+/*
+ * Windows.Storage resources and translations
+ *
+ * Written by Weather
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ *
+ */
+
+#include "resource.h"
+
+#pragma makedep po
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+STRINGTABLE
+BEGIN
+    IDS_FILENOTFOUND        "An item cannot be found at the specified path (%s)."
+    IDS_PATHISSHORT         "The specified path is too short. It must have at least 1 character."
+    IDS_INVALIDPATH         "The specified path (%s) contains one or more invalid characters."
+    IDS_PATHTOOLONG         "The specified path (%s) is too long. It exceeds the maximum length of %d."
+    IDS_PATHNOTALLOWED      "Access to the specified location (%s) requires a capability to be declared in the manifest."
+    IDS_TYPENOTALLOWED      "Access to the specified location (%s) requires a file type association to be declared in the application manifest."
+    IDS_NAMEISSHORT         "The specified name is too short. It must be at least 1 character."
+    IDS_NAMETOOLONG         "The specified name (%s) is too long."
+    IDS_INVALIDNAME         "The specified name (%s) contains one or more invalid characters."
+    IDS_NAMENOTFOUND        "An item cannot be found with the specified name (%s)."
+    IDS_ISNOTFOLDER         "The specified item is a file, and cannot be returned as a StorageFolder."
+    IDS_ISNOTFILE           "The specified item is a folder, and cannot be returned as a StorageFile."
+    IDS_SUBNOTALLOWED       "Subfolders cannot be created in this folder."
+    IDS_FILENOTALLOWED      "Cannot create items within this StorageFolder. This could be encountered if the folder was obtained by creating a query using grouping options."
+    IDS_NOPROVIDERACCESS    "The file cannot be opened because its provider has blocked access to it."
+    IDS_PROVIDERFAILED      "The file cannot be opened because its provider couldn't be reached. Please try again in a few minutes."
+    IDS_COLLISIONNOTALLOWED "This folder only supports a limited set of CreationCollisionOption values, including FailIfExists and GenerateUniqueName."
+END
+
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL

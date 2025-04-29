@@ -327,6 +327,8 @@ void test_DownloadsFolder( void )
     IStorageFile *storage_file = NULL;
     IAsyncOperation_StorageFile *storage_file_operation = NULL;
 
+    IAsyncAction *action = NULL;
+
     HRESULT hr;
     HSTRING tmpString;
 
@@ -338,7 +340,7 @@ void test_DownloadsFolder( void )
      * ABI::Windows::Storage::IDownloadsFolderStatics::CreateFileAsync
      */
     WindowsCreateString( L"TempDownloadFile.tmp", wcslen( L"TempDownloadFile.tmp" ), &tmpString );
-    hr = IDownloadsFolderStatics_CreateFileWithCollisionOptionAsync( downloads_folder_statics, tmpString, CreationCollisionOption_ReplaceExisting, &storage_file_operation );
+    hr = IDownloadsFolderStatics_CreateFileWithCollisionOptionAsync( downloads_folder_statics, tmpString, CreationCollisionOption_FailIfExists, &storage_file_operation );
     CHECK_HR( hr )
 
     asyncRes = await_IAsyncOperation_StorageFile( storage_file_operation, INFINITE );
@@ -351,6 +353,30 @@ void test_DownloadsFolder( void )
     CHECK_HR( hr );
 
     test_StorageItem( storage_item );
+
+    hr = IStorageItem_DeleteAsync( storage_item, StorageDeleteOption_Default, &action );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncAction( action, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+}
+
+/**
+ * ABI::Windows::Storage::KnownFolders
+ */
+void test_KnownFolders( void )
+{
+    static const WCHAR *known_folders_statics_name = L"Windows.Storage.KnownFolders";
+
+    IKnownFoldersStatics *known_folders_statics = NULL;
+
+    HRESULT hr;
+    HSTRING tmpString;
+
+    DWORD asyncRes;
+
+    ACTIVATE_INSTANCE( known_folders_statics_name, known_folders_statics, IID_IKnownFoldersStatics );
+
 }
 
 /**

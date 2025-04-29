@@ -22,6 +22,9 @@
 #ifndef STORAGE_ITEM_INTERNAL_H
 #define STORAGE_ITEM_INTERNAL_H
 
+#include "../private.h"
+#include "wine/debug.h"
+
 #include <windows.h>
 #include <knownfolders.h>
 #include <shlobj.h>
@@ -30,14 +33,9 @@
 #include <stdio.h>
 #include <combaseapi.h>
 
+#include "StorageProviderInternal.h"
 #include "StorageFolderInternal.h"
 #include "FileProperties/BasicPropertiesInternal.h"
-
-
-#include "../private.h"
-#include "wine/debug.h"
-
-#include "StorageProviderInternal.h"
 
 extern struct IStorageItemPropertiesVtbl storage_item_properties_vtbl;
 extern struct IStorageItemPropertiesWithProviderVtbl storage_item_properties_with_provider_vtbl;

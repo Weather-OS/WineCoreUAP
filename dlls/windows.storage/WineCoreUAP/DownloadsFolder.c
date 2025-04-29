@@ -179,6 +179,17 @@ static HRESULT WINAPI downloads_folder_statics_CreateFileWithCollisionOptionAsyn
     if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
+    // The examined behavior disallows any modifications to existing data in the downloads folder.
+    // Even though the client could query the folder using StorageFolder::GetFolderFromPathAsync() and bypass this,
+    // The behavior is different when using IDownloadsFolderStatics.
+    if ( option == CreationCollisionOption_ReplaceExisting || option == CreationCollisionOption_OpenIfExists )
+    {
+        hr = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( hr, GetResourceW( IDS_COLLISIONNOTALLOWED ) ) ) )
+            return E_UNEXPECTED;
+        return hr;
+    }
+
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )
     {
@@ -202,6 +213,17 @@ static HRESULT WINAPI downloads_folder_statics_CreateFolderWithCollisionOptionAs
     //Arguments
     if ( !desiredName || WindowsIsStringEmpty( desiredName ) ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
+
+    // The examined behavior disallows any modifications to existing data in the downloads folder.
+    // Even though the client could query the folder using StorageFolder::GetFolderFromPathAsync() and bypass this,
+    // The behavior is different when using IDownloadsFolderStatics.
+    if ( option == CreationCollisionOption_ReplaceExisting || option == CreationCollisionOption_OpenIfExists )
+    {
+        hr = E_INVALIDARG;
+        if ( FAILED( SetLastRestrictedErrorWithMessageW( hr, GetResourceW( IDS_COLLISIONNOTALLOWED ) ) ) )
+            return E_UNEXPECTED;
+        return hr;
+    }
 
     hr = downloads_folder_GetDownloadsFolder( &downloadsFolder );
     if ( SUCCEEDED ( hr ) )

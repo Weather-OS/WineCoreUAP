@@ -37,6 +37,12 @@
 #include "winstring.h"
 #include "shellapi.h"
 #include "roapi.h"
+#include "roerrorapi.h"
+#include "aclapi.h"
+#include "accctrl.h"
+#include "restrictederrorinfo.h"
+
+#include "resource.h"
 
 #include "activation.h"
 
@@ -105,6 +111,11 @@ extern IActivationFactory *storage_library_statics_factory;
 extern IActivationFactory *query_options_activatable_factory;
 extern IActivationFactory *random_access_stream_factory;
 extern IActivationFactory *random_access_stream_reference_factory;
+
+extern HRESULT SetLastRestrictedErrorWithMessageW( HRESULT status, LPCWSTR message );
+extern HRESULT SetLastRestrictedErrorWithMessageFormattedW( HRESULT status, LPCWSTR format, ... );
+extern LPCWSTR GetResourceW( INT resourceId );
+extern LPCSTR GetResourceA( INT resourceId );
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
