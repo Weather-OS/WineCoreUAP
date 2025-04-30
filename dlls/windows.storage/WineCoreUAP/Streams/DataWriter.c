@@ -816,6 +816,10 @@ static HRESULT WINAPI data_writer_Store( IUnknown *invoker, IUnknown *param, PRO
     hr = IAsyncOperationWithProgress_UINT32_UINT32_GetResults( operation, &bytesWritten );
     if ( FAILED( hr ) ) return hr;
 
+    IAsyncOperationWithProgress_UINT32_UINT32_Release( operation );
+
+    CHECK_LAST_RESTRICTED_ERROR();
+
     //Buffer is cleared after each store operation.
     //A new buffer is created afterwards.
     IBuffer_Release( impl->buffer );

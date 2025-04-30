@@ -291,7 +291,10 @@ HRESULT WINAPI storage_item_Rename( IUnknown *invoker, IUnknown *param, PROPVARI
 
         if ( !MoveFileW( WindowsGetStringRawBuffer( itemPath, NULL ), newItemPath ) )
         {
-            status = E_ABORT;
+            status = HRESULT_FROM_WIN32( GetLastError() );
+            if ( isFolder )
+                if ( FAILED( SetLastRestrictedErrorWithMessageFormattedW( status, GetResourceW( IDS_RENAMEDELNOTALLOWED ), WindowsGetStringRawBuffer( itemPath, NULL ) ) ) )
+                    return E_UNEXPECTED;
         }
 
         //The behavior calls for reassigning properties.

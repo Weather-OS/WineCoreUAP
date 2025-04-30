@@ -23,8 +23,6 @@
 
 _ENABLE_DEBUGGING_
 
-DEFINE_ASYNC_COMPLETED_HANDLER( random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
-
 static VOID GenerateUniqueFileName( LPWSTR buffer, SIZE_T bufferSize ) {
     UUID uuid;
     LPWSTR str;
@@ -92,7 +90,7 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile ** resul
     if ( SUCCEEDED( status ) )
     {
         memcpy( &file->IStorageItemProperties_iface, fileItemProperties, sizeof(struct storage_item_properties) );
-        status = random_access_stream_reference_CreateStreamReference( path, &file->IRandomAccessStreamReference_iface );
+        status = CreateRandomAccessStreamOnFile( WindowsGetStringRawBuffer( path, NULL ), FileAccessMode_Read, &IID_IRandomAccessStreamReference, (void **)&file->IRandomAccessStreamReference_iface );
     }
     
     if ( SUCCEEDED( status ) )
@@ -110,8 +108,6 @@ HRESULT WINAPI storage_file_AssignFile ( HSTRING filePath, IStorageFile ** resul
         if (pwsMimeOut != NULL)
         {
             WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->ContentType );
-            // For Stream Content Type.
-            WindowsCreateString( pwsMimeOut, wcslen( pwsMimeOut ), &file->streamContentType );
         }
 
         CoTaskMemFree( pwsMimeOut );
@@ -422,27 +418,23 @@ _CLEANUP:
 
 HRESULT WINAPI storage_file_Open ( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    DWORD asyncRes;
     HRESULT status = S_OK;
-
-    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IRandomAccessStream };
+    HSTRING filePath;
     
+    IStorageItem *fileItem = NULL;
     IRandomAccessStream *fileStream = NULL;
-    IRandomAccessStreamReference *fileStreamReference = NULL;
-    IAsyncOperation_IRandomAccessStream *random_access_stream_operation = NULL;
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
-    status = IStorageFile_QueryInterface( (IStorageFile *)invoker, &IID_IRandomAccessStreamReference, (void **)&fileStreamReference );
+    status = IStorageFile_QueryInterface( (IStorageFile *)invoker, &IID_IStorageItem, (void **)&fileItem );
     if ( FAILED( status ) ) return status;
 
-    status = async_operation_create( (IUnknown *)fileStreamReference, NULL, random_access_stream_reference_CreateStream, iids, (IAsyncOperation_IInspectable **)&random_access_stream_operation );
+    IStorageItem_get_Path( fileItem, &filePath );
+
+    status = CreateRandomAccessStreamOnFile( WindowsGetStringRawBuffer( filePath, NULL ), FileAccessMode_ReadWrite, &IID_IRandomAccessStream, (void **)&fileStream );
     if ( FAILED( status ) ) return status;
 
-    asyncRes = await_IAsyncOperation_IRandomAccessStream( random_access_stream_operation, INFINITE );
-    if ( asyncRes ) return E_ABORT;
-
-    status = IAsyncOperation_IRandomAccessStream_GetResults( random_access_stream_operation, &fileStream );
+    CHECK_LAST_RESTRICTED_ERROR();
 
     if ( SUCCEEDED( status ) )
     {

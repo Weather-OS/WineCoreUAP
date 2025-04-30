@@ -177,7 +177,7 @@ static HRESULT WINAPI storage_file_QueryInterface( IStorageFile *iface, REFIID i
 
     if (IsEqualGUID( iid, &IID_IRandomAccessStreamReference ))
     {
-        *out = &impl->IRandomAccessStreamReference_iface;
+        *out = impl->IRandomAccessStreamReference_iface;
         IInspectable_AddRef( *out );        
         return S_OK;
     }

@@ -231,6 +231,7 @@ HRESULT WINAPI known_folders_statics_GetKnownFolder( KnownFolderId folderId, ISt
     IStorageFolderStatics_Release( storageFolderStatics );
     if ( storageFolderOperation )
         IAsyncOperation_StorageFolder_Release( storageFolderOperation );
+    CHECK_LAST_RESTRICTED_ERROR();
     
     return status;
 }
@@ -255,31 +256,11 @@ HRESULT WINAPI known_folders_statics_GetKnownFolderAsync( IUnknown *invoker, IUn
 
 HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    IStorageItem *knownFolderItem = NULL;
     IStorageFolder *knownFolder = NULL;
 
-    HSTRING knownFolderPath;
     HRESULT status = S_OK;    
-    WCHAR title[MAX_BUFFER];
-    WCHAR message[MAX_BUFFER];
-    WCHAR manifestPath[MAX_PATH];
-    INT promptResult;
-
-    struct appx_package package;
 
     TRACE( "iface %p, value %p\n", invoker, result );
-
-    GetModuleFileNameW(NULL, manifestPath, MAX_PATH);
-    PathRemoveFileSpecW(manifestPath);
-    PathAppendW(manifestPath, L"AppxManifest.xml");
-
-    if ( !PathFileExistsW( manifestPath ) )
-        return APPX_E_MISSING_REQUIRED_FILE;
-
-    if ( !OK( registerAppxPackage( manifestPath, &package ) ) )
-    {
-        return APPX_E_INVALID_MANIFEST;
-    }
 
     status = known_folders_statics_GetKnownFolder ( (KnownFolderId)param, &knownFolder );
     if ( status == E_ACCESSDENIED )
@@ -287,46 +268,15 @@ HRESULT WINAPI known_folders_statics_RequestAccess( IUnknown *invoker, IUnknown 
         result->vt = VT_UI4;
         result->ulVal = (ULONG)KnownFoldersAccessStatus_NotDeclaredByApp;
         return status;
-    }
-
-    if ( SUCCEEDED( status ) )
+    } else if ( SUCCEEDED( status ) )
     {
-        if ( package.Package.Properties.DisplayName )
-        {
-            swprintf( title, MAX_BUFFER, L"Let %s access the following file location?", package.Package.Properties.DisplayName );
-        } else
-        {
-            swprintf( title, MAX_BUFFER, L"Let this app access the following file location?" );
-        }
-
-        IStorageFolder_QueryInterface( knownFolder, &IID_IStorageItem, (void **)&knownFolderItem );
-        IStorageItem_get_Path( knownFolderItem, &knownFolderPath );
-
-        swprintf( message, MAX_BUFFER, L"%s\n%s", title, WindowsGetStringRawBuffer( knownFolderPath, NULL ) );
-        
-        promptResult = MessageBoxW (
-            NULL,
-            message,
-            title,
-            MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2
-        );
-
         result->vt = VT_UI4;
-
-        switch ( promptResult )
-        {
-            case IDYES:
-                result->ulVal = (ULONG)KnownFoldersAccessStatus_Allowed;
-                break;
-                
-            case IDNO:
-                result->ulVal = (ULONG)KnownFoldersAccessStatus_DeniedByUser;
-                break;
-
-            default:
-                result->ulVal = (ULONG)KnownFoldersAccessStatus_AllowedPerAppFolder;
-                break;
-        }
+        result->ulVal = (ULONG)KnownFoldersAccessStatus_Allowed;
+        return status;
+    } else {
+        result->vt = VT_UI4;
+        result->ulVal = (ULONG)KnownFoldersAccessStatus_DeniedBySystem;
+        return status;
     }
 
     return status;

@@ -33,9 +33,15 @@
 #define WINSHLWAPI
 #include "shlwapi.h"
 
+#include "private.h"
+
+#include "WineCoreUAP/Storage/Streams/RandomAccessStreamReferenceInternal.h"
+
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(shcore);
+
+DEFINE_ASYNC_COMPLETED_HANDLER( random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
 
 static DWORD shcore_tls;
 static IUnknown *process_ref;
@@ -2551,3 +2557,78 @@ HRESULT WINAPI CreateRandomAccessStreamOverStream(IStream *stream, BSOS_OPTIONS 
     FIXME("(%p, %d, %s, %p) stub\n", stream, options, debugstr_guid(riid), ppv);
     return E_NOTIMPL;
 }
+
+/*************************************************************************
+ * CreateRandomAccessStreamOnFile        [SHCORE.@]
+ */
+HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD access_mode, REFIID riid, void **ppv)
+{
+    HRESULT hr;
+    HSTRING pathString;
+    DWORD asyncRes;
+
+    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IRandomAccessStream };
+    
+    IRandomAccessStream *fileStream = NULL;
+    IRandomAccessStreamReference *fileStreamReference = NULL;
+    IAsyncOperation_IRandomAccessStream *random_access_stream_operation = NULL;
+
+    WindowsCreateString( filePath, wcslen( filePath ), &pathString );
+
+    hr = random_access_stream_reference_CreateStreamReference( pathString, access_mode, &fileStreamReference );
+    if ( FAILED( hr ) )
+    {
+        WindowsDeleteString( pathString );
+        return hr;
+    }
+
+    if ( IsEqualGUID( riid, &IID_IRandomAccessStreamReference ) )
+    {
+        *ppv = fileStreamReference;
+        IInspectable_AddRef( *ppv );
+    }
+    else
+    {
+        hr = async_operation_create( (IUnknown *)fileStreamReference, NULL, random_access_stream_reference_CreateStream, iids, (IAsyncOperation_IInspectable **)&random_access_stream_operation );
+        if ( FAILED( hr ) ) return hr;
+    
+        asyncRes = await_IAsyncOperation_IRandomAccessStream( random_access_stream_operation, INFINITE );
+        if ( asyncRes ) return E_ABORT;
+    
+        hr = IAsyncOperation_IRandomAccessStream_GetResults( random_access_stream_operation, &fileStream );
+        if ( FAILED( hr ) ) return hr;
+    
+        IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+
+        return IRandomAccessStream_QueryInterface( fileStream, riid, ppv );
+    }
+
+    return hr;
+}
+ 
+/*************************************************************************
+ * DllGetActivationFactory        [SHCORE.@]
+ */
+HRESULT WINAPI DllGetActivationFactory( HSTRING classid, IActivationFactory **factory )
+{
+    const WCHAR *buffer = WindowsGetStringRawBuffer( classid, NULL );
+
+    TRACE( "class %s, factory %p.\n", debugstr_hstring( classid ), factory );
+
+    *factory = NULL;
+
+    /**
+     * Windows.Storage.Streams
+    */
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_RandomAccessStream ))
+        //(@shcore.dll)
+        IActivationFactory_QueryInterface( random_access_stream_factory, &IID_IActivationFactory, (void **)factory );
+
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_RandomAccessStreamReference ))
+        //(@shcore.dll)
+        IActivationFactory_QueryInterface( random_access_stream_reference_factory, &IID_IActivationFactory, (void **)factory );
+
+    if (*factory) return S_OK;
+    return CLASS_E_CLASSNOTAVAILABLE;
+}
+

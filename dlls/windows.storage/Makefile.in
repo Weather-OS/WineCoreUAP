@@ -1,5 +1,5 @@
 MODULE  = windows.storage.dll
-IMPORTS = $(APPX_PE_LIBS) $(XML2_PE_LIBS) shell32 user32 propsys combase ole32 advapi32 shlwapi rpcrt4 urlmon
+IMPORTS = $(APPX_PE_LIBS) $(XML2_PE_LIBS) shell32 user32 propsys combase ole32 advapi32 shlwapi rpcrt4 urlmon shcore
 EXTRAINCL = $(APPX_PE_CFLAGS) $(XML2_PE_CFLAGS)
 DELAYIMPORTS = oleaut32
 
@@ -54,15 +54,8 @@ SOURCES = \
 	WineCoreUAP/Streams/Buffer.c \
 	WineCoreUAP/Streams/BufferByteAccess.c \
 	WineCoreUAP/Streams/BufferInternal.c \
-	WineCoreUAP/Streams/ContentTypeProvider.c \
 	WineCoreUAP/Streams/DataReader.c \
 	WineCoreUAP/Streams/DataWriter.c \
-	WineCoreUAP/Streams/InputOutputStream.c \
-	WineCoreUAP/Streams/InputOutputStreamInternal.c \
-	WineCoreUAP/Streams/RandomAccessStream.c \
-	WineCoreUAP/Streams/RandomAccessStreamInternal.c \
-	WineCoreUAP/Streams/RandomAccessStreamReference.c \
-	WineCoreUAP/Streams/RandomAccessStreamReferenceInternal.c \
 	\
 	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
 	\

@@ -31,6 +31,7 @@
 #include "winstring.h"
 #include "shlwapi.h"
 #include "shlobj.h"
+#include "roerrorapi.h"
 
 #include "roapi.h"
 
@@ -150,6 +151,20 @@ void check_interface_( unsigned int line, void *obj, const IID *iid );
 
 #define stubbed_interface( obj, iid ) stubbed_interface_( __LINE__, obj, iid )
 void stubbed_interface_( unsigned int line, void *obj, const IID *iid );
+
+#define CHECK_LAST_RESTRICTED_ERROR()                                                                   \
+    {                                                                                                   \
+        BSTR _error_desc;                                                                               \
+        HRESULT _hr;                                                                                    \
+        IRestrictedErrorInfo *_restricted_error = NULL;                                                 \
+        _hr = GetRestrictedErrorInfo( &_restricted_error );                                             \
+        if ( _hr != S_FALSE )                                                                           \
+        {                                                                                               \
+            IRestrictedErrorInfo_GetErrorDetails( _restricted_error, &_error_desc, &_hr, NULL, NULL );  \
+            trace( "got hr %#lx, message: %s\n", _hr, debugstr_w(_error_desc) );                        \
+            IRestrictedErrorInfo_Release( _restricted_error );                                          \
+        }                                                                                               \
+    }
 
 #define CHECK_HR( hr )                      \
     ok( hr == S_OK, "got hr %#lx.\n", hr ); \

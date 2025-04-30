@@ -22,7 +22,7 @@
 #ifndef CONTENT_TYPE_PROVIDER_INTERNAL_H
 #define CONTENT_TYPE_PROVIDER_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "wine/debug.h"
  
 struct content_type_provider 

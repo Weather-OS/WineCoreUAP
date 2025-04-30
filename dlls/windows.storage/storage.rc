@@ -44,6 +44,7 @@ BEGIN
     IDS_NOPROVIDERACCESS    "The file cannot be opened because its provider has blocked access to it."
     IDS_PROVIDERFAILED      "The file cannot be opened because its provider couldn't be reached. Please try again in a few minutes."
     IDS_COLLISIONNOTALLOWED "This folder only supports a limited set of CreationCollisionOption values, including FailIfExists and GenerateUniqueName."
+    IDS_RENAMEDELNOTALLOWED "Cannot delete or rename the specified folder (%s). If the folder was acquired using the File Picker or the KnownFolders API, it cannot be deleted or renamed. Additionally, the folder cannot be deleted if it resides in a filtered location, such as the Documents library or removable devices."
 END
 
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL

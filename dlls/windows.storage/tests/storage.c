@@ -24,7 +24,9 @@
 
 DEFINE_ASYNC_COMPLETED_HANDLER( async_uint_handler, IAsyncOperationCompletedHandler_UINT32, IAsyncOperation_UINT32 )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_boolean_handler, IAsyncOperationCompletedHandler_boolean, IAsyncOperation_boolean )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_known_folders_access_status, IAsyncOperationCompletedHandler_KnownFoldersAccessStatus, IAsyncOperation_KnownFoldersAccessStatus )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_uint_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_UINT32_UINT32, IAsyncOperationWithProgress_UINT32_UINT32 )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_long_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_UINT64_UINT64, IAsyncOperationWithProgress_UINT64_UINT64 )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_buffer_with_progress_handler, IAsyncOperationWithProgressCompletedHandler_IBuffer_UINT32, IAsyncOperationWithProgress_IBuffer_UINT32 )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
@@ -35,7 +37,7 @@ DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_vector_view_handler, IAsync
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_StorageFile, IAsyncOperation_IVectorView_StorageFile )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_item_handler, IAsyncOperationCompletedHandler_IStorageItem, IAsyncOperation_IStorageItem )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_item_vector_view_handler, IAsyncOperationCompletedHandler_IVectorView_IStorageItem, IAsyncOperation_IVectorView_IStorageItem )
-DEFINE_ASYNC_COMPLETED_HANDLER( async_action_handler, IAsyncActionCompletedHandler, IAsyncAction );
+DEFINE_ASYNC_COMPLETED_HANDLER( async_action_handler, IAsyncActionCompletedHandler, IAsyncAction )
 
 void check_interface_( unsigned int line, void *obj, const IID *iid )
 {
@@ -177,16 +179,23 @@ void test_StorageItem( IStorageItem *item )
     asyncRes = await_IAsyncAction( action, INFINITE );
     ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
 
-    hr = IStorageItem_get_Name( item, &secondName );
-    CHECK_HR( hr );
-    WindowsCompareStringOrdinal( secondName, origName, &compResult );
-    ok( compResult, "the string rename is the same as origName! compResult %d\n", compResult );
+    hr = IAsyncAction_GetResults( action );
+    CHECK_LAST_RESTRICTED_ERROR();
 
-    hr = IStorageItem_RenameAsync( item, origName, NameCollisionOption_ReplaceExisting, &action );
-    CHECK_HR( hr );
+    // Known folders are not allowed to be renamed or deleted.
+    if ( hr != E_ACCESSDENIED )
+    {
+        hr = IStorageItem_get_Name( item, &secondName );
+        CHECK_HR( hr );
+        WindowsCompareStringOrdinal( secondName, origName, &compResult );
+        ok( compResult, "the string rename is the same as origName! compResult %d\n", compResult );
 
-    asyncRes = await_IAsyncAction( action, INFINITE );
-    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+        hr = IStorageItem_RenameAsync( item, origName, NameCollisionOption_ReplaceExisting, &action );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncAction( action, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+    }
 
     /**
      * ABI::Windows::Storage::IStorageItem::GetBasicPropertiesAsync
@@ -369,14 +378,44 @@ void test_KnownFolders( void )
     static const WCHAR *known_folders_statics_name = L"Windows.Storage.KnownFolders";
 
     IKnownFoldersStatics *known_folders_statics = NULL;
+    IKnownFoldersStatics4 *known_folders_statics4 = NULL;    
+    KnownFoldersAccessStatus access_status;
+    IAsyncOperation_KnownFoldersAccessStatus *access_status_operation = NULL;
+
+    IStorageItem *storage_item = NULL;
+
+    IStorageFolder *storage_folder = NULL;
 
     HRESULT hr;
-    HSTRING tmpString;
 
     DWORD asyncRes;
 
     ACTIVATE_INSTANCE( known_folders_statics_name, known_folders_statics, IID_IKnownFoldersStatics );
+    ACTIVATE_INSTANCE( known_folders_statics_name, known_folders_statics4, IID_IKnownFoldersStatics4 );
 
+    /**
+     * ABI::Windows::Storage::IKnownFoldersStatics::DocumentsLibrary
+     */
+    hr = IKnownFoldersStatics_get_DocumentsLibrary( known_folders_statics, &storage_folder );
+    CHECK_HR( hr );
+
+    hr = IStorageFolder_QueryInterface( storage_folder, &IID_IStorageItem, (void **)&storage_item );
+    CHECK_HR( hr );
+    test_StorageItem( storage_item );
+
+    /**
+     * ABI::Windows::Storage::IKnownFoldersStatics4::RequestAccessAsync
+     */
+    hr = IKnownFoldersStatics4_RequestAccessAsync( known_folders_statics4, KnownFolderId_DownloadsFolder, &access_status_operation );
+    CHECK_HR( hr );
+
+    asyncRes = await_IAsyncOperation_KnownFoldersAccessStatus( access_status_operation, INFINITE );
+    ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+    hr = IAsyncOperation_KnownFoldersAccessStatus_GetResults( access_status_operation, &access_status );
+    CHECK_HR( hr );
+
+    trace( "Returned Windows::Storage::IKnownFoldersStatics4::RequestAccessAsync is %d\n", access_status );
 }
 
 /**
@@ -400,10 +439,12 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     IOutputStream *output_stream = NULL;
     IInputStream *input_stream = NULL;
     IRandomAccessStream *cloned_stream = NULL;
+    IRandomAccessStreamStatics *stream_statics = NULL;
 
     IAsyncOperation_UINT32 *unit_operation = NULL;
     IAsyncOperation_boolean *boolean_operation = NULL;
     IAsyncOperationWithProgress_UINT32_UINT32 *uint_operation_with_progress = NULL;
+    IAsyncOperationWithProgress_UINT64_UINT64 *long_operation_with_progress = NULL;
     IAsyncOperationWithProgress_IBuffer_UINT32 *buffer_operation_with_progress = NULL;
 
     HSTRING tmpString;
@@ -413,7 +454,7 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     DWORD asyncRes;
     UINT64 position;
     UINT64 size;
-    UINT32 code_unit_count;
+    UINT32 code_unit_count;    
     HRESULT hr = S_OK;
     BOOLEAN canRead = FALSE;
     BOOLEAN canWrite = FALSE;
@@ -422,6 +463,7 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, data_reader_factory, IID_IDataReaderFactory );
     ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, data_reader_statics, IID_IDataReaderStatics );
     ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_Buffer, buffer_factory, IID_IBufferFactory );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_RandomAccessStream, stream_statics, IID_IRandomAccessStreamStatics );
 
     /**
      * ABI::Windows::Storage::Streams::IRandomAccessStream
@@ -596,6 +638,47 @@ void test_Streams_RandomAccessStream( IRandomAccessStream *stream )
     WindowsCompareStringOrdinal( tmpString, checkString, &comparisonResult );
     ok ( !comparisonResult, "the 2 compared strings do not match!\n" ); 
 }
+    
+    /**
+     * ABI::Windows::Storage::Streams::IRandomAccessStreamStatics::CopyAsync
+     */
+
+    //A fun test to see if the file can write to itself.
+    if ( canWrite )
+    {
+        hr = IRandomAccessStream_GetInputStreamAt( stream, 0, &input_stream );
+        CHECK_HR( hr );
+
+        hr = IRandomAccessStream_GetOutputStreamAt( stream, 0, &output_stream );
+        CHECK_HR( hr );
+
+        hr = IRandomAccessStreamStatics_CopyAsync( stream_statics, input_stream, output_stream, &long_operation_with_progress );
+        CHECK_HR( hr );
+
+        asyncRes = await_IAsyncOperationWithProgress_UINT64_UINT64( long_operation_with_progress, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+
+        hr = IRandomAccessStream_GetInputStreamAt( stream, 0, &input_stream );
+        CHECK_HR( hr );
+
+        hr = IDataReaderFactory_CreateDataReader( data_reader_factory, input_stream, &data_reader );
+        CHECK_HR( hr );
+    
+        IRandomAccessStream_get_Size( stream, &size );
+        
+        hr = IDataReader_LoadAsync( data_reader, size, &unit_operation );
+        CHECK_HR( hr );
+    
+        asyncRes = await_IAsyncOperation_UINT32( unit_operation, INFINITE );
+        ok( !asyncRes, "got asyncRes %#lx\n", asyncRes );
+    
+        hr = IDataReader_ReadString( data_reader, size, &tmpString );
+        CHECK_HR( hr );
+    
+        WindowsCreateString( L"Hello, World!\nGoodbye, World!\n", wcslen( L"Hello, World!\nGoodbye, World!\n" ), &checkString );
+        WindowsCompareStringOrdinal( tmpString, checkString, &comparisonResult );
+        ok ( !comparisonResult, "the 2 compared strings do not match!\nFirst string was %s, second string was %s\n", debugstr_hstring( tmpString ), debugstr_hstring( checkString ) ); 
+    }
 
     /**
      * ABI::Windows::Foundation::IClosable
@@ -1264,11 +1347,12 @@ START_TEST(storage)
     else
     {
         test_AppDataPathsStatics( &apppath );
+        test_KnownFolders();
     }
     
     test_StorageFolder( apppath, &returnedItem, &returnedFile, &returnedFolder );
-    test_DownloadsFolder();
     test_StorageFile( apppath, returnedFolder );
+    test_DownloadsFolder();
 
     RoUninitialize();
 }

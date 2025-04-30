@@ -22,7 +22,7 @@
 #ifndef INPUT_OUTPUT_STREAM_INTERNAL_H
 #define INPUT_OUTPUT_STREAM_INTERNAL_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "provider.h"
 
 #include "wine/debug.h"
@@ -53,6 +53,7 @@ struct input_stream
         LONG closableRef;
 
     UINT64 *headPosition;
+    UINT64 updatePos; // Workaround for when the client uses both streams at the same time
 
     LONG ref;
 };
@@ -68,6 +69,7 @@ struct output_stream
         LONG closableRef;
 
     UINT64 *headPosition;
+    UINT64 updatePos; // Workaround for when the client uses both streams at the same time
 
     IAsyncOperationWithProgress_UINT32_UINT32 *currentOperation; //Flushing purposes
     

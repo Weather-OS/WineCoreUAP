@@ -46,6 +46,7 @@ HRESULT WINAPI storage_folder_query_operations_FetchFileQuery( IStorageFolderQue
     fileQueryResult->searchType = StorageItemTypes_File;
     if ( inheritedFolder->IStorageFolder_iface.lpVtbl != &storage_folder_vtbl )
     {
+        free( fileQueryResult );
         return E_ABORT;
     } 
     fileQueryResult->Folder = &inheritedFolder->IStorageFolder_iface;
@@ -72,6 +73,7 @@ HRESULT WINAPI storage_folder_query_operations_FetchFolderQuery( IStorageFolderQ
     folderQueryResult->searchType = StorageItemTypes_Folder;
     if ( inheritedFolder->IStorageFolder_iface.lpVtbl != &storage_folder_vtbl )
     {
+        free( folderQueryResult );
         return E_ABORT;
     } 
     folderQueryResult->Folder = &inheritedFolder->IStorageFolder_iface;
@@ -98,6 +100,7 @@ HRESULT WINAPI storage_folder_query_operations_FetchItemQuery( IStorageFolderQue
     itemQueryResult->searchType = StorageItemTypes_None;
     if ( inheritedFolder->IStorageFolder_iface.lpVtbl != &storage_folder_vtbl )
     {
+        free( itemQueryResult );
         return E_ABORT;
     } 
     itemQueryResult->Folder = &inheritedFolder->IStorageFolder_iface;

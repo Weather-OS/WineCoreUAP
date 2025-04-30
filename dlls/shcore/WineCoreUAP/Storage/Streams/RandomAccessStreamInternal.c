@@ -54,7 +54,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         if( FAILED( status ) ) goto _FAIL;
 
         asyncResult = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_uint32_async_with_progress_operation, INFINITE );
-        if ( !asyncResult ) goto _FAIL;
+        if ( asyncResult ) goto _FAIL;
 
         status = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_uint32_async_with_progress_operation, &readBuffer );
         if( FAILED( status ) ) goto _FAIL;
@@ -69,7 +69,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
             if( FAILED( status ) ) goto _FAIL;
 
             asyncResult = await_IAsyncOperationWithProgress_IBuffer_UINT32( buffer_uint32_async_with_progress_operation, INFINITE );
-            if ( !asyncResult ) goto _FAIL;
+            if ( asyncResult ) goto _FAIL;
 
             status = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( buffer_uint32_async_with_progress_operation, &segmentBuffer );
             if( FAILED( status ) ) goto _FAIL;
@@ -79,7 +79,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
             if ( bytesReadInSegment == 0 ) break;
 
             status = IBuffer_QueryInterface( segmentBuffer, &IID_IBufferByteAccess, (void **)&segmentBufferByteAccess );
-            if( FAILED( status ) ) goto _FAIL;;
+            if( FAILED( status ) ) goto _FAIL;
 
             IBufferByteAccess_get_Buffer( segmentBufferByteAccess, &tmpByteBuffer );
 
@@ -107,5 +107,6 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         IBuffer_Release( segmentBuffer );
         CoTaskMemFree( tmpByteBuffer );
         CoTaskMemFree( byteBuffer );
+        CHECK_LAST_RESTRICTED_ERROR();
         return status;
 }

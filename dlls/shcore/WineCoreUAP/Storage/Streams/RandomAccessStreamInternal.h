@@ -22,7 +22,7 @@
 #ifndef RANDOM_ACCESS_STREAM_INTERNAL_H
 #define RANDOM_ACCESS_STREAM_INTERNAL_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "provider.h"
 
 #include "wine/debug.h"

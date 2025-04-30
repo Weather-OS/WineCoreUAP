@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage Implementation
+/* shcore WinRT implementations
  *
  * Written by Weather
  *
@@ -19,19 +19,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-/**
- * Developer notes: Do not waste your time coding asynchronous tasks for node updates.
- * These are almost never used in a WinRT setting, These include, but are not limited to:
- *  - IStorageQueryResultBase::ContentsChanged
- *  - IStorageFolder::ContentsChanged
- */
-
-#ifndef __WINE_WINDOWS_STORAGE_PRIVATE_H
-#define __WINE_WINDOWS_STORAGE_PRIVATE_H
-
-#include <stdarg.h>
+#ifndef __WINE_SHCORE_WINDOWS_STORAGE_PRIVATE_H
+#define __WINE_SHCORE_WINDOWS_STORAGE_PRIVATE_H
 
 #define COBJMACROS
+#include "stdarg.h"
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
@@ -41,8 +33,6 @@
 #include "aclapi.h"
 #include "accctrl.h"
 #include "restrictederrorinfo.h"
-
-#include "resource.h"
 
 #include "activation.h"
 
@@ -64,62 +54,19 @@
 
 #include "provider.h"
 
-#define WINDOWS_TICK 10000000
-#define SEC_TO_UNIX_EPOCH 11644473600LL
-
 #define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_storage);
-
-struct vector_iids
-{
-    const GUID *observableVector;
-    const GUID *vector;
-    const GUID *view;
-    const GUID *iterable;
-    const GUID *iterator;
-};
-
-struct map_iids
-{
-    const GUID *observableMap;
-    const GUID *map;
-    const GUID *view;
-    const GUID *iterable;
-    const GUID *iterator;
-};
 
 struct async_operation_iids
 {
     const GUID *operation;
 };
 
-extern IActivationFactory *app_data_paths_factory;
-extern IActivationFactory *user_data_paths_factory;
-extern IActivationFactory *storage_folder_factory;
-extern IActivationFactory *storage_file_factory;
-extern IActivationFactory *known_folders_factory;
-extern IActivationFactory *basic_properties_factory;
-extern IActivationFactory *storage_item_content_properties_factory;
-extern IActivationFactory *downloads_folder_factory;
-extern IActivationFactory *file_io_factory;
-extern IActivationFactory *path_io_factory;
-extern IActivationFactory *buffer_factory;
-extern IActivationFactory *system_properties_factory;
-extern IActivationFactory *system_data_paths_factory;
-extern IActivationFactory *data_reader_factory;
-extern IActivationFactory *data_writer_factory;
-extern IActivationFactory *storage_library_statics_factory;
-extern IActivationFactory *query_options_activatable_factory;
-
-extern HRESULT SetLastRestrictedErrorWithMessageW( HRESULT status, LPCWSTR message );
-extern HRESULT SetLastRestrictedErrorWithMessageFormattedW( HRESULT status, LPCWSTR format, ... );
-extern LPCWSTR GetResourceW( INT resourceId );
-extern LPCSTR GetResourceA( INT resourceId );
+extern IActivationFactory *random_access_stream_factory;
+extern IActivationFactory *random_access_stream_reference_factory;
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 typedef HRESULT (WINAPI *async_operation_with_progress_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress );
-
-typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );
 
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
@@ -135,36 +82,8 @@ extern HRESULT async_operation_with_progress_uint32_create( IUnknown *invoker, I
                                               IAsyncOperationWithProgress_UINT32_UINT32 **out );
 extern HRESULT async_operation_with_progress_uint64_create( IUnknown *invoker, IUnknown *param, async_operation_with_progress_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperationWithProgress_UINT64_UINT64 **out );
-extern HRESULT async_operation_hstring_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_HSTRING **out );
-extern HRESULT async_action_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
-                                              IAsyncAction **ret);
 extern HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
                                               IAsyncOperation_UINT32 **out );
-extern HRESULT async_operation_indexed_state_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_IndexedState **out );
-extern HRESULT vector_create( const struct vector_iids *iids, void **out );
-
-extern HRESULT observable_vector_create( const struct vector_iids *iids, void **out );
-
-extern HRESULT hstring_vector_create( IVector_HSTRING **out );
-
-extern HRESULT hstring_map_create( const struct map_iids *iids, void **out );
-
-extern HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out );
-
-extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
-
-extern HRESULT property_set_create( const struct map_iids *iids, IPropertySet **out );
-
-extern HRESULT async_operation_basic_properties_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
-                                              IAsyncOperation_BasicProperties **out );
-
-#define DEFINE_VECTOR_IIDS( interface ) \
-    struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };
-
-#define DEFINE_HSTRING_MAP_IIDS( interface ) \
-    struct map_iids interface##_iids = {.iterable = &IID_IIterable_IKeyValuePair_HSTRING_##interface, .iterator = &IID_IIterator_IKeyValuePair_HSTRING_##interface, .map = &IID_IMap_HSTRING_##interface, .view = &IID_IMapView_HSTRING_##interface, .observableMap = &IID_IObservableMap_HSTRING_##interface };
 
 #define DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )                 \
     static inline impl_type *impl_from( iface_type *iface )                                        \

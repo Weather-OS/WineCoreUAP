@@ -24,11 +24,13 @@
 
 _ENABLE_DEBUGGING_
 
-HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, IRandomAccessStreamReference *value )
+HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, FileAccessMode accessMode, IRandomAccessStreamReference **value )
 {
     HANDLE stream;
 
-    struct random_access_stream_reference *reference = impl_from_IRandomAccessStreamReference( value );
+    struct random_access_stream_reference *reference;
+
+    if (!(reference = calloc( 1, sizeof(*reference) ))) return E_OUTOFMEMORY;
 
     reference->IRandomAccessStreamReference_iface.lpVtbl = &random_access_stream_reference_vtbl;
 
@@ -41,18 +43,20 @@ HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING pat
     CloseHandle(stream);
 
     // Check writability
-    stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-    if ( stream != INVALID_HANDLE_VALUE ) {
-        reference->canWrite = TRUE;
+    if ( accessMode == FileAccessMode_ReadWrite )
+    {
+        stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+        if ( stream != INVALID_HANDLE_VALUE ) {
+            reference->canWrite = TRUE;
+        }
+        CloseHandle(stream);
     }
-    CloseHandle(stream);
-
-    // Content Type
-    
 
     reference->ref = 1;
 
     WindowsDuplicateString( path, &reference->handlePath );
+
+    *value = &reference->IRandomAccessStreamReference_iface;
     
     return S_OK;
 }

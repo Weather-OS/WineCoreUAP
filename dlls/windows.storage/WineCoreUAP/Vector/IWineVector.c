@@ -1,4 +1,4 @@
-/* WinRT Windows.Gaming.Input implementation
+/* WinRT IWineVector implementation
  *
  * Copyright 2021 Rémi Bernon for CodeWeavers
  *

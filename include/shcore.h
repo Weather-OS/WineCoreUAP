@@ -28,5 +28,6 @@ typedef enum BSOS_OPTIONS
 } BSOS_OPTIONS;
 
 HRESULT WINAPI CreateRandomAccessStreamOverStream(IStream *stream, BSOS_OPTIONS options, REFIID riid, void **ppv);
+HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD accessMode, REFIID riid, void **ppv);
 
 #endif

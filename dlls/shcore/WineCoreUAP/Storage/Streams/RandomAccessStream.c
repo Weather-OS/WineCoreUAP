@@ -417,6 +417,7 @@ static HRESULT WINAPI random_access_stream_GetInputStreamAt( IRandomAccessStream
         input->stream = impl->stream;
         input->closableRef = 1;
         input->ref = 1;
+        input->updatePos = position;
 
         impl->Position = position;
 
@@ -451,6 +452,7 @@ static HRESULT WINAPI random_access_stream_GetOutputStreamAt( IRandomAccessStrea
         output->closableRef = 1;
         output->ref = 1;
         output->currentOperation = NULL;
+        output->updatePos = position;
 
         impl->Position = position;
 

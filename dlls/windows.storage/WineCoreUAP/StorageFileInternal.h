@@ -24,7 +24,6 @@
 
 #include "StorageFolderInternal.h"
 #include "StorageItemInternal.h"
-#include "Streams/RandomAccessStreamReferenceInternal.h"
 
 #include "../private.h"
 #include "wine/debug.h"
@@ -62,14 +61,7 @@ struct storage_file
         HSTRING FolderRelativeId;
         LONG IStorageItemPropertiesRef;
 
-    //IRandomAccessStreamReference Derivatives
-    IRandomAccessStreamReference IRandomAccessStreamReference_iface;
-        BOOLEAN canRead;
-        BOOLEAN canWrite;
-        HSTRING handlePath;
-        HSTRING streamContentType;
-        UINT64 streamSize;
-        LONG IRandomAccessStreamRef;
+    IRandomAccessStreamReference *IRandomAccessStreamReference_iface;
 
     LONG ref;
 };

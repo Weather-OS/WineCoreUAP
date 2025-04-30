@@ -350,10 +350,10 @@ static ULONG WINAPI restricted_errorinfo_Release(IRestrictedErrorInfo *iface)
 static HRESULT WINAPI restricted_errorinfo_GetErrorDetails(IRestrictedErrorInfo *iface, BSTR *description, HRESULT *error, BSTR *restrictedDescription, BSTR *capabilitySid)
 {
     struct error_info *error_info = impl_from_IRestrictedErrorInfo_iface(iface);
-    *description = SysAllocString(error_info->description);
-    *restrictedDescription = SysAllocString(error_info->restricted_description);
-    *capabilitySid = SysAllocString(error_info->capability_sid);
-    *error = error_info->hresult_error;
+    if( description ) *description = SysAllocString(error_info->description);
+    if( restrictedDescription ) *restrictedDescription = SysAllocString(error_info->restricted_description);
+    if( capabilitySid ) *capabilitySid = SysAllocString(error_info->capability_sid);
+    if( error ) *error = error_info->hresult_error;
     return S_OK;
 }
 

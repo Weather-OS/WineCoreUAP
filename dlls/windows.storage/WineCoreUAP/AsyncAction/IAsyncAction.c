@@ -119,7 +119,13 @@ static HRESULT WINAPI async_action_get_Completed(IAsyncAction *iface, IAsyncActi
 static HRESULT WINAPI async_action_GetResults(IAsyncAction *iface)
 {
     //IAsyncAction does not return anything upon completion
-    return S_OK;
+    struct async_action *impl = impl_from_IAsyncAction( iface );
+    PROPVARIANT result = {.vt = VT_NULL};
+    HRESULT hr;
+
+    hr = IWineAsyncInfoImpl_get_Result( impl->IWineAsyncInfoImpl_inner, &result );
+
+    return hr;
 }
 
 static const IAsyncActionVtbl async_action_vtbl =

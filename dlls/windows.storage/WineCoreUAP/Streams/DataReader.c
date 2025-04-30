@@ -881,6 +881,10 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
     hr = IAsyncOperationWithProgress_IBuffer_UINT32_GetResults( operation, &returnedBuffer );
     if ( FAILED(hr) ) return hr;
 
+    IAsyncOperationWithProgress_IBuffer_UINT32_Release( operation );
+
+    CHECK_LAST_RESTRICTED_ERROR();
+
     impl->buffer = returnedBuffer;
     hr = IBuffer_get_Length( returnedBuffer, &impl->UnconsumedBufferLength );
 

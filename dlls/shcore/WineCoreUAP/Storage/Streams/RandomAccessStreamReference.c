@@ -115,9 +115,9 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
 {
     HRESULT hr;
     HSTRING path;
-    IStorageItem *item;
 
-    struct random_access_stream_reference *reference;
+    IStorageItem *item;
+    IRandomAccessStreamReference *reference = NULL;
 
     TRACE( "iface %p, file %p, stream_reference %p.\n", iface, file, stream_reference );
 
@@ -125,15 +125,13 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
     if ( !file ) return E_INVALIDARG;
     if ( !stream_reference ) return E_POINTER;
 
-    if (!(reference = calloc( 1, sizeof(*reference) ))) return E_OUTOFMEMORY;
-
     hr = IStorageFile_QueryInterface( file, &IID_IStorageItem, (void **)&item );
     if ( FAILED( hr ) ) return hr;
 
     IStorageItem_get_Path( item, &path );
 
-    hr = random_access_stream_reference_CreateStreamReference( path, &reference->IRandomAccessStreamReference_iface );
-    *stream_reference = &reference->IRandomAccessStreamReference_iface;
+    hr = random_access_stream_reference_CreateStreamReference( path, FileAccessMode_ReadWrite, &reference );
+    *stream_reference = reference;
 
     return hr;
 }

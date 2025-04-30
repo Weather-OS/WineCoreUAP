@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <combaseapi.h>
+#include <shcore.h>
 
 #include "StorageProviderInternal.h"
 #include "StorageFolderInternal.h"

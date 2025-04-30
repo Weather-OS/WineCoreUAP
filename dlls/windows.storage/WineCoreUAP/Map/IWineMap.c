@@ -1,6 +1,6 @@
-/* WinRT Windows.Gaming.Input implementation
+/* WinRT IWineMap implementation
  *
- * Copyright 2021 Rémi Bernon for CodeWeavers
+ * Written by Weather
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

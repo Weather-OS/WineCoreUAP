@@ -22,7 +22,7 @@
 #ifndef RANDOM_ACCESS_STREAM_REFERENCE_INTERNAL_H
 #define RANDOM_ACCESS_STREAM_REFERENCE_INTERNAL_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "provider.h"
 
 #include "wine/debug.h"
@@ -33,6 +33,9 @@ extern const struct IRandomAccessStreamWithContentTypeVtbl random_access_stream_
 extern const struct IRandomAccessStreamReferenceVtbl random_access_stream_reference_vtbl;
 extern const struct IClosableVtbl closable_random_access_stream_vtbl;
 extern const struct IContentTypeProviderVtbl content_type_provider_vtbl;
+
+//it's easier to import this through extern.
+extern HRESULT WINAPI SHCreateStreamOnFileEx(const WCHAR *path, DWORD mode, DWORD attributes, BOOL create, IStream *template, IStream **ret);
 
 struct random_access_stream_reference_statics
 {
@@ -57,7 +60,7 @@ struct random_access_stream_reference
 struct random_access_stream_reference *impl_from_IRandomAccessStreamReference( IRandomAccessStreamReference *iface );
 
 HRESULT WINAPI random_access_stream_reference_CreateStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
-HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, IRandomAccessStreamReference *value );
+HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING path, FileAccessMode accessMode, IRandomAccessStreamReference **value );
 HRESULT WINAPI random_access_stream_reference_CreateReadOnlyStream( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 #endif

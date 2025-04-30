@@ -142,7 +142,8 @@ HRESULT WINAPI query_result_base_SearchCountAsync( IUnknown *invoker, IUnknown *
     {
         result->vt = VT_UI4;
         result->ulVal = (ULONG)size;
-    }
+    } else
+        IVector_IStorageItem_Release( items );
 
     return status;
 }
@@ -183,7 +184,10 @@ HRESULT WINAPI query_result_base_FindFirstAsync( IUnknown *invoker, IUnknown *pa
         if ( asyncRes ) return E_ABORT;
 
         status = IAsyncOperation_IVectorView_IStorageItem_GetResults( folderItemsOperation, &folderItems );
+        IAsyncOperation_IVectorView_IStorageItem_Release( folderItemsOperation );
         if ( FAILED( status ) ) return status;
+
+        CHECK_LAST_RESTRICTED_ERROR();
 
         IVectorView_IStorageItem_get_Size( folderItems, &size );
         

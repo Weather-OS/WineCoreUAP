@@ -41,7 +41,7 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
     struct input_stream *stream = impl_from_IInputStream( (IInputStream *)invoker );
 
     /**
-     * Paramteres
+     * Parameters
      */
     struct input_stream_options *options = (struct input_stream_options *)param;
 
@@ -54,7 +54,7 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     if ( streamSize <= 0 )
         return E_BOUNDS;
-
+    
     IBuffer_get_Capacity( options->buffer, &bufferCapacity );
 
     if ( bufferCapacity < options->count )
@@ -108,6 +108,8 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
 HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
 {
+    ULARGE_INTEGER li;
+    LARGE_INTEGER li2;
     HRESULT status = S_OK;
     UINT64 totalBytesWritten = 0;
     UINT32 totalBytesToWrite = 0;
@@ -127,6 +129,13 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
     IBufferByteAccess_get_Buffer( bufferByteAccess, &buffer );
 
     IBuffer_get_Length( bufferToWrite, &totalBytesToWrite );
+
+    //Get current position from stream->stream Istream
+
+    li2.QuadPart = 0;
+
+    IStream_Seek( stream->stream, li2, STREAM_SEEK_CUR, &li );
+    printf( "Current position: %llu\n", li.QuadPart );
 
     while ( totalBytesWritten < totalBytesToWrite )
     {

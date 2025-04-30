@@ -1,9 +1,28 @@
 MODULE    = shcore.dll
 IMPORTLIB = shcore
-IMPORTS   = advapi32
+IMPORTS   = advapi32 shell32 user32 combase ole32 advapi32 
 DELAYIMPORTS = user32 ole32
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
-	main.c
+	main.c \
+	provider.idl \
+	classes.idl \
+	\
+	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/IWineAsyncWithProgressUINT.c \
+	WineCoreUAP/AsyncOperation/UINT32Async.c \
+	WineCoreUAP/AsyncOperation/UINT32AsyncWithProgress.c \
+	WineCoreUAP/AsyncOperation/UINT64AsyncWithProgress.c \
+	\
+	WineCoreUAP/Storage/Streams/ContentTypeProvider.c \
+	WineCoreUAP/Storage/Streams/InputOutputStream.c \
+	WineCoreUAP/Storage/Streams/InputOutputStreamInternal.c \
+	WineCoreUAP/Storage/Streams/RandomAccessStream.c \
+	WineCoreUAP/Storage/Streams/RandomAccessStreamInternal.c \
+	WineCoreUAP/Storage/Streams/RandomAccessStreamReference.c \
+	WineCoreUAP/Storage/Streams/RandomAccessStreamReferenceInternal.c \
+	WineCoreUAP/Storage/Streams/Buffer.c \
+	WineCoreUAP/Storage/Streams/BufferByteAccess.c \
+	WineCoreUAP/Storage/Streams/BufferInternal.c

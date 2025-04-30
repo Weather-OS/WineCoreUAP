@@ -57,5 +57,6 @@ _CLEANUP:
     if ( FAILED( status ) ) 
         if ( *outFolder )
             IStorageFolder_Release( *outFolder );
+    CHECK_LAST_RESTRICTED_ERROR();
     return status;
 }
