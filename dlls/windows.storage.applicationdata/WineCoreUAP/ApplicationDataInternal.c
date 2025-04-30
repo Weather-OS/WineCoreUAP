@@ -21,19 +21,44 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(data);
 
+static HRESULT setSePrivilege( LPCSTR privilege, BOOL enable )
+{
+    HANDLE hToken;
+    TOKEN_PRIVILEGES tp;
+    LUID luid;
+
+    if ( !OpenProcessToken( GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken ) )
+        return E_FAIL;
+
+    if ( !LookupPrivilegeValueA( NULL, privilege, &luid ) )
+    {
+        CloseHandle( hToken );
+        return HRESULT_FROM_WIN32( GetLastError() );
+    }
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = enable ? SE_PRIVILEGE_ENABLED : 0;
+
+    AdjustTokenPrivileges( hToken, FALSE, &tp, sizeof(tp), NULL, NULL );
+
+    CloseHandle( hToken );
+    return S_OK;
+}
+
 HRESULT WINAPI application_data_Init( IApplicationData **value )
 {
-    HRESULT status = S_OK;    
+    static LPCWSTR rootKeyName = L"ApplicationData";
+    HRESULT status = S_OK;
     LPCWSTR AppName;    
-    HANDLE settingsFile;
+    LSTATUS hiveStatus;
     WCHAR path[MAX_PATH] = L"C:\\users\\";
     WCHAR username[256];
     WCHAR manifestPath[MAX_PATH];
     DWORD username_len = sizeof(username);
-    DWORD bytesRead;
-    DWORD bytesWritten;
-
-    BYTE versionData[9] = {0};
+    DWORD dataSize = sizeof(UINT32);
+    DWORD type;
+    HKEY rootKey;
 
     struct application_data *data;
     struct appx_package package;
@@ -81,45 +106,51 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
 
     PathAppendW( path, SETTINGS_DATA_PATH );
 
-    settingsFile = CreateFileW( path, GENERIC_ALL, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
-    if ( settingsFile == INVALID_HANDLE_VALUE )
-        return E_UNEXPECTED;
+    status = setSePrivilege( SE_RESTORE_NAME, TRUE );
+    if ( FAILED( status ) ) return status;
 
-    if ( !ReadFile( settingsFile, versionData, 8, &bytesRead, NULL ) )
+    status = setSePrivilege( SE_BACKUP_NAME, TRUE );
+    if ( FAILED( status ) ) return status;
+
+    if ( PathFileExistsW( path ) )
     {
-        CloseHandle( settingsFile );
-        return E_ABORT;
+        hiveStatus = RegLoadKeyW( HKEY_LOCAL_MACHINE, rootKeyName, path );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegOpenKeyExW( HKEY_LOCAL_MACHINE, rootKeyName, 0, KEY_ALL_ACCESS, &rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegQueryValueExW( rootKey, L"Version", NULL, &type, (LPBYTE)&data->Version, &dataSize );
+        if ( hiveStatus != ERROR_SUCCESS ) data->Version = 0;
+
+        hiveStatus = RegCloseKey( rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegUnLoadKeyW( HKEY_LOCAL_MACHINE, rootKeyName );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+    } else
+    {
+        hiveStatus = RegCreateKeyW( HKEY_LOCAL_MACHINE, rootKeyName, &rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegSaveKeyW( rootKey, path, NULL );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+        data->Version = 0;    
+        
+        hiveStatus = RegDeleteKeyW( HKEY_LOCAL_MACHINE, rootKeyName );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegCloseKey( rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
     }
 
-    if ( !bytesRead )
-    {
-        if ( !WriteFile( settingsFile, (BYTE *)"00000000\n", 9, &bytesWritten, NULL ) )
-        {
-            CloseHandle( settingsFile );
-            return E_ABORT;
-        }
+    status = setSePrivilege( SE_RESTORE_NAME, FALSE );
+    if ( FAILED( status ) ) return status;
 
-        if ( bytesWritten != 8 )
-        {
-            CloseHandle( settingsFile );
-            return E_UNEXPECTED;
-        }
-
-        data->Version = 0u;
-    } else 
-    {
-        data->Version = atoi( (LPCSTR)versionData );
-    }
-
-    if ( SetFilePointer( settingsFile, 9, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
-    {
-        CloseHandle( settingsFile );
-        return E_UNEXPECTED;
-    }
+    status = setSePrivilege( SE_BACKUP_NAME, FALSE );
+    if ( FAILED( status ) ) return status;
 
     *value = &data->IApplicationData_iface;
-
-    CloseHandle( settingsFile );
 
     TRACE( "created IApplicationData %p.\n", value );
     return status;
@@ -128,13 +159,14 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
 
 HRESULT WINAPI application_data_SetVersion( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
+    static LPCWSTR rootKeyName = L"ApplicationData";
     HRESULT status = S_OK;
-    HANDLE settingsFile;
+    LSTATUS hiveStatus;
     LPWSTR appDataPath;
     UINT32 ver;
-    DWORD bytesWritten;
-    CHAR newVer[9];
+    HKEY rootKey;    
 
+    struct application_data *data = impl_from_IApplicationData( (IApplicationData *)invoker );
     struct set_version_options *set_version_options = (struct set_version_options*)param;
     appDataPath = (LPWSTR)malloc( MAX_PATH * sizeof( WCHAR ) );
 
@@ -146,34 +178,42 @@ HRESULT WINAPI application_data_SetVersion( IUnknown *invoker, IUnknown *param, 
         PathAppendW( appDataPath, SETTINGS_PATH );
         PathAppendW( appDataPath, SETTINGS_DATA_PATH );
 
-        settingsFile = CreateFileW( appDataPath, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-        if ( settingsFile == INVALID_HANDLE_VALUE )
-            return E_UNEXPECTED;
-
-        if ( SetFilePointer( settingsFile, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER ) 
-        {
-            CloseHandle( settingsFile );
-            return E_UNEXPECTED;
-        }
-
         ISetVersionRequest_get_DesiredVersion( &set_version_options->request, &ver );
 
-        sprintf( newVer, "%08d", ver );
+        status = setSePrivilege( SE_RESTORE_NAME, TRUE );
+        if ( FAILED( status ) ) return status;
 
-        if ( !WriteFile( settingsFile, (BYTE *)newVer, 8, &bytesWritten, NULL ) )
-        {
-            CloseHandle( settingsFile );
-            return E_ABORT;
-        }
+        status = setSePrivilege( SE_BACKUP_NAME, TRUE );
+        if ( FAILED( status ) ) return status;
+    
+        // Load the hive, set the version, and unload the hive
+        hiveStatus = RegLoadKeyW( HKEY_LOCAL_MACHINE, rootKeyName, appDataPath );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
 
-        if ( bytesWritten != 8 )
-        {
-            CloseHandle( settingsFile );
-            return E_UNEXPECTED;
-        }
+        hiveStatus = RegOpenKeyExW( HKEY_LOCAL_MACHINE, rootKeyName, 0, KEY_ALL_ACCESS, &rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
 
-        CloseHandle( settingsFile );
+        hiveStatus = RegSetValueExW( rootKey, L"Version", 0, REG_DWORD, (LPBYTE)&ver, sizeof(ver) );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegSaveKeyW( rootKey, appDataPath, NULL );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+        data->Version = 0;    
+
+        hiveStatus = RegCloseKey( rootKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+    
+        hiveStatus = RegUnLoadKeyW( HKEY_LOCAL_MACHINE, rootKeyName );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        status = setSePrivilege( SE_RESTORE_NAME, FALSE );
+        if ( FAILED( status ) ) return status;
+    
+        status = setSePrivilege( SE_BACKUP_NAME, FALSE );
+        if ( FAILED( status ) ) return status;
     }
+
+    data->Version = ver;
 
     return status;
 }
