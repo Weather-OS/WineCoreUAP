@@ -198,7 +198,6 @@ HRESULT WINAPI application_data_SetVersion( IUnknown *invoker, IUnknown *param, 
 
         hiveStatus = RegSaveKeyW( rootKey, appDataPath, NULL );
         if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
-        data->Version = 0;    
 
         hiveStatus = RegCloseKey( rootKey );
         if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
