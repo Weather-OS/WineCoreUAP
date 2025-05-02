@@ -20,7 +20,6 @@
  */
 
 #include "ContentTypeProviderInternal.h"
-#include "BufferInternal.h"
 
 _ENABLE_DEBUGGING_
 

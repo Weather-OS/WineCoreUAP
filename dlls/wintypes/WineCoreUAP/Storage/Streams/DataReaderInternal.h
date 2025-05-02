@@ -22,7 +22,7 @@
 #ifndef DATA_READER_INTERNAL_H
 #define DATA_READER_INTERNAL_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "wine/debug.h"
 
 extern struct IDataReaderVtbl data_reader_vtbl;

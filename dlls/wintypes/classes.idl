@@ -29,3 +29,74 @@
 #include "windows.foundation.idl"
 #include "windows.foundation.metadata.idl"
 //#include "windows.storage.streams.idl"
+
+namespace Windows.Storage.Streams {
+    interface IBuffer;
+    interface IBufferFactory;
+    interface IBufferStatics;
+    interface IBufferByteAccess;
+    interface IDataReader;
+    interface IDataReaderFactory;
+    interface IDataReaderStatics;
+    interface IDataWriter;
+    interface IDataWriterFactory;
+
+    [
+        activatable(Windows.Storage.Streams.IBufferFactory, Windows.Foundation.UniversalApiContract, 1.0),
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.Streams.IBufferStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        threading(both)
+    ]
+    runtimeclass Buffer
+    {
+        [default] interface Windows.Storage.Streams.IBuffer;
+    }
+
+    [
+        activatable(Windows.Storage.Streams.IDataReaderFactory, Windows.Foundation.UniversalApiContract, 1.0),
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        static(Windows.Storage.Streams.IDataReaderStatics, Windows.Foundation.UniversalApiContract, 1.0),
+        threading(both)
+    ]
+    runtimeclass DataReader
+    {
+        [default] interface Windows.Storage.Streams.IDataReader;
+        interface Windows.Foundation.IClosable;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass DataReaderLoadOperation
+    {
+        [default] interface Windows.Foundation.IAsyncOperation<UINT32>;
+    }
+
+
+    [
+        activatable(Windows.Foundation.UniversalApiContract, 1.0),
+        activatable(Windows.Storage.Streams.IDataWriterFactory, Windows.Foundation.UniversalApiContract, 1.0),
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        threading(both)
+    ]
+    runtimeclass DataWriter
+    {
+        [default] interface Windows.Storage.Streams.IDataWriter;
+        interface Windows.Foundation.IClosable;
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile)
+    ]
+    runtimeclass DataWriterStoreOperation
+    {
+        [default] interface Windows.Foundation.IAsyncOperation<UINT32>;
+    }
+}
+
+//#include "windows.storage.idl"

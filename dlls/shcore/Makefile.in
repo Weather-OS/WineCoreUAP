@@ -1,7 +1,7 @@
 MODULE    = shcore.dll
 IMPORTLIB = shcore
-IMPORTS   = advapi32 shell32 user32 combase ole32 advapi32 
-DELAYIMPORTS = user32 ole32
+IMPORTS   = advapi32
+DELAYIMPORTS = user32 ole32 combase 
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
@@ -22,7 +22,4 @@ SOURCES = \
 	WineCoreUAP/Storage/Streams/RandomAccessStream.c \
 	WineCoreUAP/Storage/Streams/RandomAccessStreamInternal.c \
 	WineCoreUAP/Storage/Streams/RandomAccessStreamReference.c \
-	WineCoreUAP/Storage/Streams/RandomAccessStreamReferenceInternal.c \
-	WineCoreUAP/Storage/Streams/Buffer.c \
-	WineCoreUAP/Storage/Streams/BufferByteAccess.c \
-	WineCoreUAP/Storage/Streams/BufferInternal.c
+	WineCoreUAP/Storage/Streams/RandomAccessStreamReferenceInternal.c

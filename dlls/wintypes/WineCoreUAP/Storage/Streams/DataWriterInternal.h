@@ -22,7 +22,7 @@
 #ifndef DATA_WRITER_INTERNAL_H
 #define DATA_WRITER_INTERNAL_H
 
-#include "../../private.h"
+#include "../../../private.h"
 #include "wine/debug.h"
 
 extern struct IDataWriterVtbl data_writer_vtbl;

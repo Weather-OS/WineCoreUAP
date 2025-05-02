@@ -549,8 +549,12 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     DWORD bytesRead;
     BOOL readResult;    
     
+    IBufferByteAccess *buffer_byte_access = NULL;
+    IBufferFactory *buffer_factory = NULL;
     IStorageItem *item = NULL;
     IBuffer *buffer = NULL;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_Buffer, buffer_factory, IID_IBufferFactory );
 
     //Parameters
     WindowsDuplicateString( (HSTRING)param, &filePath );
@@ -567,12 +571,17 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
         goto _CLEANUP;
     }
 
-    status = buffer_Create( fileSize, &buffer );
-
+    status = IBufferFactory_Create( buffer_factory, fileSize, &buffer );
     if ( FAILED( status ) )
         goto _CLEANUP;
-    
-    outputBuffer = impl_from_IBuffer( buffer )->Buffer;
+
+    status = IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&buffer_byte_access );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
+
+    status = IBufferByteAccess_get_Buffer( buffer_byte_access, &outputBuffer );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
     
     readResult = ReadFile( fileHandle, (LPVOID)outputBuffer, fileSize, &bytesRead, NULL );
 
@@ -584,7 +593,7 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
 
     if ( SUCCEEDED ( status ) )
     {
-        IBuffer_AddRef( buffer );
+        IBuffer_put_Length( buffer, fileSize );
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)buffer;
     }

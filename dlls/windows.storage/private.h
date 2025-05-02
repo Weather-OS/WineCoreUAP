@@ -102,11 +102,8 @@ extern IActivationFactory *storage_item_content_properties_factory;
 extern IActivationFactory *downloads_folder_factory;
 extern IActivationFactory *file_io_factory;
 extern IActivationFactory *path_io_factory;
-extern IActivationFactory *buffer_factory;
 extern IActivationFactory *system_properties_factory;
 extern IActivationFactory *system_data_paths_factory;
-extern IActivationFactory *data_reader_factory;
-extern IActivationFactory *data_writer_factory;
 extern IActivationFactory *storage_library_statics_factory;
 extern IActivationFactory *query_options_activatable_factory;
 

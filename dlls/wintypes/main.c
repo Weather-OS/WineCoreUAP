@@ -1304,10 +1304,21 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
         IActivationFactory_AddRef((*factory = &api_information_statics.IActivationFactory_iface));
     if (!wcscmp(buffer, L"Windows.Foundation.PropertyValue"))
         IActivationFactory_AddRef((*factory = &property_value_statics.IActivationFactory_iface));
-    if (!wcscmp(buffer, L"Windows.Storage.Streams.DataWriter"))
-        IActivationFactory_AddRef((*factory = data_writer_activation_factory));
-    if (!wcscmp(buffer, L"Windows.Storage.Streams.RandomAccessStreamReference"))
-        IActivationFactory_AddRef((*factory = stream_reference_statics_activation_factory));
+    /**
+     * Windows.Storage.Streams
+    */
+   if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_Buffer ))
+       //(@WinTypes.dll)
+       IActivationFactory_QueryInterface( buffer_factory, &IID_IActivationFactory, (void **)factory );
+    
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_DataReader ))
+       //(@WinTypes.dll)
+       IActivationFactory_QueryInterface( data_reader_factory, &IID_IActivationFactory, (void **)factory );
+    
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_DataWriter ))
+       //(@WinTypes.dll)
+       IActivationFactory_QueryInterface( data_writer_factory, &IID_IActivationFactory, (void **)factory );
+
 
     if (*factory) return S_OK;
     return CLASS_E_CLASSNOTAVAILABLE;

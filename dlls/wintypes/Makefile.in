@@ -4,6 +4,14 @@ IMPORTS   = combase
 
 SOURCES = \
 	classes.idl \
+	provider.idl \
 	main.c \
-	storage.c \
-	wintypes_private.idl
+	wintypes_private.idl \
+	\
+	WineCoreUAP/AsyncOperation/IWineAsync.c \
+	WineCoreUAP/AsyncOperation/UINT32Async.c \
+	WineCoreUAP/Storage/Streams/Buffer.c \
+	WineCoreUAP/Storage/Streams/BufferByteAccess.c \
+	WineCoreUAP/Storage/Streams/BufferInternal.c \
+	WineCoreUAP/Storage/Streams/DataReader.c \
+	WineCoreUAP/Storage/Streams/DataWriter.c

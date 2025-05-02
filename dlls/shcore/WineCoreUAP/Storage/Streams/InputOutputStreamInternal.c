@@ -26,7 +26,8 @@ _ENABLE_DEBUGGING_
 DEFINE_ASYNC_COMPLETED_HANDLER( currentOperation_async, IAsyncOperationWithProgressCompletedHandler_UINT32_UINT32, IAsyncOperationWithProgress_UINT32_UINT32 )
 
 HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
-{
+{    
+    LARGE_INTEGER li;
     STATSTG stat;
     HRESULT status = S_OK;    
     UINT32 totalBytesRead = 0;
@@ -54,6 +55,10 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     if ( streamSize <= 0 )
         return E_BOUNDS;
+
+    //Update stream position (Workaround for when the client uses both streams at the same time)
+    li.QuadPart = stream->updatePos;
+    IStream_Seek( stream->stream, li, STREAM_SEEK_SET, NULL );
     
     IBuffer_get_Capacity( options->buffer, &bufferCapacity );
 
@@ -97,6 +102,8 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
     if ( stream->headPosition )
         *stream->headPosition += totalBytesRead;
 
+    stream->updatePos += totalBytesRead;
+
     if ( SUCCEEDED( status ) )
     {
         result->vt = VT_UNKNOWN;
@@ -108,8 +115,7 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
 HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress )
 {
-    ULARGE_INTEGER li;
-    LARGE_INTEGER li2;
+    LARGE_INTEGER li;
     HRESULT status = S_OK;
     UINT64 totalBytesWritten = 0;
     UINT32 totalBytesToWrite = 0;
@@ -130,12 +136,9 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
 
     IBuffer_get_Length( bufferToWrite, &totalBytesToWrite );
 
-    //Get current position from stream->stream Istream
-
-    li2.QuadPart = 0;
-
-    IStream_Seek( stream->stream, li2, STREAM_SEEK_CUR, &li );
-    printf( "Current position: %llu\n", li.QuadPart );
+    //Update stream position (Workaround for when the client uses both streams at the same time)
+    li.QuadPart = stream->updatePos;
+    IStream_Seek( stream->stream, li, STREAM_SEEK_SET, NULL );
 
     while ( totalBytesWritten < totalBytesToWrite )
     {
@@ -164,6 +167,8 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
 
     if ( stream->headPosition )
         *stream->headPosition += totalBytesWritten;
+
+    stream->updatePos += totalBytesWritten;
 
     if ( SUCCEEDED( status ) )
     {

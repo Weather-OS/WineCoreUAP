@@ -22,7 +22,6 @@
 #ifndef FILE_IO_INTERNAL_H
 #define FILE_IO_INTERNAL_H
 
-#include "Streams/BufferInternal.h"
 #include "StorageFileInternal.h"
 
 #include "../private.h"

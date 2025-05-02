@@ -51,14 +51,6 @@ SOURCES = \
 	\
 	WineCoreUAP/FileProperties/AsyncOperation/BasicPropertiesAsync.c \
 	\
-	WineCoreUAP/Streams/Buffer.c \
-	WineCoreUAP/Streams/BufferByteAccess.c \
-	WineCoreUAP/Streams/BufferInternal.c \
-	WineCoreUAP/Streams/DataReader.c \
-	WineCoreUAP/Streams/DataWriter.c \
-	\
-	WineCoreUAP/Streams/AsyncOperation/BufferAsync.c \
-	\
 	WineCoreUAP/Search/QueryOptions.c \
 	WineCoreUAP/Search/StorageQueryResults.c \
 	WineCoreUAP/Search/StorageQueryResultsInternal.c \
@@ -66,5 +58,4 @@ SOURCES = \
 	WineCoreUAP/Search/StorageFolderQueryOperationsInternal.c \
 	provider.idl \
 	classes.idl \
-	classes.streams.idl \
 	classes.search.idl \

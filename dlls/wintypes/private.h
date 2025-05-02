@@ -17,6 +17,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifndef __WINE_WINETYPES_H
+#define __WINE_WINETYPES_H
+
 #include <stdarg.h>
 
 #define COBJMACROS
@@ -25,6 +28,8 @@
 #include "winstring.h"
 #include "wine/debug.h"
 #include "objbase.h"
+#include "roerrorapi.h"
+#include "restrictederrorinfo.h"
 
 #include "activation.h"
 #include "rometadataresolution.h"
@@ -38,5 +43,123 @@
 #include "windows.storage.streams.h"
 #include "wintypes_private.h"
 
-extern IActivationFactory *data_writer_activation_factory;
-extern IActivationFactory *stream_reference_statics_activation_factory;
+#include "provider.h"
+
+extern IActivationFactory *data_reader_factory;
+extern IActivationFactory *data_writer_factory;
+extern IActivationFactory *buffer_factory;
+
+#define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_storage);
+
+struct async_operation_iids
+{
+    const GUID *operation;
+};
+
+typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
+
+extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
+    IInspectable *outer, IWineAsyncInfoImpl **out );
+extern HRESULT async_operation_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
+    IAsyncOperation_IInspectable **out );
+extern HRESULT async_operation_uint32_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, const struct async_operation_iids iids,
+    IAsyncOperation_UINT32 **out );
+
+#define DEFINE_ASYNC_COMPLETED_HANDLER( name, iface_type, async_type )                              \
+    struct name                                                                                     \
+    {                                                                                               \
+        iface_type iface_type##_iface;                                                              \
+        LONG refcount;                                                                              \
+        BOOL invoked;                                                                               \
+        HANDLE event;                                                                               \
+    };                                                                                              \
+                                                                                                    \
+    static HRESULT WINAPI name##_QueryInterface( iface_type *iface, REFIID iid, void **out )        \
+    {                                                                                               \
+        if (IsEqualGUID( iid, &IID_IUnknown ) || IsEqualGUID( iid, &IID_IAgileObject ) ||           \
+            IsEqualGUID( iid, &IID_##iface_type ))                                                  \
+        {                                                                                           \
+            IInspectable_AddRef( (IInspectable *)iface );                                           \
+            *out = iface;                                                                           \
+            return S_OK;                                                                            \
+        }                                                                                           \
+                                                                                                    \
+        *out = NULL;                                                                                \
+        return E_NOINTERFACE;                                                                       \
+    }                                                                                               \
+                                                                                                    \
+    static ULONG WINAPI name##_AddRef( iface_type *iface )                                          \
+    {                                                                                               \
+        struct name *impl = CONTAINING_RECORD( iface, struct name, iface_type##_iface );            \
+        return InterlockedIncrement( &impl->refcount );                                             \
+    }                                                                                               \
+                                                                                                    \
+    static ULONG WINAPI name##_Release( iface_type *iface )                                         \
+    {                                                                                               \
+        struct name *impl = CONTAINING_RECORD( iface, struct name, iface_type##_iface );            \
+        ULONG ref = InterlockedDecrement( &impl->refcount );                                        \
+        if (!ref) free( impl );                                                                     \
+        return ref;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    static HRESULT WINAPI name##_Invoke( iface_type *iface, async_type *async, AsyncStatus status ) \
+    {                                                                                               \
+        struct name *impl = CONTAINING_RECORD( iface, struct name, iface_type##_iface );            \
+        impl->invoked = TRUE;                                                                       \
+        if (impl->event) SetEvent( impl->event );                                                   \
+        return S_OK;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    static iface_type##Vtbl name##_vtbl =                                                           \
+    {                                                                                               \
+        name##_QueryInterface,                                                                      \
+        name##_AddRef,                                                                              \
+        name##_Release,                                                                             \
+        name##_Invoke,                                                                              \
+    };                                                                                              \
+                                                                                                    \
+    static iface_type *name##_create( HANDLE event )                                                \
+    {                                                                                               \
+        struct name *impl;                                                                          \
+                                                                                                    \
+        if (!(impl = calloc( 1, sizeof(*impl) ))) return NULL;                                      \
+        impl->iface_type##_iface.lpVtbl = &name##_vtbl;                                             \
+        impl->event = event;                                                                        \
+        impl->refcount = 1;                                                                         \
+                                                                                                    \
+        return &impl->iface_type##_iface;                                                           \
+    }                                                                                               \
+                                                                                                    \
+    static DWORD await_##async_type( async_type *async, DWORD timeout )                             \
+    {                                                                                               \
+        iface_type *handler;                                                                        \
+        HANDLE event;                                                                               \
+        DWORD ret;                                                                                  \
+                                                                                                    \
+        event = CreateEventW( NULL, FALSE, FALSE, NULL );                                           \
+        handler = name##_create( event );                                                           \
+        async_type##_put_Completed( async, handler );                                               \
+        ret = WaitForSingleObject( event, timeout );                                                \
+        CloseHandle( event );                                                                       \
+        iface_type##_Release( handler );                                                            \
+                                                                                                    \
+        return ret;                                                                                 \
+    }
+
+#define DEFINE_IINSPECTABLE_OUTER( pfx, iface_type, impl_type, outer_iface )                       \
+    DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, impl->outer_iface )
+
+#define CHECK_LAST_RESTRICTED_ERROR()                                                               \
+{                                                                                                   \
+    HRESULT _hr;                                                                                    \
+    IRestrictedErrorInfo *_restricted_error = NULL;                                                 \
+    _hr = GetRestrictedErrorInfo( &_restricted_error );                                             \
+    if ( _hr != S_FALSE )                                                                           \
+    {                                                                                               \
+        IRestrictedErrorInfo_GetErrorDetails( _restricted_error, NULL, &_hr, NULL, NULL );          \
+        SetRestrictedErrorInfo( _restricted_error );                                                \
+        return _hr;                                                                                 \
+    }                                                                                               \
+}
+
+#endif

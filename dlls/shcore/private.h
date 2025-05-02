@@ -27,7 +27,6 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
-#include "shellapi.h"
 #include "roapi.h"
 #include "roerrorapi.h"
 #include "aclapi.h"

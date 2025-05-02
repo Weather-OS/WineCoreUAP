@@ -212,3 +212,27 @@ assignAppxResources( xmlNode * manifest, appxResourceList *List )
 
     return STATUS_SUCCESS;
 }
+
+static appxstatus
+assignAppxApplication( xmlNode * manifest, appxResourceList *List )
+{
+    for ( xmlNode *node = manifest; node; node = node->next ) 
+    {
+        if ( node->type == XML_ELEMENT_NODE ) 
+        {
+            if ( !xmlStrcmp( node->name, (const xmlChar*)"Package" ) )
+            {
+                for ( xmlNode *packageNode = node->children; packageNode; packageNode = packageNode->next )
+                {
+                    if ( packageNode->type == XML_ELEMENT_NODE && 
+                        !xmlStrcmp( packageNode->name, (const xmlChar*)"Resources" ) )
+                    {
+                        *List = (appxCapabilityList)packageNode;
+                    }
+                }
+            }
+        }
+    }
+
+    return STATUS_SUCCESS;
+}

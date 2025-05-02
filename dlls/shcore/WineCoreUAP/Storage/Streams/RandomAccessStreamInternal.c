@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "BufferInternal.h"
 #include "RandomAccessStreamInternal.h"
 
 _ENABLE_DEBUGGING_
@@ -38,9 +37,12 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
     IBuffer *buffer;
     IBuffer *readBuffer;
     IBuffer *segmentBuffer;
+    IBufferFactory *bufferFactory;
     IBufferByteAccess *segmentBufferByteAccess;
     IBufferByteAccess *readBufferByteAccess;
     IAsyncOperationWithProgress_IBuffer_UINT32 *buffer_uint32_async_with_progress_operation;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_Buffer, bufferFactory, IID_IBufferFactory );
 
     TRACE( "source %p, destination %p\n", source, destination );
 
@@ -48,8 +50,8 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
 
     if ( bytesToCopy )
     {
-        buffer_Create( bytesToCopy, &buffer );
-
+        IBufferFactory_Create( bufferFactory, bytesToCopy, &buffer );
+        
         status = IInputStream_ReadAsync( source, buffer, bytesToCopy, InputStreamOptions_None, &buffer_uint32_async_with_progress_operation );
         if( FAILED( status ) ) goto _FAIL;
 
@@ -63,7 +65,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         //Copy in 4096 byte segments until bytes read is not 4096.
         while ( bytesReadInSegment == BUFFER_SIZE )
         {
-            buffer_Create( BUFFER_SIZE, &buffer );
+            IBufferFactory_Create( bufferFactory, BUFFER_SIZE, &buffer );
 
             status = IInputStream_ReadAsync( source, buffer, BUFFER_SIZE, InputStreamOptions_None, &buffer_uint32_async_with_progress_operation );
             if( FAILED( status ) ) goto _FAIL;
@@ -88,7 +90,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
             bytesRead += bytesReadInSegment;
         }
 
-        buffer_Create( bytesRead, &readBuffer );
+        IBufferFactory_Create( bufferFactory, bytesRead, &readBuffer );
 
         status = IBuffer_QueryInterface( readBuffer, &IID_IBufferByteAccess, (void **)&readBufferByteAccess );
         if( FAILED( status ) ) goto _FAIL;

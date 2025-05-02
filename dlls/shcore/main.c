@@ -33,8 +33,6 @@
 #define WINSHLWAPI
 #include "shlwapi.h"
 
-#include "private.h"
-
 #include "WineCoreUAP/Storage/Streams/RandomAccessStreamReferenceInternal.h"
 
 #include "wine/debug.h"
