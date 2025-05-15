@@ -68,7 +68,7 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
     status = IBuffer_QueryInterface( options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
     if ( FAILED( status ) ) return status;
 
-    IBufferByteAccess_get_Buffer( bufferByteAccess, &buffer );
+    IBufferByteAccess_Buffer( bufferByteAccess, &buffer );
 
     while ( totalBytesRead < streamSize )
     {
@@ -132,7 +132,7 @@ HRESULT WINAPI output_stream_Write( IUnknown *invoker, IUnknown *param, PROPVARI
     status = IBuffer_QueryInterface( bufferToWrite, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
     if ( FAILED( status ) ) return status;
 
-    IBufferByteAccess_get_Buffer( bufferByteAccess, &buffer );
+    IBufferByteAccess_Buffer( bufferByteAccess, &buffer );
 
     IBuffer_get_Length( bufferToWrite, &totalBytesToWrite );
 

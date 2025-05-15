@@ -51,6 +51,8 @@
 #define WIDL_using_Windows_Storage_Search
 #include "windows.storage.search.h"
 
+#include "robuffer.h"
+
 #include "provider.h"
 
 #define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_storage);

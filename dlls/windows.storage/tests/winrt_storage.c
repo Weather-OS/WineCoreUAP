@@ -1315,7 +1315,7 @@ void test_StorageFile( wchar_t* path, IStorageFolder *folder )
 
 }
 
-START_TEST(storage)
+START_TEST(winrt_storage)
 {
     HRESULT hr;
     wchar_t *apppath;

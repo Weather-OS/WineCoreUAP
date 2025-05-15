@@ -235,7 +235,7 @@ static HRESULT WINAPI data_writer_WriteByte( IDataWriter *iface, BYTE value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         returnedBufferBytes[ impl->UnstoredBufferLength ] = value;
         impl->UnstoredBufferLength--;
 
@@ -266,7 +266,7 @@ static HRESULT WINAPI data_writer_WriteBytes( IDataWriter *iface, UINT32 __value
 
     if ( SUCCEEDED( hr ) )
     {    
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], value, __valueSize );
         impl->UnstoredBufferLength += __valueSize;
 
@@ -300,14 +300,14 @@ static HRESULT WINAPI data_writer_WriteBuffer( IDataWriter *iface, IBuffer* buff
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
     if ( FAILED( hr ) ) return hr;
-    IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
     IBufferByteAccess_Release( returnedBufferByteAccess );
 
     hr = IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &bufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], bufferBytes, bufferLength );
         impl->UnstoredBufferLength += bufferLength;
 
@@ -345,14 +345,14 @@ static HRESULT WINAPI data_writer_WriteBufferRange( IDataWriter *iface, IBuffer*
 
     hr = IBuffer_QueryInterface( impl->buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
     if ( FAILED( hr ) ) return hr;
-    IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+    IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
     IBufferByteAccess_Release( returnedBufferByteAccess );
 
     hr = IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&returnedBufferByteAccess );
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &bufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &bufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], bufferBytes + start, count );
         impl->UnstoredBufferLength += count;
 
@@ -381,7 +381,7 @@ static HRESULT WINAPI data_writer_WriteBoolean( IDataWriter *iface, boolean valu
 
     if ( SUCCEEDED( hr ) )
     {    
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         returnedBufferBytes[ impl->UnstoredBufferLength ] = value;    
         impl->UnstoredBufferLength--;
 
@@ -409,7 +409,7 @@ static HRESULT WINAPI data_writer_WriteGuid( IDataWriter *iface, GUID value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
 
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.Data1, 4 );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength + 4 ], &value.Data2, 2 );
@@ -441,7 +441,7 @@ static HRESULT WINAPI data_writer_WriteInt16( IDataWriter *iface, INT16 value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 2 );
         impl->UnstoredBufferLength += 2;
 
@@ -469,7 +469,7 @@ static HRESULT WINAPI data_writer_WriteInt32( IDataWriter *iface, INT32 value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
         impl->UnstoredBufferLength += 4;
 
@@ -497,7 +497,7 @@ static HRESULT WINAPI data_writer_WriteInt64( IDataWriter *iface, INT64 value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
         impl->UnstoredBufferLength += 8;
 
@@ -525,7 +525,7 @@ static HRESULT WINAPI data_writer_WriteUInt16( IDataWriter *iface, UINT16 value 
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 2 );
         impl->UnstoredBufferLength += 2;
 
@@ -553,7 +553,7 @@ static HRESULT WINAPI data_writer_WriteUInt32( IDataWriter *iface, UINT32 value 
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
         impl->UnstoredBufferLength += 4;
 
@@ -581,7 +581,7 @@ static HRESULT WINAPI data_writer_WriteUInt64( IDataWriter *iface, UINT64 value 
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
         impl->UnstoredBufferLength += 8;
 
@@ -609,7 +609,7 @@ static HRESULT WINAPI data_writer_WriteSingle( IDataWriter *iface, FLOAT value )
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 4 );
         impl->UnstoredBufferLength += 4;
 
@@ -637,7 +637,7 @@ static HRESULT WINAPI data_writer_WriteDouble( IDataWriter *iface, DOUBLE value 
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value, 8 );
         impl->UnstoredBufferLength += 8;
 
@@ -665,7 +665,7 @@ static HRESULT WINAPI data_writer_WriteDateTime( IDataWriter *iface, DateTime va
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.UniversalTime, 8 );
         impl->UnstoredBufferLength += 8;
 
@@ -693,7 +693,7 @@ static HRESULT WINAPI data_writer_WriteTimeSpan( IDataWriter *iface, TimeSpan va
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
         memcpy( &returnedBufferBytes[ impl->UnstoredBufferLength ], &value.Duration, 8 );
         impl->UnstoredBufferLength += 8;
 
@@ -744,7 +744,7 @@ static HRESULT WINAPI data_writer_WriteString( IDataWriter *iface, HSTRING value
 
     if ( SUCCEEDED( hr ) )
     {
-        IBufferByteAccess_get_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
+        IBufferByteAccess_Buffer( returnedBufferByteAccess, &returnedBufferBytes );
 
         switch ( impl->Encoding )
         {

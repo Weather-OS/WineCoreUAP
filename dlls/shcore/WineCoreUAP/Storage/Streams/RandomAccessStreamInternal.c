@@ -83,7 +83,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
             status = IBuffer_QueryInterface( segmentBuffer, &IID_IBufferByteAccess, (void **)&segmentBufferByteAccess );
             if( FAILED( status ) ) goto _FAIL;
 
-            IBufferByteAccess_get_Buffer( segmentBufferByteAccess, &tmpByteBuffer );
+            IBufferByteAccess_Buffer( segmentBufferByteAccess, &tmpByteBuffer );
 
             byteBuffer = (BYTE *)realloc(byteBuffer, bytesRead + bytesReadInSegment);
             memcpy( byteBuffer + bytesRead, tmpByteBuffer, bytesReadInSegment );
@@ -95,7 +95,7 @@ HRESULT WINAPI random_access_stream_statics_Copy( IInputStream *source, IOutputS
         status = IBuffer_QueryInterface( readBuffer, &IID_IBufferByteAccess, (void **)&readBufferByteAccess );
         if( FAILED( status ) ) goto _FAIL;
 
-        IBufferByteAccess_get_Buffer( readBufferByteAccess, &tmpByteBuffer );
+        IBufferByteAccess_Buffer( readBufferByteAccess, &tmpByteBuffer );
         memcpy( tmpByteBuffer, byteBuffer, bytesRead );
 
         IBuffer_put_Length( readBuffer, bytesRead );

@@ -45,6 +45,8 @@
 #include "windows.storage.streams.h"
 #include "wintypes_private.h"
 
+#include "robuffer.h"
+
 #include "provider.h"
 
 extern IActivationFactory *property_set_factory;

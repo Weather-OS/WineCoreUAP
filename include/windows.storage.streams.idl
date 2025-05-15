@@ -38,7 +38,6 @@ namespace Windows.Storage.Streams {
     interface IBuffer;
     interface IBufferFactory;
     interface IBufferStatics;
-    interface IBufferByteAccess;
     interface IContentTypeProvider;
     interface IDataReader;
     interface IDataReaderFactory;
@@ -155,15 +154,6 @@ namespace Windows.Storage.Streams {
                                            [out, retval] Windows.Storage.Streams.Buffer **value);
         HRESULT CreateMemoryBufferOverIBuffer([in] Windows.Storage.Streams.IBuffer *input,
                                               [out, retval] Windows.Foundation.MemoryBuffer **value);
-    }
-
-    [
-        contract(Windows.Foundation.UniversalApiContract, 1.0),
-        uuid(905a0fef-bc53-11df-8c49-001e4fc686da)
-    ]
-    interface IBufferByteAccess : IUnknown
-    {
-        [propget] HRESULT Buffer([out, retval] BYTE **value);
     }
 
     [

@@ -62,6 +62,8 @@
 #define WIDL_using_Windows_Storage_Search
 #include "windows.storage.search.h"
 
+#include "robuffer.h"
+
 #include "provider.h"
 
 #define WINDOWS_TICK 10000000

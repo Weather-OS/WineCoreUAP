@@ -579,7 +579,7 @@ HRESULT WINAPI path_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, P
     if ( FAILED( status ) )
         goto _CLEANUP;
 
-    status = IBufferByteAccess_get_Buffer( buffer_byte_access, &outputBuffer );
+    status = IBufferByteAccess_Buffer( buffer_byte_access, &outputBuffer );
     if ( FAILED( status ) )
         goto _CLEANUP;
     
@@ -631,7 +631,7 @@ HRESULT WINAPI path_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, 
     TRACE( "iface %p, value %p\n", invoker, result );
 
     IBuffer_QueryInterface( write_buffer_options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
-    IBufferByteAccess_get_Buffer( bufferByteAccess, &contents );
+    IBufferByteAccess_Buffer( bufferByteAccess, &contents );
 
     fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
     //Clear the file

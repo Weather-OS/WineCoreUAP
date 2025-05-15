@@ -117,7 +117,6 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
     HSTRING path;
 
     IStorageItem *item;
-    IRandomAccessStreamReference *reference = NULL;
 
     TRACE( "iface %p, file %p, stream_reference %p.\n", iface, file, stream_reference );
 
@@ -130,8 +129,10 @@ static HRESULT WINAPI random_access_stream_reference_statics_CreateFromFile( IRa
 
     IStorageItem_get_Path( item, &path );
 
-    hr = random_access_stream_reference_CreateStreamReference( path, FileAccessMode_ReadWrite, &reference );
-    *stream_reference = reference;
+    hr = random_access_stream_reference_CreateStreamReference( path, FileAccessMode_ReadWrite, stream_reference );
+
+    IStorageItem_Release( item );
+    WindowsDeleteString( path );
 
     return hr;
 }

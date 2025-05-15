@@ -26,16 +26,17 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
+#include "roapi.h"
 
 #include "activation.h"
-
-#include "roapi.h"
 
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
 #define WIDL_using_Windows_Storage
 #include "windows.storage.h"
+
+#include "robuffer.h"
 
 #include "provider.h"
 #include "reg.h"

@@ -34,7 +34,7 @@ HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING pat
 
     reference->IRandomAccessStreamReference_iface.lpVtbl = &random_access_stream_reference_vtbl;
 
-    //Readability
+    // Readability
     stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
     reference->streamSize = GetFileSize( stream, NULL );
     if ( stream != INVALID_HANDLE_VALUE ) {
@@ -42,7 +42,7 @@ HRESULT WINAPI random_access_stream_reference_CreateStreamReference( HSTRING pat
     }
     CloseHandle(stream);
 
-    // Check writability
+    // Writability
     if ( accessMode == FileAccessMode_ReadWrite )
     {
         stream = CreateFileW( WindowsGetStringRawBuffer( path, NULL ), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
