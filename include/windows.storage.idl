@@ -113,6 +113,7 @@ namespace Windows.Storage {
 
     runtimeclass AppDataPaths;
     runtimeclass ApplicationData;
+    runtimeclass ApplicationDataCompositeValue;
     runtimeclass ApplicationDataContainer;
     runtimeclass DownloadsFolder;
     runtimeclass FileIO;
@@ -1329,6 +1330,20 @@ namespace Windows.Storage {
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IApplicationData2;
         [contract(Windows.Foundation.UniversalApiContract, 1.0)] interface Windows.Storage.IApplicationData3;
         [contract(Windows.Foundation.UniversalApiContract, 12.0)] interface Windows.Foundation.IClosable;
+    }
+
+    [
+        activatable(Windows.Foundation.UniversalApiContract, 1.0),
+        contract(Windows.Foundation.UniversalApiContract, 1.0),
+        marshaling_behavior(agile),
+        threading(mta)
+    ]
+    runtimeclass ApplicationDataCompositeValue
+    {
+        [default] interface Windows.Foundation.Collections.IPropertySet;
+        interface Windows.Foundation.Collections.IObservableMap<HSTRING, IInspectable*>;
+        interface Windows.Foundation.Collections.IMap<HSTRING, IInspectable*>;
+        interface Windows.Foundation.Collections.IIterable<Windows.Foundation.Collections.IKeyValuePair<HSTRING, IInspectable*>*>;
     }
 
     [

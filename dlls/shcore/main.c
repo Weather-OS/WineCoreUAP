@@ -2588,15 +2588,34 @@ HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD access_mode
     else
     {
         hr = async_operation_create( (IUnknown *)fileStreamReference, NULL, random_access_stream_reference_CreateStream, iids, (IAsyncOperation_IInspectable **)&random_access_stream_operation );
-        if ( FAILED( hr ) ) return hr;
+        if ( FAILED( hr ) )
+        {
+            IRandomAccessStreamReference_Release( fileStreamReference );
+            WindowsDeleteString( pathString );
+            return hr;
+        }
     
         asyncRes = await_IAsyncOperation_IRandomAccessStream( random_access_stream_operation, INFINITE );
-        if ( asyncRes ) return E_ABORT;
+        if ( asyncRes )
+        {
+            IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+            IRandomAccessStreamReference_Release( fileStreamReference );
+            WindowsDeleteString( pathString );
+            return E_ABORT;
+        }
     
         hr = IAsyncOperation_IRandomAccessStream_GetResults( random_access_stream_operation, &fileStream );
-        if ( FAILED( hr ) ) return hr;
+        if ( FAILED( hr ) )
+        {
+            IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+            IRandomAccessStreamReference_Release( fileStreamReference );
+            WindowsDeleteString( pathString );
+            return hr;
+        }
     
         IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+
+        WindowsDeleteString( pathString );
 
         return IRandomAccessStream_QueryInterface( fileStream, riid, ppv );
     }

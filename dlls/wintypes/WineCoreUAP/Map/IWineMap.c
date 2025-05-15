@@ -908,6 +908,97 @@ static const struct IObservableMap_HSTRING_IInspectableVtbl observable_hstring_m
     observable_hstring_map_remove_MapChanged
 };
 
+//All of this fits together to form IPropertySet and IValueSet
+struct property_set
+{
+    IPropertySet IPropertySet_iface;
+    //Inheritence tree
+        IObservableMap_HSTRING_IInspectable *map;
+    LONG ref;
+};
+
+static inline struct property_set *impl_from_IPropertySet( IPropertySet *iface )
+{
+    return CONTAINING_RECORD( iface, struct property_set, IPropertySet_iface );
+}
+
+static HRESULT WINAPI property_set_QueryInterface( IPropertySet *iface, REFIID iid, void **out )
+{
+    HRESULT hr;
+    struct property_set *impl = impl_from_IPropertySet( iface );
+
+    DEFINE_HSTRING_MAP_IIDS( IInspectable );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IPropertySet ))
+    {
+        IInspectable_AddRef( (*out = &impl->IPropertySet_iface) );
+        return S_OK;
+    }
+
+    if ( !impl->map )
+    {
+        hr = observable_hstring_map_create( &IInspectable_iids, (void **)&impl->map );
+        if ( FAILED( hr ) ) return hr;
+    }
+
+    return IObservableMap_HSTRING_IInspectable_QueryInterface( impl->map, iid, out );
+}
+
+static ULONG WINAPI property_set_AddRef( IPropertySet *iface )
+{
+    struct property_set *impl = impl_from_IPropertySet( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI property_set_Release( IPropertySet *iface )
+{
+    struct property_set *impl = impl_from_IPropertySet( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref)
+        free( impl );
+
+    return ref;
+}
+
+static HRESULT WINAPI property_set_GetIids( IPropertySet *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI property_set_GetRuntimeClassName( IPropertySet *iface, HSTRING *class_name )
+{
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI property_set_GetTrustLevel( IPropertySet *iface, TrustLevel *trust_level )
+{
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
+    return E_NOTIMPL;
+}
+
+const struct IPropertySetVtbl property_set_vtbl =
+{
+    property_set_QueryInterface,
+    property_set_AddRef,
+    property_set_Release,
+    /* IInspectable methods */
+    property_set_GetIids,
+    property_set_GetRuntimeClassName,
+    property_set_GetTrustLevel
+};
+
 struct hstring_map_event_handler
 {
     IMapChangedEventHandler_HSTRING_IInspectable IMapChangedEventHandler_HSTRING_IInspectable_iface;

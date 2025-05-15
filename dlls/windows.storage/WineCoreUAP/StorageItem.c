@@ -366,7 +366,6 @@ static HRESULT WINAPI storage_item2_GetParentAsync( IStorageItem2 *iface, IAsync
     HRESULT hr;
     HSTRING parentPath;
     WCHAR path[MAX_PATH];
-    LPWSTR parent;
 
     TRACE( "iface %p, operation %p\n", iface, operation );
 
@@ -374,10 +373,7 @@ static HRESULT WINAPI storage_item2_GetParentAsync( IStorageItem2 *iface, IAsync
     if ( !operation ) return E_POINTER;
 
     wcscpy( path, WindowsGetStringRawBuffer( impl->Path, NULL ) );
-    parent = wcsrchr( path, L'\\' );
-
-    if ( parent != NULL )
-        *parent = L'\0';
+    PathRemoveFileSpecW( path );
 
     WindowsCreateString( path, wcslen( path ), &parentPath );
 

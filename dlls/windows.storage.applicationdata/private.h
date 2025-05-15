@@ -38,8 +38,11 @@
 #include "windows.storage.h"
 
 #include "provider.h"
+#include "reg.h"
 
 extern IActivationFactory *application_data_factory;
+
+#define _ENABLE_DEBUGGING_ WINE_DEFAULT_DEBUG_CHANNEL(winrt_appdata);
 
 struct vector_iids
 {
@@ -48,6 +51,20 @@ struct vector_iids
     const GUID *view;
     const GUID *iterable;
     const GUID *iterator;
+};
+
+struct map_iids
+{
+    const GUID *observableMap;
+    const GUID *map;
+    const GUID *view;
+    const GUID *iterable;
+    const GUID *iterator;
+};
+
+struct event_iids
+{
+    const GUID *event;
 };
 
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
@@ -66,14 +83,17 @@ extern HRESULT vector_create( const struct vector_iids *iids, void **out );
 
 extern HRESULT observable_vector_create( const struct vector_iids *iids, void **out );
 
-extern HRESULT hstring_map_create( const struct vector_iids *iids, void **out );
+extern HRESULT hstring_map_create( const struct map_iids *iids, void **out );
 
-extern HRESULT observable_hstring_map_create( const struct vector_iids *iids, void **out );
+extern HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out );
 
 extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
 
 #define DEFINE_VECTOR_IIDS( interface ) \
     struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };
+
+#define DEFINE_HSTRING_MAP_IIDS( interface ) \
+    struct map_iids interface##_iids = {.iterable = &IID_IIterable_IKeyValuePair_HSTRING_##interface, .iterator = &IID_IIterator_IKeyValuePair_HSTRING_##interface, .map = &IID_IMap_HSTRING_##interface, .view = &IID_IMapView_HSTRING_##interface, .observableMap = &IID_IObservableMap_HSTRING_##interface };
 
 #define DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )                 \
     static inline impl_type *impl_from( iface_type *iface )                                        \
@@ -212,6 +232,17 @@ extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback
                                                                                                     \
         return ret;                                                                                 \
     }
+
+#define ACTIVATE_INSTANCE( instance_name, instance_object, instance_iid ) \
+{                                                                                   \
+    HSTRING _str;                                                                   \
+    HRESULT _hr;                                                                    \
+    _hr = WindowsCreateString( instance_name, wcslen( instance_name ), &_str );     \
+                                                                                    \
+    _hr = RoGetActivationFactory( _str, &instance_iid, (void **)&instance_object ); \
+    WindowsDeleteString( _str );                                                    \
+    if (_hr == REGDB_E_CLASSNOTREG) return E_ABORT;                                 \
+}
 
 #define DEFINE_IUNKNOWN( pfx, iface_type, impl_type, base_iface )                                  \
     DEFINE_IUNKNOWN_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )

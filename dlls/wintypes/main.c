@@ -1304,12 +1304,20 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
         IActivationFactory_AddRef((*factory = &api_information_statics.IActivationFactory_iface));
     if (!wcscmp(buffer, L"Windows.Foundation.PropertyValue"))
         IActivationFactory_AddRef((*factory = &property_value_statics.IActivationFactory_iface));
+
+    /**
+     * Windows.Foundation 
+    */
+    if (!wcscmp( buffer, RuntimeClass_Windows_Foundation_Collections_PropertySet ))
+        //(@WinTypes.dll)
+        IActivationFactory_QueryInterface( property_set_factory, &IID_IActivationFactory, (void **)factory );
+    
     /**
      * Windows.Storage.Streams
     */
-   if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_Buffer ))
-       //(@WinTypes.dll)
-       IActivationFactory_QueryInterface( buffer_factory, &IID_IActivationFactory, (void **)factory );
+    if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_Buffer ))
+        //(@WinTypes.dll)
+        IActivationFactory_QueryInterface( buffer_factory, &IID_IActivationFactory, (void **)factory );
     
     if (!wcscmp( buffer, RuntimeClass_Windows_Storage_Streams_DataReader ))
        //(@WinTypes.dll)

@@ -56,5 +56,3 @@ namespace Windows.Storage.Streams {
         [default] interface Windows.Storage.Streams.IRandomAccessStreamReference;
     }
 }
-
-//#include "windows.storage.idl"

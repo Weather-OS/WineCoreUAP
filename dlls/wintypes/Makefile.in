@@ -8,6 +8,12 @@ SOURCES = \
 	main.c \
 	wintypes_private.idl \
 	\
+	WineCoreUAP/Map/IWineMap.c \
+	\
+	WineCoreUAP/Vector/IWineVector.c \
+	\
+	WineCoreUAP/Foundation/Collections/PropertySet.c \
+	\
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/AsyncOperation/UINT32Async.c \
 	WineCoreUAP/Storage/Streams/Buffer.c \

@@ -19,7 +19,7 @@
 
 #include "SetVersionInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+_ENABLE_DEBUGGING_
 
 struct set_version *impl_from_ISetVersionRequest( ISetVersionRequest *iface )
 {

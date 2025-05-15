@@ -19,7 +19,7 @@
 
 #include "ApplicationDataInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+_ENABLE_DEBUGGING_
 
 DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_folder_handler, IAsyncOperationCompletedHandler_StorageFolder, IAsyncOperation_StorageFolder )
 
@@ -230,7 +230,8 @@ static HRESULT WINAPI application_data_get_LocalSettings( IApplicationData *ifac
 
 static HRESULT WINAPI application_data_get_RoamingSettings( IApplicationData *iface, IApplicationDataContainer **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
+    //Client should use Azure App Service instead.
+    TRACE( "iface %p, value %p client should use Azure app Service!\n", iface, value );
     return E_NOTIMPL;
 }
 

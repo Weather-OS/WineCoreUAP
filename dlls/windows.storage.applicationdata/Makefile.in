@@ -7,6 +7,8 @@ SOURCES = \
 	WineCoreUAP/AsyncOperation/IWineAsync.c \
 	WineCoreUAP/ApplicationData.c \
 	WineCoreUAP/ApplicationDataInternal.c \
+	WineCoreUAP/ApplicationDataContainer.c \
+	WineCoreUAP/ApplicationDataContainerInternal.c \
 	WineCoreUAP/SetVersion.c \
 	WineCoreUAP/Vector/IWineVector.c \
 	WineCoreUAP/Map/IWineMap.c \

@@ -19,7 +19,7 @@
 
 #include "ApplicationDataInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+_ENABLE_DEBUGGING_
 
 static HRESULT setSePrivilege( LPCSTR privilege, BOOL enable )
 {
@@ -48,7 +48,6 @@ static HRESULT setSePrivilege( LPCSTR privilege, BOOL enable )
 
 HRESULT WINAPI application_data_Init( IApplicationData **value )
 {
-    static LPCWSTR rootKeyName = L"ApplicationData";
     HRESULT status = S_OK;
     LPCWSTR AppName;    
     LSTATUS hiveStatus;
@@ -59,10 +58,10 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
     DWORD dataSize = sizeof(UINT32);
     DWORD type;
     HKEY rootKey;
+    HKEY tmpKey;
 
     struct application_data *data;
     struct appx_package package;
-
 
     GetModuleFileNameW( NULL, manifestPath, MAX_PATH );
     PathRemoveFileSpecW( manifestPath );
@@ -133,11 +132,23 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
         hiveStatus = RegCreateKeyW( HKEY_LOCAL_MACHINE, rootKeyName, &rootKey );
         if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
 
+        hiveStatus = RegCreateKeyW( rootKey, L"LocalState", &tmpKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegCloseKey( tmpKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegCreateKeyW( rootKey, L"RoamingState", &tmpKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
+        hiveStatus = RegCloseKey( tmpKey );
+        if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
+
         hiveStatus = RegSaveKeyW( rootKey, path, NULL );
         if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
         data->Version = 0;    
         
-        hiveStatus = RegDeleteKeyW( HKEY_LOCAL_MACHINE, rootKeyName );
+        hiveStatus = RegDeleteTreeW( HKEY_LOCAL_MACHINE, rootKeyName );
         if ( hiveStatus != ERROR_SUCCESS ) return HRESULT_FROM_WIN32( hiveStatus );
 
         hiveStatus = RegCloseKey( rootKey );
@@ -159,7 +170,6 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
 
 HRESULT WINAPI application_data_SetVersion( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
-    static LPCWSTR rootKeyName = L"ApplicationData";
     HRESULT status = S_OK;
     LSTATUS hiveStatus;
     LPWSTR appDataPath;

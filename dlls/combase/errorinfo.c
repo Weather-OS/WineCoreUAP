@@ -519,6 +519,8 @@ HRESULT WINAPI SetRestrictedErrorInfo(IRestrictedErrorInfo *restricted_error_inf
     if (FAILED(hr)) 
         return hr;
 
+    FIXME("application reported an error! error description was %s, error hresult was 0x%#lx\n", debugstr_w(error_info->description), error_info->hresult_error);
+
     ICreateErrorInfo_QueryInterface( createErrorInfo, &IID_IErrorInfo, (void **)&errorInfo );
 
     return SetErrorInfo( 0, errorInfo );;

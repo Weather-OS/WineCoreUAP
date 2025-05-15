@@ -1,4 +1,4 @@
-/* WinRT Windows.Storage.ApplicationData Implementation
+/* WinRT Windows.Foundation.PropertySet Implementation
  *
  * Written by Weather
  *
@@ -19,35 +19,21 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef APPLICATION_DATA_CONTAINER_INTERNAL_H
-#define APPLICATION_DATA_CONTAINER_INTERNAL_H
+#ifndef PROPERTY_SET_INTERNAL_H
+#define PROPERTY_SET_INTERNAL_H
 
-#include "../private.h"
+#include "../../../private.h"
 #include "wine/debug.h"
-#include "shlwapi.h"
-#include "propidl.h"
-#include "propvarutil.h"
 
-#include "ApplicationDataInternal.h"
+extern struct IPropertySetVtbl property_set_vtbl;
 
-#define MAX_VALUE_SIZE (1024 * 1024)
-#define MAX_VALUE_NAME (128 * 128)
-
-extern const struct IApplicationDataContainerVtbl application_data_container_vtbl;
-
-struct application_data_container
+struct property_set_statics
 {
-    //Derivatives
-    IApplicationDataContainer IApplicationDataContainer_iface;
-    HSTRING Name;
-    ApplicationDataLocality Locality; //Client handles everything regarding Locales. We don't need to do anything.
-    IPropertySet *Values;
-    IMap_HSTRING_ApplicationDataContainer *Containers;
-
-    HKEY containerKey;
+    IActivationFactory IActivationFactory_iface;
+    IPropertySet IPropertySet_iface;
     LONG ref;
 };
 
-struct application_data *impl_from_IApplicationData( IApplicationData *iface );
+struct buffer *impl_from_IPropertySet( IPropertySet *iface );
 
 #endif

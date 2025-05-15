@@ -19,7 +19,7 @@
 
 #include "ApplicationDataContainerInternal.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(data);
+_ENABLE_DEBUGGING_
 
 struct application_data_container *impl_from_IApplicationDataContainer( IApplicationDataContainer *iface )
 {

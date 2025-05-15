@@ -1348,11 +1348,11 @@ START_TEST(storage)
     {
         test_AppDataPathsStatics( &apppath );
         test_KnownFolders();
+        test_DownloadsFolder();
     }
     
     test_StorageFolder( apppath, &returnedItem, &returnedFile, &returnedFolder );
     test_StorageFile( apppath, returnedFolder );
-    test_DownloadsFolder();
 
     RoUninitialize();
 }
