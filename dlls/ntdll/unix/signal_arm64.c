@@ -231,17 +231,6 @@ void set_process_instrumentation_callback( void *callback )
 
 
 /***********************************************************************
- *           unwind_builtin_dll
- *
- * Equivalent of RtlVirtualUnwind for builtin modules.
- */
-NTSTATUS unwind_builtin_dll( void *args )
-{
-    return STATUS_UNSUCCESSFUL;
-}
-
-
-/***********************************************************************
  *           syscall_frame_fixup_for_fastpath
  *
  * Fixes up the given syscall frame such that the syscall dispatcher
@@ -1678,8 +1667,8 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
                    /* switch to user stack */
                    "mov sp, x17\n\t"
                    "ret x16\n"
-                   "4:\tmov x0, #0xc0000000\n\t" /* STATUS_INVALID_PARAMETER */
-                   "movk x0, #0x000d\n\t"
+                   "4:\tmov x0, #0xc0000000\n\t" /* STATUS_INVALID_SYSTEM_SERVICE */
+                   "movk x0, #0x001c\n\t"
                    "b " __ASM_LOCAL_LABEL("__wine_syscall_dispatcher_return") )
 
 __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher_return,

@@ -32,6 +32,7 @@
 #include "wincrypt.h"
 #include "mscat.h"
 #include "devguid.h"
+#include "ntddvdeo.h"
 #include "initguid.h"
 #include "devpkey.h"
 #include "setupapi.h"
@@ -1948,11 +1949,9 @@ static void test_device_key(void)
 
     SetLastError(0xdeadbeef);
     key = SetupDiOpenDevRegKey(set, &device, DICS_FLAG_GLOBAL, 0, DIREG_DRV, 0);
-todo_wine {
     ok(key == INVALID_HANDLE_VALUE, "Expected failure.\n");
     ok(GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_ACCESS_DENIED, /* win2k3 */
             "Got unexpected error %#lx.\n", GetLastError());
-}
 
     key = SetupDiOpenDevRegKey(set, &device, DICS_FLAG_GLOBAL, 0, DIREG_DRV, KEY_READ);
     ok(key != INVALID_HANDLE_VALUE, "Failed to open device key, error %#lx.\n", GetLastError());
@@ -3942,6 +3941,84 @@ todo_wine {
     SetupDiDestroyDeviceInfoList(set);
 }
 
+static void test_SetupDiOpenDeviceInterface(void)
+{
+    BYTE iface_detail_buffer[sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W) + 256 * sizeof(WCHAR)];
+    SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
+    SP_DEVICE_INTERFACE_DETAIL_DATA_W *iface_data;
+    SP_DEVINFO_DATA device = { sizeof(device) };
+    WCHAR device_path[256];
+    char device_patha[256];
+    HDEVINFO set;
+    BOOL ret;
+
+    set = SetupDiGetClassDevsW(&GUID_DEVINTERFACE_DISPLAY_ADAPTER, NULL, NULL, DIGCF_DEVICEINTERFACE);
+    ok(set != INVALID_HANDLE_VALUE, "got %p.\n", set);
+    ret = SetupDiEnumDeviceInterfaces(set, NULL, &GUID_DEVINTERFACE_DISPLAY_ADAPTER, 0, &iface);
+    if (!ret && GetLastError() == ERROR_NO_MORE_ITEMS)
+    {
+        skip("No display adapters, skipping test.\n");
+        SetupDiDestroyDeviceInfoList(set);
+        return;
+    }
+    ok(ret, "got error %lu.\n", GetLastError());
+    iface_data = (SP_DEVICE_INTERFACE_DETAIL_DATA_W *)iface_detail_buffer;
+    iface_data->cbSize = sizeof(*iface_data);
+    ret = SetupDiGetDeviceInterfaceDetailW(set, &iface, iface_data, sizeof(iface_detail_buffer), NULL, &device);
+    ok(ret, "got error %lu.\n", GetLastError());
+    wcscpy(device_path, iface_data->DevicePath);
+    SetupDiDestroyDeviceInfoList(set);
+
+    set = SetupDiCreateDeviceInfoListExW(NULL, NULL, NULL, NULL);
+    ok(set != INVALID_HANDLE_VALUE, "got %p.\n", set);
+    memset(&iface, 0xcc, sizeof(iface));
+    iface.cbSize = sizeof(iface);
+
+    ret = SetupDiOpenDeviceInterfaceW(set, NULL, 0, &iface);
+    ok(!ret && GetLastError() == ERROR_INVALID_PARAMETER, "got ret %d, error %#lx.\n", ret, GetLastError());
+
+    ret = SetupDiOpenDeviceInfoW(set, L"qqq", NULL, 0, &device);
+    todo_wine_if(!ret && GetLastError() == ERROR_NO_SUCH_DEVINST)
+    ok(!ret && GetLastError() == ERROR_INVALID_DEVINST_NAME, "got ret %d, error %#lx.\n", ret, GetLastError());
+    ret = SetupDiOpenDeviceInterfaceW(set, L"\\\\?\\", 0, &iface);
+    ok((!ret && GetLastError() == ERROR_NO_SUCH_DEVICE_INTERFACE) ||
+       broken(!ret && GetLastError() == ERROR_BAD_PATHNAME), /* Win7 */
+       "got ret %d, error %#lx.\n", ret, GetLastError());
+    ret = SetupDiOpenDeviceInterfaceW(set, device_path, 0, NULL);
+    ok(ret, "got error %#lx.\n", GetLastError());
+    SetupDiDestroyDeviceInfoList(set);
+
+    set = SetupDiCreateDeviceInfoListExW(NULL, NULL, NULL, NULL);
+    ok(set != INVALID_HANDLE_VALUE, "got %p.\n", set);
+    memset(&iface, 0xcc, sizeof(iface));
+    iface.cbSize = sizeof(iface);
+
+    ret = SetupDiOpenDeviceInterfaceW(set, device_path, 0, &iface);
+    ok(ret, "got error %lu.\n", GetLastError());
+    ok(IsEqualGUID(&iface.InterfaceClassGuid, &GUID_DEVINTERFACE_DISPLAY_ADAPTER), "got %s.\n",
+            debugstr_guid(&iface.InterfaceClassGuid));
+    memset(&iface, 0xcc, sizeof(iface));
+    iface.cbSize = sizeof(iface);
+    ret = SetupDiEnumDeviceInterfaces(set, NULL, &GUID_DEVINTERFACE_DISPLAY_ADAPTER, 0, &iface);
+    ok(ret, "got error %lu.\n", GetLastError());
+    SetupDiDestroyDeviceInfoList(set);
+
+    set = SetupDiCreateDeviceInfoListExW(NULL, NULL, NULL, NULL);
+    ok(set != INVALID_HANDLE_VALUE, "got %p.\n", set);
+    WideCharToMultiByte(CP_ACP, 0, device_path, -1, device_patha, sizeof(device_patha), NULL, NULL);
+    memset(&iface, 0xcc, sizeof(iface));
+    iface.cbSize = sizeof(iface);
+    ret = SetupDiOpenDeviceInterfaceA(set, device_patha, 0, &iface);
+    ok(ret, "got error %lu.\n", GetLastError());
+    ok(IsEqualGUID(&iface.InterfaceClassGuid, &GUID_DEVINTERFACE_DISPLAY_ADAPTER), "got %s.\n",
+            debugstr_guid(&iface.InterfaceClassGuid));
+    memset(&iface, 0xcc, sizeof(iface));
+    iface.cbSize = sizeof(iface);
+    ret = SetupDiEnumDeviceInterfaces(set, NULL, &GUID_DEVINTERFACE_DISPLAY_ADAPTER, 0, &iface);
+    ok(ret, "got error %lu.\n", GetLastError());
+    SetupDiDestroyDeviceInfoList(set);
+}
+
 static BOOL file_exists(const char *path)
 {
     return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
@@ -4701,6 +4778,7 @@ START_TEST(devinst)
     test_driver_list();
     test_call_class_installer();
     test_get_class_devs();
+    test_SetupDiOpenDeviceInterface();
 
     if (!testsign_create_cert(&ctx))
         return;

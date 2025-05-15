@@ -1459,10 +1459,16 @@ static HRESULT WINAPI WineJScript_InitHostObject(IWineJScript *iface, IWineJSDis
 }
 
 static HRESULT WINAPI WineJScript_InitHostConstructor(IWineJScript *iface, IWineJSDispatchHost *constr,
-                                                      IWineJSDispatch *prototype, IWineJSDispatch **ret)
+                                                      const WCHAR *method_name, IWineJSDispatch **ret)
 {
     JScript *This = impl_from_IWineJScript(iface);
-    return init_host_constructor(This->ctx, constr, prototype, ret);
+    return init_host_constructor(This->ctx, constr, method_name, ret);
+}
+
+static HRESULT WINAPI WineJScript_FillGlobals(IWineJScript *iface, IWineJSDispatchHost *script_global)
+{
+    JScript *This = impl_from_IWineJScript(iface);
+    return fill_globals(This->ctx, script_global);
 }
 
 static const IWineJScriptVtbl WineJScriptVtbl = {
@@ -1471,6 +1477,7 @@ static const IWineJScriptVtbl WineJScriptVtbl = {
     WineJScript_Release,
     WineJScript_InitHostObject,
     WineJScript_InitHostConstructor,
+    WineJScript_FillGlobals,
 };
 
 HRESULT create_jscript_object(BOOL is_encode, REFIID riid, void **ppv)

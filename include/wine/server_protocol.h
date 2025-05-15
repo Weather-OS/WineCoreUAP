@@ -827,6 +827,7 @@ struct pe_image_info
     mem_size_t     stack_commit;
     unsigned int   entry_point;
     unsigned int   map_size;
+    unsigned int   alignment;
     unsigned int   zerobits;
     unsigned int   subsystem;
     unsigned short subsystem_minor;
@@ -844,6 +845,7 @@ struct pe_image_info
     unsigned char  image_flags;
     unsigned int   loader_flags;
     unsigned int   header_size;
+    unsigned int   header_map_size;
     unsigned int   file_size;
     unsigned int   checksum;
     unsigned int   dbg_offset;
@@ -1004,6 +1006,11 @@ typedef volatile struct
     object_id_t          id;
     object_shm_t         shm;
 } shared_object_t;
+
+typedef volatile struct
+{
+    struct user_entry user_entries[MAX_USER_HANDLES];
+} session_shm_t;
 
 struct obj_locator
 {
@@ -1203,9 +1210,9 @@ struct get_process_info_reply
     unsigned int session_id;
     int          exit_code;
     int          priority;
+    unsigned short base_priority;
     unsigned short machine;
     /* VARARG(image,pe_image_info); */
-    char __pad_62[2];
 };
 
 
@@ -1264,19 +1271,20 @@ struct set_process_info_request
 {
     struct request_header __header;
     obj_handle_t handle;
-    int          mask;
     int          priority;
+    int          base_priority;
     affinity_t   affinity;
     obj_handle_t token;
-    char __pad_36[4];
+    int          mask;
 };
 struct set_process_info_reply
 {
     struct reply_header __header;
 };
-#define SET_PROCESS_INFO_PRIORITY 0x01
-#define SET_PROCESS_INFO_AFFINITY 0x02
-#define SET_PROCESS_INFO_TOKEN    0x04
+#define SET_PROCESS_INFO_PRIORITY      0x01
+#define SET_PROCESS_INFO_BASE_PRIORITY 0x02
+#define SET_PROCESS_INFO_AFFINITY      0x04
+#define SET_PROCESS_INFO_TOKEN         0x08
 
 
 
@@ -1297,7 +1305,7 @@ struct get_thread_info_reply
     affinity_t   affinity;
     int          exit_code;
     int          priority;
-    int          last;
+    int          base_priority;
     int          suspend_count;
     unsigned int flags;
     data_size_t  desc_len;
@@ -1305,6 +1313,7 @@ struct get_thread_info_reply
 };
 #define GET_THREAD_INFO_FLAG_DBG_HIDDEN 0x01
 #define GET_THREAD_INFO_FLAG_TERMINATED 0x02
+#define GET_THREAD_INFO_FLAG_LAST       0x04
 
 
 
@@ -1328,24 +1337,25 @@ struct set_thread_info_request
 {
     struct request_header __header;
     obj_handle_t handle;
-    int          mask;
     int          priority;
+    int          base_priority;
     affinity_t   affinity;
     client_ptr_t entry_point;
     obj_handle_t token;
+    unsigned int mask;
     /* VARARG(desc,unicode_str); */
-    char __pad_44[4];
 };
 struct set_thread_info_reply
 {
     struct reply_header __header;
 };
-#define SET_THREAD_INFO_PRIORITY    0x01
-#define SET_THREAD_INFO_AFFINITY    0x02
-#define SET_THREAD_INFO_TOKEN       0x04
-#define SET_THREAD_INFO_ENTRYPOINT  0x08
-#define SET_THREAD_INFO_DESCRIPTION 0x10
-#define SET_THREAD_INFO_DBG_HIDDEN  0x20
+#define SET_THREAD_INFO_PRIORITY        0x01
+#define SET_THREAD_INFO_BASE_PRIORITY   0x02
+#define SET_THREAD_INFO_AFFINITY        0x04
+#define SET_THREAD_INFO_TOKEN           0x08
+#define SET_THREAD_INFO_ENTRYPOINT      0x10
+#define SET_THREAD_INFO_DESCRIPTION     0x20
+#define SET_THREAD_INFO_DBG_HIDDEN      0x40
 
 
 
@@ -3456,14 +3466,10 @@ struct get_window_info_request
 struct get_window_info_reply
 {
     struct reply_header __header;
-    user_handle_t  full_handle;
     user_handle_t  last_active;
-    process_id_t   pid;
-    thread_id_t    tid;
-    atom_t         atom;
     int            is_unicode;
     unsigned int   dpi_context;
-    char __pad_36[4];
+    char __pad_20[4];
 };
 
 
@@ -5364,9 +5370,11 @@ struct get_token_info_reply
     unsigned int   session_id;
     int            primary;
     int            impersonation_level;
-    int            elevation;
+    int            elevation_type;
+    int            is_elevated;
     int            group_count;
     int            privilege_count;
+    char __pad_52[4];
 };
 
 
@@ -5611,7 +5619,8 @@ struct set_window_layered_info_reply
 struct alloc_user_handle_request
 {
     struct request_header __header;
-    char __pad_12[4];
+    unsigned short type;
+    char __pad_14[2];
 };
 struct alloc_user_handle_reply
 {
@@ -5625,7 +5634,10 @@ struct alloc_user_handle_reply
 struct free_user_handle_request
 {
     struct request_header __header;
+    unsigned short type;
+    char __pad_14[2];
     user_handle_t  handle;
+    char __pad_20[4];
 };
 struct free_user_handle_reply
 {
@@ -5848,6 +5860,22 @@ struct resume_process_reply
     struct reply_header __header;
 };
 
+
+struct get_next_process_request
+{
+    struct request_header __header;
+    obj_handle_t last;
+    unsigned int access;
+    unsigned int attributes;
+    unsigned int flags;
+    char __pad_28[4];
+};
+struct get_next_process_reply
+{
+    struct reply_header __header;
+    obj_handle_t handle;
+    char __pad_12[4];
+};
 
 
 struct get_next_thread_request
@@ -6175,6 +6203,7 @@ enum request
     REQ_terminate_job,
     REQ_suspend_process,
     REQ_resume_process,
+    REQ_get_next_process,
     REQ_get_next_thread,
     REQ_set_keyboard_repeat,
     REQ_NB_REQUESTS
@@ -6474,6 +6503,7 @@ union generic_request
     struct terminate_job_request terminate_job_request;
     struct suspend_process_request suspend_process_request;
     struct resume_process_request resume_process_request;
+    struct get_next_process_request get_next_process_request;
     struct get_next_thread_request get_next_thread_request;
     struct set_keyboard_repeat_request set_keyboard_repeat_request;
 };
@@ -6771,10 +6801,11 @@ union generic_reply
     struct terminate_job_reply terminate_job_reply;
     struct suspend_process_reply suspend_process_reply;
     struct resume_process_reply resume_process_reply;
+    struct get_next_process_reply get_next_process_reply;
     struct get_next_thread_reply get_next_thread_reply;
     struct set_keyboard_repeat_reply set_keyboard_repeat_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 855
+#define SERVER_PROTOCOL_VERSION 871
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

@@ -40,6 +40,17 @@
 @ cdecl wined3d_command_list_decref(ptr)
 @ cdecl wined3d_command_list_incref(ptr)
 
+@ cdecl wined3d_decoder_begin_frame(ptr ptr)
+@ cdecl wined3d_decoder_create(ptr ptr ptr)
+@ cdecl wined3d_decoder_decref(ptr)
+@ cdecl wined3d_decoder_decode(ptr long long)
+@ cdecl wined3d_decoder_end_frame(ptr)
+@ cdecl wined3d_decoder_get_buffer(ptr long)
+
+@ cdecl wined3d_decoder_output_view_create(ptr ptr ptr ptr ptr)
+@ cdecl wined3d_decoder_output_view_decref(ptr)
+@ cdecl wined3d_decoder_output_view_incref(ptr)
+
 @ cdecl wined3d_deferred_context_create(ptr ptr)
 @ cdecl wined3d_deferred_context_destroy(ptr)
 @ cdecl wined3d_deferred_context_record_command_list(ptr long ptr)
@@ -71,6 +82,8 @@
 @ cdecl wined3d_device_get_state(ptr)
 @ cdecl wined3d_device_get_swapchain(ptr long)
 @ cdecl wined3d_device_get_swapchain_count(ptr)
+@ cdecl wined3d_device_get_video_decode_profile_count(ptr)
+@ cdecl wined3d_device_get_video_decode_profile(ptr long ptr)
 @ cdecl wined3d_device_get_wined3d(ptr)
 @ cdecl wined3d_device_incref(ptr)
 @ cdecl wined3d_device_process_vertices(ptr ptr long long long ptr ptr long long)
@@ -339,6 +352,9 @@
 @ cdecl wined3d_vertex_declaration_get_parent(ptr)
 @ cdecl wined3d_vertex_declaration_incref(ptr)
 
+@ stdcall vkd3d_D3DPreprocess(ptr long ptr ptr ptr ptr ptr) D3DPreprocess
+@ stdcall vkd3d_D3DCompile2VKD3D(ptr long ptr ptr ptr ptr ptr long long long ptr long ptr ptr long) D3DCompile2VKD3D
+
 @ cdecl vkd3d_acquire_vk_queue(ptr)
 @ cdecl vkd3d_create_device(ptr ptr ptr)
 @ cdecl vkd3d_create_image_resource(ptr ptr ptr)
@@ -360,6 +376,7 @@
 @ cdecl vkd3d_resource_incref(ptr)
 @ cdecl vkd3d_serialize_root_signature(ptr long ptr ptr)
 @ cdecl vkd3d_serialize_versioned_root_signature(ptr ptr ptr)
+@ cdecl vkd3d_queue_signal_on_cpu(ptr ptr long)
 
 @ cdecl vkd3d_shader_compile(ptr ptr ptr)
 @ cdecl vkd3d_shader_convert_root_signature(ptr long ptr)

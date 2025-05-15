@@ -1023,6 +1023,34 @@ static BOOL notify_dispinfoT(const LISTVIEW_INFO *infoPtr, UINT code, LPNMLVDISP
     return ret;
 }
 
+static int notify_odfinditem(const LISTVIEW_INFO *infoPtr, NMLVFINDITEMW *nmlv)
+{
+    NMLVFINDITEMA nmlva;
+    char *str = NULL;
+    int len, ret;
+
+    if (infoPtr->notifyFormat == NFR_UNICODE)
+        return notify_hdr(infoPtr, LVN_ODFINDITEMW, &nmlv->hdr);
+
+    /* A/W layout is the same, the only difference is string encoding. */
+    memcpy(&nmlva, nmlv, sizeof(nmlva));
+    nmlva.lvfi.psz = NULL;
+
+    if (nmlv->lvfi.psz)
+    {
+        len = WideCharToMultiByte(CP_ACP, 0, nmlv->lvfi.psz, -1, NULL, 0, NULL, NULL);
+        str = Alloc(len);
+        if (!str) return 0;
+        WideCharToMultiByte(CP_ACP, 0, nmlv->lvfi.psz, -1, str, len, NULL, NULL);
+        nmlva.lvfi.psz = str;
+    }
+
+    ret = notify_hdr(infoPtr, LVN_ODFINDITEMA, &nmlva.hdr);
+    Free(str);
+
+    return ret;
+}
+
 static void customdraw_fill(NMLVCUSTOMDRAW *lpnmlvcd, const LISTVIEW_INFO *infoPtr, HDC hdc,
 			    const RECT *rcBounds, const LVITEMW *lplvItem)
 {
@@ -1917,7 +1945,7 @@ static INT LISTVIEW_ProcessLetterKeys(LISTVIEW_INFO *infoPtr, WPARAM charCode, L
 
         infoPtr->szSearchParam[infoPtr->nSearchParamLength] = 0;
 
-        nItem = notify_hdr(infoPtr, LVN_ODFINDITEMW, (LPNMHDR)&nmlv.hdr);
+        nItem = notify_odfinditem(infoPtr, &nmlv);
     }
     else
     {
@@ -5601,6 +5629,13 @@ static BOOL LISTVIEW_DeleteAllItems(LISTVIEW_INFO *infoPtr, BOOL destroy)
     }
     LISTVIEW_InvalidateList(infoPtr);
     infoPtr->bNoItemMetrics = TRUE;
+
+    if (!destroy)
+    {
+        NotifyWinEvent( EVENT_OBJECT_REORDER, infoPtr->hwndSelf, OBJID_CLIENT, 0 );
+        NotifyWinEvent( EVENT_OBJECT_DESTROY, infoPtr->hwndSelf, OBJID_CLIENT, 0 );
+        NotifyWinEvent( EVENT_OBJECT_CREATE, infoPtr->hwndSelf, OBJID_CLIENT, 0 );
+    }
     
     return TRUE;
 }
@@ -5892,6 +5927,9 @@ static BOOL LISTVIEW_DeleteItem(LISTVIEW_INFO *infoPtr, INT nItem)
     /* now is the invalidation fun */
     if (!is_icon)
         LISTVIEW_ScrollOnInsert(infoPtr, nItem, -1);
+
+    NotifyWinEvent( EVENT_OBJECT_DESTROY, infoPtr->hwndSelf, OBJID_CLIENT, nItem + 1 );
+
     return TRUE;
 }
 
@@ -5921,18 +5959,15 @@ static BOOL LISTVIEW_EndEditLabelT(LISTVIEW_INFO *infoPtr, BOOL storeText, BOOL 
 
     if (storeText)
     {
-        DWORD len = isW ? GetWindowTextLengthW(infoPtr->hwndEdit) : GetWindowTextLengthA(infoPtr->hwndEdit);
+        DWORD len = (isW ? GetWindowTextLengthW(infoPtr->hwndEdit) : GetWindowTextLengthA(infoPtr->hwndEdit)) + 1;
 
-        if (len++)
-        {
-            if (!(pszText = Alloc(len * (isW ? sizeof(WCHAR) : sizeof(CHAR)))))
-                return FALSE;
+        if (!(pszText = Alloc(len * (isW ? sizeof(WCHAR) : sizeof(CHAR)))))
+            return FALSE;
 
-            if (isW)
-                GetWindowTextW(infoPtr->hwndEdit, pszText, len);
-            else
-                GetWindowTextA(infoPtr->hwndEdit, (CHAR*)pszText, len);
-        }
+        if (isW)
+            GetWindowTextW(infoPtr->hwndEdit, pszText, len);
+        else
+            GetWindowTextA(infoPtr->hwndEdit, (CHAR*)pszText, len);
     }
 
     TRACE("(pszText=%s, isW=%d)\n", debugtext_t(pszText, isW), isW);
@@ -6301,7 +6336,7 @@ static INT LISTVIEW_FindItemW(const LISTVIEW_INFO *infoPtr, INT nStart,
 
         nmlv.iStart = nStart;
         nmlv.lvfi = *lpFindInfo;
-        return notify_hdr(infoPtr, LVN_ODFINDITEMW, (LPNMHDR)&nmlv.hdr);
+        return notify_odfinditem(infoPtr, &nmlv);
     }
 
     if (!lpFindInfo || nItem < 0) return -1;
@@ -7792,7 +7827,11 @@ static INT LISTVIEW_InsertItemT(LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem,
 
     TRACE("(item=%s, isW=%d)\n", debuglvitem_t(lpLVItem, isW), isW);
 
-    if (infoPtr->dwStyle & LVS_OWNERDATA) return infoPtr->nItemCount++;
+    if (infoPtr->dwStyle & LVS_OWNERDATA)
+    {
+        NotifyWinEvent( EVENT_OBJECT_CREATE, hwndSelf, OBJID_CLIENT, infoPtr->nItemCount + 1 );
+        return infoPtr->nItemCount++;
+    }
 
     /* make sure it's an item, and not a subitem; cannot insert a subitem */
     if (!lpLVItem || lpLVItem->iSubItem) return -1;
@@ -7924,6 +7963,9 @@ static INT LISTVIEW_InsertItemT(LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem,
 
     /* now is the invalidation fun */
     LISTVIEW_ScrollOnInsert(infoPtr, nItem, 1);
+
+    NotifyWinEvent( EVENT_OBJECT_CREATE, hwndSelf, OBJID_CLIENT, nItem + 1 );
+
     return nItem;
 
 undo:
@@ -8447,8 +8489,8 @@ static BOOL LISTVIEW_SetColumnWidth(LISTVIEW_INFO *infoPtr, INT nColumn, INT cx)
 	if (infoPtr->himlSmall && (nColumn == 0 || (LISTVIEW_GetColumnInfo(infoPtr, nColumn)->fmt & LVCFMT_IMAGE)))
 	    max_cx += infoPtr->iconSize.cx;
 	max_cx += TRAILING_LABEL_PADDING;
-        if (nColumn == 0 && (infoPtr->dwLvExStyle & LVS_EX_CHECKBOXES))
-            max_cx += GetSystemMetrics(SM_CXSMICON);
+        if (nColumn == 0 && infoPtr->himlState)
+            max_cx += infoPtr->iconStateSize.cx;
     }
 
     /* autosize based on listview items width */
@@ -9328,6 +9370,8 @@ static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
   LISTVIEW_UpdateScroll(infoPtr);
   LISTVIEW_InvalidateList(infoPtr);
 
+  NotifyWinEvent( EVENT_OBJECT_REORDER, infoPtr->hwndSelf, OBJID_CLIENT, 0 );
+
   TRACE("nView %ld\n", nView);
 
   return 1;
@@ -9840,6 +9884,14 @@ static LRESULT LISTVIEW_VScroll(LISTVIEW_INFO *infoPtr, INT nScrollCode,
 
     case SB_PAGEDOWN:
 	nScrollDiff = scrollInfo.nPage;
+        break;
+
+    case SB_TOP:
+        nScrollDiff = -nOldScrollPos;
+        break;
+
+    case SB_BOTTOM:
+        nScrollDiff = scrollInfo.nMax - nOldScrollPos;
         break;
 
     case SB_THUMBPOSITION:
@@ -11552,11 +11604,17 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return 1;
 
   case LVM_GETORIGIN:
-    if (!lParam) return FALSE;
+  {
+    POINT *point = (POINT *)lParam;
+
+    if (!point) return FALSE;
     if (infoPtr->uView == LV_VIEW_DETAILS ||
         infoPtr->uView == LV_VIEW_LIST) return FALSE;
-    LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
+    LISTVIEW_GetOrigin(infoPtr, point);
+    point->x = -point->x;
+    point->y = -point->y;
     return TRUE;
+  }
 
   /* case LVM_GETOUTLINECOLOR: */
 

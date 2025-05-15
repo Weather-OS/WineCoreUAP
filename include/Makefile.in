@@ -326,6 +326,7 @@ SOURCES = \
 	fci.h \
 	fdi.h \
 	featurestagingapi.h \
+	fibersapi.h \
 	fileapi.h \
 	filter.idl \
 	fltdefs.h \
@@ -334,6 +335,7 @@ SOURCES = \
 	gameux.idl \
 	gamingtcui.h \
 	gdiplus.h \
+	gdiplusbase.h \
 	gdipluscolor.h \
 	gdipluscolormatrix.h \
 	gdipluseffects.h \
@@ -457,6 +459,8 @@ SOURCES = \
 	minidumpapiset.h \
 	minmax.h \
 	minschannel.h \
+	minwinbase.h \
+	minwindef.h \
 	mlang.idl \
 	mmc.idl \
 	mmddk.h \
@@ -464,6 +468,9 @@ SOURCES = \
 	mmreg.h \
 	mmstream.idl \
 	mmsystem.h \
+	mpeg2bits.h \
+	mpeg2data.idl \
+	mpeg2structs.idl \
 	mpegtype.idl \
 	mprapi.h \
 	mprerror.h \
@@ -633,6 +640,7 @@ SOURCES = \
 	physicalmonitorenumerationapi.h \
 	pktdef.h \
 	poppack.h \
+	powersetting.h \
 	powrprof.h \
 	prntvpt.h \
 	processthreadsapi.h \
@@ -666,6 +674,7 @@ SOURCES = \
 	rmxfguid.h \
 	rmxftmpl.x \
 	roapi.h \
+	robuffer.idl \
 	roerrorapi.h \
 	rometadata.h \
 	rometadataresolution.h \
@@ -754,6 +763,7 @@ SOURCES = \
 	structuredquerycondition.idl \
 	svrapi.h \
 	synchapi.h \
+	sysinfoapi.h \
 	systemmediatransportcontrolsinterop.idl \
 	t2embapi.h \
 	tapi.h \
@@ -941,6 +951,7 @@ SOURCES = \
 	wine/mscvpdb.h \
 	wine/mssign.h \
 	wine/nsi.h \
+	wine/opengl_driver.h \
 	wine/orpc.idl \
 	wine/plugplay.idl \
 	wine/rbtree.h \
@@ -954,10 +965,10 @@ SOURCES = \
 	wine/vulkan.h \
 	wine/vulkan_driver.h \
 	wine/wgl.h \
-	wine/wgl_driver.h \
 	wine/winbase16.h \
 	wine/windef16.h \
 	wine/wine_common_ver.rc \
+	wine/winebth.h \
 	wine/wined3d.h \
 	wine/winedmo.h \
 	wine/winedxgi.idl \
@@ -1019,6 +1030,7 @@ SOURCES = \
 	wownt16.h \
 	wownt32.h \
 	wpcapi.idl \
+	ws2bth.h \
 	ws2def.h \
 	ws2ipdef.h \
 	ws2spi.h \

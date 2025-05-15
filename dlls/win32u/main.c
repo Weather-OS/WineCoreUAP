@@ -39,8 +39,8 @@ void *__wine_syscall_dispatcher = NULL;
 #ifdef __arm64ec__
 enum syscall_ids
 {
-#define SYSCALL_ENTRY(id,name,args) __id_##name = id + 0x1000,
-ALL_SYSCALLS64
+#define SYSCALL_ENTRY(id,name,args) __id_##name = id,
+ALL_SYSCALLS
 #undef SYSCALL_ENTRY
 };
 
@@ -782,6 +782,11 @@ BOOL SYSCALL_API NtGdiLineTo( HDC hdc, INT x, INT y )
     SYSCALL_FUNC( NtGdiLineTo );
 }
 
+ULONG SYSCALL_API NtGdiMakeFontDir( DWORD embed, BYTE *buffer, UINT size, const WCHAR *path, UINT len )
+{
+    SYSCALL_FUNC( NtGdiMakeFontDir );
+}
+
 BOOL SYSCALL_API NtGdiMaskBlt( HDC hdcDest, INT nXDest, INT nYDest, INT nWidth, INT nHeight,
                                HDC hdcSrc, INT nXSrc, INT nYSrc, HBITMAP hbmMask,
                                INT xMask, INT yMask, DWORD dwRop, DWORD bk_color )
@@ -1120,6 +1125,11 @@ UINT SYSCALL_API NtUserAssociateInputContext( HWND hwnd, HIMC ctx, ULONG flags )
 BOOL SYSCALL_API NtUserAttachThreadInput( DWORD from, DWORD to, BOOL attach )
 {
     SYSCALL_FUNC( NtUserAttachThreadInput );
+}
+
+HDWP SYSCALL_API NtUserBeginDeferWindowPos( INT count )
+{
+    SYSCALL_FUNC( NtUserBeginDeferWindowPos );
 }
 
 HDC SYSCALL_API NtUserBeginPaint( HWND hwnd, PAINTSTRUCT *ps )
@@ -1674,6 +1684,11 @@ INT SYSCALL_API NtUserGetPriorityClipboardFormat( UINT *list, INT count )
     SYSCALL_FUNC( NtUserGetPriorityClipboardFormat );
 }
 
+BOOL SYSCALL_API NtUserGetProcessDefaultLayout( ULONG *layout )
+{
+    SYSCALL_FUNC( NtUserGetProcessDefaultLayout );
+}
+
 ULONG SYSCALL_API NtUserGetProcessDpiAwarenessContext( HANDLE process )
 {
     SYSCALL_FUNC( NtUserGetProcessDpiAwarenessContext );
@@ -1821,6 +1836,11 @@ BOOL SYSCALL_API NtUserInvalidateRgn( HWND hwnd, HRGN hrgn, BOOL erase )
     SYSCALL_FUNC( NtUserInvalidateRgn );
 }
 
+BOOL SYSCALL_API NtUserIsChildWindowDpiMessageEnabled( HWND hwnd )
+{
+    SYSCALL_FUNC( NtUserIsChildWindowDpiMessageEnabled );
+}
+
 BOOL SYSCALL_API NtUserIsClipboardFormatAvailable( UINT format )
 {
     SYSCALL_FUNC( NtUserIsClipboardFormatAvailable );
@@ -1829,6 +1849,11 @@ BOOL SYSCALL_API NtUserIsClipboardFormatAvailable( UINT format )
 BOOL SYSCALL_API NtUserIsMouseInPointerEnabled(void)
 {
     SYSCALL_FUNC( NtUserIsMouseInPointerEnabled );
+}
+
+BOOL SYSCALL_API NtUserKillSystemTimer( HWND hwnd, UINT_PTR id )
+{
+    SYSCALL_FUNC( NtUserKillSystemTimer );
 }
 
 BOOL SYSCALL_API NtUserKillTimer( HWND hwnd, UINT_PTR id )
@@ -2050,6 +2075,11 @@ HWND SYSCALL_API NtUserSetActiveWindow( HWND hwnd )
     SYSCALL_FUNC( NtUserSetActiveWindow );
 }
 
+BOOL SYSCALL_API NtUserSetAdditionalForegroundBoostProcesses( HWND hwnd, DWORD count, HANDLE *handles )
+{
+    SYSCALL_FUNC( NtUserSetAdditionalForegroundBoostProcesses );
+}
+
 HWND SYSCALL_API NtUserSetCapture( HWND hwnd )
 {
     SYSCALL_FUNC( NtUserSetCapture );
@@ -2109,6 +2139,11 @@ BOOL SYSCALL_API NtUserSetCursorPos( INT x, INT y )
 HWND SYSCALL_API NtUserSetFocus( HWND hwnd )
 {
     SYSCALL_FUNC( NtUserSetFocus );
+}
+
+BOOL SYSCALL_API NtUserSetForegroundWindow( HWND hwnd )
+{
+    SYSCALL_FUNC( NtUserSetForegroundWindow );
 }
 
 void SYSCALL_API NtUserSetInternalWindowPos( HWND hwnd, UINT cmd, RECT *rect, POINT *pt )
@@ -2420,12 +2455,6 @@ HWND SYSCALL_API NtUserWindowFromPoint( LONG x, LONG y )
     SYSCALL_FUNC( NtUserWindowFromPoint );
 }
 
-BOOL SYSCALL_API __wine_get_file_outline_text_metric( const WCHAR *path, TEXTMETRICW *otm,
-                                                      UINT *em_square, WCHAR *face_name )
-{
-    SYSCALL_FUNC( __wine_get_file_outline_text_metric );
-}
-
 BOOL SYSCALL_API __wine_get_icm_profile( HDC hdc, BOOL allow_default, DWORD *size, WCHAR *filename )
 {
     SYSCALL_FUNC( __wine_get_icm_profile );
@@ -2434,13 +2463,12 @@ BOOL SYSCALL_API __wine_get_icm_profile( HDC hdc, BOOL allow_default, DWORD *siz
 #else /*  __arm64ec__ */
 
 #ifdef _WIN64
-#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id + 0x1000, name )
-ALL_SYSCALLS64
+#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id, name )
 #else
-#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id + 0x1000, name, args )
+#define SYSCALL_ENTRY(id,name,args) __ASM_SYSCALL_FUNC( id, name, args )
 DEFINE_SYSCALL_HELPER32()
-ALL_SYSCALLS32
 #endif
+ALL_SYSCALLS
 #undef SYSCALL_ENTRY
 
 #endif /*  __arm64ec__ */

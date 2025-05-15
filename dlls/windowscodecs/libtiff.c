@@ -152,6 +152,7 @@ typedef struct {
     UINT tile_size;
     int tiled;
     UINT tiles_across;
+    UINT tiles_along;
 } tiff_decode_info;
 
 struct tiff_decoder
@@ -160,6 +161,7 @@ struct tiff_decoder
     IStream *stream;
     TIFF *tiff;
     DWORD frame_count;
+    unsigned int *frame_map;
     DWORD cached_frame;
     tiff_decode_info cached_decode_info;
     INT cached_tile_x, cached_tile_y;
@@ -204,20 +206,27 @@ static HRESULT tiff_get_decode_info(TIFF *tiff, tiff_decode_info *decode_info)
     decode_info->samples = samples;
 
     if (samples == 1)
-        planar = 1;
+        planar = PLANARCONFIG_CONTIG;
     else
     {
         ret = TIFFGetField(tiff, TIFFTAG_PLANARCONFIG, &planar);
-        if (!ret) planar = 1;
-        if (planar != 1)
-        {
-            FIXME("unhandled planar configuration %u\n", planar);
-            return E_FAIL;
-        }
+        if (!ret) planar = PLANARCONFIG_CONTIG;
     }
     decode_info->planar = planar;
 
     TRACE("planar %u, photometric %u, samples %u, bps %u\n", planar, photometric, samples, bps);
+
+    if (photometric == PHOTOMETRIC_YCBCR)
+    {
+        uint16_t compress;
+
+        TIFFGetFieldDefaulted(tiff, TIFFTAG_COMPRESSION, &compress);
+        if (planar == PLANARCONFIG_CONTIG && compress == COMPRESSION_JPEG)
+        {
+            TIFFSetField(tiff, TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB);
+            photometric = PHOTOMETRIC_RGB;
+        }
+    }
 
     switch(photometric)
     {
@@ -475,6 +484,7 @@ static HRESULT tiff_get_decode_info(TIFF *tiff, tiff_decode_info *decode_info)
         decode_info->tile_stride = ((decode_info->frame.bpp * decode_info->tile_width + 7)/8);
         decode_info->tile_size = decode_info->tile_height * decode_info->tile_stride;
         decode_info->tiles_across = (decode_info->frame.width + decode_info->tile_width - 1) / decode_info->tile_width;
+        decode_info->tiles_along = (decode_info->frame.height + decode_info->tile_height - 1) / decode_info->tile_height;
     }
     else if ((ret = TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &decode_info->tile_height)))
     {
@@ -567,6 +577,56 @@ static HRESULT tiff_get_decode_info(TIFF *tiff, tiff_decode_info *decode_info)
     return S_OK;
 }
 
+static bool tiff_decoder_should_skip_directory(TIFF *tiff)
+{
+    unsigned int value;
+
+    if (TIFFGetField(tiff, TIFFTAG_SUBFILETYPE, &value))
+        return value & FILETYPE_REDUCEDIMAGE;
+
+    return false;
+}
+
+static HRESULT tiff_decoder_collect_frames(struct tiff_decoder *decoder)
+{
+    unsigned int dir_count = TIFFNumberOfDirectories(decoder->tiff), frame_count, dir;
+    unsigned int *map;
+
+    if (!dir_count)
+        return S_OK;
+
+    if (!(map = calloc(dir_count, sizeof(*map))))
+        return E_OUTOFMEMORY;
+
+    frame_count = 0;
+    for (dir = 0; dir < dir_count; ++dir)
+    {
+        if (!TIFFSetDirectory(decoder->tiff, dir))
+        {
+            free(map);
+            return E_FAIL;
+        }
+
+        if (tiff_decoder_should_skip_directory(decoder->tiff)) continue;
+
+        map[frame_count++] = dir;
+    }
+
+    if (!frame_count)
+    {
+        free(map);
+        return WINCODEC_ERR_BADIMAGE;
+    }
+
+    /* Back to the first useful directory. */
+    TIFFSetDirectory(decoder->tiff, map[0]);
+
+    decoder->frame_count = frame_count;
+    decoder->frame_map = map;
+
+    return S_OK;
+}
+
 static HRESULT CDECL tiff_decoder_initialize(struct decoder* iface, IStream *stream, struct decoder_stat *st)
 {
     struct tiff_decoder *This = impl_from_decoder(iface);
@@ -576,7 +636,9 @@ static HRESULT CDECL tiff_decoder_initialize(struct decoder* iface, IStream *str
     if (!This->tiff)
         return E_FAIL;
 
-    This->frame_count = TIFFNumberOfDirectories(This->tiff);
+    if (FAILED(hr = tiff_decoder_collect_frames(This)))
+        goto fail;
+
     This->cached_frame = 0;
     hr = tiff_get_decode_info(This->tiff, &This->cached_decode_info);
     if (FAILED(hr))
@@ -608,7 +670,7 @@ static HRESULT tiff_decoder_select_frame(struct tiff_decoder* This, DWORD frame)
 
     prev_tile_size = This->cached_tile ? This->cached_decode_info.tile_size : 0;
 
-    res = TIFFSetDirectory(This->tiff, frame);
+    res = TIFFSetDirectory(This->tiff, This->frame_map[frame]);
     if (!res)
         return E_INVALIDARG;
 
@@ -650,21 +712,120 @@ static HRESULT CDECL tiff_decoder_get_frame_info(struct decoder* iface, UINT fra
     return hr;
 }
 
-static HRESULT tiff_decoder_read_tile(struct tiff_decoder *This, UINT tile_x, UINT tile_y)
+static HRESULT CDECL tiff_decoder_get_decoder_palette(struct decoder *iface, UINT frame, WICColor *colors,
+        UINT *num_colors)
 {
-    tsize_t ret;
-    int swap_bytes;
-    tiff_decode_info *info = &This->cached_decode_info;
+    return WINCODEC_ERR_PALETTEUNAVAILABLE;
+}
 
-    swap_bytes = TIFFIsByteSwapped(This->tiff);
+static HRESULT tiff_read_tile(struct tiff_decoder *decoder, UINT tile_x, UINT tile_y, UINT s, void *buffer,
+        size_t size, size_t *out_length)
+{
+    tiff_decode_info *info = &decoder->cached_decode_info;
+    unsigned int index;
+    tsize_t ret;
+
+    *out_length = 0;
 
     if (info->tiled)
-        ret = TIFFReadEncodedTile(This->tiff, tile_x + tile_y * info->tiles_across, This->cached_tile, info->tile_size);
+    {
+        index = tile_x + tile_y * info->tiles_across + info->tiles_across * info->tiles_along * s;
+        ret = TIFFReadEncodedTile(decoder->tiff, index, buffer, size);
+    }
     else
-        ret = TIFFReadEncodedStrip(This->tiff, tile_y, This->cached_tile, info->tile_size);
+    {
+        index = TIFFComputeStrip(decoder->tiff, tile_y * info->tile_height, s);
+        ret = TIFFReadEncodedStrip(decoder->tiff, index, buffer, size);
+    }
 
     if (ret == -1)
         return E_FAIL;
+
+    *out_length = ret;
+    return S_OK;
+}
+
+static HRESULT tiff_decoder_copy_planes(struct tiff_decoder *decoder, const uint8_t *srcdata)
+{
+    tiff_decode_info *info = &decoder->cached_decode_info;
+    size_t sample_size, width_bytes;
+    const uint8_t *src;
+    uint8_t *dst;
+
+    if (info->bps % 8)
+    {
+        FIXME("Separate sample planes for %ubps are not supported.\n", info->bps);
+        return E_NOTIMPL;
+    }
+
+    sample_size = info->bps / 8;
+    width_bytes = info->tile_width * sample_size;
+
+    for (int y = 0; y < info->tile_height; y++)
+    {
+        dst = decoder->cached_tile + y * width_bytes * info->samples;
+
+        for (int x = 0; x < info->tile_width; x++)
+        {
+            for (int s = 0; s < info->samples; s++)
+            {
+                src = srcdata + (y + s * info->tile_height) * width_bytes + x * sample_size;
+
+                if (info->bps == 8)
+                    *dst = *src;
+                else if (info->bps == 16)
+                    *(uint16_t *)dst = *(uint16_t *)src;
+                else if (info->bps == 32)
+                    *(uint32_t *)dst = *(uint32_t *)src;
+                else if (info->bps == 64)
+                    *(uint64_t *)dst = *(uint64_t *)src;
+                else
+                    memcpy(dst, src, sample_size);
+
+                dst += sample_size;
+            }
+        }
+    }
+
+    return S_OK;
+}
+
+static HRESULT tiff_decoder_read_tile(struct tiff_decoder *This, UINT tile_x, UINT tile_y)
+{
+    tiff_decode_info *info = &This->cached_decode_info;
+    HRESULT hr = S_OK;
+    size_t len;
+
+    if (info->planar == PLANARCONFIG_CONTIG)
+    {
+        hr = tiff_read_tile(This, tile_x, tile_y, 0, This->cached_tile, info->tile_size, &len);
+    }
+    else
+    {
+        size_t offset = 0, size = info->samples * info->tile_size;
+        uint8_t *buffer;
+
+        /* Read separate planes one by one, and put them together in contiguous form. */
+        if (!(buffer = malloc(size)))
+            return E_OUTOFMEMORY;
+
+        for (int s = 0; s < info->samples; ++s)
+        {
+            hr = tiff_read_tile(This, tile_x, tile_y, s, buffer + offset, size, &len);
+            if (FAILED(hr)) break;
+
+            offset += len;
+            size -= len;
+        }
+
+        if (SUCCEEDED(hr))
+            hr = tiff_decoder_copy_planes(This, buffer);
+
+        free(buffer);
+    }
+
+    if (FAILED(hr))
+        return hr;
 
     /* 3bps RGB */
     if (info->source_bpp == 3 && info->samples == 3 && info->frame.bpp == 24)
@@ -776,7 +937,7 @@ static HRESULT tiff_decoder_read_tile(struct tiff_decoder *This, UINT tile_x, UI
     else if (info->source_bpp == 4 && info->samples == 4 && info->frame.bpp == 32)
     {
         BYTE *srcdata, *src, *dst;
-        DWORD x, y, count, width_bytes = (info->tile_width * 3 + 7) / 8;
+        DWORD x, y, count, width_bytes = (info->tile_width * 4 + 7) / 8;
 
         count = width_bytes * info->tile_height;
 
@@ -865,34 +1026,6 @@ static HRESULT tiff_decoder_read_tile(struct tiff_decoder *This, UINT tile_x, UI
 
             reverse_bgr8(sample_count, This->cached_tile, info->tile_width,
                 info->tile_height, info->tile_width * sample_count);
-        }
-    }
-
-    if (swap_bytes && info->bps > 8)
-    {
-        UINT row, i, samples_per_row;
-        BYTE *sample, temp;
-
-        samples_per_row = info->tile_width * info->samples;
-
-        switch(info->bps)
-        {
-        case 16:
-            for (row=0; row<info->tile_height; row++)
-            {
-                sample = This->cached_tile + row * info->tile_stride;
-                for (i=0; i<samples_per_row; i++)
-                {
-                    temp = sample[1];
-                    sample[1] = sample[0];
-                    sample[0] = temp;
-                    sample += 2;
-                }
-            }
-            break;
-        default:
-            ERR("unhandled bps for byte swap %u\n", info->bps);
-            return E_FAIL;
         }
     }
 
@@ -1063,12 +1196,14 @@ static void CDECL tiff_decoder_destroy(struct decoder* iface)
     struct tiff_decoder *This = impl_from_decoder(iface);
     if (This->tiff) TIFFClose(This->tiff);
     free(This->cached_tile);
+    free(This->frame_map);
     free(This);
 }
 
 static const struct decoder_funcs tiff_decoder_vtable = {
     tiff_decoder_initialize,
     tiff_decoder_get_frame_info,
+    tiff_decoder_get_decoder_palette,
     tiff_decoder_copy_pixels,
     tiff_decoder_get_metadata_blocks,
     tiff_decoder_get_color_context,

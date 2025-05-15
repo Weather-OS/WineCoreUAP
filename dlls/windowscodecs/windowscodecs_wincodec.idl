@@ -140,13 +140,6 @@ coclass WICDdsEncoder { interface IWICBitmapEncoder; }
 coclass WICDefaultFormatConverter { interface IWICFormatConverter; }
 
 [
-    helpstring("WIC TGA Decoder"),
-    threading(both),
-    uuid(b11fc79a-67cc-43e6-a9ce-e3d54945d304)
-]
-coclass WineTgaDecoder { interface IWICBitmapDecoder; }
-
-[
     helpstring("WIC Unknown Metadata Reader"),
     threading(both),
     uuid(699745c2-5066-4b82-a8e3-d40478dbec8c)
@@ -251,6 +244,27 @@ coclass WICPngTextMetadataReader { interface IWICMetadataReader; }
     uuid(d94edf02-efe5-4f0d-85c8-f5a68b3000b1)
 ]
 coclass WICPngTimeMetadataReader { interface IWICMetadataReader; }
+
+[
+    helpstring("WIC Png tIME Metadata Writer"),
+    threading(both),
+    uuid(1ab78400-b5a3-4d91-8ace-33fcd1499be6)
+]
+coclass WICPngTimeMetadataWriter { interface IWICMetadataWriter; }
+
+[
+    helpstring("WIC Png bKGD Metadata Reader"),
+    threading(both),
+    uuid(0ce7a4a6-03e8-4a60-9d15-282ef32ee7da)
+]
+coclass WICPngBkgdMetadataReader { interface IWICMetadataReader; }
+
+[
+    helpstring("WIC Png bKGD Metadata Writer"),
+    threading(both),
+    uuid(68e3f2fd-31ae-4441-bb6a-fd7047525f90)
+]
+coclass WICPngBkgdMetadataWriter { interface IWICMetadataWriter; }
 
 [
     helpstring("WIC LSD Metadata Reader"),

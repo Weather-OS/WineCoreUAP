@@ -45,6 +45,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(xim);
 #endif
 
 static WCHAR *ime_comp_buf;
+static DWORD ime_comp_cursor_pos = 0;
 
 static XIMStyle input_style = 0;
 static XIMStyle input_style_req = XIMPreeditCallbacks | XIMStatusCallbacks;
@@ -168,6 +169,33 @@ static int xic_preedit_done( XIC xic, XPointer user, XPointer arg )
     return 0;
 }
 
+static DWORD get_comp_cursor_pos( XIMPreeditDrawCallbackStruct *params )
+{
+    int i, cursor_begin = -1, cursor_end = -1;
+    XIMText *text = params->text;
+
+    if (text && text->feedback)
+    {
+        for (i = 0; i < text->length; i++)
+        {
+            if (text->feedback[i] & XIMReverse)
+            {
+                if (cursor_begin == -1) cursor_begin = i;
+                cursor_end = i + 1;
+            }
+        }
+        if (cursor_begin != -1) cursor_begin += params->chg_first;
+        if (cursor_end   != -1) cursor_end   += params->chg_first;
+    }
+
+    if (cursor_begin == cursor_end)
+        cursor_begin = cursor_end = params->caret; /* ATTR_INPUT */
+
+    TRACE( "caret %d, cursor_begin %d, cursor_end %d\n", params->caret, cursor_begin, cursor_end );
+
+    return MAKELONG( cursor_begin, cursor_end );
+}
+
 static int xic_preedit_draw( XIC xic, XPointer user, XPointer arg )
 {
     XIMPreeditDrawCallbackStruct *params = (void *)arg;
@@ -202,14 +230,14 @@ static int xic_preedit_draw( XIC xic, XPointer user, XPointer arg )
 
     if (text && str != text->string.multi_byte) free( str );
 
-    post_ime_update( hwnd, params->caret, ime_comp_buf, NULL );
+    ime_comp_cursor_pos = get_comp_cursor_pos( params );
+    post_ime_update( hwnd, ime_comp_cursor_pos, ime_comp_buf, NULL );
 
     return 0;
 }
 
 static int xic_preedit_caret( XIC xic, XPointer user, XPointer arg )
 {
-    static int xim_caret_pos;
     XIMPreeditCaretCallbackStruct *params = (void *)arg;
     HWND hwnd = (HWND)user;
     int pos;
@@ -218,7 +246,7 @@ static int xic_preedit_caret( XIC xic, XPointer user, XPointer arg )
 
     if (!params) return 0;
 
-    pos = xim_caret_pos;
+    pos = LOWORD( ime_comp_cursor_pos );
     switch (params->direction)
     {
     case XIMForwardChar:
@@ -246,9 +274,17 @@ static int xic_preedit_caret( XIC xic, XPointer user, XPointer arg )
         FIXME( "Not implemented\n" );
         break;
     }
-    params->position = xim_caret_pos = pos;
+    params->position = pos;
 
-    post_ime_update( hwnd, pos, ime_comp_buf, NULL );
+    /* uim implements the preedit_caret callback. This callback is only
+       valid when the xim is in non-converted state (ATTR_INPUT).
+     */
+    if (LOWORD( ime_comp_cursor_pos ) == HIWORD( ime_comp_cursor_pos ) &&
+        LOWORD( ime_comp_cursor_pos ) != pos)
+    {
+        ime_comp_cursor_pos = MAKELONG( pos, pos );
+        post_ime_update( hwnd, ime_comp_cursor_pos, ime_comp_buf, NULL );
+    }
 
     return 0;
 }

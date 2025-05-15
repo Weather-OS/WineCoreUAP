@@ -204,6 +204,7 @@ static void dump_get_process_info_reply( const struct get_process_info_reply *re
     fprintf( stderr, ", session_id=%08x", req->session_id );
     fprintf( stderr, ", exit_code=%d", req->exit_code );
     fprintf( stderr, ", priority=%d", req->priority );
+    fprintf( stderr, ", base_priority=%04x", req->base_priority );
     fprintf( stderr, ", machine=%04x", req->machine );
     dump_varargs_pe_image_info( ", image=", cur_size );
 }
@@ -251,10 +252,11 @@ static void dump_get_process_vm_counters_reply( const struct get_process_vm_coun
 static void dump_set_process_info_request( const struct set_process_info_request *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
-    fprintf( stderr, ", mask=%d", req->mask );
     fprintf( stderr, ", priority=%d", req->priority );
+    fprintf( stderr, ", base_priority=%d", req->base_priority );
     dump_uint64( ", affinity=", &req->affinity );
     fprintf( stderr, ", token=%04x", req->token );
+    fprintf( stderr, ", mask=%d", req->mask );
 }
 
 static void dump_get_thread_info_request( const struct get_thread_info_request *req )
@@ -272,7 +274,7 @@ static void dump_get_thread_info_reply( const struct get_thread_info_reply *req 
     dump_uint64( ", affinity=", &req->affinity );
     fprintf( stderr, ", exit_code=%d", req->exit_code );
     fprintf( stderr, ", priority=%d", req->priority );
-    fprintf( stderr, ", last=%d", req->last );
+    fprintf( stderr, ", base_priority=%d", req->base_priority );
     fprintf( stderr, ", suspend_count=%d", req->suspend_count );
     fprintf( stderr, ", flags=%08x", req->flags );
     fprintf( stderr, ", desc_len=%u", req->desc_len );
@@ -295,11 +297,12 @@ static void dump_get_thread_times_reply( const struct get_thread_times_reply *re
 static void dump_set_thread_info_request( const struct set_thread_info_request *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
-    fprintf( stderr, ", mask=%d", req->mask );
     fprintf( stderr, ", priority=%d", req->priority );
+    fprintf( stderr, ", base_priority=%d", req->base_priority );
     dump_uint64( ", affinity=", &req->affinity );
     dump_uint64( ", entry_point=", &req->entry_point );
     fprintf( stderr, ", token=%04x", req->token );
+    fprintf( stderr, ", mask=%08x", req->mask );
     dump_varargs_unicode_str( ", desc=", cur_size );
 }
 
@@ -1705,11 +1708,7 @@ static void dump_get_window_info_request( const struct get_window_info_request *
 
 static void dump_get_window_info_reply( const struct get_window_info_reply *req )
 {
-    fprintf( stderr, " full_handle=%08x", req->full_handle );
-    fprintf( stderr, ", last_active=%08x", req->last_active );
-    fprintf( stderr, ", pid=%04x", req->pid );
-    fprintf( stderr, ", tid=%04x", req->tid );
-    fprintf( stderr, ", atom=%04x", req->atom );
+    fprintf( stderr, " last_active=%08x", req->last_active );
     fprintf( stderr, ", is_unicode=%d", req->is_unicode );
     fprintf( stderr, ", dpi_context=%08x", req->dpi_context );
 }
@@ -3025,7 +3024,8 @@ static void dump_get_token_info_reply( const struct get_token_info_reply *req )
     fprintf( stderr, ", session_id=%08x", req->session_id );
     fprintf( stderr, ", primary=%d", req->primary );
     fprintf( stderr, ", impersonation_level=%d", req->impersonation_level );
-    fprintf( stderr, ", elevation=%d", req->elevation );
+    fprintf( stderr, ", elevation_type=%d", req->elevation_type );
+    fprintf( stderr, ", is_elevated=%d", req->is_elevated );
     fprintf( stderr, ", group_count=%d", req->group_count );
     fprintf( stderr, ", privilege_count=%d", req->privilege_count );
 }
@@ -3179,6 +3179,7 @@ static void dump_set_window_layered_info_request( const struct set_window_layere
 
 static void dump_alloc_user_handle_request( const struct alloc_user_handle_request *req )
 {
+    fprintf( stderr, " type=%04x", req->type );
 }
 
 static void dump_alloc_user_handle_reply( const struct alloc_user_handle_reply *req )
@@ -3188,7 +3189,8 @@ static void dump_alloc_user_handle_reply( const struct alloc_user_handle_reply *
 
 static void dump_free_user_handle_request( const struct free_user_handle_request *req )
 {
-    fprintf( stderr, " handle=%08x", req->handle );
+    fprintf( stderr, " type=%04x", req->type );
+    fprintf( stderr, ", handle=%08x", req->handle );
 }
 
 static void dump_set_cursor_request( const struct set_cursor_request *req )
@@ -3314,6 +3316,19 @@ static void dump_suspend_process_request( const struct suspend_process_request *
 }
 
 static void dump_resume_process_request( const struct resume_process_request *req )
+{
+    fprintf( stderr, " handle=%04x", req->handle );
+}
+
+static void dump_get_next_process_request( const struct get_next_process_request *req )
+{
+    fprintf( stderr, " last=%04x", req->last );
+    fprintf( stderr, ", access=%08x", req->access );
+    fprintf( stderr, ", attributes=%08x", req->attributes );
+    fprintf( stderr, ", flags=%08x", req->flags );
+}
+
+static void dump_get_next_process_reply( const struct get_next_process_reply *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
 }
@@ -3638,6 +3653,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] =
     (dump_func)dump_terminate_job_request,
     (dump_func)dump_suspend_process_request,
     (dump_func)dump_resume_process_request,
+    (dump_func)dump_get_next_process_request,
     (dump_func)dump_get_next_thread_request,
     (dump_func)dump_set_keyboard_repeat_request,
 };
@@ -3934,6 +3950,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] =
     NULL,
     NULL,
     NULL,
+    (dump_func)dump_get_next_process_reply,
     (dump_func)dump_get_next_thread_reply,
     (dump_func)dump_set_keyboard_repeat_reply,
 };
@@ -4230,6 +4247,7 @@ static const char * const req_names[REQ_NB_REQUESTS] =
     "terminate_job",
     "suspend_process",
     "resume_process",
+    "get_next_process",
     "get_next_thread",
     "set_keyboard_repeat",
 };

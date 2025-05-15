@@ -39,7 +39,7 @@ WINE_DECLARE_DEBUG_CHANNEL(icon);
 
 struct cursoricon_object
 {
-    struct user_object      obj;        /* object header */
+    HICON                   handle;     /* cursor full handle */
     struct list             entry;      /* entry in shared icons list */
     struct free_icon_params params;     /* opaque params used by 16-bit code */
     UNICODE_STRING          module;     /* module for icons loaded from resources */
@@ -152,7 +152,8 @@ HICON alloc_cursoricon_handle( BOOL is_icon )
 
     if (!(obj = calloc( 1, sizeof(*obj) ))) return NULL;
     obj->is_icon = is_icon;
-    if (!(handle = alloc_user_handle( &obj->obj, NTUSER_OBJ_ICON ))) free( obj );
+    if (!(handle = alloc_user_handle( obj, NTUSER_OBJ_ICON ))) free( obj );
+    else obj->handle = handle;
     return handle;
 }
 
@@ -212,6 +213,7 @@ static BOOL free_icon_handle( HICON handle )
             free( obj->ani.frames );
         }
         if (!IS_INTRESOURCE( obj->resname )) free( obj->resname );
+        if (obj->module.Length) free(obj->module.Buffer);
         free( obj );
         KeUserDispatchCallback( &params.dispatch, sizeof(params), &ret_ptr, &ret_len );
         user_driver->pDestroyCursorIcon( handle );
@@ -357,7 +359,7 @@ HICON WINAPI NtUserFindExistingCursorIcon( UNICODE_STRING *module, UNICODE_STRIN
         if (memcmp( ptr->module.Buffer, module->Buffer, module->Length )) continue;
         /* We pass rsrc as desc argument, this is not compatible with Windows */
         if (ptr->rsrc != desc) continue;
-        ret = ptr->obj.handle;
+        ret = ptr->handle;
         break;
     }
     user_unlock();
@@ -397,7 +399,7 @@ HCURSOR WINAPI NtUserGetCursorFrameInfo( HCURSOR cursor, DWORD istep, DWORD *rat
 
     if (!(obj = get_icon_ptr( cursor ))) return 0;
 
-    TRACE( "%p => %d %p %p\n", cursor, (int)istep, rate_jiffies, num_steps );
+    TRACE( "%p => %d %p %p\n", cursor, istep, rate_jiffies, num_steps );
 
     icon_steps = obj->is_ani ? obj->ani.num_steps : 1;
     if (istep < icon_steps || !obj->is_ani)

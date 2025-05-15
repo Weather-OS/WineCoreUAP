@@ -177,7 +177,6 @@ static struct macdrv_win_data *alloc_win_data(HWND hwnd)
     if ((data = calloc(1, sizeof(*data))))
     {
         data->hwnd = hwnd;
-        data->swap_interval = 1;
         pthread_mutex_lock(&win_data_mutex);
         if (!win_datas)
             win_datas = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
@@ -1097,7 +1096,7 @@ static LRESULT move_window(HWND hwnd, WPARAM wparam)
     capturePoint.y = (short)HIWORD(dwPoint);
     NtUserClipCursor(NULL);
 
-    TRACE("hwnd %p hittest %d, pos %d,%d\n", hwnd, hittest, (int)capturePoint.x, (int)capturePoint.y);
+    TRACE("hwnd %p hittest %d, pos %d,%d\n", hwnd, hittest, capturePoint.x, capturePoint.y);
 
     origRect.left = origRect.right = origRect.top = origRect.bottom = 0;
     if (NtUserAdjustWindowRect(&origRect, style, FALSE, NtUserGetWindowLongW(hwnd, GWL_EXSTYLE), dpi))
@@ -1388,11 +1387,11 @@ void macdrv_DestroyWindow(HWND hwnd)
 
 
 /*****************************************************************
- *              SetFocus   (MACDRV.@)
+ *              ActivateWindow   (MACDRV.@)
  *
- * Set the Mac focus.
+ * Set the Mac active window.
  */
-void macdrv_SetFocus(HWND hwnd)
+void macdrv_ActivateWindow(HWND hwnd, HWND previous)
 {
     struct macdrv_thread_data *thread_data = macdrv_thread_data();
 
@@ -1413,7 +1412,7 @@ void macdrv_SetLayeredWindowAttributes(HWND hwnd, COLORREF key, BYTE alpha, DWOR
 {
     struct macdrv_win_data *data = get_win_data(hwnd);
 
-    TRACE("hwnd %p key %#08x alpha %#02x flags %x\n", hwnd, (unsigned int)key, alpha, (unsigned int)flags);
+    TRACE("hwnd %p key %#08x alpha %#02x flags %x\n", hwnd, key, alpha, flags);
 
     if (data)
     {
@@ -1501,7 +1500,7 @@ void macdrv_SetWindowStyle(HWND hwnd, INT offset, STYLESTRUCT *style)
 {
     struct macdrv_win_data *data;
 
-    TRACE("hwnd %p offset %d styleOld 0x%08x styleNew 0x%08x\n", hwnd, offset, (unsigned int)style->styleOld, (unsigned int)style->styleNew);
+    TRACE("hwnd %p offset %d styleOld 0x%08x styleNew 0x%08x\n", hwnd, offset, style->styleOld, style->styleNew);
 
     if (hwnd == NtUserGetDesktopWindow()) return;
     if (!(data = get_win_data(hwnd))) return;
@@ -1627,7 +1626,7 @@ done:
 /***********************************************************************
  *              UpdateLayeredWindow   (MACDRV.@)
  */
-void macdrv_UpdateLayeredWindow(HWND hwnd, UINT flags)
+void macdrv_UpdateLayeredWindow(HWND hwnd, BYTE alpha, UINT flags)
 {
     struct macdrv_win_data *data;
 
@@ -1638,7 +1637,7 @@ void macdrv_UpdateLayeredWindow(HWND hwnd, UINT flags)
             show_window(data);
 
         /* The ULW flags are a superset of the LWA flags. */
-        sync_window_opacity(data, 255, TRUE, flags);
+        sync_window_opacity(data, alpha, TRUE, flags);
         release_win_data(data);
     }
 }
@@ -1661,10 +1660,6 @@ LRESULT macdrv_WindowMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             sync_window_region(data, (HRGN)1);
             release_win_data(data);
         }
-        return 0;
-    case WM_WINE_DESKTOP_RESIZED:
-        macdrv_reset_device_metrics();
-        macdrv_reassert_window_position(hwnd);
         return 0;
     case WM_MACDRV_ACTIVATE_ON_FOLLOWING_FOCUS:
         activate_on_following_focus();
@@ -1854,16 +1849,16 @@ void macdrv_window_frame_changed(HWND hwnd, const macdrv_event *event)
     if (data->rects.window.left == rect.left && data->rects.window.top == rect.top)
         flags |= SWP_NOMOVE;
     else
-        TRACE("%p moving from (%d,%d) to (%d,%d)\n", hwnd, (int)data->rects.window.left,
-              (int)data->rects.window.top, (int)rect.left, (int)rect.top);
+        TRACE("%p moving from (%d,%d) to (%d,%d)\n", hwnd, data->rects.window.left,
+              data->rects.window.top, rect.left, rect.top);
 
     if ((data->rects.window.right - data->rects.window.left == width &&
          data->rects.window.bottom - data->rects.window.top == height) ||
         (IsRectEmpty(&data->rects.window) && width == 1 && height == 1))
         flags |= SWP_NOSIZE;
     else
-        TRACE("%p resizing from (%dx%d) to (%dx%d)\n", hwnd, (int)(data->rects.window.right - data->rects.window.left),
-              (int)(data->rects.window.bottom - data->rects.window.top), width, height);
+        TRACE("%p resizing from (%dx%d) to (%dx%d)\n", hwnd, data->rects.window.right - data->rects.window.left,
+              data->rects.window.bottom - data->rects.window.top, width, height);
 
     being_dragged = data->drag_event != NULL;
     release_win_data(data);
@@ -1899,17 +1894,9 @@ void macdrv_window_got_focus(HWND hwnd, const macdrv_event *event)
 
     if (can_window_become_foreground(hwnd) && !(style & WS_MINIMIZE))
     {
-        /* simulate a mouse click on the menu to find out
-         * whether the window wants to be activated */
-        LRESULT ma = send_message(hwnd, WM_MOUSEACTIVATE,
-                                  (WPARAM)NtUserGetAncestor(hwnd, GA_ROOT),
-                                  MAKELONG(HTMENU, WM_LBUTTONDOWN));
-        if (ma != MA_NOACTIVATEANDEAT && ma != MA_NOACTIVATE)
-        {
-            TRACE("setting foreground window to %p\n", hwnd);
-            NtUserSetForegroundWindow(hwnd);
-            return;
-        }
+        TRACE("setting foreground window to %p\n", hwnd);
+        NtUserSetForegroundWindow(hwnd);
+        return;
     }
 
     TRACE("win %p/%p rejecting focus\n", hwnd, event->window);

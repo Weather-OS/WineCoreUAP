@@ -806,7 +806,7 @@ static bool wined3d_null_image_vk_init(struct wined3d_image_vk *image, struct wi
 
     if (!wined3d_context_vk_create_image(context_vk, type,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_R8G8B8A8_UNORM,
-            1, 1, 1, sample_count, 1, layer_count, flags, image))
+            1, 1, 1, sample_count, 1, layer_count, flags, NULL, image))
     {
         return false;
     }
@@ -4403,6 +4403,12 @@ void CDECL wined3d_device_context_update_sub_resource(struct wined3d_device_cont
         WARN("Invalid box %s specified.\n", debug_box(box));
         return;
     }
+    else if ((resource->format->attrs & WINED3D_FORMAT_ATTR_PLANAR)
+            && ((box->left & 1) || (box->right & 1) || (box->top & 1) || (box->bottom & 1)))
+    {
+        WARN("Invalid box %s for planar resource.\n", debug_box(box));
+        return;
+    }
 
     wined3d_device_context_lock(context);
     wined3d_device_context_emit_update_sub_resource(context, resource,
@@ -4567,6 +4573,7 @@ HRESULT CDECL wined3d_device_context_map(struct wined3d_device_context *context,
         struct wined3d_resource *resource, unsigned int sub_resource_idx,
         struct wined3d_map_desc *map_desc, const struct wined3d_box *box, unsigned int flags)
 {
+    const struct wined3d_format *format = resource->format;
     struct wined3d_sub_resource_desc desc;
     struct wined3d_box b;
     HRESULT hr;
@@ -4616,6 +4623,12 @@ HRESULT CDECL wined3d_device_context_map(struct wined3d_device_context *context,
 
     wined3d_device_context_lock(context);
     hr = wined3d_device_context_emit_map(context, resource, sub_resource_idx, map_desc, box, flags);
+    if (format->attrs & WINED3D_FORMAT_ATTR_PLANAR)
+    {
+        unsigned int height = box->bottom - box->top;
+        map_desc->slice_pitch = map_desc->row_pitch * height
+                + (map_desc->row_pitch * 2 / format->uv_width * height / format->uv_height);
+    }
     wined3d_device_context_unlock(context);
     return hr;
 }
@@ -5622,4 +5635,31 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
         return CallWindowProcW(proc, window, message, wparam, lparam);
     else
         return CallWindowProcA(proc, window, message, wparam, lparam);
+}
+
+unsigned int CDECL wined3d_device_get_video_decode_profile_count(struct wined3d_device *device)
+{
+    GUID profiles[WINED3D_DECODER_MAX_PROFILE_COUNT];
+    unsigned int count;
+
+    TRACE("device %p.\n", device);
+
+    device->adapter->decoder_ops->get_profiles(device->adapter, &count, profiles);
+    return count;
+}
+
+HRESULT CDECL wined3d_device_get_video_decode_profile(struct wined3d_device *device, unsigned int idx, GUID *profile)
+{
+    GUID profiles[WINED3D_DECODER_MAX_PROFILE_COUNT];
+    unsigned int count;
+
+    TRACE("device %p, idx %u.\n", device, idx);
+
+    device->adapter->decoder_ops->get_profiles(device->adapter, &count, profiles);
+
+    if (idx >= count)
+        return E_INVALIDARG;
+
+    *profile = profiles[idx];
+    return S_OK;
 }

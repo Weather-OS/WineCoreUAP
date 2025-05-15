@@ -8,7 +8,7 @@
 
 #include <corecrt_wio.h>
 
-#include <pshpack8.h>
+#pragma pack(push,8)
 
 #if defined(_USE_32BIT_TIME_T)
 # define _finddata_t     _finddata32_t
@@ -94,6 +94,7 @@ extern "C" {
 #endif
 
 _ACRTIMP int      __cdecl _access(const char*,int);
+_ACRTIMP errno_t  __cdecl _access_s(const char*,int);
 _ACRTIMP int      __cdecl _chmod(const char*,int);
 _ACRTIMP int      __cdecl _chsize(int,__msvcrt_long);
 _ACRTIMP int      __cdecl _chsize_s(int,__int64);
@@ -149,6 +150,6 @@ _ACRTIMP int      __cdecl rename(const char*,const char*);
 }
 #endif
 
-#include <poppack.h>
+#pragma pack(pop)
 
 #endif /* _IO_DEFINED */

@@ -184,7 +184,7 @@ extern struct file *get_view_file( const struct memory_view *view, unsigned int 
 extern const struct pe_image_info *get_view_image_info( const struct memory_view *view, client_ptr_t *base );
 extern int get_view_nt_name( const struct memory_view *view, struct unicode_str *name );
 extern void free_mapped_views( struct process *process );
-extern int get_page_size(void);
+extern size_t get_page_size(void);
 extern struct mapping *create_fd_mapping( struct object *root, const struct unicode_str *name, struct fd *fd,
                                           unsigned int attr, const struct security_descriptor *sd );
 extern struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
@@ -193,25 +193,25 @@ extern struct mapping *create_session_mapping( struct object *root, const struct
                                                unsigned int attr, const struct security_descriptor *sd );
 extern void set_session_mapping( struct mapping *mapping );
 
-extern const volatile void *alloc_shared_object(void);
-extern void free_shared_object( const volatile void *object_shm );
-extern void invalidate_shared_object( const volatile void *object_shm );
-extern struct obj_locator get_shared_object_locator( const volatile void *object_shm );
+extern session_shm_t *shared_session;
+extern volatile void *alloc_shared_object(void);
+extern void free_shared_object( volatile void *object_shm );
+extern void invalidate_shared_object( volatile void *object_shm );
+extern struct obj_locator get_shared_object_locator( volatile void *object_shm );
 
 #define SHARED_WRITE_BEGIN( object_shm, type )                          \
     do {                                                                \
-        const type *__shared = (object_shm);                            \
-        type *shared = (type *)__shared;                                \
+        type *shared = (object_shm);                                    \
         shared_object_t *__obj = CONTAINING_RECORD( shared, shared_object_t, shm );  \
         LONG64 __seq = __obj->seq + 1, __end = __seq + 1;               \
         assert( (__seq & 1) != 0 );                                     \
-        __WINE_ATOMIC_STORE_RELEASE( &__obj->seq, &__seq );             \
+        WriteRelease64( &__obj->seq, __seq );                           \
         do
 
 #define SHARED_WRITE_END                                                \
         while(0);                                                       \
         assert( __seq == __obj->seq );                                  \
-        __WINE_ATOMIC_STORE_RELEASE( &__obj->seq, &__end );             \
+        WriteRelease64( &__obj->seq, __end );                           \
     } while(0)
 
 /* device functions */

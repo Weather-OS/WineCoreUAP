@@ -28,7 +28,7 @@ use Time::Local qw(timegm_modern);
 my $UNIVERSION = "16.0.0";
 my $CLDRVERSION = "46";
 my $ISO639VERSION = "20230123";
-my $TZVERSION = "2024a";
+my $TZVERSION = "2025a";
 
 my %data_files =
 (
@@ -55,7 +55,11 @@ my %data_files =
  jis0212   => { url  => "https://www.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/JIS/JIS0212.TXT",
                 sha  => "477820bb3055bbcc90880d788cd95607d221dc94457bae249231adecf13c12e6" },
  tzdata    => { url  => "https://data.iana.org/time-zones/releases/tzdata$TZVERSION.tar.gz",
-                sha  => "0d0434459acbd2059a7a8da1f3304a84a86591f6ed69c6248fffa502b6edffe3" },
+                sha  => "4d5fcbc72c7c450ebfe0b659bd0f1c02fbf52fd7f517a9ea13fe71c21eb5f0d0" },
+ glyphs    => { url  => "https://github.com/adobe-type-tools/agl-aglfn/raw/4036a9ca80a62f64f9de4f7321a9a045ad0ecfd6/glyphlist.txt",
+                sha  => "a3b2f61ced9f3644cc0d4ecde5c59df34ca286c689d9484a43a710a81c466789" },
+ psfonts   => { url  => "https://mirrors.ctan.org/fonts/adobe/afm/Adobe-Core35_AFMs-229.tar.gz",
+                sha  => "034ed3025cff4c48bbefae90f9eff7dc6237dd384443c594c017b571e49d0649" },
 );
 
 
@@ -5467,7 +5471,7 @@ sub parse_transition_date($$@)
                    Jul => 7, Aug => 8, Sep => 9, Oct => 10, Nov => 11, Dec => 12 );
     my %days = ( Sun => 0, Mon => 1, Tue => 2, Wed => 3, Thu => 4, Fri => 5, Sat => 6 );
 
-    my $mon = $in ? $months{$in} : 1;
+    my $mon = $in ? $months{substr($in,0,3)} : 1;
     my ($week, $dow, $flag, $time, $sec);
     my $first = month_first_dow( $year, $mon );
 
@@ -5849,6 +5853,293 @@ sub dump_registry_script($%)
 }
 
 
+sub is_win_ansi($)
+{
+    my $c = shift;
+    return 1 if $c >= 0x0020 && $c <= 0x007e;
+    return 1 if $c >= 0x00a0 && $c <= 0x00ff;
+    return 1 if $c >= 0x0152 && $c <= 0x0153;
+    return 1 if $c >= 0x0160 && $c <= 0x0161;
+    return 1 if $c >= 0x017d && $c <= 0x017e;
+    return 1 if $c >= 0x2013 && $c <= 0x2014;
+    return 1 if $c >= 0x2018 && $c <= 0x201a;
+    return 1 if $c >= 0x201c && $c <= 0x201e;
+    return 1 if $c >= 0x2020 && $c <= 0x2022;
+    return 1 if $c >= 0x2039 && $c <= 0x203a;
+    return 1 if $c == 0x0178;
+    return 1 if $c == 0x0192;
+    return 1 if $c == 0x02c6;
+    return 1 if $c == 0x02c9;
+    return 1 if $c == 0x02dc;
+    return 1 if $c == 0x03bc;
+    return 1 if $c == 0x2026;
+    return 1 if $c == 0x2030;
+    return 1 if $c == 0x20ac;
+    return 1 if $c == 0x2122;
+    return 1 if $c == 0x2219;
+    return 0;
+}
+
+################################################################
+# build the PostScript font metrics
+sub dump_psfonts($)
+{
+    my $dir = shift;
+
+    my @psfonts =
+    (
+     "Courier",
+     "Courier-Bold",
+     "Courier-BoldOblique",
+     "Courier-Oblique",
+     "Helvetica",
+     "Helvetica-Bold",
+     "Helvetica-BoldOblique",
+     "Helvetica-Narrow",
+     "Helvetica-NarrowBold",
+     "Helvetica-NarrowBoldOblique",
+     "Helvetica-NarrowOblique",
+     "Helvetica-Oblique",
+     "ITCAvantGarde-Book",
+     "ITCAvantGarde-BookOblique",
+     "ITCAvantGarde-Demi",
+     "ITCAvantGarde-DemiOblique",
+     "ITCBookman-Demi",
+     "ITCBookman-DemiItalic",
+     "ITCBookman-Light",
+     "ITCBookman-LightItalic",
+     "ITCZapfChancery-MediumItalic",
+     "NewCenturySchlbk-Bold",
+     "NewCenturySchlbk-BoldItalic",
+     "NewCenturySchlbk-Italic",
+     "NewCenturySchlbk-Roman",
+     "Palatino-Bold",
+     "Palatino-BoldItalic",
+     "Palatino-Italic",
+     "Palatino-Roman",
+     "Symbol",
+     "Times-Bold",
+     "Times-BoldItalic",
+     "Times-Italic",
+     "Times-Roman",
+     "ZapfDingbats",
+    );
+
+    my %fonts;
+    my %glyphs;
+    my %glyph_values;
+
+    my $FILE = open_data_file( "glyphs" );
+    while (<$FILE>)
+    {
+        chomp;
+        s/\r$//;
+        next if /^$/;
+        next if /^#/;
+        if (/([A-Za-z0-9_]+);([0-9A-F]+)/)
+        {
+            $glyph_values{$2} ||= $1;
+            $glyphs{$1} ||= hex $2;
+            next;
+        }
+        die "unrecognized line $_";
+    }
+
+    my $filename = "$dir/glyphs.c";
+    printf "Building %s\n", $filename;
+    my $count = scalar keys %glyphs;
+    open OUTPUT, ">$filename.new" or die "Cannot create $filename";
+    print OUTPUT "/* Adobe Glyph List, generated from $current_data_file */\n";
+    print OUTPUT "/* DO NOT EDIT!! */\n\n";
+    print OUTPUT "#include \"psdrv.h\"\n\n";
+    print OUTPUT "const INT PSDRV_AGLbyNameSize = $count;\n\n";
+    print OUTPUT "const UNICODEGLYPH PSDRV_AGLbyName[$count] =\n{\n";
+    map { printf OUTPUT "    { 0x%04x, \"$_\" },\n", $glyphs{$_}; } sort keys %glyphs;
+    print OUTPUT "};\n\n";
+
+    $count = scalar keys %glyph_values;
+    print OUTPUT "const INT PSDRV_AGLbyUVSize = $count;\n\n";
+    print OUTPUT "const UNICODEGLYPH PSDRV_AGLbyUV[$count] =\n{\n";
+    map { printf OUTPUT "    { 0x%04x, \"%s\" },\n", hex $_, $glyph_values{$_}; } sort keys %glyph_values;
+    print OUTPUT "};\n";
+    close OUTPUT;
+    save_file($filename);
+
+    foreach my $file (@psfonts)
+    {
+        my $FILE = open_data_file( "psfonts", "Adobe-Core35_AFMs-229/$file.afm" );
+        my %font;
+        while (<$FILE>)
+        {
+            chomp;
+            last if /^StartFontMetrics\s/;
+            die "unrecognized line $_";
+        }
+        while (<$FILE>)
+        {
+            chomp;
+            last if /^StartCharMetrics\s/;
+            next if /^Comment\s/;
+            if (/^([A-Za-z]+)\s+(.*)/)
+            {
+                $font{$1} = $2;
+                next;
+            }
+            die "unrecognized line $_";
+        }
+        $font{chars} = [ ];
+        my $ascender = 0;
+        my $descender = 0;
+        while (<$FILE>)
+        {
+            chomp;
+            last if /^EndCharMetrics$/;
+            my @fields = split /\s*;\s*/;
+            my %char;
+            foreach my $f (@fields)
+            {
+                if ($f =~ /^C\s+(-?\d+)/)
+                {
+                    $char{C} = $1;
+                }
+                elsif ($f =~ /^WX\s+(\d+)/)
+                {
+                    $char{WX} = $1;
+                }
+                elsif ($f =~ /^N\s+([A-Za-z0-9_]+)/)
+                {
+                    $char{N} = $1;
+                    if ($font{EncodingScheme} eq "FontSpecific")
+                    {
+                        if ($char{C} == -1)
+                        {
+                            %char = ();
+                            last;
+                        }
+                        $char{UV} = 0xf000 + $char{C};
+                    }
+                    elsif (defined $glyphs{$1})
+                    {
+                        $char{UV} = $glyphs{$1};
+                    }
+                    else
+                    {
+                        %char = ();
+                        last;
+                    }
+                }
+                elsif ($f =~ /^B\s+(.*)/)
+                {
+                    next if $font{EncodingScheme} eq "FontSpecific";
+                    next unless is_win_ansi( $char{C} );
+                    my @bbox = split /\s+/, $1;
+                    $ascender = $bbox[3] if $bbox[3] > $ascender;
+                    $descender = $bbox[1] if $bbox[1] < $descender;
+                }
+                elsif ($f =~ /^L\s+/)
+                {
+                    next;
+                }
+                else { die "unrecognized field $f"; }
+            }
+            push @{$font{chars}}, \%char if %char;
+        }
+        close $FILE;
+
+        $font{FamilyName} .= " Narrow" if $font{FullName} =~ / Narrow/;
+        my @bbox = split /\s+/, $font{FontBBox};
+        $ascender ||= $bbox[3];
+        $descender ||= $bbox[1];
+        my $linegap = 1150 - ($ascender - $descender);
+        $font{FontBBox} = \@bbox;
+        $font{usUnitsPerEm} = 1000;
+        $font{sAscender} = $ascender;
+        $font{sDescender} = $descender;
+        $font{sLineGap} = $linegap > 0 ? $linegap : 0;
+        $font{usWinAscent} = $ascender;
+        $font{usWinDescent} = -$descender;
+
+        if ($font{EncodingScheme} eq "FontSpecific")
+        {
+            my $width = 0;
+            foreach my $m (@{$font{chars}})
+            {
+                $width += $m->{WX};
+            }
+            $font{sAvgCharWidth} = $width / scalar @{$font{chars}};
+        }
+        else
+        {
+            my @weights;
+            $weights[ord(' ')] = 166;
+            @weights[ord('a')..ord('z')] = ( 64, 14, 27,  35, 100, 20, 14, 42, 63, 3, 6, 35, 20, 56, 56, 17, 4, 49, 56, 71, 31, 10, 18, 3, 18, 2 );
+            my $width = 0;
+            foreach my $m (@{$font{chars}})
+            {
+                next unless defined $weights[$m->{UV}];
+                $width += $weights[$m->{UV}] * $m->{WX};
+            }
+            $font{sAvgCharWidth} = ($width + 500) / 1000;
+        }
+        (my $varname = $font{FontName}) =~ s/-/_/g;
+        $fonts{$varname} = \%font;
+    }
+
+    $filename = "$dir/corefonts.c";
+    printf "Building %s\n", $filename;
+    open OUTPUT, ">$filename.new" or die "Cannot create $filename";
+    print OUTPUT "/* Adobe Core Fonts, generated from $data_files{psfonts}->{url} */\n";
+    print OUTPUT "/* DO NOT EDIT!! */\n\n";
+    print OUTPUT "#include \"psdrv.h\"\n\n";
+
+    foreach my $name (sort keys %fonts)
+    {
+        my $count = scalar @{$fonts{$name}->{chars}};
+        printf OUTPUT "static const AFMMETRICS metrics_%s[%u] =\n{\n", $name, $count;
+        foreach my $m (sort { $a->{UV} <=> $b->{UV} } @{$fonts{$name}->{chars}})
+        {
+            printf OUTPUT "    { 0x%04x, %4u },\n", $m->{UV}, $m->{WX};
+        }
+        print OUTPUT  "};\n\n";
+    }
+
+    foreach my $name (sort keys %fonts)
+    {
+        my %weights = ( Bold => "FW_BOLD",
+                        Book => "FW_NORMAL",
+                        Demi => "FW_BOLD",
+                        Light => "FW_NORMAL",
+                        Roman => "FW_NORMAL",
+                        Medium => "FW_NORMAL",
+            );
+        printf OUTPUT "static const AFM font_%s =\n{\n", $name;
+        printf OUTPUT "    .FontName = \"%s\",\n", $fonts{$name}->{FontName};
+        printf OUTPUT "    .FamilyName = L\"%s\",\n", $fonts{$name}->{FamilyName};
+        printf OUTPUT "    .EncodingScheme = L\"%s\",\n", $fonts{$name}->{EncodingScheme};
+        printf OUTPUT "    .Weight = %s,\n", $weights{$fonts{$name}->{Weight}};
+        printf OUTPUT "    .ItalicAngle = %s,\n", $fonts{$name}->{ItalicAngle};
+        printf OUTPUT "    .IsFixedPitch = %s,\n", uc $fonts{$name}->{IsFixedPitch};
+        printf OUTPUT "    .FontBBox = { %d, %d, %d, %d },\n", @{$fonts{$name}->{FontBBox}}[0..3];
+        printf OUTPUT "    .WinMetrics.usUnitsPerEm = %d,\n", $fonts{$name}->{usUnitsPerEm};
+        printf OUTPUT "    .WinMetrics.sAscender = %d,\n", $fonts{$name}->{sAscender};
+        printf OUTPUT "    .WinMetrics.sDescender = %d,\n", $fonts{$name}->{sDescender};
+        printf OUTPUT "    .WinMetrics.sLineGap = %d,\n", $fonts{$name}->{sLineGap};
+        printf OUTPUT "    .WinMetrics.sAvgCharWidth = %d,\n", $fonts{$name}->{sAvgCharWidth};
+        printf OUTPUT "    .WinMetrics.usWinAscent = %d,\n", $fonts{$name}->{usWinAscent};
+        printf OUTPUT "    .WinMetrics.usWinDescent = %d,\n", $fonts{$name}->{usWinDescent};
+        printf OUTPUT "    .NumofMetrics = %s,\n", $count;
+        printf OUTPUT "    .Metrics = metrics_%s\n", $name;
+        print OUTPUT  "};\n\n";
+    }
+
+    print OUTPUT "const AFM * const PSDRV_BuiltinAFMs[] =\n{\n";
+    map { print OUTPUT  "    &font_$_,\n"; } sort keys %fonts;
+    print OUTPUT  "    NULL\n};\n";
+    close OUTPUT;
+    save_file($filename);
+}
+
+
 ################################################################
 # save a file if modified
 sub save_file($)
@@ -5886,6 +6177,7 @@ dump_scripts( "dlls/dwrite/scripts" );
 dump_indic( "dlls/gdi32/uniscribe/indicsyllable.c" );
 dump_vertical( "dlls/win32u/vertical.c", 1 );
 dump_vertical( "dlls/wineps.drv/vertical.c", 0 );
+dump_psfonts( "dlls/wineps.drv" );
 dump_intl_nls("nls/l_intl.nls");
 dump_norm_table( "nls/normnfc.nls" );
 dump_norm_table( "nls/normnfd.nls" );

@@ -123,7 +123,7 @@ static BOOL (WINAPI *pGetFontRealizationInfo)(HDC hdc, void *);
 static const WCHAR test_fontfile[] = L"wine_test_font.ttf";
 
 /* PANOSE is 10 bytes in size, need to pack the structure properly */
-#include "pshpack2.h"
+#pragma pack(push,2)
 typedef struct
 {
     USHORT majorVersion;
@@ -448,7 +448,7 @@ enum opentype_cmap_table_format
     OPENTYPE_CMAP_TABLE_SEGMENTED_COVERAGE = 12,
 };
 
-#include "poppack.h"
+#pragma pack(pop)
 
 static void *create_factory_iid(REFIID riid)
 {
@@ -2582,8 +2582,9 @@ static void test_system_fontcollection(void)
     ok(i == (UINT32)-1, "got %u\n", i);
 
     hr = IDWriteFontCollection_QueryInterface(collection, &IID_IDWriteFontCollection1, (void**)&collection1);
-    if (hr == S_OK) {
-        IDWriteFontSet *fontset, *fontset2;
+    if (hr == S_OK)
+    {
+        IDWriteFontSet *fontset, *fontset2, *fontset3;
         IDWriteFontFamily1 *family1;
         IDWriteFactory3 *factory3;
 
@@ -2605,10 +2606,9 @@ static void test_system_fontcollection(void)
         EXPECT_REF(collection1, 2);
         EXPECT_REF(factory, 2);
         hr = IDWriteFontCollection1_GetFontSet(collection1, &fontset);
-        todo_wine
         ok(hr == S_OK, "Failed to get fontset, hr %#lx.\n", hr);
-    if (hr == S_OK) {
         EXPECT_REF(collection1, 2);
+        todo_wine
         EXPECT_REF(factory, 2);
         EXPECT_REF(fontset, 1);
 
@@ -2621,18 +2621,25 @@ static void test_system_fontcollection(void)
         hr = IDWriteFactory_QueryInterface(factory, &IID_IDWriteFactory3, (void **)&factory3);
         ok(hr == S_OK, "Failed to get IDWriteFactory3 interface, hr %#lx.\n", hr);
 
+        todo_wine
         EXPECT_REF(factory, 3);
         hr = IDWriteFactory3_GetSystemFontSet(factory3, &fontset2);
         ok(hr == S_OK, "Failed to get system font set, hr %#lx.\n", hr);
         ok(fontset != fontset2, "Expected new fontset instance.\n");
         EXPECT_REF(fontset2, 1);
+        todo_wine
         EXPECT_REF(factory, 4);
 
+        hr = IDWriteFactory3_GetSystemFontSet(factory3, &fontset3);
+        ok(hr == S_OK, "Failed to get system font set, hr %#lx.\n", hr);
+        todo_wine
+        ok(fontset2 == fontset3, "Expected new fontset instance.\n");
+
+        IDWriteFontSet_Release(fontset3);
         IDWriteFontSet_Release(fontset2);
         IDWriteFontSet_Release(fontset);
 
         IDWriteFactory3_Release(factory3);
-    }
         IDWriteFontCollection1_Release(collection1);
     }
     else

@@ -26,22 +26,6 @@
 #include <stdint.h>
 #include "d3dx9_test_images.h"
 
-/*
- * MAKE_DDHRESULT is first defined in d3dx9.h, with the same definition as the
- * one in ddraw.h.
- */
-#ifdef MAKE_DDHRESULT
-#undef MAKE_DDHRESULT
-#endif
-#include "ddraw.h"
-
-static BOOL compare_uint(uint32_t x, uint32_t y, uint32_t max_diff)
-{
-    uint32_t diff = x > y ? x - y : y - x;
-
-    return diff <= max_diff;
-}
-
 static BOOL compare_float(float f, float g, uint32_t ulps)
 {
     int32_t x = *(int32_t *)&f;
@@ -149,45 +133,45 @@ static HRESULT create_file(const char *filename, const unsigned char *data, cons
     return D3DERR_INVALIDCALL;
 }
 
-/* dds_pixel_format.flags */
-#define DDS_PF_ALPHA 0x00000001
-#define DDS_PF_ALPHA_ONLY 0x00000002
-#define DDS_PF_FOURCC 0x00000004
-#define DDS_PF_INDEXED 0x00000020
-#define DDS_PF_RGB 0x00000040
-#define DDS_PF_LUMINANCE 0x00020000
-#define DDS_PF_BUMPLUMINANCE 0x00040000
-#define DDS_PF_BUMPDUDV 0x00080000
-
-struct dds_pixel_format
+static IDirect3DDevice9 *create_device(HWND *window)
 {
-    DWORD size;
-    DWORD flags;
-    DWORD fourcc;
-    DWORD bpp;
-    DWORD rmask;
-    DWORD gmask;
-    DWORD bmask;
-    DWORD amask;
-};
+    D3DPRESENT_PARAMETERS present_parameters = { 0 };
+    IDirect3DDevice9 *device;
+    IDirect3D9 *d3d;
+    HRESULT hr;
+    HWND wnd;
 
-struct dds_header
-{
-    DWORD size;
-    DWORD flags;
-    DWORD height;
-    DWORD width;
-    DWORD pitch_or_linear_size;
-    DWORD depth;
-    DWORD miplevels;
-    DWORD reserved[11];
-    struct dds_pixel_format pixel_format;
-    DWORD caps;
-    DWORD caps2;
-    DWORD caps3;
-    DWORD caps4;
-    DWORD reserved2;
-};
+    *window = NULL;
+
+    if (!(wnd = CreateWindowA("static", "d3dx9_test", WS_OVERLAPPEDWINDOW, 0, 0,
+            640, 480, NULL, NULL, NULL, NULL)))
+    {
+        skip("Couldn't create application window.\n");
+        return NULL;
+    }
+
+    if (!(d3d = Direct3DCreate9(D3D_SDK_VERSION)))
+    {
+        skip("Couldn't create IDirect3D9 object.\n");
+        DestroyWindow(wnd);
+        return NULL;
+    }
+
+    present_parameters.Windowed = TRUE;
+    present_parameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    hr = IDirect3D9_CreateDevice(d3d, D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, wnd, D3DCREATE_HARDWARE_VERTEXPROCESSING,
+            &present_parameters, &device);
+    IDirect3D9_Release(d3d);
+    if (FAILED(hr))
+    {
+        skip("Failed to create IDirect3DDevice9 object %#lx.\n", hr);
+        DestroyWindow(wnd);
+        return NULL;
+    }
+
+    *window = wnd;
+    return device;
+}
 
 /* fills dds_header with reasonable default values */
 static void fill_dds_header(struct dds_header *header)
@@ -550,7 +534,7 @@ static void test_dds_header_handling(void)
 #define IMAGE_RIGHTTOLEFT 0x10
 #define IMAGE_TOPTOBOTTOM 0x20
 
-#include "pshpack1.h"
+#pragma pack(push,1)
 struct tga_header
 {
     uint8_t  id_length;
@@ -573,7 +557,7 @@ struct tga_footer
     uint32_t developer_directory_offset;
     uint8_t magic[18];
 };
-#include "poppack.h"
+#pragma pack(pop)
 
 static const struct tga_footer default_tga_footer = {
     0, 0,
@@ -1116,89 +1100,6 @@ static inline void _check_readback_pixel_4bpp(unsigned int line, struct surface_
    todo_wine_if(todo) ok_(__FILE__, line)(color == expected_color, "Got color 0x%08x, expected 0x%08x.\n", color, expected_color);
 }
 
-static const PALETTEENTRY test_palette[256] =
-{
-    {0x00,0x00,0x00,0x00}, {0x00,0x00,0x80,0x01}, {0x00,0x80,0x00,0x02}, {0x00,0x80,0x80,0x03},
-    {0x80,0x00,0x00,0x04}, {0x80,0x00,0x80,0x05}, {0x80,0x80,0x00,0x06}, {0xc0,0xc0,0xc0,0x07},
-    {0xc0,0xdc,0xc0,0x08}, {0xf0,0xca,0xa6,0x09}, {0x00,0x20,0x40,0x0a}, {0x00,0x20,0x60,0x0b},
-    {0x00,0x20,0x80,0x0c}, {0x00,0x20,0xa0,0x0d}, {0x00,0x20,0xc0,0x0e}, {0x00,0x20,0xe0,0x0f},
-
-    {0x00,0x40,0x00,0x10}, {0x00,0x40,0x20,0x11}, {0x00,0x40,0x40,0x12}, {0x00,0x40,0x60,0x13},
-    {0x00,0x40,0x80,0x14}, {0x00,0x40,0xa0,0x15}, {0x00,0x40,0xc0,0x16}, {0x00,0x40,0xe0,0x17},
-    {0x00,0x60,0x00,0x18}, {0x00,0x60,0x20,0x19}, {0x00,0x60,0x40,0x1a}, {0x00,0x60,0x60,0x1b},
-    {0x00,0x60,0x80,0x1c}, {0x00,0x60,0xa0,0x1d}, {0x00,0x60,0xc0,0x1e}, {0x00,0x60,0xe0,0x1f},
-
-    {0x00,0x80,0x00,0x20}, {0x00,0x80,0x20,0x21}, {0x00,0x80,0x40,0x22}, {0x00,0x80,0x60,0x23},
-    {0x00,0x80,0x80,0x24}, {0x00,0x80,0xa0,0x25}, {0x00,0x80,0xc0,0x26}, {0x00,0x80,0xe0,0x27},
-    {0x00,0xa0,0x00,0x28}, {0x00,0xa0,0x20,0x29}, {0x00,0xa0,0x40,0x2a}, {0x00,0xa0,0x60,0x2b},
-    {0x00,0xa0,0x80,0x2c}, {0x00,0xa0,0xa0,0x2d}, {0x00,0xa0,0xc0,0x2e}, {0x00,0xa0,0xe0,0x2f},
-
-    {0x00,0xc0,0x00,0x30}, {0x00,0xc0,0x20,0x31}, {0x00,0xc0,0x40,0x32}, {0x00,0xc0,0x60,0x33},
-    {0x00,0xc0,0x80,0x34}, {0x00,0xc0,0xa0,0x35}, {0x00,0xc0,0xc0,0x36}, {0x00,0xc0,0xe0,0x37},
-    {0x00,0xe0,0x00,0x38}, {0x00,0xe0,0x20,0x39}, {0x00,0xe0,0x40,0x3a}, {0x00,0xe0,0x60,0x3b},
-    {0x00,0xe0,0x80,0x3c}, {0x00,0xe0,0xa0,0x3d}, {0x00,0xe0,0xc0,0x3e}, {0x00,0xe0,0xe0,0x3f},
-
-    {0x40,0x00,0x00,0x40}, {0x40,0x00,0x20,0x41}, {0x40,0x00,0x40,0x42}, {0x40,0x00,0x60,0x43},
-    {0x40,0x00,0x80,0x44}, {0x40,0x00,0xa0,0x45}, {0x40,0x00,0xc0,0x46}, {0x40,0x00,0xe0,0x47},
-    {0x40,0x20,0x00,0x48}, {0x40,0x20,0x20,0x49}, {0x40,0x20,0x40,0x4a}, {0x40,0x20,0x60,0x4b},
-    {0x40,0x20,0x80,0x4c}, {0x40,0x20,0xa0,0x4d}, {0x40,0x20,0xc0,0x4e}, {0x40,0x20,0xe0,0x4f},
-
-    {0x40,0x40,0x00,0x50}, {0x40,0x40,0x20,0x51}, {0x40,0x40,0x40,0x52}, {0x40,0x40,0x60,0x53},
-    {0x40,0x40,0x80,0x54}, {0x40,0x40,0xa0,0x55}, {0x40,0x40,0xc0,0x56}, {0x40,0x40,0xe0,0x57},
-    {0x40,0x60,0x00,0x58}, {0x40,0x60,0x20,0x59}, {0x40,0x60,0x40,0x5a}, {0x40,0x60,0x60,0x5b},
-    {0x40,0x60,0x80,0x5c}, {0x40,0x60,0xa0,0x5d}, {0x40,0x60,0xc0,0x5e}, {0x40,0x60,0xe0,0x5f},
-
-    {0x40,0x80,0x00,0x60}, {0x40,0x80,0x20,0x61}, {0x40,0x80,0x40,0x62}, {0x40,0x80,0x60,0x63},
-    {0x40,0x80,0x80,0x64}, {0x40,0x80,0xa0,0x65}, {0x40,0x80,0xc0,0x66}, {0x40,0x80,0xe0,0x67},
-    {0x40,0xa0,0x00,0x68}, {0x40,0xa0,0x20,0x69}, {0x40,0xa0,0x40,0x6a}, {0x40,0xa0,0x60,0x6b},
-    {0x40,0xa0,0x80,0x6c}, {0x40,0xa0,0xa0,0x6d}, {0x40,0xa0,0xc0,0x6e}, {0x40,0xa0,0xe0,0x6f},
-
-    {0x40,0xc0,0x00,0x70}, {0x40,0xc0,0x20,0x71}, {0x40,0xc0,0x40,0x72}, {0x40,0xc0,0x60,0x73},
-    {0x40,0xc0,0x80,0x74}, {0x40,0xc0,0xa0,0x75}, {0x40,0xc0,0xc0,0x76}, {0x40,0xc0,0xe0,0x77},
-    {0x40,0xe0,0x00,0x78}, {0x40,0xe0,0x20,0x79}, {0x40,0xe0,0x40,0x7a}, {0x40,0xe0,0x60,0x7b},
-    {0x40,0xe0,0x80,0x7c}, {0x40,0xe0,0xa0,0x7d}, {0x40,0xe0,0xc0,0x7e}, {0x40,0xe0,0xe0,0x7f},
-
-    {0x80,0x00,0x00,0x80}, {0x80,0x00,0x20,0x81}, {0x80,0x00,0x40,0x82}, {0x80,0x00,0x60,0x83},
-    {0x80,0x00,0x80,0x84}, {0x80,0x00,0xa0,0x85}, {0x80,0x00,0xc0,0x86}, {0x80,0x00,0xe0,0x87},
-    {0x80,0x20,0x00,0x88}, {0x80,0x20,0x20,0x89}, {0x80,0x20,0x40,0x8a}, {0x80,0x20,0x60,0x8b},
-    {0x80,0x20,0x80,0x8c}, {0x80,0x20,0xa0,0x8d}, {0x80,0x20,0xc0,0x8e}, {0x80,0x20,0xe0,0x8f},
-
-    {0x80,0x40,0x00,0x90}, {0x80,0x40,0x20,0x91}, {0x80,0x40,0x40,0x92}, {0x80,0x40,0x60,0x93},
-    {0x80,0x40,0x80,0x94}, {0x80,0x40,0xa0,0x95}, {0x80,0x40,0xc0,0x96}, {0x80,0x40,0xe0,0x97},
-    {0x80,0x60,0x00,0x98}, {0x80,0x60,0x20,0x99}, {0x80,0x60,0x40,0x9a}, {0x80,0x60,0x60,0x9b},
-    {0x80,0x60,0x80,0x9c}, {0x80,0x60,0xa0,0x9d}, {0x80,0x60,0xc0,0x9e}, {0x80,0x60,0xe0,0x9f},
-
-    {0x80,0x80,0x00,0xa0}, {0x80,0x80,0x20,0xa1}, {0x80,0x80,0x40,0xa2}, {0x80,0x80,0x60,0xa3},
-    {0x80,0x80,0x80,0xa4}, {0x80,0x80,0xa0,0xa5}, {0x80,0x80,0xc0,0xa6}, {0x80,0x80,0xe0,0xa7},
-    {0x80,0xa0,0x00,0xa8}, {0x80,0xa0,0x20,0xa9}, {0x80,0xa0,0x40,0xaa}, {0x80,0xa0,0x60,0xab},
-    {0x80,0xa0,0x80,0xac}, {0x80,0xa0,0xa0,0xad}, {0x80,0xa0,0xc0,0xae}, {0x80,0xa0,0xe0,0xaf},
-
-    {0x80,0xc0,0x00,0xb0}, {0x80,0xc0,0x20,0xb1}, {0x80,0xc0,0x40,0xb2}, {0x80,0xc0,0x60,0xb3},
-    {0x80,0xc0,0x80,0xb4}, {0x80,0xc0,0xa0,0xb5}, {0x80,0xc0,0xc0,0xb6}, {0x80,0xc0,0xe0,0xb7},
-    {0x80,0xe0,0x00,0xb8}, {0x80,0xe0,0x20,0xb9}, {0x80,0xe0,0x40,0xba}, {0x80,0xe0,0x60,0xbb},
-    {0x80,0xe0,0x80,0xbc}, {0x80,0xe0,0xa0,0xbd}, {0x80,0xe0,0xc0,0xbe}, {0x80,0xe0,0xe0,0xbf},
-
-    {0xc0,0x00,0x00,0xc0}, {0xc0,0x00,0x20,0xc1}, {0xc0,0x00,0x40,0xc2}, {0xc0,0x00,0x60,0xc3},
-    {0xc0,0x00,0x80,0xc4}, {0xc0,0x00,0xa0,0xc5}, {0xc0,0x00,0xc0,0xc6}, {0xc0,0x00,0xe0,0xc7},
-    {0xc0,0x20,0x00,0xc8}, {0xc0,0x20,0x20,0xc9}, {0xc0,0x20,0x40,0xca}, {0xc0,0x20,0x60,0xcb},
-    {0xc0,0x20,0x80,0xcc}, {0xc0,0x20,0xa0,0xcd}, {0xc0,0x20,0xc0,0xce}, {0xc0,0x20,0xe0,0xcf},
-
-    {0xc0,0x40,0x00,0xd0}, {0xc0,0x40,0x20,0xd1}, {0xc0,0x40,0x40,0xd2}, {0xc0,0x40,0x60,0xd3},
-    {0xc0,0x40,0x80,0xd4}, {0xc0,0x40,0xa0,0xd5}, {0xc0,0x40,0xc0,0xd6}, {0xc0,0x40,0xe0,0xd7},
-    {0xc0,0x60,0x00,0xd8}, {0xc0,0x60,0x20,0xd9}, {0xc0,0x60,0x40,0xda}, {0xc0,0x60,0x60,0xdb},
-    {0xc0,0x60,0x80,0xdc}, {0xc0,0x60,0xa0,0xdd}, {0xc0,0x60,0xc0,0xde}, {0xc0,0x60,0xe0,0xdf},
-
-    {0xc0,0x80,0x00,0xe0}, {0xc0,0x80,0x20,0xe1}, {0xc0,0x80,0x40,0xe2}, {0xc0,0x80,0x60,0xe3},
-    {0xc0,0x80,0x80,0xe4}, {0xc0,0x80,0xa0,0xe5}, {0xc0,0x80,0xc0,0xe6}, {0xc0,0x80,0xe0,0xe7},
-    {0xc0,0xa0,0x00,0xe8}, {0xc0,0xa0,0x20,0xe9}, {0xc0,0xa0,0x40,0xea}, {0xc0,0xa0,0x60,0xeb},
-    {0xc0,0xa0,0x80,0xec}, {0xc0,0xa0,0xa0,0xed}, {0xc0,0xa0,0xc0,0xee}, {0xc0,0xa0,0xe0,0xef},
-
-    {0xc0,0xc0,0x00,0xf0}, {0xc0,0xc0,0x20,0xf1}, {0xc0,0xc0,0x40,0xf2}, {0xc0,0xc0,0x60,0xf3},
-    {0xc0,0xc0,0x80,0xf4}, {0xc0,0xc0,0xa0,0xf5}, {0xf0,0xfb,0xff,0xf6}, {0xa4,0xa0,0xa0,0xf7},
-    {0x80,0x80,0x80,0xf8}, {0x00,0x00,0xff,0xf9}, {0x00,0xff,0x00,0xfa}, {0x00,0xff,0xff,0xfb},
-    {0xff,0x00,0x00,0xfc}, {0xff,0x00,0xff,0xfd}, {0xff,0xff,0x00,0xfe}, {0xff,0xff,0xff,0xff},
-};
-
 static const uint16_t v16u16_2_2[] =
 {
     0x0000, 0x3000, 0x4000, 0x7fff, 0x8000, 0x8001, 0xc000, 0xffff,
@@ -1289,21 +1190,29 @@ static uint32_t get_bpp_for_d3dformat(D3DFORMAT format)
     case D3DFMT_Q16W16V16U16:
         return 8;
 
+    case D3DFMT_Q8W8V8U8:
     case D3DFMT_A8B8G8R8:
     case D3DFMT_A8R8G8B8:
     case D3DFMT_V16U16:
     case D3DFMT_G16R16:
+    case D3DFMT_R32F:
         return 4;
 
     case D3DFMT_R8G8B8:
         return 3;
 
+    case D3DFMT_A4R4G4B4:
     case D3DFMT_X1R5G5B5:
     case D3DFMT_A1R5G5B5:
+    case D3DFMT_R5G6B5:
     case D3DFMT_V8U8:
     case D3DFMT_A8P8:
         return 2;
 
+    case D3DFMT_R3G3B2:
+    case D3DFMT_DXT5:
+    case D3DFMT_DXT4:
+    case D3DFMT_A4L4:
     case D3DFMT_L8:
     case D3DFMT_P8:
         return 1;
@@ -2152,6 +2061,438 @@ static void test_load_surface_from_tga(IDirect3DDevice9 *device)
     }
 
     free(tga);
+}
+
+static const uint8_t r8g8b8_4_4[] =
+{
+    0xff,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0xff,0x00,0xff,0x00,0x00,0xff,
+    0x00,0x00,0x00,0xff,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0xff,0xff,0xff,
+    0x00,0xff,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0xff,0xff,0xff,0x00,0x80,0x80,0x00,
+};
+
+static const uint8_t r8g8b8_4_4_expected[] =
+{
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t dxt5_4_4[] =
+{
+    0xff,0x00,0x00,0x00,0x00,0x49,0x92,0x24,0x00,0xf8,0x00,0xf8,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t dxt5_4_4_expected_no_ck[] =
+{
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+};
+
+static const uint8_t dxt5_4_4_expected_ck[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+};
+
+static const uint8_t dxt4_4_4[] =
+{
+    0x22,0xcc,0x86,0xc6,0xe6,0x86,0xc6,0xe6,0x10,0x84,0x10,0x84,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t dxt4_4_4_expected_no_ck[] =
+{
+    0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x22,0xff,0xff,0xff,0x44,0xff,0xff,0xff,0x66,
+    0xf7,0xf3,0xf7,0x88,0xc5,0xc2,0xc5,0xaa,0xa5,0xa2,0xa5,0xcc,0x84,0x82,0x84,0xff,
+    0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x22,0xff,0xff,0xff,0x44,0xff,0xff,0xff,0x66,
+    0xf7,0xf3,0xf7,0x88,0xc5,0xc2,0xc5,0xaa,0xa5,0xa2,0xa5,0xcc,0x84,0x82,0x84,0xff,
+};
+
+static const uint8_t dxt4_4_4_expected_ck[] =
+{
+    0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x22,0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x66,
+    0xf7,0xf3,0xf7,0x88,0xc5,0xc2,0xc5,0xaa,0xa5,0xa2,0xa5,0xcc,0x84,0x82,0x84,0xff,
+    0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x22,0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x66,
+    0xf7,0xf3,0xf7,0x88,0xc5,0xc2,0xc5,0xaa,0xa5,0xa2,0xa5,0xcc,0x84,0x82,0x84,0xff,
+};
+
+static const uint8_t p8_4_4[] =
+{
+    0x10,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,
+};
+
+static const uint8_t p8_4_4_expected[] =
+{
+    0x00,0x40,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t a8p8_4_4[] =
+{
+    0xff,0x10,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,
+    0xf0,0x10,0xf0,0x10,0xf0,0x10,0xf0,0x10,0xf0,0x10,0xf0,0x10,0xf0,0x10,0xf0,0x10,
+};
+
+static const uint8_t a8p8_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0xc0,0xc0,0x00,0x00,0xc0,0xc0,0x00,0x00,0xc0,0xc0,0x00,
+    0x00,0xc0,0xc0,0x00,0x00,0xc0,0xc0,0x00,0x00,0xc0,0xc0,0x00,0x00,0xc0,0xc0,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t a32r32g32b32_4_4[] =
+{
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t a32r32g32b32_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+    0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,
+};
+
+static const uint8_t r32_4_4[] =
+{
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,0x00,0x00,0x80,0x3f,
+    0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,
+    0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,0x00,0x00,0x00,0x3f,
+};
+
+static const uint8_t r32_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,
+    0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,0xff,0xff,0x80,0xff,
+};
+
+static const uint8_t q8w8v8u8_4_4[] =
+{
+    0x00,0x10,0x20,0x30,0x40,0x50,0x60,0x70,0x80,0x90,0xa0,0xb0,0xc0,0xd0,0xe0,0xf0,
+    0x04,0x14,0x24,0x34,0x44,0x54,0x64,0x74,0x84,0x94,0xa4,0xb4,0xc4,0xd4,0xe4,0xf4,
+    0x00,0x00,0x28,0x38,0x48,0x58,0x68,0x78,0x88,0x98,0xa8,0xb8,0xc8,0xd8,0xe8,0xf8,
+    0x0c,0x1c,0x2c,0x3c,0x4c,0x5c,0x6c,0x7c,0x8c,0x9c,0xac,0xbc,0xcc,0xdc,0xec,0xfc,
+};
+
+static const uint8_t q8w8v8u8_4_4_expected[] =
+{
+    0xa0,0x90,0x80,0xb0,0xe0,0xd0,0xc0,0xf0,0x1f,0x0f,0x00,0x2f,0x5f,0x4f,0x3f,0x6f,
+    0xa4,0x94,0x84,0xb4,0xe4,0xd4,0xc4,0xf4,0x23,0x13,0x03,0x33,0x63,0x53,0x43,0x73,
+    0x80,0x80,0x80,0x80,0xe8,0xd8,0xc8,0xf8,0x27,0x17,0x07,0x37,0x67,0x57,0x47,0x77,
+    0xac,0x9c,0x8c,0xbc,0xec,0xdc,0xcc,0xfc,0x2b,0x1b,0x0b,0x3b,0x6b,0x5b,0x4b,0x7b,
+};
+
+static const uint8_t a8r8g8b8_4_4[] =
+{
+    0x00,0xff,0x00,0x80,0x00,0xff,0x00,0x80,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x80,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+};
+
+static const uint8_t a8r8g8b8_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x80,0x00,0x00,0xff,0xff,0x00,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+    0x00,0x00,0xff,0xff,0x00,0x00,0xff,0xff,0xff,0xff,0x00,0xff,0xff,0xff,0x00,0xff,
+};
+
+static const uint8_t a4r4g4b4_4_4[] =
+{
+    0xff,0x00,0x0f,0x00,0x00,0xf0,0x00,0x0f,0xf0,0x00,0xf0,0x00,0xf0,0x00,0xf0,0x00,
+    0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,
+};
+
+static const uint8_t a4r4g4b4_4_4_expected[] =
+{
+    0xff,0xff,0x00,0x00,0xff,0x00,0x00,0x00,0x00,0x00,0x00,0xff,0x00,0x00,0xff,0x00,
+    0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+static const uint8_t a4r4g4b4_4_4_expected2[] =
+{
+    0x00,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0x00,0x00,0x00,0xff,0x00,0x00,0xff,0x00,
+    0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x00,
+    0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,
+    0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,0x00,0x88,
+};
+
+static const uint8_t a4l4_4_4[] =
+{
+    0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff,
+};
+
+static const uint8_t a4l4_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x11,0x11,0x11,0x11,0x22,0x22,0x22,0x22,0x33,0x33,0x33,0x33,
+    0x44,0x44,0x44,0x44,0x55,0x55,0x55,0x55,0x66,0x66,0x66,0x66,0x77,0x77,0x77,0x77,
+    0x00,0x00,0x00,0x00,0x99,0x99,0x99,0x99,0xaa,0xaa,0xaa,0xaa,0xbb,0xbb,0xbb,0xbb,
+    0xcc,0xcc,0xcc,0xcc,0xdd,0xdd,0xdd,0xdd,0xee,0xee,0xee,0xee,0xff,0xff,0xff,0xff,
+};
+
+static const uint8_t a4l4_4_4_expected2[] =
+{
+    0x00,0x00,0x00,0x00,0x11,0x11,0x11,0x11,0x22,0x22,0x22,0x22,0x33,0x33,0x33,0x33,
+    0x44,0x44,0x44,0x44,0x55,0x55,0x55,0x55,0x66,0x66,0x66,0x66,0x77,0x77,0x77,0x77,
+    0x88,0x88,0x88,0x88,0x99,0x99,0x99,0x99,0xaa,0xaa,0xaa,0xaa,0xbb,0xbb,0xbb,0xbb,
+    0xcc,0xcc,0xcc,0xcc,0xdd,0xdd,0xdd,0xdd,0xee,0xee,0xee,0xee,0xff,0xff,0xff,0xff,
+};
+
+static const uint8_t a1r5g5b5_4_4[] =
+{
+    0x00,0x00,0x42,0x08,0x84,0x10,0xc6,0x18,0x08,0x21,0x4a,0x29,0x8c,0x31,0xce,0x39,
+    0x10,0xc2,0x52,0xca,0x94,0xd2,0xd6,0xda,0x18,0xe3,0x5a,0xeb,0x9c,0xf3,0xde,0xfb,
+};
+
+static const uint8_t a1r5g5b5_4_4_expected[] =
+{
+    0x00,0x00,0x00,0x00,0x10,0x10,0x10,0x00,0x21,0x21,0x21,0x00,0x31,0x31,0x31,0x00,
+    0x42,0x42,0x42,0x00,0x52,0x52,0x52,0x00,0x63,0x63,0x63,0x00,0x73,0x73,0x73,0x00,
+    0x84,0x84,0x84,0xff,0x94,0x94,0x94,0xff,0x00,0x00,0x00,0x00,0xb5,0xb5,0xb5,0xff,
+    0xc5,0xc5,0xc5,0xff,0xd6,0xd6,0xd6,0xff,0xe6,0xe6,0xe6,0xff,0xf7,0xf7,0xf7,0xff,
+};
+
+static const uint8_t r5g6b5_4_4[] =
+{
+    0x00,0x00,0x82,0x10,0x04,0x21,0x86,0x31,0x08,0x42,0x8a,0x52,0x0c,0x63,0x8e,0x73,
+    0x10,0x84,0x92,0x94,0x14,0xa5,0x96,0xb5,0x18,0xc6,0x9a,0xd6,0x1c,0xe7,0x9e,0xf7,
+};
+
+static const uint8_t r5g6b5_4_4_expected[] =
+{
+    0x00,0x00,0x00,0xff,0x10,0x10,0x10,0xff,0x21,0x20,0x21,0xff,0x31,0x31,0x31,0xff,
+    0x42,0x41,0x42,0xff,0x52,0x51,0x52,0xff,0x63,0x61,0x63,0xff,0x73,0x71,0x73,0xff,
+    0x84,0x82,0x84,0xff,0x94,0x92,0x94,0xff,0x00,0x00,0x00,0x00,0xb5,0xb2,0xb5,0xff,
+    0xc5,0xc2,0xc5,0xff,0xd6,0xd2,0xd6,0xff,0xe6,0xe3,0xe6,0xff,0xf7,0xf3,0xf7,0xff,
+};
+
+static const uint8_t r3g3b2_4_4[] =
+{
+    0x00,0x00,0x24,0x24,0x49,0x49,0x6d,0x6d,0x92,0x92,0xb6,0xb6,0xdb,0xdb,0xff,0xff,
+};
+
+static const uint8_t r3g3b2_4_4_expected[] =
+{
+    0x00,0x00,0x00,0xff,0x00,0x00,0x00,0xff,0x00,0x24,0x24,0xff,0x00,0x24,0x24,0xff,
+    0x55,0x49,0x49,0xff,0x55,0x49,0x49,0xff,0x55,0x6d,0x6d,0xff,0x55,0x6d,0x6d,0xff,
+    0xaa,0x92,0x92,0xff,0xaa,0x92,0x92,0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0xff,0xdb,0xdb,0xff,0xff,0xdb,0xdb,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+};
+
+static BOOL is_dxt_d3dformat(D3DFORMAT fmt);
+static void test_color_key(void)
+{
+    static const struct
+    {
+        D3DFORMAT src_format;
+        const void *src_data;
+
+        const void *expected_dst_data;
+        D3DCOLOR color_key;
+        const void *expected_dst_data_32;
+        uint8_t max_diff;
+        BOOL todo;
+    } tests[] =
+    {
+        /* Color key with alpha channel unset. */
+        {
+            D3DFMT_R8G8B8, r8g8b8_4_4, r8g8b8_4_4_expected, 0x00008080,
+        },
+        /* Same color key as before except the alpha channel is set. */
+        {
+            D3DFMT_R8G8B8, r8g8b8_4_4, r8g8b8_4_4_expected, 0xff008080,
+        },
+        /* Color key on a palette. */
+        {
+            D3DFMT_P8, p8_4_4, p8_4_4_expected, 0xf0c0c000,
+        },
+        {
+            D3DFMT_A8P8, a8p8_4_4, a8p8_4_4_expected, 0x10c0c000,
+        },
+        {
+            D3DFMT_A32B32G32R32F, a32r32g32b32_4_4, a32r32g32b32_4_4_expected, 0xffff0000,
+        },
+        /* 5. */
+        /*
+         * Only channels that exist in the source format matter for the color
+         * key, other channels can be set to any value and are ignored.
+         */
+        {
+            D3DFMT_R32F, r32_4_4, r32_4_4_expected, 0xffff3080,
+        },
+        /*
+         * Both 0x7f and 0x80 channel values in the color key map to 0x00 in
+         * 8-bit SNORM.
+         */
+        {
+            D3DFMT_Q8W8V8U8, q8w8v8u8_4_4, q8w8v8u8_4_4_expected, 0xb87f80a8,
+        },
+        /* Alpha channel factors into the color key check. */
+        {
+            D3DFMT_A8R8G8B8, a8r8g8b8_4_4, a8r8g8b8_4_4_expected, 0x8000ff00,
+        },
+        {
+            D3DFMT_A8R8G8B8, a8r8g8b8_4_4, a8r8g8b8_4_4, 0x0000ff00,
+        },
+        /*
+         * 0x80-0x90 color key channel values all match 0x8 in the source
+         * format.
+         */
+        {
+            D3DFMT_A4R4G4B4, a4r4g4b4_4_4, a4r4g4b4_4_4_expected, 0x80009000,
+        },
+        /* 10. */
+        /* 0xf7-0xff match 0xf in the source format. */
+        {
+            D3DFMT_A4R4G4B4, a4r4g4b4_4_4, a4r4g4b4_4_4_expected2, 0x0000f7ff,
+        },
+        {
+            D3DFMT_A4L4, a4l4_4_4, a4l4_4_4_expected, 0x88818283,
+        },
+        {
+            D3DFMT_A4L4, a4l4_4_4, a4l4_4_4_expected2, 0x88818200,
+        },
+        {
+            D3DFMT_A1R5G5B5, a1r5g5b5_4_4, a1r5g5b5_4_4_expected, 0x80a1a8a4, .max_diff = 1
+        },
+        {
+            D3DFMT_R5G6B5, r5g6b5_4_4, r5g6b5_4_4_expected, 0x81a1a0a8, .max_diff = 1
+        },
+        /* 15. */
+        {
+            D3DFMT_R3G3B2, r3g3b2_4_4, r3g3b2_4_4_expected, 0x81a4c8bf,
+        },
+        /*
+         * Test color key handling for compressed formats. On 64-bit the color key
+         * is used, but on 32-bit it is ignored.
+         */
+        {
+            D3DFMT_DXT5, dxt5_4_4, dxt5_4_4_expected_ck, 0xffff0000, dxt5_4_4_expected_no_ck,
+        },
+        /*
+         * Test premultiplied alpha handling with a color key - color key applies
+         * to the value after the premultiplied alpha transformation is undone.
+         */
+        {
+            D3DFMT_DXT4, dxt4_4_4, dxt4_4_4_expected_ck, 0x44ffffff, dxt4_4_4_expected_no_ck,
+            .todo = TRUE
+        },
+        /*
+         * Color key also has the same range of values as R5G6B5 for the color
+         * channels.
+         */
+        {
+            D3DFMT_DXT4, dxt4_4_4, dxt4_4_4_expected_ck, 0x44fbfdfb, dxt4_4_4_expected_no_ck,
+            .todo = TRUE
+        },
+        /* Values out of range for R5G6B5, won't be color keyed. */
+        {
+            D3DFMT_DXT4, dxt4_4_4, dxt4_4_4_expected_no_ck, 0x44fafcfa,
+            .todo = TRUE
+        },
+    };
+    unsigned int i, x, y, mismatch_count;
+    PALETTEENTRY tmp_palette[256];
+    const uint8_t *expected_dst;
+    IDirect3DDevice9 *device;
+    D3DLOCKED_RECT lock_rect;
+    IDirect3DSurface9 *surf;
+    uint32_t src_pitch;
+    RECT rect;
+    HRESULT hr;
+    HWND hwnd;
+
+    if (!(device = create_device(&hwnd)))
+        return;
+
+    memcpy(tmp_palette, test_palette, sizeof(test_palette));
+    /* Set palette entries 0xf1-0xff to the same value. */
+    for (i = 0; i < 0xf; ++i)
+        tmp_palette[0xf1 + i] = tmp_palette[0xf0];
+
+    SetRect(&rect, 0, 0, 4, 4);
+    hr = IDirect3DDevice9_CreateOffscreenPlainSurface(device, 4, 4, D3DFMT_A8R8G8B8, D3DPOOL_SCRATCH, &surf, NULL);
+    ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        mismatch_count = 0;
+        src_pitch = get_bpp_for_d3dformat(tests[i].src_format) * 4;
+        hr = D3DXLoadSurfaceFromMemory(surf, NULL, NULL, tests[i].src_data, tests[i].src_format,
+                src_pitch, tmp_palette, &rect, D3DX_FILTER_NONE, tests[i].color_key);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+        if (sizeof(void *) == 4 && tests[i].expected_dst_data_32)
+            expected_dst = tests[i].expected_dst_data_32;
+        else
+            expected_dst = tests[i].expected_dst_data;
+
+        IDirect3DSurface9_LockRect(surf, &lock_rect, NULL, D3DLOCK_READONLY);
+        for (y = 0; y < 4; ++y)
+        {
+            const uint8_t *dst_expected_row = ((const uint8_t *)expected_dst) + (sizeof(uint32_t) * 4 * y);
+            const uint8_t *dst_row = ((const uint8_t *)lock_rect.pBits) + (lock_rect.Pitch * y);
+
+            for (x = 0; x < 4; ++x)
+            {
+                const uint32_t dst_expected_color = ((const uint32_t *)dst_expected_row)[x];
+                const uint32_t dst_color = ((const uint32_t *)dst_row)[x];
+
+                if (!compare_color_4bpp(dst_color, dst_expected_color, tests[i].max_diff))
+                    mismatch_count++;
+            }
+        }
+        IDirect3DSurface9_UnlockRect(surf);
+
+        todo_wine_if(tests[i].todo) ok(!mismatch_count, "Unexpected number of mismatched pixels %u.\n", mismatch_count);
+        winetest_pop_context();
+    }
+
+    /*
+     * Trying to use D3DX_FILTER_SRGB_IN with a color key results in
+     * STATUS_ACCESS_VIOLATION on native.
+     */
+    if (0)
+    {
+        const uint32_t src_pitch = get_bpp_for_d3dformat(tests[0].src_format) * 4;
+
+        hr = D3DXLoadSurfaceFromMemory(surf, NULL, NULL, tests[0].src_data, tests[0].src_format,
+                src_pitch, NULL, &rect, D3DX_FILTER_NONE | D3DX_FILTER_SRGB_IN,
+                tests[0].color_key);
+        ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+    }
+
+    check_release((IUnknown *)surf, 0);
+    check_release((IUnknown *)device, 0);
+    DestroyWindow(hwnd);
 }
 
 static void test_D3DXLoadSurface(IDirect3DDevice9 *device)
@@ -3425,82 +3766,6 @@ static void test_D3DXLoadSurface(IDirect3DDevice9 *device)
     if(testbitmap_ok) DeleteFileA("testbitmap.bmp");
 }
 
-#define check_dds_pixel_format_struct(pixel_format, expected_pixel_format, wine_todo) \
-    check_dds_pixel_format_struct_(__FILE__, __LINE__, pixel_format, expected_pixel_format, wine_todo)
-static void check_dds_pixel_format_struct_(const char *file, uint32_t line, const struct dds_pixel_format *pixel_format,
-        const struct dds_pixel_format *expected_pixel_format, BOOL wine_todo)
-{
-    BOOL matched;
-
-    matched = !memcmp(expected_pixel_format, pixel_format, sizeof(*pixel_format));
-    todo_wine_if(wine_todo) ok_(file, line)(matched, "Got unexpected dds pixel format values.\n");
-    if (matched)
-        return;
-
-    todo_wine_if(wine_todo && pixel_format->flags != expected_pixel_format->flags)
-        ok_(file, line)(pixel_format->flags == expected_pixel_format->flags, "Unexpected DDS pixel format flags %#lx.\n",
-                pixel_format->flags);
-    todo_wine_if(wine_todo && pixel_format->fourcc != expected_pixel_format->fourcc)
-        ok_(file, line)(pixel_format->fourcc == expected_pixel_format->fourcc, "Unexpected DDS pixel format fourcc %#lx.\n",
-                pixel_format->fourcc);
-    todo_wine_if(wine_todo && pixel_format->bpp != expected_pixel_format->bpp)
-        ok_(file, line)(pixel_format->bpp == expected_pixel_format->bpp, "Unexpected DDS pixel format bpp %#lx.\n",
-                pixel_format->bpp);
-    todo_wine_if(wine_todo && pixel_format->rmask != expected_pixel_format->rmask)
-        ok_(file, line)(pixel_format->rmask == expected_pixel_format->rmask, "Unexpected DDS pixel format rmask %#lx.\n",
-                pixel_format->rmask);
-    todo_wine_if(wine_todo && pixel_format->gmask != expected_pixel_format->gmask)
-        ok_(file, line)(pixel_format->gmask == expected_pixel_format->gmask, "Unexpected DDS pixel format gmask %#lx.\n",
-                pixel_format->gmask);
-    todo_wine_if(wine_todo && pixel_format->bmask != expected_pixel_format->bmask)
-        ok_(file, line)(pixel_format->bmask == expected_pixel_format->bmask, "Unexpected DDS pixel format bmask %#lx.\n",
-                pixel_format->bmask);
-    todo_wine_if(wine_todo && pixel_format->amask != expected_pixel_format->amask)
-        ok_(file, line)(pixel_format->amask == expected_pixel_format->amask, "Unexpected DDS pixel format amask %#lx.\n",
-                pixel_format->amask);
-}
-
-#define check_dds_header(header, flags, height, width, pitch, depth, mip_levels, pixel_format, caps, caps2, wine_todo) \
-    check_dds_header_(__FILE__, __LINE__, header, flags, height, width, pitch, depth, mip_levels, pixel_format, \
-                      caps, caps2, wine_todo)
-static void check_dds_header_(const char *file, uint32_t line, const struct dds_header *header, uint32_t flags,
-        uint32_t height, uint32_t width, uint32_t pitch, uint32_t depth, uint32_t mip_levels,
-        const struct dds_pixel_format *pixel_format, uint32_t caps, uint32_t caps2, BOOL wine_todo)
-{
-    const struct dds_header expected_header = { sizeof(*header), flags, height, width, pitch, depth, mip_levels, { 0 },
-                                                *pixel_format, caps, caps2, 0, 0, 0 };
-    BOOL matched;
-
-    matched = !memcmp(&expected_header, header, sizeof(*header));
-    todo_wine_if(wine_todo) ok_(file, line)(matched, "Got unexpected dds header values.\n");
-    if (matched)
-        return;
-
-    todo_wine_if(wine_todo && header->flags != flags)
-        ok_(file, line)(header->flags == flags, "Unexpected DDS header flags %#lx.\n", header->flags);
-    todo_wine_if(wine_todo && header->width != width)
-        ok_(file, line)(header->width == width, "Unexpected DDS header width %#lx.\n", header->width);
-    todo_wine_if(wine_todo && header->height != height)
-        ok_(file, line)(header->height == height, "Unexpected DDS header height %#lx.\n", header->height);
-    todo_wine_if(wine_todo && header->pitch_or_linear_size != pitch)
-        ok_(file, line)(header->pitch_or_linear_size == pitch, "Unexpected DDS header pitch %#lx.\n",
-                header->pitch_or_linear_size);
-    todo_wine_if(wine_todo && header->depth != depth)
-        ok_(file, line)(header->depth == depth, "Unexpected DDS header depth %#lx.\n", header->depth);
-    todo_wine_if(wine_todo && header->miplevels != mip_levels)
-        ok_(file, line)(header->miplevels == mip_levels, "Unexpected DDS header mip levels %#lx.\n", header->miplevels);
-    ok_(file, line)(!memcmp(header->reserved, expected_header.reserved, sizeof(header->reserved)),
-            "Unexpected values in DDS header reserved field.");
-    check_dds_pixel_format_struct(&header->pixel_format, pixel_format, FALSE);
-    todo_wine_if(wine_todo && header->caps != caps)
-        ok_(file, line)(header->caps == caps, "Unexpected DDS header caps %#lx.\n", header->caps);
-    todo_wine_if(wine_todo && header->caps2 != caps2)
-        ok_(file, line)(header->caps2 == caps2, "Unexpected DDS header caps2 %#lx.\n", header->caps2);
-    ok_(file, line)(!header->caps3, "Unexpected DDS header caps3 %#lx.\n", header->caps3);
-    ok_(file, line)(!header->caps4, "Unexpected DDS header caps4 %#lx.\n", header->caps4);
-    ok_(file, line)(!header->reserved2, "Unexpected DDS header reserved2 %#lx.\n", header->reserved2);
-}
-
 #define DDS_FILE_HEADER_SIZE (sizeof(uint32_t) + sizeof(struct dds_header))
 #define PALETTED_DDS_FILE_HEADER_SIZE (DDS_FILE_HEADER_SIZE + (sizeof(PALETTEENTRY) * 256))
 static void test_save_surface_to_dds(IDirect3DDevice9 *device)
@@ -3826,6 +4091,692 @@ static void test_save_surface_to_dds(IDirect3DDevice9 *device)
     }
 }
 
+static BOOL is_dxt_d3dformat(D3DFORMAT fmt)
+{
+    return (fmt & 0x00ffffff) == MAKEFOURCC('D','X','T',0);
+}
+
+static void test_save_surface_iffs(IDirect3DDevice9 *device)
+{
+    static const struct
+    {
+        D3DXIMAGE_FILEFORMAT format;
+        const char *name;
+    }
+    test_iffs[] =
+    {
+        { D3DXIFF_BMP, "D3DXIFF_BMP" },
+        { D3DXIFF_JPG, "D3DXIFF_JPG" },
+        { D3DXIFF_TGA, "D3DXIFF_TGA" },
+        { D3DXIFF_PNG, "D3DXIFF_PNG" },
+        { D3DXIFF_PPM, "D3DXIFF_PPM" },
+        { D3DXIFF_DIB, "D3DXIFF_DIB" },
+        { D3DXIFF_HDR, "D3DXIFF_HDR" },
+        { D3DXIFF_PFM, "D3DXIFF_PFM" },
+    };
+    static const struct
+    {
+        D3DFORMAT format;
+        const PALETTEENTRY *palette;
+        uint8_t init_pixel_value;
+        struct
+        {
+            HRESULT hr;
+            D3DFORMAT format;
+            BOOL todo_hr;
+            BOOL todo_format;
+        }
+        iff_expected[8];
+    }
+    iff_tests[] =
+    {
+        { D3DFMT_P8, test_palette, 0x00,
+          { { D3D_OK, D3DFMT_P8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_P8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8P8, test_palette, 0x00,
+          { { D3D_OK, D3DFMT_P8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_P8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_P8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8P8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8P8, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R8G8B8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R8G8B8, },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        /*
+         * For BMP/DIB, these encode as D3DFMT_X8R8G8B8. If there's at least
+         * one pixel with a non-zero alpha channel, it reports as D3DFMT_A8R8G8B8.
+         */
+        { D3DFMT_A8R8G8B8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8, },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8R8G8B8, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8, },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          }
+        },
+        { D3DFMT_X8R8G8B8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8, },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        /*
+         * Unlike D3DFMT_A8R8G8B8, even if the alpha channel is all 0,
+         * D3DFMT_A8B8G8R8 doesn't get replaced with D3DFMT_X8B8G8R8
+         * for BMP/DIB.
+         */
+        { D3DFMT_A8B8G8R8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8B8G8R8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8B8G8R8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_X8B8G8R8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8B8G8R8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8B8G8R8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R5G6B5, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R5G6B5, },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R5G6B5, },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_X1R5G5B5, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X1R5G5B5, },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X1R5G5B5, },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A1R5G5B5, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A1R5G5B5, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A1R5G5B5, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R3G3B2, NULL, 0x00,
+          { { D3D_OK, D3DFMT_P8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_P8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8R3G3B2, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8R3G3B2, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R3G3B2, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A4R4G4B4, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A4R4G4B4, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A4R4G4B4, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_X4R4G4B4, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X4R4G4B4, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X4R4G4B4, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A2R10G10B10, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A2R10G10B10, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A2R10G10B10, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A2B10G10R10, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A2B10G10R10, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A2B10G10R10, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A16B16G16R16, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_G16R16, NULL, 0x00,
+          { { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8R3G3B2, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R3G3B2, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A8L8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8L8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8L8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A4L4, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A4R4G4B4, .todo_format = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A4R4G4B4, .todo_format = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        /*
+         * For BMP/DIB, this ends up as a paletted bitmap file where the
+         * palette consists of RGB values of 0x00->0xff. Essentially, the luma
+         * value acts as an index into this palette. Weird that there are L16
+         * and A8L8 representations, but this is done in a unique way.
+         */
+        { D3DFMT_L8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_P8, .todo_format = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_P8, .todo_format = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_L16, NULL, 0x00,
+          { { D3D_OK, D3DFMT_L16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_L16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT1, NULL, 0x00,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT2, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT2, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT3, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT3, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT4, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT4, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT5, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_DXT5, NULL, 0xff,
+          { { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R16F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_G16R16F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A16B16G16R16F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R32F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_G32R32F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_G16R16, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A32B32G32R32F, NULL, 0x00,
+          { { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A8R8G8B8 },
+            { D3D_OK, D3DFMT_A16B16G16R16 },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8 },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_Q8W8V8U8, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_V8U8, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_V16U16, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_X8L8V8U8, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_A2W10V10U10, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_Q16W16V16U16, NULL, 0x00,
+          { { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+            { D3DERR_INVALIDCALL, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_R8G8_B8G8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_G8R8_G8B8, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_UYVY, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+        { D3DFMT_YUY2, NULL, 0x00,
+          { { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_X8R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_R8G8B8, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+            { D3D_OK, D3DFMT_A32B32G32R32F, .todo_hr = TRUE },
+          },
+        },
+    };
+    IDirect3DSurface9 *surface;
+    ID3DXBuffer *buffer;
+    unsigned int i, j;
+    HRESULT hr;
+
+    for (i = 0; i < ARRAY_SIZE(iff_tests); ++i)
+    {
+        D3DLOCKED_RECT lockrect;
+
+        hr = IDirect3DDevice9_CreateOffscreenPlainSurface(device, 4, 4, iff_tests[i].format,
+                D3DPOOL_SCRATCH, &surface, NULL);
+        if (FAILED(hr))
+        {
+            skip("Couldn't create surface for format %#x.\n", iff_tests[i].format);
+            continue;
+        }
+
+        hr = IDirect3DSurface9_LockRect(surface, &lockrect, NULL, 0);
+        if (SUCCEEDED(hr))
+        {
+            const uint32_t tmp_height = is_dxt_d3dformat(iff_tests[i].format) ? 1 : 4;
+
+            for (j = 0; j < tmp_height; ++j)
+                memset(((uint8_t *)lockrect.pBits) + (j * lockrect.Pitch), iff_tests[i].init_pixel_value,
+                        lockrect.Pitch);
+            IDirect3DSurface9_UnlockRect(surface);
+        }
+
+        winetest_push_context("Test %u (%s)", i, debug_d3dformat(iff_tests[i].format));
+        for (j = 0; j < ARRAY_SIZE(test_iffs); ++j)
+        {
+            winetest_push_context("File format %u (%s)", j, test_iffs[j].name);
+
+            buffer = NULL;
+            hr = D3DXSaveSurfaceToFileInMemory(&buffer, test_iffs[j].format, surface, iff_tests[i].palette, NULL);
+            todo_wine_if(iff_tests[i].iff_expected[j].todo_hr) ok(hr == iff_tests[i].iff_expected[j].hr,
+                    "Unexpected hr %#lx.\n", hr);
+            if (SUCCEEDED(hr))
+            {
+                D3DXIMAGE_INFO info = { 0 };
+
+                hr = D3DXGetImageInfoFromFileInMemory(ID3DXBuffer_GetBufferPointer(buffer),
+                        ID3DXBuffer_GetBufferSize(buffer), &info);
+                ok(hr == D3D_OK, "Unexpected hr %#lx.\n", hr);
+                todo_wine_if(iff_tests[i].iff_expected[j].todo_format)
+                    ok(info.Format == iff_tests[i].iff_expected[j].format,
+                            "Unexpected image format %u (%s), expected %u (%s).\n", info.Format,
+                            debug_d3dformat(info.Format), iff_tests[i].iff_expected[j].format,
+                            debug_d3dformat(iff_tests[i].iff_expected[j].format));
+                ID3DXBuffer_Release(buffer);
+            }
+            winetest_pop_context();
+        }
+
+        IDirect3DSurface9_Release(surface);
+        winetest_pop_context();
+    }
+}
+
 static void test_D3DXSaveSurfaceToFileInMemory(IDirect3DDevice9 *device)
 {
     static const struct dds_pixel_format d3dfmt_a8r8g8b8_pf = { 32, DDS_PF_RGB | DDS_PF_ALPHA, 0, 32,
@@ -3852,10 +4803,16 @@ static void test_D3DXSaveSurfaceToFileInMemory(IDirect3DDevice9 *device)
          struct dds_header header;
          BYTE *data;
     } *dds;
+    struct
+    {
+         struct tga_header header;
+         BYTE *data;
+    } *tga;
+    ID3DXBuffer *buffer, *buffer2;
     IDirect3DSurface9 *surface;
     IDirect3DTexture9 *texture;
     unsigned int i, x, y;
-    ID3DXBuffer *buffer;
+    D3DXIMAGE_INFO info;
     HRESULT hr;
     RECT rect;
 
@@ -3934,6 +4891,52 @@ static void test_D3DXSaveSurfaceToFileInMemory(IDirect3DDevice9 *device)
             &d3dfmt_a8r8g8b8_pf, DDSCAPS_TEXTURE | DDSCAPS_ALPHA, 0, FALSE);
     ID3DXBuffer_Release(buffer);
 
+    /* Test saved targa file headers. */
+    hr = D3DXSaveSurfaceToFileInMemory(&buffer, D3DXIFF_TGA, surface, NULL, NULL);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
+
+    tga = ID3DXBuffer_GetBufferPointer(buffer);
+    ok(ID3DXBuffer_GetBufferSize(buffer) == (sizeof(tga->header) + tga->header.id_length + (4 * 4 * 4)), "Unexpected buffer size %lu.\n",
+            ID3DXBuffer_GetBufferSize(buffer));
+    ok(tga->header.image_type == IMAGETYPE_TRUECOLOR, "Got unexpected image type %u.\n", tga->header.image_type);
+    ok(tga->header.height == 4, "Got unexpected height %u.\n", tga->header.height);
+    ok(tga->header.width == 4, "Got unexpected width %u.\n", tga->header.width);
+    ok(tga->header.depth == 32, "Got unexpected depth %u.\n", tga->header.depth);
+    ok(tga->header.image_descriptor == (IMAGE_TOPTOBOTTOM | 0x8), "Got unexpected image descriptor %#x.\n", tga->header.image_descriptor);
+    ID3DXBuffer_Release(buffer);
+
+    /* Size 0 rectangle. */
+    SetRectEmpty(&rect);
+    hr = D3DXSaveSurfaceToFileInMemory(&buffer, D3DXIFF_TGA, surface, NULL, &rect);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
+
+    tga = ID3DXBuffer_GetBufferPointer(buffer);
+    ok(ID3DXBuffer_GetBufferSize(buffer) == (sizeof(tga->header) + tga->header.id_length), "Unexpected buffer size %lu.\n",
+            ID3DXBuffer_GetBufferSize(buffer));
+    ok(tga->header.image_type == IMAGETYPE_TRUECOLOR, "Got unexpected image type %u.\n", tga->header.image_type);
+    ok(!tga->header.height, "Got unexpected height %u.\n", tga->header.height);
+    ok(!tga->header.width, "Got unexpected width %u.\n", tga->header.width);
+    ok(tga->header.depth == 32, "Got unexpected depth %u.\n", tga->header.depth);
+    ok(tga->header.image_descriptor == (IMAGE_TOPTOBOTTOM | 0x8), "Got unexpected image descriptor %#x.\n", tga->header.image_descriptor);
+    ID3DXBuffer_Release(buffer);
+
+    /* Saving as D3DXIFF_DIB actually saves as a BMP. */
+    hr = D3DXSaveSurfaceToFileInMemory(&buffer, D3DXIFF_DIB, surface, NULL, NULL);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DXSaveSurfaceToFileInMemory(&buffer2, D3DXIFF_BMP, surface, NULL, NULL);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = D3DXGetImageInfoFromFileInMemory(ID3DXBuffer_GetBufferPointer(buffer), ID3DXBuffer_GetBufferSize(buffer), &info);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
+    ok(info.ImageFileFormat == D3DXIFF_BMP, "Unexpected ImageFileFormat %d.\n", info.ImageFileFormat);
+    ok(ID3DXBuffer_GetBufferSize(buffer) == ID3DXBuffer_GetBufferSize(buffer2), "Unexpected buffer size.\n");
+    ok(!memcmp(ID3DXBuffer_GetBufferPointer(buffer), ID3DXBuffer_GetBufferPointer(buffer2), ID3DXBuffer_GetBufferSize(buffer)),
+            "Files do not match.\n");
+
+    ID3DXBuffer_Release(buffer);
+    ID3DXBuffer_Release(buffer2);
+
     IDirect3DSurface9_Release(surface);
 
     for (i = 0; i < ARRAY_SIZE(test_access_types); ++i)
@@ -3958,6 +4961,7 @@ static void test_D3DXSaveSurfaceToFileInMemory(IDirect3DDevice9 *device)
     }
 
     test_save_surface_to_dds(device);
+    test_save_surface_iffs(device);
 }
 
 static void test_D3DXSaveSurfaceToFile(IDirect3DDevice9 *device)
@@ -4035,9 +5039,10 @@ static void test_D3DXSaveSurfaceToFile(IDirect3DDevice9 *device)
     {
         hr = D3DXSaveSurfaceToFileA("saved_surface.ppm", D3DXIFF_PPM, surface, NULL, NULL);
         ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
-        hr = D3DXSaveSurfaceToFileA("saved_surface.tga", D3DXIFF_TGA, surface, NULL, NULL);
-        ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
     }
+
+    hr = D3DXSaveSurfaceToFileA("saved_surface.tga", D3DXIFF_TGA, surface, NULL, NULL);
+    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
 
     hr = D3DXSaveSurfaceToFileA("saved_surface.dds", D3DXIFF_DDS, surface, NULL, NULL);
     ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
@@ -4126,4 +5131,6 @@ START_TEST(surface)
     check_release((IUnknown*)device, 0);
     check_release((IUnknown*)d3d, 0);
     DestroyWindow(wnd);
+
+    test_color_key();
 }

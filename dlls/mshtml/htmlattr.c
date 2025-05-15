@@ -208,8 +208,11 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_expando(IHTMLDOMAttribute2 *iface, V
 static HRESULT WINAPI HTMLDOMAttribute2_get_nodeType(IHTMLDOMAttribute2 *iface, LONG *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = 2;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_parentNode(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
@@ -225,97 +228,156 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_parentNode(IHTMLDOMAttribute2 *iface
 static HRESULT WINAPI HTMLDOMAttribute2_get_childNodes(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_firstChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_lastChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_previousSibling(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_nextSibling(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_attributes(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_ownerDocument(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = (IDispatch*)&This->doc->IHTMLDocument2_iface;
+    IDispatch_AddRef(*p);
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_insertBefore(IHTMLDOMAttribute2 *iface, IHTMLDOMNode *newChild,
         VARIANT refChild, IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p %s %p)\n", This, newChild, debugstr_variant(&refChild), node);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p %s %p)\n", This, newChild, debugstr_variant(&refChild), node);
+
+    /* mostly a stub, doesn't really insert anything on native either */
+    *node = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_replaceChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode *newChild,
         IHTMLDOMNode *oldChild, IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p %p %p)\n", This, newChild, oldChild, node);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p %p %p)\n", This, newChild, oldChild, node);
+
+    /* mostly a stub, doesn't really replace anything on native either */
+    *node = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_removeChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode *oldChild,
         IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p %p)\n", This, oldChild, node);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p %p)\n", This, oldChild, node);
+
+    /* mostly a stub, doesn't really remove anything on native either */
+    *node = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_appendChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode *newChild,
         IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p %p)\n", This, newChild, node);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p %p)\n", This, newChild, node);
+
+    /* mostly a stub, doesn't really append anything on native either */
+    *node = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_hasChildNodes(IHTMLDOMAttribute2 *iface, VARIANT_BOOL *fChildren)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%p)\n", This, fChildren);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, fChildren);
+
+    *fChildren = VARIANT_FALSE;
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_cloneNode(IHTMLDOMAttribute2 *iface, VARIANT_BOOL fDeep,
         IHTMLDOMAttribute **clonedNode)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    FIXME("(%p)->(%x %p)\n", This, fDeep, clonedNode);
-    return E_NOTIMPL;
+    HTMLDOMAttribute *new_attr;
+    HRESULT hres;
+
+    TRACE("(%p)->(%x %p)\n", This, fDeep, clonedNode);
+
+    hres = HTMLDOMAttribute_Create(This->name, NULL, 0, This->doc, &new_attr);
+    if(FAILED(hres))
+        return hres;
+
+    if(This->elem)
+        hres = get_elem_attr_value_by_dispid(This->elem, This->dispid, &new_attr->value);
+    else
+        hres = VariantCopy(&new_attr->value, &This->value);
+    if(FAILED(hres)) {
+        IHTMLDOMAttribute_Release(&new_attr->IHTMLDOMAttribute_iface);
+        return hres;
+    }
+
+    *clonedNode = &new_attr->IHTMLDOMAttribute_iface;
+    return hres;
 }
 
 static const IHTMLDOMAttribute2Vtbl HTMLDOMAttribute2Vtbl = {
@@ -368,6 +430,8 @@ static void HTMLDOMAttribute_traverse(DispatchEx *dispex, nsCycleCollectionTrave
 {
     HTMLDOMAttribute *This = impl_from_DispatchEx(dispex);
 
+    if(This->doc)
+        note_cc_edge((nsISupports*)&This->doc->node.IHTMLDOMNode_iface, "doc", cb);
     if(This->elem)
         note_cc_edge((nsISupports*)&This->elem->node.IHTMLDOMNode_iface, "elem", cb);
     traverse_variant(&This->value, "value", cb);
@@ -377,6 +441,11 @@ static void HTMLDOMAttribute_unlink(DispatchEx *dispex)
 {
     HTMLDOMAttribute *This = impl_from_DispatchEx(dispex);
 
+    if(This->doc) {
+        HTMLDocumentNode *doc = This->doc;
+        This->doc = NULL;
+        IHTMLDOMNode_Release(&doc->node.IHTMLDOMNode_iface);
+    }
     if(This->elem) {
         HTMLElement *elem = This->elem;
         This->elem = NULL;
@@ -406,8 +475,8 @@ static const tid_t HTMLDOMAttribute_iface_tids[] = {
     0
 };
 dispex_static_data_t Attr_dispex = {
-    .id           = PROT_Attr,
-    .prototype_id = PROT_Node,
+    .id           = OBJID_Attr,
+    .prototype_id = OBJID_Node,
     .vtbl         = &HTMLDOMAttribute_dispex_vtbl,
     .disp_tid     = DispHTMLDOMAttribute_tid,
     .iface_tids   = HTMLDOMAttribute_iface_tids,
@@ -459,6 +528,9 @@ HRESULT HTMLDOMAttribute_Create(const WCHAR *name, HTMLElement *elem, DISPID dis
             return E_OUTOFMEMORY;
         }
     }
+
+    ret->doc = doc;
+    IHTMLDOMNode_AddRef(&doc->node.IHTMLDOMNode_iface);
 
     *attr = ret;
     return S_OK;

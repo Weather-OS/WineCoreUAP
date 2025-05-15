@@ -30,6 +30,8 @@ struct uisettings
     IUISettings IUISettings_iface;
     IUISettings2 IUISettings2_iface;
     IUISettings3 IUISettings3_iface;
+    IUISettings4 IUISettings4_iface;
+    IUISettings5 IUISettings5_iface;
     LONG ref;
 };
 
@@ -60,6 +62,14 @@ static HRESULT WINAPI uisettings_QueryInterface( IUISettings *iface, REFIID iid,
     else if (IsEqualGUID( iid, &IID_IUISettings3 ))
     {
         *out = &impl->IUISettings3_iface;
+    }
+    else if (IsEqualGUID( iid, &IID_IUISettings4 ))
+    {
+        *out = &impl->IUISettings4_iface;
+    }
+    else if (IsEqualGUID( iid, &IID_IUISettings5 ))
+    {
+        *out = &impl->IUISettings5_iface;
     }
 
     if (!*out)
@@ -384,6 +394,81 @@ static const struct IUISettings3Vtbl uisettings3_vtbl =
     uisettings3_remove_ColorValuesChanged,
 };
 
+DEFINE_IINSPECTABLE( uisettings4, IUISettings4, struct uisettings, IUISettings_iface );
+
+static HRESULT WINAPI uisettings4_get_AdvancedEffectsEnabled( IUISettings4 *iface, boolean *value )
+{
+    FIXME( "iface %p, value %p stub!.\n", iface, value );
+    *value = TRUE;
+    return S_OK;
+}
+
+static HRESULT WINAPI uisettings4_add_AdvancedEffectsEnabledChanged( IUISettings4 *iface, ITypedEventHandler_UISettings_IInspectable *handler, EventRegistrationToken *cookie )
+{
+    FIXME( "iface %p, handler %p, cookie %p stub!\n", iface, handler, cookie );
+    *cookie = dummy_cookie;
+    return S_OK;
+}
+
+static HRESULT WINAPI uisettings4_remove_AdvancedEffectsEnabledChanged( IUISettings4 *iface, EventRegistrationToken cookie )
+{
+    FIXME( "iface %p, cookie %#I64x stub!\n", iface, cookie.value );
+    return S_OK;
+}
+
+static const struct IUISettings4Vtbl uisettings4_vtbl =
+{
+    uisettings4_QueryInterface,
+    uisettings4_AddRef,
+    uisettings4_Release,
+    /* IInspectable methods */
+    uisettings4_GetIids,
+    uisettings4_GetRuntimeClassName,
+    uisettings4_GetTrustLevel,
+    /* IUISettings4 methods */
+    uisettings4_get_AdvancedEffectsEnabled,
+    uisettings4_add_AdvancedEffectsEnabledChanged,
+    uisettings4_remove_AdvancedEffectsEnabledChanged,
+};
+
+DEFINE_IINSPECTABLE( uisettings5, IUISettings5, struct uisettings, IUISettings_iface );
+
+static HRESULT WINAPI uisettings5_get_AutoHideScrollBars( IUISettings5 *iface, boolean *value )
+{
+    FIXME( "iface %p, value %p stub!.\n", iface, value );
+    *value = FALSE;
+    return S_OK;
+}
+
+static HRESULT WINAPI uisettings5_add_AutoHideScrollBarsChanged( IUISettings5 *iface, ITypedEventHandler_UISettings_UISettingsAutoHideScrollBarsChangedEventArgs *handler,
+                                                                 EventRegistrationToken *cookie )
+{
+    FIXME( "iface %p, handler %p, cookie %p stub!\n", iface, handler, cookie );
+    *cookie = dummy_cookie;
+    return S_OK;
+}
+
+static HRESULT WINAPI uisettings5_remove_AutoHideScrollBarsChanged( IUISettings5 *iface, EventRegistrationToken cookie )
+{
+    FIXME( "iface %p, cookie %#I64x stub!\n", iface, cookie.value );
+    return S_OK;
+}
+
+static const struct IUISettings5Vtbl uisettings5_vtbl =
+{
+    uisettings5_QueryInterface,
+    uisettings5_AddRef,
+    uisettings5_Release,
+    /* IInspectable methods */
+    uisettings5_GetIids,
+    uisettings5_GetRuntimeClassName,
+    uisettings5_GetTrustLevel,
+    /* IUISettings5 methods */
+    uisettings5_get_AutoHideScrollBars,
+    uisettings5_add_AutoHideScrollBarsChanged,
+    uisettings5_remove_AutoHideScrollBarsChanged,
+};
+
 struct uisettings_statics
 {
     IActivationFactory IActivationFactory_iface;
@@ -464,6 +549,8 @@ static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInsp
     impl->IUISettings_iface.lpVtbl = &uisettings_vtbl;
     impl->IUISettings2_iface.lpVtbl = &uisettings2_vtbl;
     impl->IUISettings3_iface.lpVtbl = &uisettings3_vtbl;
+    impl->IUISettings4_iface.lpVtbl = &uisettings4_vtbl;
+    impl->IUISettings5_iface.lpVtbl = &uisettings5_vtbl;
     impl->ref = 1;
 
     *instance = (IInspectable *)&impl->IUISettings3_iface;

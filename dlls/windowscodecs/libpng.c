@@ -349,6 +349,12 @@ static HRESULT CDECL png_decoder_get_frame_info(struct decoder *iface, UINT fram
     return S_OK;
 }
 
+static HRESULT CDECL png_decoder_get_decoder_palette(struct decoder *iface, UINT frame, WICColor *colors,
+        UINT *num_colors)
+{
+    return WINCODEC_ERR_PALETTEUNAVAILABLE;
+}
+
 static HRESULT CDECL png_decoder_copy_pixels(struct decoder *iface, UINT frame,
     const WICRect *prc, UINT stride, UINT buffersize, BYTE *buffer)
 {
@@ -454,6 +460,7 @@ static void CDECL png_decoder_destroy(struct decoder* iface)
 static const struct decoder_funcs png_decoder_vtable = {
     png_decoder_initialize,
     png_decoder_get_frame_info,
+    png_decoder_get_decoder_palette,
     png_decoder_copy_pixels,
     png_decoder_get_metadata_blocks,
     png_decoder_get_color_context,
@@ -638,10 +645,6 @@ static HRESULT CDECL png_encoder_create_frame(struct encoder *encoder, const str
             return E_OUTOFMEMORY;
     }
 
-    /* Tell PNG we need to byte swap if writing a >8-bpp image */
-    if (This->format->bit_depth > 8)
-        png_set_swap(This->png_ptr);
-
     png_set_IHDR(This->png_ptr, This->info_ptr, encoder_frame->width, encoder_frame->height,
         This->format->bit_depth, This->format->color_type,
         encoder_frame->interlace ? PNG_INTERLACE_ADAM7 : PNG_INTERLACE_NONE,
@@ -681,6 +684,9 @@ static HRESULT CDECL png_encoder_create_frame(struct encoder *encoder, const str
     }
 
     png_write_info(This->png_ptr, This->info_ptr);
+
+    if (This->format->bit_depth > 8)
+        png_set_swap(This->png_ptr);
 
     if (This->format->remove_filler)
         png_set_filler(This->png_ptr, 0, PNG_FILLER_AFTER);

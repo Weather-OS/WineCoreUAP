@@ -703,7 +703,8 @@ static HWND DIALOG_CreateIndirect( HINSTANCE hInst, LPCVOID dlgTemplate,
 
         if (template.style & WS_VISIBLE && !(GetWindowLongW( hwnd, GWL_STYLE ) & WS_VISIBLE))
         {
-           NtUserShowWindow( hwnd, SW_SHOWNORMAL );   /* SW_SHOW doesn't always work */
+            NtUserShowWindow( hwnd, SW_SHOWNORMAL ); /* SW_SHOW doesn't always work */
+            UpdateWindow( hwnd );
         }
         return hwnd;
     }
@@ -940,7 +941,7 @@ BOOL WINAPI EndDialog( HWND hwnd, INT_PTR retval )
     {
         /* If this dialog was given an owner then set the focus to that owner. */
         if (owner)
-            SetForegroundWindow( owner );
+            NtUserSetForegroundWindow( owner );
         else
             NtUserActivateOtherWindow( hwnd );
     }

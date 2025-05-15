@@ -570,7 +570,7 @@
 @ stdcall -syscall NtGdiIntersectClipRect(long long long long long)
 @ stdcall -syscall NtGdiInvertRgn(long long)
 @ stdcall -syscall NtGdiLineTo(long long long)
-@ stub NtGdiMakeFontDir
+@ stdcall -syscall NtGdiMakeFontDir(long ptr long wstr long)
 @ stub NtGdiMakeInfoDC
 @ stub NtGdiMakeObjectUnXferable
 @ stub NtGdiMakeObjectXferable
@@ -804,7 +804,7 @@
 @ stdcall -syscall NtUserAttachThreadInput(long long long)
 @ stub NtUserAutoPromoteMouseInPointer
 @ stub NtUserAutoRotateScreen
-@ stub NtUserBeginDeferWindowPos
+@ stdcall -syscall NtUserBeginDeferWindowPos(long)
 @ stub NtUserBeginLayoutUpdate
 @ stdcall -syscall NtUserBeginPaint(long ptr)
 @ stub NtUserBitBltSysBmp
@@ -1075,7 +1075,7 @@
 @ stub NtUserGetPointerType
 @ stub NtUserGetPrecisionTouchPadConfiguration
 @ stdcall -syscall NtUserGetPriorityClipboardFormat(ptr long)
-@ stub NtUserGetProcessDefaultLayout
+@ stdcall -syscall NtUserGetProcessDefaultLayout(ptr)
 @ stdcall -syscall NtUserGetProcessDpiAwarenessContext(long)
 @ stub NtUserGetProcessUIContextInformation
 @ stdcall -syscall NtUserGetProcessWindowStation()
@@ -1165,7 +1165,7 @@
 @ stub NtUserInternalToUnicode
 @ stdcall -syscall NtUserInvalidateRect(long ptr long)
 @ stdcall -syscall NtUserInvalidateRgn(long long long)
-@ stub NtUserIsChildWindowDpiMessageEnabled
+@ stdcall -syscall NtUserIsChildWindowDpiMessageEnabled(ptr)
 @ stdcall -syscall NtUserIsClipboardFormatAvailable(long)
 @ stdcall -syscall NtUserIsMouseInPointerEnabled()
 @ stub NtUserIsMouseInputEnabled
@@ -1177,7 +1177,7 @@
 @ stub NtUserIsWindowBroadcastingDpiToChildren
 @ stub NtUserIsWindowDisplayChangeSuppressed
 @ stub NtUserIsWindowGDIScaledDpiMessageEnabled
-@ stub NtUserKillSystemTimer
+@ stdcall -syscall NtUserKillSystemTimer(long long)
 @ stdcall -syscall NtUserKillTimer(long long)
 @ stub NtUserLW_LoadFonts
 @ stub NtUserLayoutCompleted
@@ -1330,7 +1330,7 @@
 @ stub NtUserSetActivationFilter
 @ stub NtUserSetActiveProcessForMonitor
 @ stdcall -syscall NtUserSetActiveWindow(long)
-@ stub NtUserSetAdditionalForegroundBoostProcesses
+@ stdcall -syscall NtUserSetAdditionalForegroundBoostProcesses(ptr long ptr)
 @ stub NtUserSetAppImeLevel
 @ stub NtUserSetAutoRotation
 @ stub NtUserSetBridgeWindowChild
@@ -1368,7 +1368,7 @@
 @ stub NtUserSetFeatureReportResponse
 @ stdcall -syscall NtUserSetFocus(long)
 @ stub NtUserSetForegroundRedirectionForActivationObject
-@ stub NtUserSetForegroundWindow
+@ stdcall -syscall NtUserSetForegroundWindow(long)
 @ stub NtUserSetForegroundWindowForApplication
 @ stub NtUserSetFullscreenMagnifierOffsetsDWMUpdated
 @ stub NtUserSetGestureConfig
@@ -1545,4 +1545,3 @@
 # Wine internal extensions
 
 @ stdcall -syscall __wine_get_icm_profile(long long ptr ptr)
-@ stdcall -syscall __wine_get_file_outline_text_metric(wstr ptr ptr ptr)

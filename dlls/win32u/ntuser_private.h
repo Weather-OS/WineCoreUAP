@@ -38,23 +38,16 @@ enum system_timer_id
     SYSTEM_TIMER_CARET = 0xffff,
 };
 
-struct user_object
-{
-    HANDLE       handle;
-    unsigned int type;
-};
-
 #define OBJ_OTHER_PROCESS ((void *)1)  /* returned by get_user_handle_ptr on unknown handles */
 
 typedef struct tagWND
 {
-    struct user_object obj;           /* object header */
+    HWND               handle;        /* window full handle */
     HWND               parent;        /* Window parent */
     HWND               owner;         /* Window owner */
     struct tagCLASS   *class;         /* Window class */
     struct dce        *dce;           /* DCE pointer */
     WNDPROC            winproc;       /* Window procedure */
-    UINT               tid;           /* Owner thread id */
     HINSTANCE          hInstance;     /* Window hInstance (from CreateWindow) */
     struct window_rects rects;        /* window rects in window DPI, relative to the parent client area */
     RECT               normal_rect;   /* Normal window rect saved when maximized/minimized */
@@ -76,6 +69,7 @@ typedef struct tagWND
     struct window_surface *surface;   /* Window surface if any */
     struct list        vulkan_surfaces; /* list of vulkan surfaces created for this window */
     struct tagDIALOGINFO *dlgInfo;    /* Dialog additional info (dialogs only) */
+    int                swap_interval; /* OpenGL surface swap interval */
     int                pixel_format;  /* Pixel format set by the graphics driver */
     int                internal_pixel_format; /* Internal pixel format set via WGL_WINE_pixel_format_passthrough */
     int                cbWndExtra;    /* class cbWndExtra at window creation */
@@ -230,11 +224,11 @@ extern BOOL vulkan_init(void);
 extern void vulkan_detach_surfaces( struct list *surfaces );
 
 /* window.c */
-HANDLE alloc_user_handle( struct user_object *ptr, unsigned int type );
-void *free_user_handle( HANDLE handle, unsigned int type );
-void *get_user_handle_ptr( HANDLE handle, unsigned int type );
+HANDLE alloc_user_handle( void *ptr, unsigned short type );
+void *free_user_handle( HANDLE handle, unsigned short type );
+void *get_user_handle_ptr( HANDLE handle, unsigned short type );
 void release_user_handle_ptr( void *ptr );
-void *next_process_user_handle_ptr( HANDLE *handle, unsigned int type );
+void *next_thread_user_object( UINT tid, HANDLE *handle, unsigned short type );
 UINT win_set_flags( HWND hwnd, UINT set_mask, UINT clear_mask );
 
 static inline UINT win_get_flags( HWND hwnd )

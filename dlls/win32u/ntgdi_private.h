@@ -219,7 +219,6 @@ extern UINT get_dib_dc_color_table( HDC hdc, UINT startpos, UINT entries,
 extern UINT set_dib_dc_color_table( HDC hdc, UINT startpos, UINT entries,
                                     const RGBQUAD *colors );
 extern void dibdrv_set_window_surface( DC *dc, struct window_surface *surface );
-extern struct opengl_funcs *dibdrv_get_wgl_driver(void);
 
 /* driver.c */
 extern const struct gdi_dc_funcs null_driver;
@@ -641,7 +640,5 @@ static inline void copy_bitmapinfo( BITMAPINFO *dst, const BITMAPINFO *src )
 extern void free_heap_bits( struct gdi_image_bits *bits );
 
 void set_gdi_client_ptr( HGDIOBJ handle, void *ptr );
-
-extern SYSTEM_BASIC_INFORMATION system_info;
 
 #endif /* __WINE_NTGDI_PRIVATE_H */

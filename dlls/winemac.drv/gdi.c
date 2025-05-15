@@ -286,7 +286,7 @@ static const struct user_driver_funcs macdrv_funcs =
     .pSetCursor = macdrv_SetCursor,
     .pSetCursorPos = macdrv_SetCursorPos,
     .pSetDesktopWindow = macdrv_SetDesktopWindow,
-    .pSetFocus = macdrv_SetFocus,
+    .pActivateWindow = macdrv_ActivateWindow,
     .pSetLayeredWindowAttributes = macdrv_SetLayeredWindowAttributes,
     .pSetParent = macdrv_SetParent,
     .pSetWindowRgn = macdrv_SetWindowRgn,
@@ -310,7 +310,7 @@ static const struct user_driver_funcs macdrv_funcs =
     .pGetWindowStyleMasks = macdrv_GetWindowStyleMasks,
     .pCreateWindowSurface = macdrv_CreateWindowSurface,
     .pVulkanInit = macdrv_VulkanInit,
-    .pwine_get_wgl_driver = macdrv_wine_get_wgl_driver,
+    .pOpenGLInit = macdrv_OpenGLInit,
 };
 
 

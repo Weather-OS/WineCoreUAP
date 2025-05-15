@@ -33,19 +33,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(wincodecs);
 
-typedef struct MetadataHandler {
-    IWICMetadataWriter IWICMetadataWriter_iface;
-    LONG ref;
-    IWICPersistStream IWICPersistStream_iface;
-    IWICStreamProvider IWICStreamProvider_iface;
-    const MetadataHandlerVtbl *vtable;
-    MetadataItem *items;
-    DWORD item_count;
-    DWORD persist_options;
-    IStream *stream;
-    CRITICAL_SECTION lock;
-} MetadataHandler;
-
 static inline MetadataHandler *impl_from_IWICMetadataWriter(IWICMetadataWriter *iface)
 {
     return CONTAINING_RECORD(iface, MetadataHandler, IWICMetadataWriter_iface);
@@ -61,14 +48,14 @@ static inline MetadataHandler *impl_from_IWICStreamProvider(IWICStreamProvider *
     return CONTAINING_RECORD(iface, MetadataHandler, IWICStreamProvider_iface);
 }
 
-static void clear_metadata_item(MetadataItem *item)
+void clear_metadata_item(MetadataItem *item)
 {
     PropVariantClear(&item->schema);
     PropVariantClear(&item->id);
     PropVariantClear(&item->value);
 }
 
-static void MetadataHandler_FreeItems(MetadataHandler *This)
+void MetadataHandler_FreeItems(MetadataHandler *This)
 {
     DWORD i;
 
@@ -93,7 +80,7 @@ static HRESULT WINAPI MetadataHandler_QueryInterface(IWICMetadataWriter *iface, 
 
     if (IsEqualIID(&IID_IUnknown, iid) ||
         IsEqualIID(&IID_IWICMetadataReader, iid) ||
-        (IsEqualIID(&IID_IWICMetadataWriter, iid) && This->vtable->is_writer))
+        (IsEqualIID(&IID_IWICMetadataWriter, iid) && This->vtable->flags & METADATAHANDLER_IS_WRITER))
     {
         *ppv = &This->IWICMetadataWriter_iface;
     }
@@ -228,13 +215,14 @@ static HRESULT WINAPI MetadataHandler_GetValueByIndex(IWICMetadataWriter *iface,
 }
 
 static MetadataItem *metadatahandler_get_item(MetadataHandler *handler, const PROPVARIANT *schema,
-        const PROPVARIANT *id)
+        const PROPVARIANT *id, unsigned int *item_index)
 {
     PROPVARIANT index;
     GUID format;
     HRESULT hr;
     UINT i;
 
+    if (item_index) *item_index = 0;
     PropVariantInit(&index);
     if (id->vt == VT_CLSID && SUCCEEDED(PropVariantChangeType(&index, schema, 0, VT_UI4)))
     {
@@ -254,7 +242,11 @@ static MetadataItem *metadatahandler_get_item(MetadataHandler *handler, const PR
                 {
                     if (IsEqualGUID(&format, id->puuid))
                     {
-                        if (!index.ulVal) return &handler->items[i];
+                        if (!index.ulVal)
+                        {
+                            if (item_index) *item_index = i;
+                            return &handler->items[i];
+                        }
                         --index.ulVal;
                     }
                 }
@@ -271,10 +263,20 @@ static MetadataItem *metadatahandler_get_item(MetadataHandler *handler, const PR
 
         if (PropVariantCompareEx(id, &handler->items[i].id, 0, PVCF_USESTRCMPI) != 0) continue;
 
+        if (item_index) *item_index = i;
         return &handler->items[i];
     }
 
     return NULL;
+}
+
+static void metadata_handler_remove_item(MetadataHandler *handler, unsigned int index)
+{
+    clear_metadata_item(&handler->items[index]);
+    handler->item_count--;
+    if (index != handler->item_count)
+        memmove(&handler->items[index], &handler->items[index + 1],
+                (handler->item_count - index) * sizeof(*handler->items));
 }
 
 static HRESULT WINAPI MetadataHandler_GetValue(IWICMetadataWriter *iface,
@@ -290,7 +292,7 @@ static HRESULT WINAPI MetadataHandler_GetValue(IWICMetadataWriter *iface,
 
     EnterCriticalSection(&This->lock);
 
-    if ((item = metadatahandler_get_item(This, schema, id)))
+    if ((item = metadatahandler_get_item(This, schema, id, NULL)))
     {
         hr = value ? PropVariantCopy(value, &item->value) : S_OK;
     }
@@ -323,7 +325,7 @@ static HRESULT WINAPI MetadataHandler_SetValue(IWICMetadataWriter *iface,
 
     EnterCriticalSection(&This->lock);
 
-    if ((item = metadatahandler_get_item(This, schema, id)))
+    if ((item = metadatahandler_get_item(This, schema, id, NULL)))
     {
         PropVariantClear(&item->value);
         hr = PropVariantCopy(&item->value, value);
@@ -370,17 +372,52 @@ static HRESULT WINAPI MetadataHandler_SetValueByIndex(IWICMetadataWriter *iface,
 }
 
 static HRESULT WINAPI MetadataHandler_RemoveValue(IWICMetadataWriter *iface,
-    const PROPVARIANT *pvarSchema, const PROPVARIANT *pvarId)
+        const PROPVARIANT *schema, const PROPVARIANT *id)
 {
-    FIXME("(%p,%p,%p): stub\n", iface, pvarSchema, pvarId);
-    return E_NOTIMPL;
+    MetadataHandler *handler = impl_from_IWICMetadataWriter(iface);
+    unsigned int index;
+    HRESULT hr = S_OK;
+
+    TRACE("(%p,%p,%p)\n", iface, schema, id);
+
+    if (handler->vtable->flags & METADATAHANDLER_FIXED_ITEMS)
+        return WINCODEC_ERR_UNSUPPORTEDOPERATION;
+
+    EnterCriticalSection(&handler->lock);
+
+    if (metadatahandler_get_item(handler, schema, id, &index))
+    {
+        metadata_handler_remove_item(handler, index);
+    }
+    else
+    {
+        hr = WINCODEC_ERR_PROPERTYNOTFOUND;
+    }
+
+    LeaveCriticalSection(&handler->lock);
+
+    return hr;
 }
 
-static HRESULT WINAPI MetadataHandler_RemoveValueByIndex(IWICMetadataWriter *iface,
-    UINT nIndex)
+static HRESULT WINAPI MetadataHandler_RemoveValueByIndex(IWICMetadataWriter *iface, UINT index)
 {
-    FIXME("(%p,%u): stub\n", iface, nIndex);
-    return E_NOTIMPL;
+    MetadataHandler *handler = impl_from_IWICMetadataWriter(iface);
+    HRESULT hr = S_OK;
+
+    TRACE("(%p,%u)\n", iface, index);
+
+    EnterCriticalSection(&handler->lock);
+
+    if (index >= handler->item_count)
+        hr = E_INVALIDARG;
+    else if (handler->vtable->flags & METADATAHANDLER_FIXED_ITEMS)
+        hr = WINCODEC_ERR_UNSUPPORTEDOPERATION;
+    else
+        metadata_handler_remove_item(handler, index);
+
+    LeaveCriticalSection(&handler->lock);
+
+    return hr;
 }
 
 static const IWICMetadataWriterVtbl MetadataHandler_Vtbl = {
@@ -418,11 +455,18 @@ static ULONG WINAPI MetadataHandler_PersistStream_Release(IWICPersistStream *ifa
     return IWICMetadataWriter_Release(&This->IWICMetadataWriter_iface);
 }
 
-static HRESULT WINAPI MetadataHandler_GetClassID(IWICPersistStream *iface,
-    CLSID *pClassID)
+static HRESULT WINAPI MetadataHandler_GetClassID(IWICPersistStream *iface, CLSID *clsid)
 {
-    FIXME("(%p,%p): stub\n", iface, pClassID);
-    return E_NOTIMPL;
+    MetadataHandler *handler = impl_from_IWICPersistStream(iface);
+
+    TRACE("(%p,%p)\n", iface, clsid);
+
+    if (!clsid)
+        return E_INVALIDARG;
+
+    *clsid = *handler->vtable->clsid;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI MetadataHandler_IsDirty(IWICPersistStream *iface)
@@ -458,17 +502,19 @@ static HRESULT WINAPI MetadataHandler_LoadEx(IWICPersistStream *iface,
 {
     MetadataHandler *This = impl_from_IWICPersistStream(iface);
     HRESULT hr = S_OK;
-    MetadataItem *new_items=NULL;
-    DWORD item_count=0;
+    LARGE_INTEGER move;
 
     TRACE("(%p,%p,%s,%lx)\n", iface, stream, debugstr_guid(pguidPreferredVendor), dwPersistOptions);
 
     EnterCriticalSection(&This->lock);
 
+    This->origin.QuadPart = 0;
     if (stream)
     {
-        hr = This->vtable->fnLoad(stream, pguidPreferredVendor, dwPersistOptions,
-                &new_items, &item_count);
+        move.QuadPart = 0;
+        hr = IStream_Seek(stream, move, STREAM_SEEK_CUR, &This->origin);
+        if (SUCCEEDED(hr))
+            hr = This->vtable->fnLoad(This, stream, pguidPreferredVendor, dwPersistOptions);
     }
 
     if (This->stream)
@@ -482,13 +528,6 @@ static HRESULT WINAPI MetadataHandler_LoadEx(IWICPersistStream *iface,
             IStream_AddRef(This->stream);
     }
     This->persist_options = dwPersistOptions & WICPersistOptionMask;
-
-    if (new_items)
-    {
-        MetadataHandler_FreeItems(This);
-        This->items = new_items;
-        This->item_count = item_count;
-    }
 
     LeaveCriticalSection(&This->lock);
 
@@ -547,8 +586,11 @@ static HRESULT WINAPI metadatahandler_stream_provider_GetStream(IWICStreamProvid
 
     if (handler->stream)
     {
-        *stream = handler->stream;
-        IStream_AddRef(*stream);
+        if (SUCCEEDED(hr = IStream_Seek(handler->stream, *(LARGE_INTEGER *)&handler->origin, STREAM_SEEK_SET, NULL)))
+        {
+            *stream = handler->stream;
+            IStream_AddRef(*stream);
+        }
     }
     else
     {
@@ -576,9 +618,13 @@ static HRESULT WINAPI metadatahandler_stream_provider_GetPersistOptions(IWICStre
 
 static HRESULT WINAPI metadatahandler_stream_provider_GetPreferredVendorGUID(IWICStreamProvider *iface, GUID *guid)
 {
-    FIXME("%p, %p stub\n", iface, guid);
+    TRACE("%p, %p.\n", iface, guid);
 
-    return E_NOTIMPL;
+    if (!guid)
+        return E_INVALIDARG;
+
+    memcpy(guid, &GUID_VendorMicrosoft, sizeof(*guid));
+    return S_OK;
 }
 
 static HRESULT WINAPI metadatahandler_stream_provider_RefreshStream(IWICStreamProvider *iface)
@@ -602,7 +648,7 @@ static const IWICStreamProviderVtbl MetadataHandler_StreamProvider_Vtbl =
 HRESULT MetadataReader_Create(const MetadataHandlerVtbl *vtable, REFIID iid, void** ppv)
 {
     MetadataHandler *This;
-    HRESULT hr;
+    HRESULT hr = S_OK;
 
     TRACE("%s\n", debugstr_guid(vtable->clsid));
 
@@ -620,7 +666,11 @@ HRESULT MetadataReader_Create(const MetadataHandlerVtbl *vtable, REFIID iid, voi
     InitializeCriticalSectionEx(&This->lock, 0, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO);
     This->lock.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": MetadataHandler.lock");
 
-    hr = IWICMetadataWriter_QueryInterface(&This->IWICMetadataWriter_iface, iid, ppv);
+    if (This->vtable->fnCreate)
+        hr = This->vtable->fnCreate(This);
+
+    if (SUCCEEDED(hr))
+        hr = IWICMetadataWriter_QueryInterface(&This->IWICMetadataWriter_iface, iid, ppv);
 
     IWICMetadataWriter_Release(&This->IWICMetadataWriter_iface);
 
@@ -822,8 +872,8 @@ static HRESULT MetadataHandlerEnum_Create(MetadataHandler *parent, DWORD index,
     return S_OK;
 }
 
-static HRESULT LoadUnknownMetadata(IStream *input, const GUID *preferred_vendor,
-    DWORD persist_options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadUnknownMetadata(MetadataHandler *handler, IStream *input, const GUID *preferred_vendor,
+        DWORD persist_options)
 {
     HRESULT hr;
     MetadataItem *result;
@@ -863,8 +913,27 @@ static HRESULT LoadUnknownMetadata(IStream *input, const GUID *preferred_vendor,
     result[0].value.blob.cbSize = bytesread;
     result[0].value.blob.pBlobData = data;
 
-    *items = result;
-    *item_count = 1;
+    MetadataHandler_FreeItems(handler);
+    handler->items = result;
+    handler->item_count = 1;
+
+    return S_OK;
+}
+
+static HRESULT CreateUnknownHandler(MetadataHandler *handler)
+{
+    MetadataItem *item;
+
+    if (!(item = calloc(1, sizeof(*item))))
+        return E_OUTOFMEMORY;
+
+    PropVariantInit(&item->schema);
+    PropVariantInit(&item->id);
+    PropVariantInit(&item->value);
+    item->value.vt = VT_BLOB;
+
+    handler->items = item;
+    handler->item_count = 1;
 
     return S_OK;
 }
@@ -872,7 +941,8 @@ static HRESULT LoadUnknownMetadata(IStream *input, const GUID *preferred_vendor,
 static const MetadataHandlerVtbl UnknownMetadataReader_Vtbl =
 {
     .clsid = &CLSID_WICUnknownMetadataReader,
-    .fnLoad = LoadUnknownMetadata
+    .fnLoad = LoadUnknownMetadata,
+    .fnCreate = CreateUnknownHandler,
 };
 
 HRESULT UnknownMetadataReader_CreateInstance(REFIID iid, void** ppv)
@@ -882,9 +952,10 @@ HRESULT UnknownMetadataReader_CreateInstance(REFIID iid, void** ppv)
 
 static const MetadataHandlerVtbl UnknownMetadataWriter_Vtbl =
 {
-    .is_writer = true,
+    .flags = METADATAHANDLER_IS_WRITER | METADATAHANDLER_FIXED_ITEMS,
     .clsid = &CLSID_WICUnknownMetadataWriter,
-    .fnLoad = LoadUnknownMetadata
+    .fnLoad = LoadUnknownMetadata,
+    .fnCreate = CreateUnknownHandler,
 };
 
 HRESULT UnknownMetadataWriter_CreateInstance(REFIID iid, void** ppv)
@@ -1328,8 +1399,8 @@ static HRESULT load_IFD_entry(IStream *input, const GUID *vendor, DWORD options,
     return hr;
 }
 
-static HRESULT load_ifd_metadata_internal(IStream *input, const GUID *vendor,
-    DWORD persist_options, bool resolve_pointer_tags, bool is_writer, MetadataItem **items, DWORD *item_count)
+static HRESULT load_ifd_metadata_internal(MetadataHandler *handler, IStream *input, const GUID *vendor,
+    DWORD persist_options, bool resolve_pointer_tags, bool is_writer)
 {
     HRESULT hr;
     MetadataItem *result;
@@ -1419,67 +1490,69 @@ static HRESULT load_ifd_metadata_internal(IStream *input, const GUID *vendor,
 
     free(entry);
 
-    *items = result;
-    *item_count = count;
+    MetadataHandler_FreeItems(handler);
+    handler->items = result;
+    handler->item_count = count;
 
     return S_OK;
 }
 
-static HRESULT LoadIfdMetadataReader(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadIfdMetadataReader(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
 {
     TRACE("%p, %#lx.\n", input, options);
-    return load_ifd_metadata_internal(input, vendor, options, true, false, items, item_count);
+    return load_ifd_metadata_internal(handler, input, vendor, options, true, false);
 }
 
-static HRESULT LoadIfdMetadataWriter(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadIfdMetadataWriter(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
 {
     TRACE("%p, %#lx.\n", input, options);
-    return load_ifd_metadata_internal(input, vendor, options, true, true, items, item_count);
+    return load_ifd_metadata_internal(handler, input, vendor, options, true, true);
 }
 
-static HRESULT LoadExifMetadataReader(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
-{
-    TRACE("%p, %#lx.\n", input, options);
-
-    return load_ifd_metadata_internal(input, vendor, options, false, false, items, item_count);
-}
-
-static HRESULT LoadExifMetadataWriter(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadExifMetadataReader(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
 {
     TRACE("%p, %#lx.\n", input, options);
 
-    return load_ifd_metadata_internal(input, vendor, options, false, true, items, item_count);
+    return load_ifd_metadata_internal(handler, input, vendor, options, false, false);
 }
 
-static HRESULT LoadGpsMetadataReader(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadExifMetadataWriter(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
 {
     TRACE("%p, %#lx.\n", input, options);
 
-    return load_ifd_metadata_internal(input, vendor, options, false, false, items, item_count);
+    return load_ifd_metadata_internal(handler, input, vendor, options, false, true);
 }
 
-static HRESULT LoadGpsMetadataWriter(IStream *input, const GUID *vendor,
-        DWORD options, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadGpsMetadataReader(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
 {
     TRACE("%p, %#lx.\n", input, options);
 
-    return load_ifd_metadata_internal(input, vendor, options, false, true, items, item_count);
+    return load_ifd_metadata_internal(handler, input, vendor, options, false, false);
 }
 
-static HRESULT load_app1_metadata_internal(IStream *input, const GUID *vendor, DWORD options,
-        bool is_writer, MetadataItem **items, DWORD *item_count)
+static HRESULT LoadGpsMetadataWriter(MetadataHandler *handler, IStream *input, const GUID *vendor,
+        DWORD options)
+{
+    TRACE("%p, %#lx.\n", input, options);
+
+    return load_ifd_metadata_internal(handler, input, vendor, options, false, true);
+}
+
+static HRESULT load_app1_metadata_internal(MetadataHandler *handler, IStream *input, const GUID *vendor, DWORD options,
+        bool is_writer)
 {
     static const char exif_header[] = {'E','x','i','f',0,0};
     IWICMetadataReader *ifd_reader = NULL;
     BOOL native_byte_order;
+    MetadataItem *result;
     LARGE_INTEGER move;
 
-#include "pshpack2.h"
+#pragma pack(push,2)
     struct app1_header
     {
         BYTE exif_header[6];
@@ -1487,7 +1560,7 @@ static HRESULT load_app1_metadata_internal(IStream *input, const GUID *vendor, D
         USHORT marker;
         ULONG ifd0_offset;
     } header;
-#include "poppack.h"
+#pragma pack(pop)
 
     IStream *ifd_stream;
     ULONG length;
@@ -1543,31 +1616,32 @@ static HRESULT load_app1_metadata_internal(IStream *input, const GUID *vendor, D
         return hr;
     }
 
-    if (!(*items = calloc(1, sizeof(**items))))
+    if (!(result = calloc(1, sizeof(*result))))
     {
         IWICMetadataReader_Release(ifd_reader);
         return E_OUTOFMEMORY;
     }
 
-    (*items)[0].id.vt = VT_UI2;
-    (*items)[0].id.uiVal = 0;
-    (*items)[0].value.vt = VT_UNKNOWN;
-    (*items)[0].value.punkVal = (IUnknown *)ifd_reader;
-    *item_count = 1;
+    result->id.vt = VT_UI2;
+    result->id.uiVal = 0;
+    result->value.vt = VT_UNKNOWN;
+    result->value.punkVal = (IUnknown *)ifd_reader;
+
+    MetadataHandler_FreeItems(handler);
+    handler->items = result;
+    handler->item_count = 1;
 
     return S_OK;
 }
 
-static HRESULT LoadApp1MetadataReader(IStream *input, const GUID *vendor, DWORD options,
-        MetadataItem **items, DWORD *item_count)
+static HRESULT LoadApp1MetadataReader(MetadataHandler *handler, IStream *input, const GUID *vendor, DWORD options)
 {
-    return load_app1_metadata_internal(input, vendor, options, false, items, item_count);
+    return load_app1_metadata_internal(handler, input, vendor, options, false);
 }
 
-static HRESULT LoadApp1MetadataWriter(IStream *input, const GUID *vendor, DWORD options,
-        MetadataItem **items, DWORD *item_count)
+static HRESULT LoadApp1MetadataWriter(MetadataHandler *handler, IStream *input, const GUID *vendor, DWORD options)
 {
-    return load_app1_metadata_internal(input, vendor, options, true, items, item_count);
+    return load_app1_metadata_internal(handler, input, vendor, options, true);
 }
 
 static const MetadataHandlerVtbl IfdMetadataReader_Vtbl = {
@@ -1583,7 +1657,7 @@ HRESULT IfdMetadataReader_CreateInstance(REFIID iid, void **ppv)
 
 static const MetadataHandlerVtbl IfdMetadataWriter_Vtbl =
 {
-    .is_writer = true,
+    .flags = METADATAHANDLER_IS_WRITER,
     &CLSID_WICIfdMetadataWriter,
     LoadIfdMetadataWriter
 };
@@ -1607,7 +1681,7 @@ HRESULT GpsMetadataReader_CreateInstance(REFIID iid, void **ppv)
 
 static const MetadataHandlerVtbl GpsMetadataWriter_Vtbl =
 {
-    .is_writer = true,
+    .flags = METADATAHANDLER_IS_WRITER,
     &CLSID_WICGpsMetadataWriter,
     LoadGpsMetadataWriter
 };
@@ -1631,7 +1705,7 @@ HRESULT ExifMetadataReader_CreateInstance(REFIID iid, void **ppv)
 
 static const MetadataHandlerVtbl ExifMetadataWriter_Vtbl =
 {
-    .is_writer = true,
+    .flags = METADATAHANDLER_IS_WRITER,
     &CLSID_WICExifMetadataWriter,
     LoadExifMetadataWriter
 };
@@ -1655,7 +1729,7 @@ HRESULT App1MetadataReader_CreateInstance(REFIID iid, void **ppv)
 
 static const MetadataHandlerVtbl App1MetadataWriter_Vtbl =
 {
-    .is_writer = true,
+    .flags = METADATAHANDLER_IS_WRITER,
     &CLSID_WICApp1MetadataWriter,
     LoadApp1MetadataWriter
 };

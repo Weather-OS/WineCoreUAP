@@ -101,8 +101,7 @@ static VkResult win32u_vkCreateWin32SurfaceKHR( VkInstance client_instance, cons
         surface->hwnd = dummy;
     }
 
-    if ((res = driver_funcs->p_vulkan_surface_create( surface->hwnd, instance->host.instance,
-                                                      &host_surface, &surface->driver_private )))
+    if ((res = driver_funcs->p_vulkan_surface_create( surface->hwnd, instance, &host_surface, &surface->driver_private )))
     {
         if (dummy) NtUserDestroyWindow( dummy );
         free( surface );
@@ -509,10 +508,10 @@ static struct vulkan_funcs vulkan_funcs =
     .p_get_host_surface_extension = win32u_get_host_surface_extension,
 };
 
-static VkResult nulldrv_vulkan_surface_create( HWND hwnd, VkInstance instance, VkSurfaceKHR *surface, void **private )
+static VkResult nulldrv_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *surface, void **private )
 {
-    FIXME( "stub!\n" );
-    return VK_ERROR_INCOMPATIBLE_DRIVER;
+    VkHeadlessSurfaceCreateInfoEXT create_info = {.sType = VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT};
+    return instance->p_vkCreateHeadlessSurfaceEXT( instance->host.instance, &create_info, NULL, surface );
 }
 
 static void nulldrv_vulkan_surface_destroy( HWND hwnd, void *private )
@@ -538,7 +537,7 @@ static VkBool32 nulldrv_vkGetPhysicalDeviceWin32PresentationSupportKHR( VkPhysic
 
 static const char *nulldrv_get_host_surface_extension(void)
 {
-    return "VK_WINE_nulldrv_surface";
+    return "VK_EXT_headless_surface";
 }
 
 static const struct vulkan_driver_funcs nulldrv_funcs =
@@ -573,7 +572,7 @@ static void vulkan_driver_load(void)
     pthread_once( &init_once, vulkan_driver_init );
 }
 
-static VkResult lazydrv_vulkan_surface_create( HWND hwnd, VkInstance instance, VkSurfaceKHR *surface, void **private )
+static VkResult lazydrv_vulkan_surface_create( HWND hwnd, const struct vulkan_instance *instance, VkSurfaceKHR *surface, void **private )
 {
     vulkan_driver_load();
     return driver_funcs->p_vulkan_surface_create( hwnd, instance, surface, private );

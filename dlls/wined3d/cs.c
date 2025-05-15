@@ -119,10 +119,11 @@ enum wined3d_cs_op
     WINED3D_CS_OP_SET_RENDER_STATE,
     WINED3D_CS_OP_SET_TEXTURE_STATE,
     WINED3D_CS_OP_SET_TRANSFORM,
-    WINED3D_CS_OP_SET_CLIP_PLANE,
     WINED3D_CS_OP_SET_COLOR_KEY,
     WINED3D_CS_OP_SET_LIGHT,
     WINED3D_CS_OP_SET_LIGHT_ENABLE,
+    WINED3D_CS_OP_SET_EXTRA_VS_ARGS,
+    WINED3D_CS_OP_SET_EXTRA_PS_ARGS,
     WINED3D_CS_OP_SET_FEATURE_LEVEL,
     WINED3D_CS_OP_PUSH_CONSTANTS,
     WINED3D_CS_OP_RESET_STATE,
@@ -140,6 +141,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW,
     WINED3D_CS_OP_COPY_UAV_COUNTER,
     WINED3D_CS_OP_GENERATE_MIPMAPS,
+    WINED3D_CS_OP_DECODE,
     WINED3D_CS_OP_EXECUTE_COMMAND_LIST,
     WINED3D_CS_OP_STOP,
 };
@@ -385,13 +387,6 @@ struct wined3d_cs_set_transform
     struct wined3d_matrix matrix;
 };
 
-struct wined3d_cs_set_clip_plane
-{
-    enum wined3d_cs_op opcode;
-    UINT plane_idx;
-    struct wined3d_vec4 plane;
-};
-
 struct wined3d_cs_set_light
 {
     enum wined3d_cs_op opcode;
@@ -403,6 +398,18 @@ struct wined3d_cs_set_light_enable
     enum wined3d_cs_op opcode;
     unsigned int idx;
     BOOL enable;
+};
+
+struct wined3d_cs_set_extra_vs_args
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_extra_vs_args args;
+};
+
+struct wined3d_cs_set_extra_ps_args
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_extra_ps_args args;
 };
 
 struct wined3d_cs_set_feature_level
@@ -532,6 +539,14 @@ struct wined3d_cs_generate_mipmaps
     struct wined3d_shader_resource_view *view;
 };
 
+struct wined3d_cs_decode
+{
+    enum wined3d_cs_op opcode;
+    struct wined3d_decoder *decoder;
+    struct wined3d_decoder_output_view *output_view;
+    unsigned int bitstream_size, slice_control_size;
+};
+
 struct wined3d_cs_execute_command_list
 {
     enum wined3d_cs_op opcode;
@@ -605,10 +620,11 @@ static const char *debug_cs_op(enum wined3d_cs_op op)
         WINED3D_TO_STR(WINED3D_CS_OP_SET_RENDER_STATE);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_TEXTURE_STATE);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_TRANSFORM);
-        WINED3D_TO_STR(WINED3D_CS_OP_SET_CLIP_PLANE);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_COLOR_KEY);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_LIGHT);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_LIGHT_ENABLE);
+        WINED3D_TO_STR(WINED3D_CS_OP_SET_EXTRA_PS_ARGS);
+        WINED3D_TO_STR(WINED3D_CS_OP_SET_EXTRA_VS_ARGS);
         WINED3D_TO_STR(WINED3D_CS_OP_SET_FEATURE_LEVEL);
         WINED3D_TO_STR(WINED3D_CS_OP_PUSH_CONSTANTS);
         WINED3D_TO_STR(WINED3D_CS_OP_RESET_STATE);
@@ -626,6 +642,7 @@ static const char *debug_cs_op(enum wined3d_cs_op op)
         WINED3D_TO_STR(WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW);
         WINED3D_TO_STR(WINED3D_CS_OP_COPY_UAV_COUNTER);
         WINED3D_TO_STR(WINED3D_CS_OP_GENERATE_MIPMAPS);
+        WINED3D_TO_STR(WINED3D_CS_OP_DECODE);
         WINED3D_TO_STR(WINED3D_CS_OP_EXECUTE_COMMAND_LIST);
         WINED3D_TO_STR(WINED3D_CS_OP_STOP);
 #undef WINED3D_TO_STR
@@ -1328,12 +1345,12 @@ static void wined3d_cs_exec_set_rendertarget_views(struct wined3d_cs *cs, const 
             device_invalidate_state(device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
 
         if (!(device->adapter->d3d_info.wined3d_creation_flags & WINED3D_SRGB_READ_WRITE_CONTROL)
-                || cs->state.render_states[WINED3D_RS_SRGBWRITEENABLE])
+                || cs->state.extra_ps_args.srgb_write)
         {
             prev_srgb_write = prev && prev->format_caps & WINED3D_FORMAT_CAP_SRGB_WRITE;
             curr_srgb_write = view && view->format_caps & WINED3D_FORMAT_CAP_SRGB_WRITE;
             if (prev_srgb_write != curr_srgb_write)
-                device_invalidate_state(device, STATE_RENDER(WINED3D_RS_SRGBWRITEENABLE));
+                device_invalidate_state(device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
         }
     }
 
@@ -1950,27 +1967,6 @@ void wined3d_device_context_emit_set_transform(struct wined3d_device_context *co
     wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
 }
 
-static void wined3d_cs_exec_set_clip_plane(struct wined3d_cs *cs, const void *data)
-{
-    const struct wined3d_cs_set_clip_plane *op = data;
-
-    cs->state.clip_planes[op->plane_idx] = op->plane;
-    device_invalidate_state(cs->c.device, STATE_CLIPPLANE(op->plane_idx));
-}
-
-void wined3d_device_context_emit_set_clip_plane(struct wined3d_device_context *context,
-        unsigned int plane_idx, const struct wined3d_vec4 *plane)
-{
-    struct wined3d_cs_set_clip_plane *op;
-
-    op = wined3d_device_context_require_space(context, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
-    op->opcode = WINED3D_CS_OP_SET_CLIP_PLANE;
-    op->plane_idx = plane_idx;
-    op->plane = *plane;
-
-    wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
-}
-
 static void wined3d_cs_exec_set_color_key(struct wined3d_cs *cs, const void *data)
 {
     const struct wined3d_cs_set_color_key *op = data;
@@ -2115,6 +2111,46 @@ void wined3d_device_context_emit_set_light_enable(struct wined3d_device_context 
     op->opcode = WINED3D_CS_OP_SET_LIGHT_ENABLE;
     op->idx = idx;
     op->enable = enable;
+
+    wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
+}
+
+static void wined3d_cs_exec_set_extra_vs_args(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_set_extra_vs_args *op = data;
+
+    cs->state.extra_vs_args = op->args;
+    device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_VERTEX));
+}
+
+void wined3d_device_context_emit_set_extra_vs_args(struct wined3d_device_context *context,
+        const struct wined3d_extra_vs_args *args)
+{
+    struct wined3d_cs_set_extra_vs_args *op;
+
+    op = wined3d_device_context_require_space(context, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_SET_EXTRA_VS_ARGS;
+    op->args = *args;
+
+    wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
+}
+
+static void wined3d_cs_exec_set_extra_ps_args(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_set_extra_ps_args *op = data;
+
+    cs->state.extra_ps_args = op->args;
+    device_invalidate_state(cs->c.device, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
+}
+
+void wined3d_device_context_emit_set_extra_ps_args(struct wined3d_device_context *context,
+        const struct wined3d_extra_ps_args *args)
+{
+    struct wined3d_cs_set_extra_ps_args *op;
+
+    op = wined3d_device_context_require_space(context, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_SET_EXTRA_PS_ARGS;
+    op->args = *args;
 
     wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
 }
@@ -2779,8 +2815,29 @@ void wined3d_device_context_emit_update_sub_resource(struct wined3d_device_conte
 
     if (context->ops->map_upload_bo(context, resource, sub_resource_idx, &map_desc, box, WINED3D_MAP_WRITE))
     {
-        wined3d_format_copy_data(resource->format, data, row_pitch, slice_pitch, map_desc.data, map_desc.row_pitch,
-                map_desc.slice_pitch, box->right - box->left, box->bottom - box->top, box->back - box->front);
+        const struct wined3d_format *format = resource->format;
+
+        if (format->attrs & WINED3D_FORMAT_ATTR_PLANAR)
+        {
+            unsigned int uv_height = format->uv_height;
+            unsigned int uv_width = format->uv_width;
+            const struct wined3d_format *plane_format;
+
+            plane_format = wined3d_get_format(context->device->adapter, format->plane_formats[0], 0);
+            wined3d_format_copy_data(plane_format, data, row_pitch, slice_pitch, map_desc.data, map_desc.row_pitch,
+                    map_desc.slice_pitch, box->right - box->left, box->bottom - box->top, box->back - box->front);
+            plane_format = wined3d_get_format(context->device->adapter, format->plane_formats[1], 0);
+            wined3d_format_copy_data(plane_format, (const uint8_t *)data + (row_pitch * (box->bottom - box->top)),
+                    row_pitch * 2 / uv_width, slice_pitch * 2 / uv_width / uv_height,
+                    (uint8_t *)map_desc.data + map_desc.slice_pitch,
+                    map_desc.row_pitch * 2 / uv_width, map_desc.slice_pitch * 2 / uv_width / uv_height,
+                    (box->right - box->left) / uv_width, (box->bottom - box->top) / uv_height, box->back - box->front);
+        }
+        else
+        {
+            wined3d_format_copy_data(format, data, row_pitch, slice_pitch, map_desc.data, map_desc.row_pitch,
+                    map_desc.slice_pitch, box->right - box->left, box->bottom - box->top, box->back - box->front);
+        }
         context->ops->unmap_upload_bo(context, resource, sub_resource_idx, &dummy_box, &bo);
         wined3d_device_context_upload_bo(context, resource, sub_resource_idx,
                 box, &bo, map_desc.row_pitch, map_desc.slice_pitch);
@@ -2919,6 +2976,43 @@ void wined3d_device_context_emit_generate_mipmaps(struct wined3d_device_context 
     wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
 }
 
+static void wined3d_cs_exec_decode(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_decode *op = data;
+    struct wined3d_context *context;
+
+    context = context_acquire(cs->c.device, NULL, 0);
+    cs->c.device->adapter->decoder_ops->decode(context, op->decoder,
+            op->output_view, op->bitstream_size, op->slice_control_size);
+    context_release(context);
+}
+
+void wined3d_cs_emit_decode(struct wined3d_decoder *decoder, struct wined3d_decoder_output_view *output_view,
+        unsigned int bitstream_size, unsigned int slice_control_size)
+{
+    struct wined3d_device_context *context = &output_view->texture->resource.device->cs->c;
+    struct wined3d_cs_decode *op;
+
+    op = wined3d_device_context_require_space(context, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_DECODE;
+    op->decoder = decoder;
+    op->output_view = output_view;
+    op->bitstream_size = bitstream_size;
+    op->slice_control_size = slice_control_size;
+
+    wined3d_device_context_reference_resource(context, &output_view->texture->resource);
+    wined3d_device_context_reference_resource(context,
+            wined3d_decoder_get_buffer(decoder, WINED3D_DECODER_BUFFER_BITSTREAM));
+    wined3d_device_context_reference_resource(context,
+            wined3d_decoder_get_buffer(decoder, WINED3D_DECODER_BUFFER_INVERSE_QUANTIZATION_MATRIX));
+    wined3d_device_context_reference_resource(context,
+            wined3d_decoder_get_buffer(decoder, WINED3D_DECODER_BUFFER_PICTURE_PARAMETERS));
+    wined3d_device_context_reference_resource(context,
+            wined3d_decoder_get_buffer(decoder, WINED3D_DECODER_BUFFER_SLICE_CONTROL));
+
+    wined3d_device_context_submit(context, WINED3D_CS_QUEUE_DEFAULT);
+}
+
 static void wined3d_cs_emit_stop(struct wined3d_cs *cs)
 {
     struct wined3d_cs_stop *op;
@@ -2967,10 +3061,11 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_SET_RENDER_STATE            */ wined3d_cs_exec_set_render_state,
     /* WINED3D_CS_OP_SET_TEXTURE_STATE           */ wined3d_cs_exec_set_texture_state,
     /* WINED3D_CS_OP_SET_TRANSFORM               */ wined3d_cs_exec_set_transform,
-    /* WINED3D_CS_OP_SET_CLIP_PLANE              */ wined3d_cs_exec_set_clip_plane,
     /* WINED3D_CS_OP_SET_COLOR_KEY               */ wined3d_cs_exec_set_color_key,
     /* WINED3D_CS_OP_SET_LIGHT                   */ wined3d_cs_exec_set_light,
     /* WINED3D_CS_OP_SET_LIGHT_ENABLE            */ wined3d_cs_exec_set_light_enable,
+    /* WINED3D_CS_OP_SET_EXTRA_VS_ARGS           */ wined3d_cs_exec_set_extra_vs_args,
+    /* WINED3D_CS_OP_SET_EXTRA_PS_ARGS           */ wined3d_cs_exec_set_extra_ps_args,
     /* WINED3D_CS_OP_SET_FEATURE_LEVEL           */ wined3d_cs_exec_set_feature_level,
     /* WINED3D_CS_OP_PUSH_CONSTANTS              */ wined3d_cs_exec_push_constants,
     /* WINED3D_CS_OP_RESET_STATE                 */ wined3d_cs_exec_reset_state,
@@ -2988,6 +3083,7 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_CLEAR_UNORDERED_ACCESS_VIEW */ wined3d_cs_exec_clear_unordered_access_view,
     /* WINED3D_CS_OP_COPY_UAV_COUNTER            */ wined3d_cs_exec_copy_uav_counter,
     /* WINED3D_CS_OP_GENERATE_MIPMAPS            */ wined3d_cs_exec_generate_mipmaps,
+    /* WINED3D_CS_OP_DECODE                      */ wined3d_cs_exec_decode,
     /* WINED3D_CS_OP_EXECUTE_COMMAND_LIST        */ wined3d_cs_exec_execute_command_list,
 };
 
@@ -3074,9 +3170,16 @@ static void get_map_pitch(const struct wined3d_format *format, const struct wine
 
     wined3d_format_calculate_pitch(format, 1, width, height, &map_desc->row_pitch, &map_desc->slice_pitch);
 
-    *size = (depth - 1) * map_desc->slice_pitch
-            + ((height - 1) / format->block_height) * map_desc->row_pitch
-            + ((width + format->block_width - 1) / format->block_width) * format->block_byte_count;
+    if (format->attrs & WINED3D_FORMAT_ATTR_PLANAR)
+    {
+        *size = wined3d_format_calculate_size(format, 1, width, height, 1);
+    }
+    else
+    {
+        *size = (depth - 1) * map_desc->slice_pitch
+                + ((height - 1) / format->block_height) * map_desc->row_pitch
+                + ((width + format->block_width - 1) / format->block_width) * format->block_byte_count;
+    }
 }
 
 static bool wined3d_cs_map_upload_bo(struct wined3d_device_context *context, struct wined3d_resource *resource,

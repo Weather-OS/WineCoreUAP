@@ -184,11 +184,11 @@ typedef struct {
     ULONG (*release)(jsdisp_t*);
     void (*on_put)(jsdisp_t*,const WCHAR*);
     HRESULT (*lookup_prop)(jsdisp_t*,const WCHAR*,unsigned,struct property_info*);
-    HRESULT (*next_prop)(jsdisp_t*,unsigned,struct property_info*);
     HRESULT (*prop_get)(jsdisp_t*,unsigned,jsval_t*);
     HRESULT (*prop_put)(jsdisp_t*,unsigned,jsval_t);
     HRESULT (*prop_delete)(jsdisp_t*,unsigned);
     HRESULT (*prop_config)(jsdisp_t*,unsigned,unsigned);
+    HRESULT (*fill_props)(jsdisp_t*);
     HRESULT (*to_string)(jsdisp_t*,jsstr_t**);
     HRESULT (*gc_traverse)(struct gc_ctx*,enum gc_traverse_op,jsdisp_t*);
 } builtin_info_t;
@@ -198,10 +198,11 @@ struct jsdisp_t {
 
     LONG ref;
 
-    BOOLEAN has_weak_refs;
-    BOOLEAN extensible;
-    BOOLEAN gc_marked;
-    BOOLEAN is_constructor;
+    BOOLEAN is_constructor : 1;
+    BOOLEAN has_weak_refs : 1;
+    BOOLEAN props_filled : 1;
+    BOOLEAN extensible : 1;
+    BOOLEAN gc_marked : 1;
 
     DWORD buf_size;
     DWORD prop_cnt;
@@ -241,7 +242,8 @@ HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**);
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*);
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*);
 HRESULT init_host_object(script_ctx_t*,IWineJSDispatchHost*,IWineJSDispatch*,UINT32,IWineJSDispatch**);
-HRESULT init_host_constructor(script_ctx_t*,IWineJSDispatchHost*,IWineJSDispatch*,IWineJSDispatch**);
+HRESULT init_host_constructor(script_ctx_t*,IWineJSDispatchHost*,const WCHAR*,IWineJSDispatch**);
+HRESULT fill_globals(script_ctx_t*,IWineJSDispatchHost*);
 
 HRESULT disp_call(script_ctx_t*,IDispatch*,DISPID,WORD,unsigned,jsval_t*,jsval_t*);
 HRESULT disp_call_name(script_ctx_t*,IDispatch*,const WCHAR*,WORD,unsigned,jsval_t*,jsval_t*);
@@ -263,7 +265,7 @@ HRESULT jsdisp_get_idx_id(jsdisp_t*,DWORD,DISPID*);
 HRESULT disp_delete(IDispatch*,DISPID,BOOL*);
 HRESULT disp_delete_name(script_ctx_t*,IDispatch*,jsstr_t*,BOOL*);
 HRESULT jsdisp_index_lookup(jsdisp_t*,const WCHAR*,unsigned,struct property_info*);
-HRESULT jsdisp_next_index(jsdisp_t*,unsigned,unsigned,struct property_info*);
+HRESULT jsdisp_fill_indices(jsdisp_t*,unsigned);
 HRESULT jsdisp_delete_idx(jsdisp_t*,DWORD);
 HRESULT jsdisp_get_own_property(jsdisp_t*,const WCHAR*,BOOL,property_desc_t*);
 HRESULT jsdisp_define_property(jsdisp_t*,const WCHAR*,property_desc_t*);

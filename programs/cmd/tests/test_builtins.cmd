@@ -120,13 +120,13 @@ rem test in interactive mode... echo is always preserved after a call
 @echo echo on>foo.txt
 @echo call callme.cmd @echo off>>foo.txt
 @echo echo^>foo.tmp>>foo.txt
-type foo.txt | cmd.exe > NULL
+type foo.txt | cmd.exe > NUL
 @call :showEchoMode foo.tmp
 
 @echo echo off>foo.txt
 @echo call callme.cmd @echo on>>foo.txt
 @echo echo^>foo.tmp>>foo.txt
-type foo.txt | cmd.exe > NULL
+type foo.txt | cmd.exe > NUL
 @call :showEchoMode foo.tmp
 
 rem cleanup
@@ -1522,7 +1522,8 @@ if 1 == 0 (
 @tab@
 ) else echo block containing two lines with just tab seems to work
 ::
-echo @if 1 == 1 (> blockclosing.cmd
+set WINE_IDONTEXIST=
+echo @if [%%WINE_IDONTEXIST%%] == [] (@tab@> blockclosing.cmd
 echo   echo with closing bracket>> blockclosing.cmd
 echo )>> blockclosing.cmd
 cmd.exe /Q /C blockclosing.cmd
@@ -4128,6 +4129,15 @@ echo erase /q foobar.bat > foobar.bat
 echo echo shouldnot >> foobar.bat
 call foobar.bat
 if exist foobar.bat (echo stillthere & erase /q foobar.bat >NUL)
+
+echo ------------ Testing updated code page execution ------------
+echo @echo off>utf8.cmd
+echo chcp 65001>>utf8.cmd
+echo set utf8=@\xE3@@\xA1@@\xA1@@\xE3@@\xA1@@\xA1@>>utf8.cmd
+echo if not %%utf8:~0,2%%==%%utf8%% exit 1 >>utf8.cmd
+start /wait cmd /cutf8.cmd
+if errorlevel 1 (echo Failure) else echo Success
+del utf8.cmd
 
 echo ------------ Testing combined CALLs/GOTOs ------------
 echo @echo off>foo.cmd

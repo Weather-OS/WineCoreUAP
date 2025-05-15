@@ -2,6 +2,7 @@
  * Private winebth.sys defs
  *
  * Copyright 2024 Vibhav Pant
+ * Copyright 2025 Vibhav Pant
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,6 +24,7 @@
 
 #include <bthsdpdef.h>
 #include <bluetoothapis.h>
+#include <bthdef.h>
 #include <ddk/wdm.h>
 
 #include <wine/debug.h>
@@ -108,10 +110,6 @@ DEFINE_BTH_RADIO_DEVPROPKEY( HCIVendorFeatures, 8 );               /* DEVPROP_TY
 DEFINE_BTH_RADIO_DEVPROPKEY( MaximumAdvertisementDataLength, 17 ); /* DEVPROP_TYPE_UINT16 */
 DEFINE_BTH_RADIO_DEVPROPKEY( LELocalSupportedFeatures, 22 );       /* DEVPROP_TYPE_UINT64 */
 
-/* Valid masks for the "flags" field in BTH_LOCAL_RADIO_INFO. */
-#define LOCAL_RADIO_DISCOVERABLE 0x0001
-#define LOCAL_RADIO_CONNECTABLE  0x0002
-
 typedef struct
 {
     UINT_PTR handle;
@@ -136,6 +134,35 @@ typedef UINT16 winebluetooth_radio_props_mask_t;
      WINEBLUETOOTH_RADIO_PROPERTY_VERSION | WINEBLUETOOTH_RADIO_PROPERTY_DISCOVERING |             \
      WINEBLUETOOTH_RADIO_PROPERTY_PAIRABLE)
 
+typedef struct
+{
+    UINT_PTR handle;
+} winebluetooth_device_t;
+
+typedef UINT16 winebluetooth_device_props_mask_t;
+
+#define WINEBLUETOOTH_DEVICE_PROPERTY_NAME           (1)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_ADDRESS        (1 << 1)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_CONNECTED      (1 << 2)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_PAIRED         (1 << 3)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_LEGACY_PAIRING (1 << 4)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_TRUSTED        (1 << 5)
+#define WINEBLUETOOTH_DEVICE_PROPERTY_CLASS          (1 << 6)
+
+#define WINEBLUETOOTH_DEVICE_ALL_PROPERTIES                                                 \
+    (WINEBLUETOOTH_DEVICE_PROPERTY_NAME | WINEBLUETOOTH_DEVICE_PROPERTY_ADDRESS |           \
+     WINEBLUETOOTH_DEVICE_PROPERTY_CONNECTED | WINEBLUETOOTH_DEVICE_PROPERTY_PAIRED |       \
+     WINEBLUETOOTH_DEVICE_PROPERTY_LEGACY_PAIRING | WINEBLUETOOTH_DEVICE_PROPERTY_TRUSTED | \
+     WINEBLUETOOTH_DEVICE_PROPERTY_CLASS)
+
+union winebluetooth_property
+{
+    BOOL boolean;
+    ULONG ulong;
+    BLUETOOTH_ADDRESS address;
+    WCHAR name[BLUETOOTH_MAX_NAME_SIZE];
+};
+
 struct winebluetooth_radio_properties
 {
     BOOL discoverable;
@@ -149,6 +176,17 @@ struct winebluetooth_radio_properties
     BYTE version;
 };
 
+struct winebluetooth_device_properties
+{
+    BLUETOOTH_ADDRESS address;
+    CHAR name[BLUETOOTH_MAX_NAME_SIZE];
+    BOOL connected;
+    BOOL paired;
+    BOOL legacy_pairing;
+    BOOL trusted;
+    UINT32 class;
+};
+
 NTSTATUS winebluetooth_radio_get_unique_name( winebluetooth_radio_t radio, char *name,
                                               SIZE_T *size );
 void winebluetooth_radio_free( winebluetooth_radio_t radio );
@@ -156,12 +194,35 @@ static inline BOOL winebluetooth_radio_equal( winebluetooth_radio_t r1, wineblue
 {
     return r1.handle == r2.handle;
 }
+NTSTATUS winebluetooth_radio_set_property( winebluetooth_radio_t radio,
+                                           ULONG prop_flag,
+                                           union winebluetooth_property *property );
+NTSTATUS winebluetooth_radio_start_discovery( winebluetooth_radio_t radio );
+NTSTATUS winebluetooth_radio_stop_discovery( winebluetooth_radio_t radio );
+NTSTATUS winebluetooth_radio_remove_device( winebluetooth_radio_t radio, winebluetooth_device_t device );
+NTSTATUS winebluetooth_auth_agent_enable_incoming( void );
+
+void winebluetooth_device_free( winebluetooth_device_t device );
+static inline BOOL winebluetooth_device_equal( winebluetooth_device_t d1, winebluetooth_device_t d2 )
+{
+    return d1.handle == d2.handle;
+}
+void winebluetooth_device_properties_to_info( winebluetooth_device_props_mask_t props_mask,
+                                              const struct winebluetooth_device_properties *props,
+                                              BTH_DEVICE_INFO *info );
+NTSTATUS winebluetooth_device_disconnect( winebluetooth_device_t device );
+
+NTSTATUS winebluetooth_auth_send_response( winebluetooth_device_t device, BLUETOOTH_AUTHENTICATION_METHOD method,
+                                           UINT32 numeric_or_passkey, BOOL negative, BOOL *authenticated );
 
 enum winebluetooth_watcher_event_type
 {
     BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_ADDED,
     BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_REMOVED,
     BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_PROPERTIES_CHANGED,
+    BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_ADDED,
+    BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_REMOVED,
+    BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_PROPERTIES_CHANGED
 };
 
 struct winebluetooth_watcher_event_radio_added
@@ -180,11 +241,37 @@ struct winebluetooth_watcher_event_radio_props_changed
     winebluetooth_radio_t radio;
 };
 
+struct winebluetooth_watcher_event_device_added
+{
+    winebluetooth_device_props_mask_t known_props_mask;
+    struct winebluetooth_device_properties props;
+    winebluetooth_device_t device;
+    winebluetooth_radio_t radio;
+    BOOL init_entry;
+};
+
+struct winebluetooth_watcher_event_device_props_changed
+{
+    winebluetooth_device_props_mask_t changed_props_mask;
+    struct winebluetooth_device_properties props;
+
+    winebluetooth_device_props_mask_t invalid_props_mask;
+    winebluetooth_device_t device;
+};
+
+struct winebluetooth_watcher_event_device_removed
+{
+    winebluetooth_device_t device;
+};
+
 union winebluetooth_watcher_event_data
 {
     struct winebluetooth_watcher_event_radio_added radio_added;
     winebluetooth_radio_t radio_removed;
     struct winebluetooth_watcher_event_radio_props_changed radio_props_changed;
+    struct winebluetooth_watcher_event_device_added device_added;
+    struct winebluetooth_watcher_event_device_removed device_removed;
+    struct winebluetooth_watcher_event_device_props_changed device_props_changed;
 };
 
 struct winebluetooth_watcher_event
@@ -196,6 +283,14 @@ struct winebluetooth_watcher_event
 enum winebluetooth_event_type
 {
     WINEBLUETOOTH_EVENT_WATCHER_EVENT,
+    WINEBLUETOOTH_EVENT_AUTH_EVENT
+};
+
+struct winebluetooth_auth_event
+{
+    winebluetooth_device_t device;
+    BLUETOOTH_AUTHENTICATION_METHOD method;
+    UINT32 numeric_value_or_passkey;
 };
 
 struct winebluetooth_event
@@ -203,6 +298,7 @@ struct winebluetooth_event
     enum winebluetooth_event_type status;
     union {
         struct winebluetooth_watcher_event watcher_event;
+        struct winebluetooth_auth_event auth_event;
     } data;
 };
 

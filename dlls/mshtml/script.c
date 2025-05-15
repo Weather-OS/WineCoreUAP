@@ -210,11 +210,11 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
             assert(!script_host->window->event_target.dispex.jsdisp);
             script_host->window->jscript = jscript;
 
-            hres = get_prototype(script_host->window, PROT_Window, &prototype);
+            hres = get_prototype(script_host->window, OBJID_Window, &prototype);
             if(SUCCEEDED(hres))
                 hres = IWineJScript_InitHostObject(jscript,
                                                    &script_host->window->event_target.dispex.IWineJSDispatchHost_iface,
-                                                   prototype->jsdisp, object_descriptors[PROT_Window]->js_flags,
+                                                   prototype->jsdisp, object_descriptors[OBJID_Window]->js_flags,
                                                    &script_host->window->event_target.dispex.jsdisp);
             if(FAILED(hres))
                 ERR("Could not initialize script global: %08lx\n", hres);
@@ -419,7 +419,7 @@ static HRESULT WINAPI ActiveScriptSite_GetItemInfo(IActiveScriptSite *iface, LPC
     if(wcscmp(pstrName, L"window"))
         return DISP_E_MEMBERNOTFOUND;
 
-    if(!This->window || !This->window->base.outer_window)
+    if(!This->window || is_detached_window(This->window))
         return E_FAIL;
 
     if(dispex_compat_mode(&This->window->event_target.dispex) >= COMPAT_MODE_IE9)
@@ -565,7 +565,7 @@ static HRESULT WINAPI ActiveScriptSiteWindow_GetWindow(IActiveScriptSiteWindow *
 
     TRACE("(%p)->(%p)\n", This, phwnd);
 
-    if(!This->window || !This->window->base.outer_window)
+    if(!This->window || is_detached_window(This->window))
         return E_UNEXPECTED;
 
     *phwnd = This->window->base.outer_window->browser->doc->hwnd;
@@ -1433,7 +1433,7 @@ static ScriptHost *get_script_host(HTMLInnerWindow *window, const GUID *guid)
 
 void initialize_script_global(HTMLInnerWindow *script_global)
 {
-    if(!script_global->base.outer_window)
+    if(is_detached_window(script_global))
         return;
     get_script_host(script_global, &CLSID_JScript);
 }

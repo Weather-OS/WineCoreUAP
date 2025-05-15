@@ -1466,36 +1466,6 @@ static struct decoder_pattern const tiff_patterns[] = {
     {0}
 };
 
-static const BYTE tga_footer_magic[18] = "TRUEVISION-XFILE.";
-
-static const BYTE tga_indexed_magic[18] = {0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0};
-static const BYTE tga_indexed_mask[18] = {0,0xff,0xf7,0,0,0,0,0,0,0,0,0,0,0,0,0,0xff,0xcf};
-
-static const BYTE tga_truecolor_magic[18] = {0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-static const BYTE tga_truecolor_mask[18] = {0,0xff,0xf7,0,0,0,0,0,0,0,0,0,0,0,0,0,0x87,0xc0};
-
-static const BYTE tga_grayscale_magic[18] = {0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0};
-static const BYTE tga_grayscale_mask[18] = {0,0xff,0xf7,0,0,0,0,0,0,0,0,0,0,0,0,0,0xff,0xcf};
-
-static GUID const * const tga_formats[] = {
-    &GUID_WICPixelFormat8bppGray,
-    &GUID_WICPixelFormat8bppIndexed,
-    &GUID_WICPixelFormat16bppGray,
-    &GUID_WICPixelFormat16bppBGR555,
-    &GUID_WICPixelFormat24bppBGR,
-    &GUID_WICPixelFormat32bppBGRA,
-    &GUID_WICPixelFormat32bppPBGRA,
-    NULL
-};
-
-static struct decoder_pattern const tga_patterns[] = {
-    {18,18,tga_footer_magic,mask_all,1},
-    {18,0,tga_indexed_magic,tga_indexed_mask,0},
-    {18,0,tga_truecolor_magic,tga_truecolor_mask,0},
-    {18,0,tga_grayscale_magic,tga_grayscale_mask,0},
-    {0}
-};
-
 static struct regsvr_decoder const decoder_list[] = {
     {   &CLSID_WICBmpDecoder,
 	"The Wine Project",
@@ -1531,26 +1501,26 @@ static struct regsvr_decoder const decoder_list[] = {
 	gif_patterns
     },
     {   &CLSID_WICIcoDecoder,
-	"The Wine Project",
-	"ICO Decoder",
-	"1.0.0.0",
-	&GUID_VendorMicrosoft,
-	&GUID_ContainerFormatIco,
-	"image/vnd.microsoft.icon",
-	".ico",
-	ico_formats,
-	ico_patterns
+        "The Wine Project",
+        "ICO Decoder",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_ContainerFormatIco,
+        "image/ico,image/x-icon",
+        ".ico,.icon",
+        ico_formats,
+        ico_patterns
     },
     {   &CLSID_WICJpegDecoder,
-	"The Wine Project",
-	"JPEG Decoder",
-	"1.0.0.0",
-	&GUID_VendorMicrosoft,
-	&GUID_ContainerFormatJpeg,
-	"image/jpeg",
-	".jpg;.jpeg;.jfif",
-	jpeg_formats,
-	jpeg_patterns
+        "The Wine Project",
+        "JPEG Decoder",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_ContainerFormatJpeg,
+        "image/jpeg,image/jpe,image/jpg",
+        ".jpeg,.jpe,.jpg,.jfif,.exif",
+        jpeg_formats,
+        jpeg_patterns
     },
     {   &CLSID_WICWmpDecoder,
 	"The Wine Project",
@@ -1575,26 +1545,15 @@ static struct regsvr_decoder const decoder_list[] = {
 	png_patterns
     },
     {   &CLSID_WICTiffDecoder,
-	"The Wine Project",
-	"TIFF Decoder",
-	"1.0.0.0",
-	&GUID_VendorMicrosoft,
-	&GUID_ContainerFormatTiff,
-	"image/tiff",
-	".tif;.tiff",
-	tiff_decode_formats,
-	tiff_patterns
-    },
-    {   &CLSID_WineTgaDecoder,
-	"The Wine Project",
-	"TGA Decoder",
-	"1.0.0.0",
-	&GUID_VendorWine,
-	&GUID_WineContainerFormatTga,
-	"image/x-targa",
-	".tga;.tpic",
-	tga_formats,
-	tga_patterns
+        "The Wine Project",
+        "TIFF Decoder",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_ContainerFormatTiff,
+        "image/tiff,image/tif",
+        ".tiff,.tif",
+        tiff_decode_formats,
+        tiff_patterns
     },
     { NULL }			/* list terminator */
 };
@@ -1667,14 +1626,14 @@ static struct regsvr_encoder const encoder_list[] = {
 	gif_formats
     },
     {   &CLSID_WICJpegEncoder,
-	"The Wine Project",
-	"JPEG Encoder",
-	"1.0.0.0",
-	&GUID_VendorMicrosoft,
-	&GUID_ContainerFormatJpeg,
-	"image/jpeg",
-	".jpg;.jpeg;.jfif",
-	jpeg_formats
+        "The Wine Project",
+        "JPEG Encoder",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_ContainerFormatJpeg,
+        "image/jpeg,image/jpe,image/jpg",
+        ".jpeg,.jpe,.jpg,.jfif,.exif",
+        jpeg_formats
     },
     {   &CLSID_WICPngEncoder,
 	"The Wine Project",
@@ -1687,14 +1646,14 @@ static struct regsvr_encoder const encoder_list[] = {
 	png_encode_formats
     },
     {   &CLSID_WICTiffEncoder,
-	"The Wine Project",
-	"TIFF Encoder",
-	"1.0.0.0",
-	&GUID_VendorMicrosoft,
-	&GUID_ContainerFormatTiff,
-	"image/tiff",
-	".tif;.tiff",
-	tiff_encode_formats
+        "The Wine Project",
+        "TIFF Encoder",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_ContainerFormatTiff,
+        "image/tiff,image/tif",
+        ".tiff,.tif",
+        tiff_encode_formats
     },
     { NULL }			/* list terminator */
 };
@@ -1722,8 +1681,12 @@ static GUID const * const converter_formats[] = {
     &GUID_WICPixelFormat32bppPRGBA,
     &GUID_WICPixelFormat32bppGrayFloat,
     &GUID_WICPixelFormat48bppRGB,
+    &GUID_WICPixelFormat48bppRGBHalf,
     &GUID_WICPixelFormat64bppRGBA,
     &GUID_WICPixelFormat32bppCMYK,
+    &GUID_WICPixelFormat96bppRGBFloat,
+    &GUID_WICPixelFormat128bppRGBFloat,
+    &GUID_WICPixelFormat128bppRGBAFloat,
     NULL
 };
 
@@ -1849,6 +1812,21 @@ static const struct reader_containers pngtime_containers[] = {
     {
         &GUID_ContainerFormatPng,
         pngtime_metadata_pattern
+    },
+    { NULL } /* list terminator */
+};
+
+static const BYTE bKGD[] = "bKGD";
+
+static const struct metadata_pattern pngbkgd_metadata_pattern[] = {
+    { 4, 4, bKGD, mask_all, 4 },
+    { 0 }
+};
+
+static const struct reader_containers pngbkgd_containers[] = {
+    {
+        &GUID_ContainerFormatPng,
+        pngbkgd_metadata_pattern
     },
     { NULL } /* list terminator */
 };
@@ -2028,6 +2006,16 @@ static struct regsvr_metadatareader const metadatareader_list[] = {
         0, 0, 0,
         pngtime_containers
     },
+    {   &CLSID_WICPngBkgdMetadataReader,
+        "The Wine Project",
+        "Chunk bKGD Reader",
+        "1.0.0.0",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_MetadataFormatChunkbKGD,
+        0, 0, 0,
+        pngbkgd_containers
+    },
     {   &CLSID_WICLSDMetadataReader,
         "The Wine Project",
         "Logical Screen Descriptor Reader",
@@ -2127,6 +2115,24 @@ static struct regsvr_metadatawriter const metadatawriters_list[] =
         "1.0.0.0",
         &GUID_VendorMicrosoft,
         &GUID_MetadataFormatApp1,
+    },
+    {
+        &CLSID_WICPngBkgdMetadataWriter,
+        "The Wine Project",
+        "Png bKGD Metadata Writer",
+        "1.0.0.0",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_MetadataFormatChunkbKGD,
+    },
+    {
+        &CLSID_WICPngTimeMetadataWriter,
+        "The Wine Project",
+        "Png tIME Metadata Writer",
+        "1.0.0.0",
+        "1.0.0.0",
+        &GUID_VendorMicrosoft,
+        &GUID_MetadataFormatChunktIME,
     },
     { NULL } /* list terminator */
 };
@@ -2501,6 +2507,17 @@ static struct regsvr_pixelformat const pixelformat_list[] = {
         channel_masks_128bit,
         WICPixelFormatNumericRepresentationFloat,
         1
+    },
+    {   &GUID_WICPixelFormat128bppRGBFloat,
+        "The Wine Project",
+        "128bpp RGBFloat",
+        NULL, /* no version */
+        &GUID_VendorMicrosoft,
+        128, /* bitsperpixel */
+        3, /* channel count */
+        channel_masks_128bit,
+        WICPixelFormatNumericRepresentationFloat,
+        0
     },
     { NULL }			/* list terminator */
 };

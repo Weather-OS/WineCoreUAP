@@ -493,7 +493,7 @@ static ostream *p_cout, *p_cerr, *p_clog;
 /* Emulate a __thiscall */
 #ifdef __i386__
 
-#include "pshpack1.h"
+#pragma pack(push,1)
 struct thiscall_thunk
 {
     BYTE pop_eax;    /* popl  %eax (ret addr) */
@@ -502,7 +502,7 @@ struct thiscall_thunk
     BYTE push_eax;   /* pushl %eax */
     WORD jmp_edx;    /* jmp  *%edx */
 };
-#include "poppack.h"
+#pragma pack(pop)
 
 static void * (WINAPI *call_thiscall_func1)( void *func, void *this );
 static void * (WINAPI *call_thiscall_func2)( void *func, void *this, void *a );
@@ -2404,7 +2404,7 @@ static void test_strstreambuf(void)
     ssb2.base.eback = ssb2.base.base;
     ssb2.base.gptr = ssb2.base.base + 2;
     ssb2.base.egptr = ssb2.base.base + 4;
-    strcpy(ssb2.base.base, "Check");
+    memcpy(ssb2.base.base, "Check", 5);
     ret = (int) call_func1(p_strstreambuf_doallocate, &ssb2);
     ok(ret == 1, "return value %d\n", ret);
     ok(ssb2.base.ebuf == ssb2.base.base + 10, "expected %p, got %p\n", ssb2.base.base + 10, ssb2.base.ebuf);

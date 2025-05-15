@@ -47,11 +47,7 @@ static const USHORT current_machine = IMAGE_FILE_MACHINE_ARM64;
 static const USHORT current_machine = IMAGE_FILE_MACHINE_UNKNOWN;
 #endif
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__arm__) || defined(__aarch64__)
 static const UINT_PTR page_size = 0x1000;
-#else
-extern UINT_PTR page_size;
-#endif
 
 /* exceptions */
 extern NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *context );
@@ -100,7 +96,6 @@ extern FARPROC SNOOP_GetProcAddress( HMODULE hmod, const IMAGE_EXPORT_DIRECTORY 
 extern void RELAY_SetupDLL( HMODULE hmod );
 extern void SNOOP_SetupDLL( HMODULE hmod );
 extern const WCHAR windows_dir[];
-extern const WCHAR system_dir[];
 
 extern void (FASTCALL *pBaseThreadInitThunk)(DWORD,LPTHREAD_START_ROUTINE,void *);
 

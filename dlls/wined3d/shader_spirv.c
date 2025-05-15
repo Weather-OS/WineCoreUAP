@@ -24,12 +24,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(d3d_shader);
 
 static const struct wined3d_shader_backend_ops spirv_shader_backend_vk;
 
-static const struct vkd3d_shader_compile_option spirv_compile_options[] =
-{
-    {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_7},
-    {VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE, 0},
-};
-
 struct shader_spirv_resource_bindings
 {
     struct vkd3d_shader_resource_binding *bindings;
@@ -44,7 +38,7 @@ struct shader_spirv_resource_bindings
     size_t binding_base[WINED3D_SHADER_TYPE_COUNT];
     enum wined3d_shader_type so_stage;
 
-    uint32_t ffp_extra_binding[2];
+    uint32_t ffp_ps_extra_binding, ffp_vs_extra_binding;
 };
 
 struct shader_spirv_priv
@@ -53,6 +47,8 @@ struct shader_spirv_priv
     const struct wined3d_fragment_pipe_ops *fragment_pipe;
 
     struct shader_spirv_resource_bindings bindings;
+
+    struct vkd3d_shader_compile_option compile_options[3];
 };
 
 #define MAX_SM1_INTER_STAGE_VARYINGS 12
@@ -220,7 +216,7 @@ static void shader_spirv_init_compile_args(const struct wined3d_vk_info *vk_info
     {
         unsigned int rt_alpha_swizzle = compile_args->u.fs.args.rt_alpha_swizzle;
 
-        fill_ps_parameters(args, compile_args, bindings->ffp_extra_binding[WINED3D_SHADER_TYPE_PIXEL]);
+        fill_ps_parameters(args, compile_args, bindings->ffp_ps_extra_binding);
 
         args->spirv_target.dual_source_blending = compile_args->u.fs.args.dual_source_blend;
 
@@ -281,6 +277,7 @@ static VkShaderModule shader_spirv_compile_shader(struct wined3d_context_vk *con
         const struct shader_spirv_resource_bindings *bindings, const struct wined3d_stream_output_desc *so_desc)
 {
     struct wined3d_device_vk *device_vk = wined3d_device_vk(context_vk->c.device);
+    const struct shader_spirv_priv *priv = device_vk->d.shader_priv;
     const struct wined3d_vk_info *vk_info = &device_vk->vk_info;
     struct wined3d_shader_spirv_compile_args compile_args;
     struct wined3d_shader_spirv_shader_interface iface;
@@ -302,8 +299,8 @@ static VkShaderModule shader_spirv_compile_shader(struct wined3d_context_vk *con
     info.source.size = shader_desc->byte_code_size;
     info.source_type = source_type;
     info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
-    info.options = spirv_compile_options;
-    info.option_count = ARRAY_SIZE(spirv_compile_options);
+    info.options = priv->compile_options;
+    info.option_count = ARRAY_SIZE(priv->compile_options);
     info.log_level = VKD3D_SHADER_LOG_WARNING;
     info.source_name = NULL;
 
@@ -745,7 +742,11 @@ static bool shader_spirv_resource_bindings_init(struct shader_spirv_resource_bin
                     WINED3D_SHADER_DESCRIPTOR_TYPE_CBV, WINED3D_FFP_CONSTANTS_EXTRA_REGISTER,
                     WINED3D_SHADER_RESOURCE_BUFFER, WINED3D_DATA_FLOAT, binding_idx))
                 return false;
-            bindings->ffp_extra_binding[shader_type] = binding_idx;
+
+            if (shader_type == WINED3D_SHADER_TYPE_PIXEL)
+                bindings->ffp_ps_extra_binding = binding_idx;
+            else
+                bindings->ffp_vs_extra_binding = binding_idx;
         }
     }
 
@@ -756,6 +757,7 @@ static void shader_spirv_scan_shader(struct wined3d_shader *shader,
         struct vkd3d_shader_scan_descriptor_info *descriptor_info,
         struct vkd3d_shader_scan_signature_info *signature_info)
 {
+    const struct shader_spirv_priv *priv = shader->device->shader_priv;
     struct vkd3d_shader_compile_info info;
     char *messages;
     int ret;
@@ -784,8 +786,8 @@ static void shader_spirv_scan_shader(struct wined3d_shader *shader,
     }
     info.source_type = shader->source_type;
     info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
-    info.options = spirv_compile_options;
-    info.option_count = ARRAY_SIZE(spirv_compile_options);
+    info.options = priv->compile_options;
+    info.option_count = ARRAY_SIZE(priv->compile_options);
     info.log_level = VKD3D_SHADER_LOG_WARNING;
     info.source_name = NULL;
 
@@ -1052,6 +1054,7 @@ static void shader_spirv_destroy(struct wined3d_shader *shader)
 static HRESULT shader_spirv_alloc(struct wined3d_device *device,
         const struct wined3d_vertex_pipe_ops *vertex_pipe, const struct wined3d_fragment_pipe_ops *fragment_pipe)
 {
+    const struct wined3d_vk_info *vk_info = &wined3d_adapter_vk(device->adapter)->vk_info;
     void *vertex_priv, *fragment_priv;
     struct shader_spirv_priv *priv;
 
@@ -1080,6 +1083,16 @@ static HRESULT shader_spirv_alloc(struct wined3d_device *device,
     device->vertex_priv = vertex_priv;
     device->fragment_priv = fragment_priv;
     device->shader_priv = priv;
+
+    priv->compile_options[0].name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
+    priv->compile_options[0].value = VKD3D_SHADER_API_VERSION_1_7;
+    priv->compile_options[1].name = VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE;
+    priv->compile_options[1].value = 0;
+    priv->compile_options[2].name = VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV;
+    if (vk_info->uav_read_without_format)
+        priv->compile_options[2].value = VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV_READ_FORMAT_UNKNOWN;
+    else
+        priv->compile_options[2].value = VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV_READ_FORMAT_R32;
 
     return WINED3D_OK;
 }
@@ -1204,8 +1217,6 @@ static void spirv_vertex_pipe_vk_vp_free(struct wined3d_device *device, struct w
 
 static const struct wined3d_state_entry_template spirv_vertex_pipe_vk_vp_states[] =
 {
-    {STATE_RENDER(WINED3D_RS_CLIPPING),                 {STATE_RENDER(WINED3D_RS_CLIPPING),                 state_nop}},
-    {STATE_RENDER(WINED3D_RS_CLIPPLANEENABLE),          {STATE_RENDER(WINED3D_RS_CLIPPLANEENABLE),          state_nop}},
     {STATE_RENDER(WINED3D_RS_POINTSIZE),                {STATE_RENDER(WINED3D_RS_POINTSIZE),                state_nop}},
     {STATE_RENDER(WINED3D_RS_POINTSIZE_MIN),            {STATE_RENDER(WINED3D_RS_POINTSIZE_MIN),            state_nop}},
     {STATE_RENDER(WINED3D_RS_POINTSIZE_MAX),            {STATE_RENDER(WINED3D_RS_POINTSIZE_MAX),            state_nop}},
@@ -1279,18 +1290,7 @@ static void spirv_fragment_pipe_vk_fp_free_context_data(struct wined3d_context *
 
 static const struct wined3d_state_entry_template spirv_fragment_pipe_vk_fp_states[] =
 {
-    {STATE_RENDER(WINED3D_RS_SHADEMODE),         {STATE_RENDER(WINED3D_RS_SHADEMODE),         state_nop}},
-    {STATE_RENDER(WINED3D_RS_ALPHATESTENABLE),   {STATE_RENDER(WINED3D_RS_ALPHATESTENABLE),   state_nop}},
-    {STATE_RENDER(WINED3D_RS_ALPHAFUNC),         {STATE_RENDER(WINED3D_RS_ALPHAFUNC),         state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGENABLE),         {STATE_RENDER(WINED3D_RS_FOGENABLE),         state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGCOLOR),          {STATE_RENDER(WINED3D_RS_FOGCOLOR),          state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGTABLEMODE),      {STATE_RENDER(WINED3D_RS_FOGTABLEMODE),      state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGSTART),          {STATE_RENDER(WINED3D_RS_FOGSTART),          state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGEND),            {STATE_RENDER(WINED3D_RS_FOGEND),            state_nop}},
-    {STATE_RENDER(WINED3D_RS_FOGDENSITY),        {STATE_RENDER(WINED3D_RS_FOGDENSITY),        state_nop}},
     {STATE_RENDER(WINED3D_RS_FOGVERTEXMODE),     {STATE_RENDER(WINED3D_RS_FOGVERTEXMODE),     state_nop}},
-    {STATE_RENDER(WINED3D_RS_POINTSPRITEENABLE), {STATE_RENDER(WINED3D_RS_POINTSPRITEENABLE), state_nop}},
-    {STATE_RENDER(WINED3D_RS_SRGBWRITEENABLE),   {STATE_RENDER(WINED3D_RS_SRGBWRITEENABLE),   state_nop}},
     {0}, /* Terminate */
 };
 

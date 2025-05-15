@@ -304,6 +304,147 @@ static void test_hwbpt_in_syscall(void)
     RemoveVectoredExceptionHandler(handler);
     TlsFree(ind);
 }
+
+static void *test_single_step_exc_address;
+static int test_single_step_address_test;
+static volatile LONG test_single_step_address_thread_wait;
+static HANDLE test_single_step_address_signal, test_single_step_address_wait;
+
+static LONG CALLBACK test_single_step_address_handler(EXCEPTION_POINTERS *info)
+{
+    EXCEPTION_RECORD *rec = info->ExceptionRecord;
+
+    test_single_step_exc_address = rec->ExceptionAddress;
+    ok(rec->ExceptionCode == EXCEPTION_SINGLE_STEP, "got %#lx, address %p.\n", rec->ExceptionCode, rec->ExceptionAddress);
+    ExitThread(0);
+    ok(0, "got here.\n");
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static DWORD WINAPI test_single_step_address_thread(void *dummy)
+{
+    CONTEXT c;
+
+    memset( code_mem, 0x90 /* nop */, 3 );
+
+    if (test_single_step_address_test == 1) do
+    {
+        InterlockedIncrement(&test_single_step_address_thread_wait);
+    } while (1);
+
+    if (test_single_step_address_test == 3)
+    {
+        SignalObjectAndWait(test_single_step_address_signal, test_single_step_address_wait, INFINITE, FALSE);
+        ok(0, "got here.\n");
+    }
+
+    c.ContextFlags = CONTEXT_FULL;
+    GetThreadContext(GetCurrentThread(), &c);
+#ifdef __x86_64__
+    c.Rip = (ULONG_PTR)code_mem;
+#else
+    c.Eip = (ULONG_PTR)code_mem;
+#endif
+    c.EFlags |= 0x100;
+    if (test_single_step_address_test == 2)
+        NtContinue( &c, FALSE );
+    else
+        SetThreadContext(GetCurrentThread(), &c);
+    ok(0, "got here.\n");
+    return 0;
+}
+
+static void test_single_step_address_run(void *handler, int test)
+{
+    HANDLE thread;
+    CONTEXT c;
+
+    winetest_push_context("test %d", test);
+
+    test_single_step_address_signal = CreateEventW(NULL, FALSE, FALSE, NULL);
+    test_single_step_address_wait = CreateEventW(NULL, FALSE, FALSE, NULL);
+
+    test_single_step_exc_address = NULL;
+    test_single_step_address_test = test;
+    test_single_step_address_thread_wait = 0;
+    thread = CreateThread(NULL, 0, test_single_step_address_thread, NULL, 0, NULL);
+
+    switch (test)
+    {
+        case 1:
+        case 3:
+            if (test == 1)
+            {
+                while (!test_single_step_address_thread_wait)
+                    Sleep(10);
+            }
+            else
+            {
+                WaitForSingleObject(test_single_step_address_signal, INFINITE);
+            }
+            SuspendThread(thread);
+            c.ContextFlags = CONTEXT_FULL;
+            GetThreadContext(thread, &c);
+#ifdef __x86_64__
+            c.Rip = (ULONG_PTR)code_mem;
+#else
+            c.Eip = (ULONG_PTR)code_mem;
+#endif
+            c.EFlags |= 0x100;
+            SetThreadContext(thread, &c);
+            ResumeThread(thread);
+            if (test == 3)
+                SetEvent(test_single_step_address_wait);
+            break;
+    }
+
+    WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
+    CloseHandle(test_single_step_address_signal);
+    CloseHandle(test_single_step_address_wait);
+
+    /* Vectored handler stays referenced because it execution ends with TerminateThread() and it never returns,
+     * decrement its reference count each time. */
+    pRtlRemoveVectoredExceptionHandler(handler);
+    winetest_pop_context();
+}
+
+static void test_single_step_address(void)
+{
+    void *handler;
+
+    handler = pRtlAddVectoredExceptionHandler(TRUE, test_single_step_address_handler);
+    ok(!!handler, "got NULL.\n");
+    memset( code_mem, 0x90 /* nop */, 3 );
+
+    test_single_step_address_run(handler, 0);
+
+    if (sizeof(void*) == 4)
+        ok(test_single_step_exc_address == (char *)code_mem + 1, "got %p, expected %p.\n",
+                test_single_step_exc_address, (char *)code_mem + 1);
+    else
+        ok(test_single_step_exc_address == code_mem, "got %p, expected %p.\n", test_single_step_exc_address, code_mem);
+
+
+    test_single_step_address_run(handler, 1);
+    ok(test_single_step_exc_address == (char *)code_mem + 1, "got %p, expected %p.\n", test_single_step_exc_address,
+            (char *)code_mem + 1);
+
+    test_single_step_address_run(handler, 2);
+
+    ok(test_single_step_exc_address == (char *)code_mem + 1, "got %p, expected %p.\n", test_single_step_exc_address,
+            (char *)code_mem + 1);
+
+    test_single_step_address_run(handler, 3);
+
+    if (sizeof(void*) == 4)
+        ok(test_single_step_exc_address == (char *)code_mem + 1, "got %p, expected %p.\n",
+                test_single_step_exc_address, (char *)code_mem + 1);
+    else
+        ok(test_single_step_exc_address == code_mem, "got %p, expected %p.\n", test_single_step_exc_address, code_mem);
+
+    pRtlRemoveVectoredExceptionHandler(handler);
+}
 #endif
 
 #ifdef __i386__
@@ -2259,7 +2400,6 @@ static void test_instrumentation_callback(void)
 
     unsigned int instrumentation_call_count;
     NTSTATUS status;
-
     PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION info;
 
     memcpy( code_mem, instrumentation_callback, sizeof(instrumentation_callback) );
@@ -5595,6 +5735,41 @@ static void test_instrumentation_callback(void)
         0x41, 0xff, 0xe2,                   /* jmp *r10 */
     };
 
+    static const BYTE call_func_nt_flag[] =
+    {
+        0x56,                                           /* push %rsi */
+        0x57,                                           /* push %rdi */
+        0x48, 0x89, 0xce,                               /* mov %rcx,%rsi */
+        0x48, 0x89, 0xd7,                               /* mov %rdx,%rdi */
+
+        0x9c,                                           /* pushfq */
+        0x9c,                                           /* pushfq */
+        0x48, 0x81, 0x0c, 0x24, 0x00, 0x40, 0x00, 0x00, /* orq $0x4000,(%rsp) */
+        0x9d,                                           /* popfq */
+
+        0x41, 0xff, 0xd0,                               /* call *%r8 */
+
+        0x4c, 0x89, 0x1e,                               /* mov %r11,(%rsi) */
+        0x9c,                                           /* pushfq */
+        0x5a,                                           /* popq %rdx */
+        0x9d,                                           /* popfq */
+        0x48, 0x89, 0x17,                               /* mov %rdx,(%rdi) */
+        0x5f,                                           /* pop %rdi */
+        0x5e,                                           /* pop %rsi */
+        0xc3,                                           /* ret */
+    };
+
+    static const BYTE call_NtSetContextThread_nt_flag[] =
+    {
+        0x9c,                                           /* pushfq */
+        0x48, 0x81, 0x0c, 0x24, 0x00, 0x40, 0x00, 0x00, /* orq $0x4000,(%rsp) */
+        0x9d,                                           /* popfq */
+        0x41, 0xff, 0xd0,                               /* call *%r8 */
+        0xc3,                                           /* ret */
+    };
+
+    NTSTATUS (WINAPI *func_NtSetContextThread_nt_flag)(HANDLE, CONTEXT *, void *func);
+    NTSTATUS (WINAPI *func_nt_flag)(UINT64 *ret_r11, UINT64 *ret_rflags, void *func);
     struct instrumentation_callback_data curr_data, data;
     PROCESS_INSTRUMENTATION_CALLBACK_INFORMATION info;
     HMODULE ntdll = GetModuleHandleA( "ntdll.dll" );
@@ -5602,6 +5777,7 @@ static void test_instrumentation_callback(void)
     EXCEPTION_RECORD record;
     void *vectored_handler;
     unsigned int i, count;
+    ULONG64 r11, rflags;
     NTSTATUS status;
     HANDLE thread;
     CONTEXT ctx;
@@ -5609,6 +5785,17 @@ static void test_instrumentation_callback(void)
     LONG pass;
 
     if (is_arm64ec) return;
+
+    func_nt_flag = (void *)((char *)code_mem + 512);
+    memcpy( func_nt_flag, call_func_nt_flag, sizeof(call_func_nt_flag) );
+
+    func_NtSetContextThread_nt_flag = (void *)((char *)code_mem + 1024);
+    memcpy( func_NtSetContextThread_nt_flag, call_NtSetContextThread_nt_flag, sizeof(call_NtSetContextThread_nt_flag) );
+
+    status = func_nt_flag( &r11, &rflags, NtFlushProcessWriteBuffers );
+    ok( !status, "got %#lx.\n", status );
+    ok( r11 & 0x4000, "got %#I64x.\n", r11 );
+    ok( rflags & 0x4000, "got %#I64x.\n", rflags );
 
     memcpy( code_mem, instrumentation_callback, sizeof(instrumentation_callback) );
     *(void **)((char *)code_mem + 4) = &curr_data.call_count;
@@ -5648,6 +5835,14 @@ static void test_instrumentation_callback(void)
     data = curr_data;
     ok( status == STATUS_SUCCESS, "got %#lx.\n", status );
     ok( data.call_count == 1, "got %u.\n", data.call_count );
+
+    init_instrumentation_data( &curr_data );
+    status = func_nt_flag( &r11, &rflags, NtFlushProcessWriteBuffers );
+    data = curr_data;
+    ok( !status, "got %#lx.\n", status );
+    ok( data.call_count == 1, "got %u.\n", data.call_count );
+    ok( r11 & 0x4000, "got %#I64x.\n", r11 );
+    ok( rflags & 0x4000, "got %#I64x.\n", rflags );
 
     vectored_handler = AddVectoredExceptionHandler( TRUE, test_instrumentation_callback_handler );
     ok( !!vectored_handler, "failed.\n" );
@@ -5694,8 +5889,16 @@ static void test_instrumentation_callback(void)
         ok( data.call_count == 1, "got %u.\n", data.call_count );
         ok( data.call_data[0].r10 == (void *)ctx.Rip, "got %p, expected %p.\n", data.call_data[0].r10, (void *)ctx.Rip );
         init_instrumentation_data( &curr_data );
+        func_NtSetContextThread_nt_flag( GetCurrentThread(), &ctx, NtSetContextThread );
+        ok( 0, "Shouldn't be reached.\n" );
     }
-    ok( pass == 5, "got %ld.\n", pass );
+    else if (pass == 6)
+    {
+        data = curr_data;
+        pRtlCaptureContext( &ctx );
+        ok( !(ctx.EFlags & 0x4000), "got %#lx.\n", ctx.EFlags );
+    }
+    ok( pass == 6, "got %ld.\n", pass );
     RemoveVectoredExceptionHandler( vectored_handler );
 
     apc_count = 0;
@@ -12003,6 +12206,7 @@ START_TEST(exception)
     test_set_live_context();
     test_hwbpt_in_syscall();
     test_instrumentation_callback();
+    test_single_step_address();
 
 #elif defined(__x86_64__)
 
@@ -12035,6 +12239,7 @@ START_TEST(exception)
     test_hwbpt_in_syscall();
     test_instrumentation_callback();
     test_direct_syscalls();
+    test_single_step_address();
 
 #elif defined(__aarch64__)
 

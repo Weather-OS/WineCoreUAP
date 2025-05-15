@@ -89,6 +89,7 @@ static const struct wined3d_format_channels formats[] =
     {WINED3DFMT_YUY2,                       0,  0,  0,  0,   0,  0,  0,  0,    2,   0,  0},
     {WINED3DFMT_YV12,                       0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
     {WINED3DFMT_NV12,                       0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
+    {WINED3DFMT_NV12_PLANAR,                0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
     {WINED3DFMT_DXT1,                       0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
     {WINED3DFMT_DXT2,                       0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
     {WINED3DFMT_DXT3,                       0,  0,  0,  0,   0,  0,  0,  0,    1,   0,  0},
@@ -692,6 +693,33 @@ static const struct wined3d_format_block_info format_block_info[] =
     {WINED3DFMT_YUY2,               2, 1, 4,  WINED3D_FORMAT_ATTR_BLOCKS_NO_VERIFY},
     {WINED3DFMT_UYVY,               2, 1, 4,  WINED3D_FORMAT_ATTR_BLOCKS_NO_VERIFY},
     {WINED3DFMT_R9G9B9E5_SHAREDEXP, 1, 1, 4},
+};
+
+static const struct
+{
+    enum wined3d_format_id id;
+    /* Note that all planar formats supported by Direct3D 10/11 are 2-plane
+     * formats. The documentation does not include any 3-plane formats.
+     * Moreover, Direct3D 10/11 identifies planes by their format (e.g. R8 or
+     * R8G8), which in practice means planes are identified by their component
+     * count, which can only work for formats that pack U and V into the same
+     * plane.
+     *
+     * We assume, in various places, that all formats with
+     * WINED3D_FORMAT_ATTR_PLANAR are 2-plane formats, with a Y plane followed
+     * by a UV plane, and that each component has the same number of bytes per
+     * sample. All planar formats supported by Direct3D 10/11 follow these
+     * restrictions.
+     *
+     * Direct3D 9 does support YV12, a 3-plane format, but it can only be used
+     * for blitting, not texturing.
+     */
+    enum wined3d_format_id plane_formats[2];
+    unsigned int uv_width, uv_height;
+}
+format_plane_info[] =
+{
+    {WINED3DFMT_NV12_PLANAR, {WINED3DFMT_R8_UINT, WINED3DFMT_R8G8_UINT}, 2, 2},
 };
 
 struct wined3d_format_vertex_info
@@ -2221,6 +2249,20 @@ static BOOL init_srgb_formats(struct wined3d_adapter *adapter)
     }
 
     return TRUE;
+}
+
+static void init_format_plane_info(struct wined3d_adapter *adapter)
+{
+    for (unsigned int i = 0; i < ARRAY_SIZE(format_plane_info); ++i)
+    {
+        struct wined3d_format *format = get_format_internal(adapter, format_plane_info[i].id);
+
+        format->attrs |= WINED3D_FORMAT_ATTR_PLANAR;
+        format->plane_formats[0] = format_plane_info[i].plane_formats[0];
+        format->plane_formats[1] = format_plane_info[i].plane_formats[1];
+        format->uv_width = format_plane_info[i].uv_width;
+        format->uv_height = format_plane_info[i].uv_height;
+    }
 }
 
 static GLenum wined3d_gl_type_to_enum(enum wined3d_gl_resource_type type)
@@ -4123,6 +4165,7 @@ static BOOL wined3d_adapter_init_format_info(struct wined3d_adapter *adapter, si
         goto fail;
     if (!init_srgb_formats(adapter))
         goto fail;
+    init_format_plane_info(adapter);
 
     return TRUE;
 
@@ -4200,7 +4243,7 @@ fail:
     return FALSE;
 }
 
-static void init_vulkan_format_info(struct wined3d_format_vk *format,
+static void init_vulkan_format_info(struct wined3d_adapter *adapter, struct wined3d_format_vk *format,
         const struct wined3d_vk_info *vk_info, VkPhysicalDevice vk_physical_device)
 {
     static const struct
@@ -4263,6 +4306,11 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         {WINED3DFMT_B5G6R5_UNORM,               VK_FORMAT_R5G6B5_UNORM_PACK16,     },
         {WINED3DFMT_B5G5R5A1_UNORM,             VK_FORMAT_A1R5G5B5_UNORM_PACK16,   },
         {WINED3DFMT_B4G4R4A4_UNORM,             VK_FORMAT_R4G4B4A4_UNORM_PACK16,   "YZWX"},
+        {WINED3DFMT_DXT1,                       VK_FORMAT_BC1_RGBA_UNORM_BLOCK,    },
+        {WINED3DFMT_DXT2,                       VK_FORMAT_BC2_UNORM_BLOCK,         },
+        {WINED3DFMT_DXT3,                       VK_FORMAT_BC2_UNORM_BLOCK,         },
+        {WINED3DFMT_DXT4,                       VK_FORMAT_BC3_UNORM_BLOCK,         },
+        {WINED3DFMT_DXT5,                       VK_FORMAT_BC3_UNORM_BLOCK,         },
         {WINED3DFMT_BC1_UNORM,                  VK_FORMAT_BC1_RGBA_UNORM_BLOCK,    },
         {WINED3DFMT_BC1_UNORM_SRGB,             VK_FORMAT_BC1_RGBA_SRGB_BLOCK,     },
         {WINED3DFMT_BC2_UNORM,                  VK_FORMAT_BC2_UNORM_BLOCK,         },
@@ -4282,6 +4330,7 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         {WINED3DFMT_R32_FLOAT_X8X24_TYPELESS,   VK_FORMAT_D32_SFLOAT_S8_UINT,      },
         {WINED3DFMT_X32_TYPELESS_G8X24_UINT,    VK_FORMAT_D32_SFLOAT_S8_UINT,      },
         {WINED3DFMT_D24_UNORM_S8_UINT,          VK_FORMAT_D24_UNORM_S8_UINT,       },
+        {WINED3DFMT_NV12_PLANAR,                VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,},
     };
     VkFormat vk_format = VK_FORMAT_UNDEFINED;
     VkImageFormatProperties image_properties;
@@ -4309,6 +4358,10 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         return;
     }
 
+    if ((format->f.attrs & WINED3D_FORMAT_ATTR_PLANAR) && !vk_info->supported[WINED3D_VK_KHR_SAMPLER_YCBCR_CONVERSION]
+            && vk_info->api_version < VK_API_VERSION_1_1)
+        return;
+
     format->vk_format = vk_format;
     if (fixup)
         format->f.color_fixup = create_color_fixup_desc_from_string(fixup);
@@ -4328,13 +4381,45 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         }
     }
 
+    caps = 0;
+    texture_flags = properties.linearTilingFeatures | properties.optimalTilingFeatures;
+    if ((texture_flags & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+            && (texture_flags & VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
+        caps |= WINED3D_FORMAT_CAP_BLIT;
+
+    if (format->f.attrs & WINED3D_FORMAT_ATTR_PLANAR)
+    {
+        /* Direct3D only does planar views, without YCbCr conversion.
+         * In order to query whether this is supported on the Vulkan side,
+         * we need to ignore the feature flags for the planar image,
+         * and instead combine the feature flags for the corresponding format
+         * for each plane.
+         *
+         * Somewhat oddly, Vulkan doesn't distinguish "R8_UNORM (e.g.) views of
+         * a planar image are supported" from "R8_UNORM views are supported in
+         * general", which means that we don't really know through querying if
+         * a given YUV format is supported. Fortunately we need blit support
+         * anyway, and it seems fair to assume that if blit is supported for a
+         * format, then we can also create planar views. */
+        if (!caps)
+        {
+            TRACE("Unsupported format %s (no blit support).\n", debug_d3dformat(format->f.id));
+            return;
+        }
+
+        caps = ~0u;
+        for (unsigned int i = 0; i < 2; ++i)
+            caps &= get_format_internal(adapter, format->f.plane_formats[i])->caps[WINED3D_GL_RES_TYPE_TEX_2D];
+        format->f.caps[WINED3D_GL_RES_TYPE_TEX_2D] |= caps;
+        TRACE("Caps %#08x are supported for format %s.\n", caps, debug_d3dformat(format->f.id));
+        return;
+    }
+
     if (properties.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
         format->f.caps[WINED3D_GL_RES_TYPE_BUFFER] |= WINED3D_FORMAT_CAP_VERTEX_ATTRIBUTE;
     if (properties.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)
         format->f.caps[WINED3D_GL_RES_TYPE_BUFFER] |= WINED3D_FORMAT_CAP_TEXTURE;
 
-    caps = 0;
-    texture_flags = properties.linearTilingFeatures | properties.optimalTilingFeatures;
     if (texture_flags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)
     {
         caps |= WINED3D_FORMAT_CAP_TEXTURE | WINED3D_FORMAT_CAP_VTF;
@@ -4359,14 +4444,10 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
     {
         caps |= WINED3D_FORMAT_CAP_UNORDERED_ACCESS;
     }
-    if ((texture_flags & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
-            && (texture_flags & VK_FORMAT_FEATURE_TRANSFER_DST_BIT))
-    {
-        caps |= WINED3D_FORMAT_CAP_BLIT;
-    }
-
     if (!(~caps & (WINED3D_FORMAT_CAP_RENDERTARGET | WINED3D_FORMAT_CAP_FILTERING)))
         caps |= WINED3D_FORMAT_CAP_GEN_MIPMAP;
+
+    TRACE("Caps %#08x are supported for format %s.\n", caps, debug_d3dformat(format->f.id));
 
     format->f.caps[WINED3D_GL_RES_TYPE_TEX_1D] |= caps;
     format->f.caps[WINED3D_GL_RES_TYPE_TEX_2D] |= caps;
@@ -4412,7 +4493,7 @@ BOOL wined3d_adapter_vk_init_format_info(struct wined3d_adapter_vk *adapter_vk,
         format = wined3d_format_vk_mutable(get_format_by_idx(adapter, i));
 
         if (format->f.id)
-            init_vulkan_format_info(format, vk_info, vk_physical_device);
+            init_vulkan_format_info(adapter, format, vk_info, vk_physical_device);
     }
 
     if (!init_typeless_formats(adapter)) goto fail;
@@ -4528,6 +4609,9 @@ UINT wined3d_format_calculate_size(const struct wined3d_format *format, UINT ali
         return width * height * depth * format->byte_count;
 
     wined3d_format_calculate_pitch(format, alignment, width, height, &row_pitch, &slice_pitch);
+
+    if (format->attrs & WINED3D_FORMAT_ATTR_PLANAR)
+        return row_pitch * height + (row_pitch * 2 / format->uv_width * height / format->uv_height);
 
     return slice_pitch * depth;
 }
@@ -4707,6 +4791,7 @@ const char *debug_d3dformat(enum wined3d_format_id format_id)
         FMT_TO_STR(WINED3DFMT_R9G9B9E5_SHAREDEXP);
         FMT_TO_STR(WINED3DFMT_R8G8_B8G8_UNORM);
         FMT_TO_STR(WINED3DFMT_G8R8_G8B8_UNORM);
+        FMT_TO_STR(WINED3DFMT_NV12_PLANAR);
         FMT_TO_STR(WINED3DFMT_BC1_TYPELESS);
         FMT_TO_STR(WINED3DFMT_BC1_UNORM);
         FMT_TO_STR(WINED3DFMT_BC1_UNORM_SRGB);
@@ -4857,6 +4942,7 @@ const char *wined3d_debug_bind_flags(uint32_t bind_flags)
     BIND_FLAG_TO_STR(WINED3D_BIND_DEPTH_STENCIL);
     BIND_FLAG_TO_STR(WINED3D_BIND_UNORDERED_ACCESS);
     BIND_FLAG_TO_STR(WINED3D_BIND_INDIRECT_BUFFER);
+    BIND_FLAG_TO_STR(WINED3D_BIND_DECODER_OUTPUT);
 #undef BIND_FLAG_TO_STR
     if (bind_flags)
         FIXME("Unrecognised bind flag(s) %#x.\n", bind_flags);
@@ -5365,8 +5451,6 @@ const char *debug_d3dstate(uint32_t state)
         return "STATE_VIEWPORT";
     if (STATE_IS_SCISSORRECT(state))
         return "STATE_SCISSORRECT";
-    if (STATE_IS_CLIPPLANE(state))
-        return wine_dbg_sprintf("STATE_CLIPPLANE(%#x)", state - STATE_CLIPPLANE(0));
     if (STATE_IS_RASTERIZER(state))
         return "STATE_RASTERIZER";
     if (STATE_IS_DEPTH_BOUNDS(state))
@@ -5698,46 +5782,6 @@ void get_pointsize_minmax(const struct wined3d_context *context, const struct wi
 
     *out_min = min.f;
     *out_max = max.f;
-}
-
-void get_fog_start_end(const struct wined3d_context *context, const struct wined3d_state *state,
-        float *start, float *end)
-{
-    union
-    {
-        DWORD d;
-        float f;
-    } tmpvalue;
-
-    switch (context->fog_source)
-    {
-        case FOGSOURCE_VS:
-            *start = 1.0f;
-            *end = 0.0f;
-            break;
-
-        case FOGSOURCE_FFP:
-            tmpvalue.d = state->render_states[WINED3D_RS_FOGSTART];
-            *start = tmpvalue.f;
-            tmpvalue.d = state->render_states[WINED3D_RS_FOGEND];
-            *end = tmpvalue.f;
-            /* Special handling for fog_start == fog_end. In d3d with vertex
-             * fog, everything is fogged. With table fog, everything with
-             * fog_coord < fog_start is unfogged, and fog_coord > fog_start
-             * is fogged. Windows drivers disagree when fog_coord == fog_start. */
-            if (state->render_states[WINED3D_RS_FOGTABLEMODE] == WINED3D_FOG_NONE && *start == *end)
-            {
-                *start = -INFINITY;
-                *end = 0.0f;
-            }
-            break;
-
-        default:
-            /* This should not happen, context->fog_source is set in wined3d, not the app. */
-            ERR("Unexpected fog coordinate source.\n");
-            *start = 0.0f;
-            *end = 0.0f;
-    }
 }
 
 static BOOL wined3d_get_primary_display(WCHAR *display)
@@ -6316,11 +6360,11 @@ void wined3d_ffp_get_fs_settings(const struct wined3d_state *state,
     for (; i < WINED3D_MAX_FFP_TEXTURES; ++i)
         memset(&settings->op[i], 0xff, sizeof(settings->op[i]));
 
-    if (!state->render_states[WINED3D_RS_FOGENABLE])
+    if (!state->extra_ps_args.fog_enable)
     {
         settings->fog = WINED3D_FFP_PS_FOG_OFF;
     }
-    else if (state->render_states[WINED3D_RS_FOGTABLEMODE] == WINED3D_FOG_NONE)
+    else if (state->extra_ps_args.fog_mode == WINED3D_FOG_NONE)
     {
         if (use_vs(state) || state->vertex_declaration->position_transformed)
         {
@@ -6345,7 +6389,7 @@ void wined3d_ffp_get_fs_settings(const struct wined3d_state *state,
     }
     else
     {
-        switch (state->render_states[WINED3D_RS_FOGTABLEMODE])
+        switch (state->extra_ps_args.fog_mode)
         {
             case WINED3D_FOG_LINEAR:
                 settings->fog = WINED3D_FFP_PS_FOG_LINEAR;
@@ -6355,6 +6399,9 @@ void wined3d_ffp_get_fs_settings(const struct wined3d_state *state,
                 break;
             case WINED3D_FOG_EXP2:
                 settings->fog = WINED3D_FFP_PS_FOG_EXP2;
+                break;
+            case WINED3D_FOG_NONE:
+                /* unreachable */
                 break;
         }
     }
@@ -6400,18 +6447,16 @@ void wined3d_ffp_get_fs_settings(const struct wined3d_state *state,
         settings->texcoords_initialized = wined3d_mask_from_size(WINED3D_MAX_FFP_TEXTURES);
     }
 
-    settings->pointsprite = state->render_states[WINED3D_RS_POINTSPRITEENABLE]
+    settings->pointsprite = state->extra_ps_args.point_sprite
             && state->primitive_type == WINED3D_PT_POINTLIST;
 
     if (d3d_info->ffp_alpha_test)
         settings->alpha_test_func = WINED3D_CMP_ALWAYS - 1;
     else
-        settings->alpha_test_func = (state->render_states[WINED3D_RS_ALPHATESTENABLE]
-                ? wined3d_sanitize_cmp_func(state->render_states[WINED3D_RS_ALPHAFUNC])
-                : WINED3D_CMP_ALWAYS) - 1;
+        settings->alpha_test_func = state->extra_ps_args.alpha_func - 1;
 
     if (d3d_info->emulated_flatshading)
-        settings->flatshading = state->render_states[WINED3D_RS_SHADEMODE] == WINED3D_SHADE_FLAT;
+        settings->flatshading = state->extra_ps_args.flat_shading;
     else
         settings->flatshading = FALSE;
 }
@@ -6496,8 +6541,7 @@ void wined3d_ffp_get_vs_settings(const struct wined3d_state *state, const struct
             break;
     }
 
-    settings->clipping = state->render_states[WINED3D_RS_CLIPPING]
-            && state->render_states[WINED3D_RS_CLIPPLANEENABLE];
+    settings->clipping = !!state->extra_vs_args.clip_planes;
     settings->diffuse = vdecl->diffuse;
     settings->normal = vdecl->normal;
     settings->normalize = settings->normal && state->render_states[WINED3D_RS_NORMALIZENORMALS];

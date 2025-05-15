@@ -74,6 +74,7 @@ typedef struct {
 typedef struct {
     FunctionInstance function;
     IWineJSDispatchHost *host_iface;
+    const WCHAR *method_name;
 } HostConstructor;
 
 typedef struct {
@@ -136,12 +137,6 @@ static HRESULT Arguments_lookup_prop(jsdisp_t *jsdisp, const WCHAR *name, unsign
     return jsdisp_index_lookup(&arguments->jsdisp, name, arguments->argc, desc);
 }
 
-static HRESULT Arguments_next_prop(jsdisp_t *jsdisp, unsigned id, struct property_info *desc)
-{
-    ArgumentsInstance *arguments = arguments_from_jsdisp(jsdisp);
-    return jsdisp_next_index(&arguments->jsdisp, arguments->argc, id, desc);
-}
-
 static jsval_t *get_argument_ref(ArgumentsInstance *arguments, unsigned idx)
 {
     if(arguments->buf)
@@ -176,6 +171,12 @@ static HRESULT Arguments_prop_put(jsdisp_t *jsdisp, unsigned idx, jsval_t val)
     jsval_release(*ref);
     *ref = copy;
     return S_OK;
+}
+
+static HRESULT Arguments_fill_props(jsdisp_t *jsdisp)
+{
+    ArgumentsInstance *arguments = arguments_from_jsdisp(jsdisp);
+    return jsdisp_fill_indices(&arguments->jsdisp, arguments->argc);
 }
 
 static HRESULT Arguments_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, jsdisp_t *jsdisp)
@@ -239,9 +240,9 @@ static const builtin_info_t Arguments_info = {
     .props       = Arguments_props,
     .destructor  = Arguments_destructor,
     .lookup_prop = Arguments_lookup_prop,
-    .next_prop   = Arguments_next_prop,
     .prop_get    = Arguments_prop_get,
     .prop_put    = Arguments_prop_put,
+    .fill_props  = Arguments_fill_props,
     .gc_traverse = Arguments_gc_traverse
 };
 
@@ -250,9 +251,9 @@ static const builtin_info_t Arguments_ES5_info = {
     .call        = Arguments_value,
     .destructor  = Arguments_destructor,
     .lookup_prop = Arguments_lookup_prop,
-    .next_prop   = Arguments_next_prop,
     .prop_get    = Arguments_prop_get,
     .prop_put    = Arguments_prop_put,
+    .fill_props  = Arguments_fill_props,
     .gc_traverse = Arguments_gc_traverse
 };
 
@@ -709,7 +710,7 @@ static const builtin_info_t FunctionInst_info = {
 };
 
 static HRESULT create_function(script_ctx_t *ctx, const builtin_info_t *builtin_info, const function_vtbl_t *vtbl, size_t size,
-        DWORD flags, BOOL funcprot, jsdisp_t *prototype, void **ret)
+        DWORD flags, jsdisp_t *prototype, void **ret)
 {
     FunctionInstance *function;
     HRESULT hres;
@@ -718,7 +719,7 @@ static HRESULT create_function(script_ctx_t *ctx, const builtin_info_t *builtin_
     if(!function)
         return E_OUTOFMEMORY;
 
-    if(funcprot)
+    if(prototype)
         hres = init_dispex(&function->dispex, ctx, builtin_info, prototype);
     else if(builtin_info)
         hres = init_dispex_from_constr(&function->dispex, ctx, builtin_info, ctx->function_constr);
@@ -779,7 +780,7 @@ HRESULT create_builtin_function(script_ctx_t *ctx, builtin_invoke_t value_proc, 
     if(!ctx->function_constr)
         return E_UNEXPECTED;
 
-    hres = create_function(ctx, builtin_info, &NativeFunctionVtbl, sizeof(NativeFunction), flags, FALSE, NULL, (void**)&function);
+    hres = create_function(ctx, builtin_info, &NativeFunctionVtbl, sizeof(NativeFunction), flags, NULL, (void**)&function);
     if(FAILED(hres))
         return hres;
 
@@ -957,7 +958,7 @@ HRESULT create_source_function(script_ctx_t *ctx, bytecode_t *code, function_cod
     HRESULT hres;
 
     hres = create_function(ctx, &InterpretedFunction_info, &InterpretedFunctionVtbl, sizeof(InterpretedFunction),
-                           PROPF_CONSTR, FALSE, NULL, (void**)&function);
+                           PROPF_CONSTR, NULL, (void**)&function);
     if(FAILED(hres))
         return hres;
 
@@ -975,10 +976,17 @@ HRESULT create_source_function(script_ctx_t *ctx, bytecode_t *code, function_cod
     return S_OK;
 }
 
+static const builtin_prop_t HostFunction_props[] = {
+    {L"arguments",           NULL, 0,                        Function_get_arguments},
+    {L"caller",              NULL, 0,                        Function_get_caller},
+};
+
 static const builtin_info_t HostFunction_info = {
     .class       = JSCLASS_FUNCTION,
     .call        = Function_value,
     .destructor  = Function_destructor,
+    .props_cnt   = ARRAY_SIZE(HostFunction_props),
+    .props       = HostFunction_props,
     .gc_traverse = Function_gc_traverse
 };
 
@@ -1078,7 +1086,7 @@ HRESULT create_host_function(script_ctx_t *ctx, const struct property_info *desc
         return E_UNEXPECTED;
 
     hres = create_function(ctx, &HostFunction_info, &HostFunctionVtbl, sizeof(HostFunction), PROPF_METHOD,
-                           FALSE, NULL, (void**)&function);
+                           NULL, (void**)&function);
     if(FAILED(hres))
         return hres;
 
@@ -1116,6 +1124,8 @@ static const builtin_info_t HostConstructor_info = {
     .release     = HostConstructor_release,
     .call        = Function_value,
     .destructor  = Function_destructor,
+    .props_cnt   = ARRAY_SIZE(HostFunction_props),
+    .props       = HostFunction_props,
     .gc_traverse = Function_gc_traverse,
     .lookup_prop = HostConstructor_lookup_prop,
 };
@@ -1129,6 +1139,9 @@ static HRESULT HostConstructor_call(script_ctx_t *ctx, FunctionInstance *func, j
     EXCEPINFO ei = { 0 };
     HRESULT hres = S_OK;
     unsigned i;
+
+    if(function->method_name && !(flags & DISPATCH_METHOD))
+        return E_UNEXPECTED;
 
     flags &= ~DISPATCH_JSCRIPT_INTERNAL_MASK;
     if(argc > ARRAYSIZE(buf) && !(dp.rgvarg = malloc(argc * sizeof(*dp.rgvarg))))
@@ -1146,8 +1159,8 @@ static HRESULT HostConstructor_call(script_ctx_t *ctx, FunctionInstance *func, j
                                              &ctx->jscaller->IServiceProvider_iface);
         if(hres == DISP_E_EXCEPTION)
             handle_dispatch_exception(ctx, &ei);
-        if(SUCCEEDED(hres) && r) {
-            hres = variant_to_jsval(ctx, &ret, r);
+        if(SUCCEEDED(hres)) {
+            if(r) hres = variant_to_jsval(ctx, &ret, r);
             VariantClear(&ret);
         }
     }
@@ -1159,9 +1172,21 @@ static HRESULT HostConstructor_call(script_ctx_t *ctx, FunctionInstance *func, j
     return hres;
 }
 
-static HRESULT HostConstructor_toString(FunctionInstance *function, jsstr_t **ret)
+static HRESULT HostConstructor_toString(FunctionInstance *func, jsstr_t **ret)
 {
-    *ret = jsstr_alloc(L"\nfunction() {\n    [native code]\n}\n");
+    HostConstructor *function = (HostConstructor*)func;
+    HRESULT hres;
+    BSTR str;
+
+    if(function->method_name)
+        return native_function_string(function->method_name, ret);
+
+    hres = IWineJSDispatchHost_ToString(function->host_iface, &str);
+    if(FAILED(hres))
+        return hres;
+
+    *ret = jsstr_alloc(str);
+    SysFreeString(str);
     return *ret ? S_OK : E_OUTOFMEMORY;
 }
 
@@ -1187,24 +1212,17 @@ static const function_vtbl_t HostConstructorVtbl = {
     HostConstructor_gc_traverse
 };
 
-HRESULT init_host_constructor(script_ctx_t *ctx, IWineJSDispatchHost *host_constr, IWineJSDispatch *prototype,
-                              IWineJSDispatch **ret)
+HRESULT init_host_constructor(script_ctx_t *ctx, IWineJSDispatchHost *host_constr, const WCHAR *method_name, IWineJSDispatch **ret)
 {
     HostConstructor *function;
     HRESULT hres;
 
     hres = create_function(ctx, &HostConstructor_info, &HostConstructorVtbl, sizeof(*function), PROPF_METHOD,
-                           FALSE, NULL, (void**)&function);
+                           NULL, (void**)&function);
     if(FAILED(hres))
         return hres;
     function->host_iface = host_constr;
-
-    hres = jsdisp_define_data_property(&function->function.dispex, L"prototype", PROPF_WRITABLE | PROPF_CONFIGURABLE,
-                                       jsval_disp((IDispatch *)prototype));
-    if(FAILED(hres)) {
-        IWineJSDispatch_Free(&function->function.dispex.IWineJSDispatch_iface);
-        return hres;
-    }
+    function->method_name = method_name;
 
     *ret = &function->function.dispex.IWineJSDispatch_iface;
     return S_OK;
@@ -1322,7 +1340,7 @@ static HRESULT create_bind_function(script_ctx_t *ctx, FunctionInstance *target,
     HRESULT hres;
 
     hres = create_function(ctx, &BindFunction_info, &BindFunctionVtbl, FIELD_OFFSET(BindFunction, args[argc]), PROPF_METHOD,
-                           FALSE, NULL, (void**)&function);
+                           NULL, (void**)&function);
     if(FAILED(hres))
         return hres;
 
@@ -1479,7 +1497,7 @@ HRESULT init_function_constr(script_ctx_t *ctx, jsdisp_t *object_prototype)
     HRESULT hres;
 
     hres = create_function(ctx, &Function_info, &NativeFunctionVtbl, sizeof(NativeFunction), PROPF_CONSTR,
-                           TRUE, object_prototype, (void**)&prot);
+                           object_prototype, (void**)&prot);
     if(FAILED(hres))
         return hres;
 
@@ -1487,7 +1505,7 @@ HRESULT init_function_constr(script_ctx_t *ctx, jsdisp_t *object_prototype)
     prot->name = L"prototype";
 
     hres = create_function(ctx, &FunctionInst_info, &NativeFunctionVtbl, sizeof(NativeFunction), PROPF_CONSTR|1,
-                           TRUE, &prot->function.dispex, (void**)&constr);
+                           &prot->function.dispex, (void**)&constr);
     if(SUCCEEDED(hres)) {
         constr->proc = FunctionConstr_value;
         constr->name = L"Function";

@@ -3192,7 +3192,7 @@ void wined3d_context_gl_apply_blit_state(struct wined3d_context_gl *context_gl, 
     if (gl_info->supported[WINED3D_GL_LEGACY_CONTEXT])
     {
         gl_info->gl_ops.gl.p_glDisable(GL_ALPHA_TEST);
-        context_invalidate_state(context, STATE_RENDER(WINED3D_RS_ALPHATESTENABLE));
+        context_invalidate_state(context, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
     }
     gl_info->gl_ops.gl.p_glDisable(GL_BLEND);
     gl_info->gl_ops.gl.p_glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -3206,14 +3206,14 @@ void wined3d_context_gl_apply_blit_state(struct wined3d_context_gl *context_gl, 
     if (gl_info->supported[ARB_FRAMEBUFFER_SRGB])
     {
         gl_info->gl_ops.gl.p_glDisable(GL_FRAMEBUFFER_SRGB);
-        context_invalidate_state(context, STATE_RENDER(WINED3D_RS_SRGBWRITEENABLE));
+        context_invalidate_state(context, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
     }
 
     context->last_was_rhw = TRUE;
     context_invalidate_state(context, STATE_VDECL); /* because of last_was_rhw = TRUE */
 
     wined3d_context_gl_enable_clip_distances(context_gl, 0);
-    context_invalidate_state(context, STATE_RENDER(WINED3D_RS_CLIPPING));
+    context_invalidate_state(context, STATE_SHADER(WINED3D_SHADER_TYPE_VERTEX));
 
     /* FIXME: Make draw_textured_quad() able to work with a upper left origin. */
     if (gl_info->supported[ARB_CLIP_CONTROL])
@@ -3346,7 +3346,7 @@ BOOL wined3d_context_gl_apply_clear_state(struct wined3d_context_gl *context_gl,
             gl_info->gl_ops.gl.p_glEnable(GL_FRAMEBUFFER_SRGB);
         else
             gl_info->gl_ops.gl.p_glDisable(GL_FRAMEBUFFER_SRGB);
-        context_invalidate_state(&context_gl->c, STATE_RENDER(WINED3D_RS_SRGBWRITEENABLE));
+        context_invalidate_state(&context_gl->c, STATE_SHADER(WINED3D_SHADER_TYPE_PIXEL));
     }
     checkGLcall("setting up state for clear");
 

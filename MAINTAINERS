@@ -52,7 +52,7 @@ F:	dlls/xaudio*/
 Bluetooth support
 M:      Vibhav Pant <vibhavp@gmail.com>
 F:      dlls/winebth.sys/
-F:      dlls/bluetoothapis/sdp.c
+F:      dlls/bluetoothapis/
 
 Common Controls Library
 P:	Nikolay Sivov <nsivov@codeweavers.com>
@@ -411,7 +411,6 @@ F:	*
 F:	*/
 
 Stable Branch
-M:	Michael Stefaniuc <mstefani@winehq.org>
 W:	https://gitlab.winehq.org/wine/wine/-/wikis/Stable-Rules
 
 Staging Branch

@@ -100,22 +100,15 @@ void state_shademode(struct wined3d_context *context, const struct wined3d_state
 {
     const struct wined3d_gl_info *gl_info = wined3d_context_gl(context)->gl_info;
 
-    switch (state->render_states[WINED3D_RS_SHADEMODE])
+    if (state->extra_ps_args.flat_shading)
     {
-        case WINED3D_SHADE_FLAT:
-            gl_info->gl_ops.gl.p_glShadeModel(GL_FLAT);
-            checkGLcall("glShadeModel(GL_FLAT)");
-            break;
-        case WINED3D_SHADE_GOURAUD:
-        /* WINED3D_SHADE_PHONG in practice is the same as WINED3D_SHADE_GOURAUD
-         * in D3D. */
-        case WINED3D_SHADE_PHONG:
-            gl_info->gl_ops.gl.p_glShadeModel(GL_SMOOTH);
-            checkGLcall("glShadeModel(GL_SMOOTH)");
-            break;
-        default:
-            FIXME("Unrecognized shade mode %#x.\n",
-                    state->render_states[WINED3D_RS_SHADEMODE]);
+        gl_info->gl_ops.gl.p_glShadeModel(GL_FLAT);
+        checkGLcall("glShadeModel(GL_FLAT)");
+    }
+    else
+    {
+        gl_info->gl_ops.gl.p_glShadeModel(GL_SMOOTH);
+        checkGLcall("glShadeModel(GL_SMOOTH)");
     }
 }
 
@@ -534,21 +527,11 @@ static void blend_dbb(struct wined3d_context *context, const struct wined3d_stat
 
 void state_clipping(struct wined3d_context *context, const struct wined3d_state *state, DWORD state_id)
 {
-    struct wined3d_context_gl *context_gl = wined3d_context_gl(context);
-    uint32_t enable_mask;
-
     /* glEnable(GL_CLIP_PLANEx) doesn't apply to (ARB backend) vertex shaders.
      * The enabled / disabled planes are hardcoded into the shader. Update the
      * shader to update the enabled clipplanes. In case of fixed function, we
      * need to update the clipping field from ffp_vertex_settings. */
     context->shader_update_mask |= 1u << WINED3D_SHADER_TYPE_VERTEX;
-
-    /* If enabling / disabling all
-     * TODO: Is this correct? Doesn't D3DRS_CLIPPING disable clipping on the viewport frustrum?
-     */
-    enable_mask = state->render_states[WINED3D_RS_CLIPPING] ?
-            state->render_states[WINED3D_RS_CLIPPLANEENABLE] : 0;
-    wined3d_context_gl_enable_clip_distances(context_gl, enable_mask);
 }
 
 static void renderstate_stencil_twosided(struct wined3d_context *context, GLint face,
@@ -1002,28 +985,6 @@ static void state_shader(struct wined3d_context *context, const struct wined3d_s
 void clipplane(struct wined3d_context *context, const struct wined3d_state *state, DWORD state_id)
 {
     context->constant_update_mask |= WINED3D_SHADER_CONST_VS_CLIP_PLANES;
-}
-
-void ffp_vertex_update_clip_plane_constants(const struct wined3d_gl_info *gl_info, const struct wined3d_state *state)
-{
-    for (unsigned int i = 0; i < gl_info->limits.user_clip_distances; ++i)
-    {
-        GLdouble plane[4];
-
-        gl_info->gl_ops.gl.p_glMatrixMode(GL_MODELVIEW);
-        gl_info->gl_ops.gl.p_glPushMatrix();
-        gl_info->gl_ops.gl.p_glLoadIdentity();
-
-        plane[0] = state->clip_planes[i].x;
-        plane[1] = state->clip_planes[i].y;
-        plane[2] = state->clip_planes[i].z;
-        plane[3] = state->clip_planes[i].w;
-
-        gl_info->gl_ops.gl.p_glClipPlane(GL_CLIP_PLANE0 + i, plane);
-        checkGLcall("glClipPlane");
-
-        gl_info->gl_ops.gl.p_glPopMatrix();
-    }
 }
 
 static void streamsrc(struct wined3d_context *context, const struct wined3d_state *state, DWORD state_id)
@@ -1567,21 +1528,19 @@ static void validate_state_table(struct wined3d_state_entry *state_table)
     rs_holes[] =
     {
         {  1,   8},
-        { 11,  14},
-        { 16,  24},
+        { 11,  25},
         { 27,  27},
-        { 30,  33},
-        { 39,  40},
+        { 30,  34},
+        { 36,  40},
         { 42,  47},
-        { 49, 135},
+        { 49, 136},
         {138, 139},
         {144, 144},
         {149, 150},
-        {153, 153},
-        {157, 160},
+        {152, 153},
+        {156, 160},
         {162, 165},
-        {167, 193},
-        {195, 209},
+        {167, 209},
         {  0,   0},
     };
     static const unsigned int simple_states[] =

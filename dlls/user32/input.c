@@ -577,10 +577,7 @@ HDEVNOTIFY WINAPI RegisterDeviceNotificationW( HANDLE handle, void *filter, DWOR
         return I_ScRegisterDeviceNotification( handle, (DEV_BROADCAST_HDR *)&iface, callback );
     }
     if (header->dbch_devicetype == DBT_DEVTYP_HANDLE)
-    {
-        FIXME( "DBT_DEVTYP_HANDLE not implemented\n" );
         return I_ScRegisterDeviceNotification( handle, header, callback );
-    }
 
     FIXME( "type %#lx not implemented\n", header->dbch_devicetype );
     SetLastError( ERROR_INVALID_DATA );
@@ -757,15 +754,6 @@ BOOL WINAPI GetPointerTouchInfoHistory( UINT32 id, UINT32 *count, POINTER_TOUCH_
     FIXME( "id %u, count %p, info %p stub!\n", id, count, info );
     SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
     return FALSE;
-}
-
-
-/*******************************************************************
- *           SetForegroundWindow  (USER32.@)
- */
-BOOL WINAPI SetForegroundWindow( HWND hwnd )
-{
-    return NtUserSetForegroundWindow( hwnd );
 }
 
 

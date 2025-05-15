@@ -1,5 +1,12 @@
 TESTDLL = windows.storage.dll
+<<<<<<< HEAD
 IMPORTS = shell32 combase ole32 advapi32 shlwapi
 
 SOURCES = \
 	storage.c
+=======
+IMPORTS = combase
+
+SOURCES = \
+	storage.c
+>>>>>>> upstream/master

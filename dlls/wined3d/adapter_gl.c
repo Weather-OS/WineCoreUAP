@@ -3693,6 +3693,7 @@ static BOOL wined3d_adapter_init_gl_caps(struct wined3d_adapter_gl *adapter_gl,
     adapter->shader_backend = &glsl_shader_backend;
     adapter->vertex_pipe = &glsl_vertex_pipe;
     adapter->fragment_pipe = &glsl_fragment_pipe;
+    adapter->decoder_ops = &wined3d_null_decoder_ops;
 
     if (gl_info->supported[ARB_FRAMEBUFFER_OBJECT])
     {
@@ -4727,6 +4728,21 @@ static void adapter_gl_destroy_unordered_access_view(struct wined3d_unordered_ac
     wined3d_view_gl_destroy(resource->device, &view_gl->gl_view, &view_gl->bo_user, &view_gl->counter_bo, view_gl);
 }
 
+static HRESULT adapter_gl_create_video_decoder_output_view(const struct wined3d_view_desc *desc,
+        struct wined3d_texture *texture, void *parent, const struct wined3d_parent_ops *parent_ops,
+        struct wined3d_decoder_output_view **view)
+{
+    TRACE("desc %s, texture %p, parent %p, parent_ops %p, view %p.\n",
+            wined3d_debug_view_desc(desc, &texture->resource), texture, parent, parent_ops, view);
+
+    return E_NOTIMPL;
+}
+
+static void adapter_gl_destroy_video_decoder_output_view(struct wined3d_decoder_output_view *view)
+{
+    TRACE("view %p.\n", view);
+}
+
 static HRESULT adapter_gl_create_sampler(struct wined3d_device *device, const struct wined3d_sampler_desc *desc,
         void *parent, const struct wined3d_parent_ops *parent_ops, struct wined3d_sampler **sampler)
 {
@@ -4868,6 +4884,8 @@ static const struct wined3d_adapter_ops wined3d_adapter_gl_ops =
     .adapter_destroy_shader_resource_view = adapter_gl_destroy_shader_resource_view,
     .adapter_create_unordered_access_view = adapter_gl_create_unordered_access_view,
     .adapter_destroy_unordered_access_view = adapter_gl_destroy_unordered_access_view,
+    .adapter_create_video_decoder_output_view = adapter_gl_create_video_decoder_output_view,
+    .adapter_destroy_video_decoder_output_view = adapter_gl_destroy_video_decoder_output_view,
     .adapter_create_sampler = adapter_gl_create_sampler,
     .adapter_destroy_sampler = adapter_gl_destroy_sampler,
     .adapter_create_query = adapter_gl_create_query,
@@ -4922,6 +4940,7 @@ static void wined3d_adapter_gl_init_d3d_info(struct wined3d_adapter_gl *adapter_
     d3d_info->shader_output_interpolation = !!(shader_caps.wined3d_caps & WINED3D_SHADER_CAP_OUTPUT_INTERPOLATION);
     d3d_info->viewport_array_index_any_shader = !!gl_info->supported[ARB_SHADER_VIEWPORT_LAYER_ARRAY];
     d3d_info->stencil_export = !!gl_info->supported[ARB_SHADER_STENCIL_EXPORT];
+    d3d_info->simple_instancing = !!gl_info->supported[ARB_INSTANCED_ARRAYS];
     d3d_info->unconditional_npot = !!gl_info->supported[ARB_TEXTURE_NON_POWER_OF_TWO];
     d3d_info->draw_base_vertex_offset = !!gl_info->supported[ARB_DRAW_ELEMENTS_BASE_VERTEX];
     d3d_info->vertex_bgra = !!gl_info->supported[ARB_VERTEX_ARRAY_BGRA];
@@ -5029,7 +5048,7 @@ static BOOL wined3d_adapter_gl_init(struct wined3d_adapter_gl *adapter_gl,
     {
         HMODULE mod_gl = GetModuleHandleA("opengl32.dll");
 #define USE_GL_FUNC(f) gl_info->gl_ops.gl.p_##f = (void *)GetProcAddress(mod_gl, #f);
-        ALL_WGL_FUNCS
+        ALL_GL_FUNCS
 #undef USE_GL_FUNC
         gl_info->gl_ops.wgl.p_wglSwapBuffers = (void *)GetProcAddress(mod_gl, "wglSwapBuffers");
         gl_info->gl_ops.wgl.p_wglGetPixelFormat = (void *)GetProcAddress(mod_gl, "wglGetPixelFormat");

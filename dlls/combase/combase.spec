@@ -302,7 +302,7 @@
 @ stub RoInspectCapturedStackBackTrace
 @ stub RoInspectThreadErrorInfo
 @ stdcall RoOriginateError(long ptr)
-@ stub RoOriginateErrorW
+@ stdcall RoOriginateErrorW(long long ptr)
 @ stdcall RoOriginateLanguageException(long ptr ptr)
 @ stub RoParameterizedTypeExtraGetTypeSignature
 @ stdcall RoRegisterActivationFactories(ptr ptr long ptr)
@@ -319,7 +319,7 @@
 @ stub RoUnregisterForApartmentShutdown
 @ stub SetCleanupFlag
 @ stdcall SetErrorInfo(long ptr)
-@ stdcall SetRestrictedErrorInfo(long ptr)
+@ stdcall SetRestrictedErrorInfo(ptr)
 @ stdcall StringFromCLSID(ptr ptr)
 @ stdcall StringFromGUID2(ptr ptr long)
 @ stdcall StringFromIID(ptr ptr) StringFromCLSID

@@ -3,6 +3,7 @@ IMPORTLIB = wintypes
 IMPORTS   = combase
 
 SOURCES = \
+	buffer.c \
 	classes.idl \
 	provider.idl \
 	main.c \

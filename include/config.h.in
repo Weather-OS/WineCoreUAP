@@ -21,6 +21,12 @@
 /* Define to 1 if you have the <asm/user.h> header file. */
 #undef HAVE_ASM_USER_H
 
+/* Define to 1 if you have the <bluetooth/bluetooth.h> header file. */
+#undef HAVE_BLUETOOTH_BLUETOOTH_H
+
+/* Define to 1 if you have the <bluetooth/rfcomm.h> header file. */
+#undef HAVE_BLUETOOTH_RFCOMM_H
+
 /* Define to 1 if you have the <capi20.h> header file. */
 #undef HAVE_CAPI20_H
 
@@ -50,6 +56,9 @@
 
 /* Define to 1 if you have the 'epoll_create' function. */
 #undef HAVE_EPOLL_CREATE
+
+/* Define to 1 if you have the 'epoll_pwait2' function. */
+#undef HAVE_EPOLL_PWAIT2
 
 /* Define to 1 if you have the FFmpeg libraries. */
 #undef HAVE_FFMPEG
@@ -165,6 +174,9 @@
 /* Define to 1 if you have the <linux/filter.h> header file. */
 #undef HAVE_LINUX_FILTER_H
 
+/* Define to 1 if you have the <linux/fs.h> header file. */
+#undef HAVE_LINUX_FS_H
+
 /* Define if Linux-style gethostbyname_r and gethostbyaddr_r are available */
 #undef HAVE_LINUX_GETHOSTBYNAME_R_6
 
@@ -203,6 +215,9 @@
 
 /* Define to 1 if you have the <linux/ucdrom.h> header file. */
 #undef HAVE_LINUX_UCDROM_H
+
+/* Define to 1 if you have the <linux/userfaultfd.h> header file. */
+#undef HAVE_LINUX_USERFAULTFD_H
 
 /* Define to 1 if you have the <linux/videodev2.h> header file. */
 #undef HAVE_LINUX_VIDEODEV2_H

@@ -202,6 +202,7 @@ static BOOL flatten_bezier(path_list_node_t *start, REAL x2, REAL y2, REAL x3, R
     struct list jobs;
     struct flatten_bezier_job *current, *next;
 
+    flatness = 0.62f * flatness;
     list_init( &jobs );
     flatten_bezier_add(&jobs, start, x2, y2, x3, y3, end);
     LIST_FOR_EACH_ENTRY( current, &jobs, struct flatten_bezier_job, entry )
@@ -238,7 +239,7 @@ static BOOL flatten_bezier(path_list_node_t *start, REAL x2, REAL y2, REAL x3, R
          * Also avoids limited-precision errors in flatness check
          */
         if((fabs(pt.X - mp[2].X) + fabs(pt.Y - mp[2].Y) +
-            fabs(pt_st.X - mp[2].X) + fabs(pt_st.Y - mp[2].Y) ) <= flatness * 0.5)
+            fabs(pt_st.X - mp[2].X) + fabs(pt_st.Y - mp[2].Y) ) <= flatness)
             continue;
 
         /* check flatness as a half of distance between middle point and a linearized path
@@ -250,7 +251,7 @@ static BOOL flatten_bezier(path_list_node_t *start, REAL x2, REAL y2, REAL x3, R
          */
         area_triangle = (pt.Y - pt_st.Y)*mp[2].X + (pt_st.X - pt.X)*mp[2].Y + (pt_st.Y*pt.X - pt_st.X*pt.Y);
         distance_start_end = hypotf(pt.Y - pt_st.Y, pt_st.X - pt.X);
-        if(fabs(area_triangle) <= (0.5 * flatness * distance_start_end)){
+        if(fabs(area_triangle) <= flatness * distance_start_end){
             continue;
         }
         else
@@ -1623,7 +1624,7 @@ GpStatus WINGDIPAPI GdipGetPathWorldBounds(GpPath* path, GpRectF* bounds,
 
     /* If path is empty just return. */
     count = path->pathdata.Count;
-    if(count == 0){
+    if(count < 2){
         bounds->X = bounds->Y = bounds->Width = bounds->Height = 0.0;
         return Ok;
     }
@@ -1748,20 +1749,24 @@ GpStatus WINGDIPAPI GdipReversePath(GpPath* path)
     }
 
     for(i = 0; i < count; i++){
-
         /* find next start point */
         if(path->pathdata.Types[count-i-1] == PathPointTypeStart){
             INT j;
             for(j = start; j <= i; j++){
+                /* copy points coordinate of subpath in reverse order */
                 revpath.Points[j] = path->pathdata.Points[count-j-1];
-                revpath.Types[j] = path->pathdata.Types[count-j-1];
+                /* copy points type shifted by one (j + 1), as the first point type is always PathPointTypeStart */
+                if (j < i)
+                    revpath.Types[j + 1] = path->pathdata.Types[count - j - 1];
             }
-            /* mark start point */
+            /* first point of subpath is always Start point */
             revpath.Types[start] = PathPointTypeStart;
-            /* set 'figure' endpoint type */
+            /* check if subpath contains more than 1 point */
             if(i-start > 1){
-                revpath.Types[i] = path->pathdata.Types[count-start-1] & ~PathPointTypePathTypeMask;
-                revpath.Types[i] |= revpath.Types[i-1];
+                /* add e.g. PathPointTypeCloseSubpath type to endpoint, if existing in original subpath */
+                revpath.Types[i] |= path->pathdata.Types[count - start - 1] & ~PathPointTypePathTypeMask;
+                /* remove e.g. PathPointTypeCloseSubpath type from second point */
+                revpath.Types[start + 1] &= PathPointTypePathTypeMask;
             }
             else
                 revpath.Types[i] = path->pathdata.Types[start];
@@ -2037,8 +2042,8 @@ static void widen_cap(const GpPointF *endpoint, const GpPointF *nextpoint,
         }
         else if (cap == LineCapArrowAnchor)
         {
-            extend_dx = -3.0 * extend_dx;
-            extend_dy = -3.0 * extend_dy;
+            extend_dx = -2.0 * extend_dx;
+            extend_dy = -2.0 * extend_dy;
         }
 
         if (add_first_points)

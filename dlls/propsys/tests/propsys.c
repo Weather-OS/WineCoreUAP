@@ -1513,10 +1513,111 @@ static void test_PropVariantChangeType_UI4(void)
     }
 }
 
+static void test_PropVariantChangeType_R8(void)
+{
+    PROPVARIANT src, dest;
+    HRESULT hr;
+
+    src.vt = VT_R8;
+    src.dblVal = 10.1;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 10.1, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_R4;
+    src.fltVal = 10.1f;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 10.1f ||
+       broken((float)dest.dblVal == 10.1f), /* Win7 */
+       "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_I4;
+    src.lVal = 123;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 123.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_I4;
+    src.lVal = -256;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == -256.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_I8;
+    src.hVal.QuadPart = -256;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == -256.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_I8;
+    src.hVal.QuadPart = 65536;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 65536.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_I8;
+    src.hVal.QuadPart = -321;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == -321.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_UI4;
+    src.ulVal = 6;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 6.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_UI8;
+    src.uhVal.QuadPart = 8;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 8.0, "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_R4;
+    src.fltVal = 8.1f;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 8.1f ||
+       broken((float)dest.dblVal == 0.0f), /* Win7 */
+       "Unexpected value %f.\n", dest.dblVal);
+
+    src.vt = VT_R4;
+    src.fltVal = 8.6f;
+    dest.vt = VT_EMPTY;
+    hr = PropVariantChangeType(&dest, &src, 0, VT_R8);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(dest.vt == VT_R8, "Unexpected type %d.\n", dest.vt);
+    ok(dest.dblVal == 8.6f ||
+       broken((float)dest.dblVal == 0.0f), /* Win7 */
+       "Unexpected value %f.\n", dest.dblVal);
+}
+
 static void test_PropVariantChangeType(void)
 {
     test_PropVariantChangeType_LPWSTR();
     test_PropVariantChangeType_UI4();
+    test_PropVariantChangeType_R8();
 }
 
 static void test_InitPropVariantFromCLSID(void)
@@ -1579,6 +1680,13 @@ static void test_PropVariantToDouble(void)
     ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
     ok(value == 15.0, "Unexpected value: %f.\n", value);
 
+    PropVariantInit(&propvar);
+    propvar.vt = VT_R8;
+    propvar.dblVal = 15.1;
+    hr = PropVariantToDouble(&propvar, &value);
+    ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
+    ok(value == 15.1, "Unexpected value: %f.\n", value);
+
     PropVariantClear(&propvar);
     propvar.vt = VT_I4;
     propvar.lVal = 123;
@@ -1595,17 +1703,17 @@ static void test_PropVariantToDouble(void)
 
     PropVariantClear(&propvar);
     propvar.vt = VT_I8;
-    propvar.lVal = 65536;
+    propvar.hVal.QuadPart = 65536;
     hr = PropVariantToDouble(&propvar, &value);
     ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
     ok(value == 65536.0, "Unexpected value: %f.\n", value);
 
     PropVariantClear(&propvar);
     propvar.vt = VT_I8;
-    propvar.lVal = -321;
+    propvar.hVal.QuadPart = -321;
     hr = PropVariantToDouble(&propvar, &value);
     ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
-    ok(value == 4294966975.0, "Unexpected value: %f.\n", value);
+    ok(value == -321.0, "Unexpected value: %f.\n", value);
 
     PropVariantClear(&propvar);
     propvar.vt = VT_UI4;
@@ -1620,6 +1728,24 @@ static void test_PropVariantToDouble(void)
     hr = PropVariantToDouble(&propvar, &value);
     ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
     ok(value == 8.0, "Unexpected value: %f.\n", value);
+
+    PropVariantClear(&propvar);
+    propvar.vt = VT_R4;
+    propvar.fltVal = 8.1f;
+    hr = PropVariantToDouble(&propvar, &value);
+    ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
+    ok(value == 8.1f ||
+       broken((float)value == 0.0f), /* Win7 */
+       "Unexpected value: %f.\n", value);
+
+    PropVariantClear(&propvar);
+    propvar.vt = VT_R4;
+    propvar.fltVal = 8.6f;
+    hr = PropVariantToDouble(&propvar, &value);
+    ok(hr == S_OK, "PropVariantToDouble failed: 0x%08lx.\n", hr);
+    ok(value == 8.6f ||
+       broken((float)value == 0.0f), /* Win7 */
+       "Unexpected value: %f.\n", value);
 }
 
 static void test_PropVariantToString(void)
@@ -1747,6 +1873,35 @@ do                                                                  \
     }                                                               \
 } while (0)
 
+/* This is to handle a Win7 case,
+   where VT_R4 returns the string expected from VT_R8. */
+#define check_PropVariantToBSTR2(type, member, value, expect_str)   \
+do                                                                  \
+{                                                                   \
+    PROPVARIANT check_propvar_ = {.vt = (type), .member = (value)}; \
+    HRESULT check_hr_, check_hr2_;                                  \
+    BSTR check_bstr_, check_bstr2_;                                 \
+                                                                    \
+    check_hr_ = PropVariantToBSTR(&check_propvar_, &check_bstr_);   \
+    ok_(__FILE__, __LINE__)(check_hr_ == S_OK,                      \
+            "PropVariantToBSTR returned %#lx.\n", check_hr_);       \
+                                                                    \
+    check_propvar_.vt = VT_R8;                                      \
+    check_hr2_ = PropVariantToBSTR(&check_propvar_, &check_bstr2_); \
+    ok_(__FILE__, __LINE__)(check_hr2_ == S_OK,                     \
+            "PropVariantToBSTR returned %#lx.\n", check_hr2_);      \
+                                                                    \
+    if (check_hr_ == S_OK && check_bstr2_ == S_OK)                  \
+    {                                                               \
+        ok_(__FILE__, __LINE__)(                                    \
+                !wcscmp(check_bstr_, (expect_str)) ||               \
+                broken(!wcscmp(check_bstr_, check_bstr2_)),         \
+                "Unexpected bstr %s.\n", debugstr_w(check_bstr_));  \
+        SysFreeString(check_bstr_);                                 \
+        SysFreeString(check_bstr2_);                                \
+    }                                                               \
+} while (0)
+
 static void test_PropVariantToBSTR(void)
 {
     unsigned char test_bytes[] = {1, 20, 30, 4};
@@ -1765,7 +1920,7 @@ static void test_PropVariantToBSTR(void)
     todo_wine
     {
     check_PropVariantToBSTR(VT_BOOL,   boolVal,        TRUE,                 L"1");
-    check_PropVariantToBSTR(VT_R4,     fltVal,         0.125f,               L"0.125");
+    check_PropVariantToBSTR2(VT_R4,    fltVal,         0.125f,               L"0.125");
     check_PropVariantToBSTR(VT_R8,     dblVal,         0.456,                L"0.456");
     }
     check_PropVariantToBSTR(VT_I1,     cVal,           -123,                 L"-123");

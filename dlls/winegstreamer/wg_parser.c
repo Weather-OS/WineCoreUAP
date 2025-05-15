@@ -555,6 +555,39 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
     return GST_AUTOPLUG_SELECT_TRY;
 }
 
+static gboolean autoplug_query_cb(GstElement *bin, GstPad *child,
+        GstElement *pad, GstQuery *query, gpointer user)
+{
+    GstCapsFeatures *features;
+    GstCaps *filter, *result;
+    GstStructure *structure;
+    guint i;
+
+    GST_INFO("Query %"GST_PTR_FORMAT, query);
+
+    if (query->type == GST_QUERY_CAPS)
+    {
+        result = gst_caps_new_empty();
+        gst_query_parse_caps(query, &filter);
+        for (i = 0; i < gst_caps_get_size(filter); i++)
+        {
+            if (!(features = gst_caps_get_features(filter, i))
+                    || gst_caps_features_contains(features, GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY))
+            {
+                structure = gst_caps_get_structure(filter, i);
+                gst_caps_append_structure(result, gst_structure_copy(structure));
+            }
+        }
+
+        GST_INFO("Result %"GST_PTR_FORMAT, result);
+        gst_query_set_caps_result(query, result);
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void no_more_pads_cb(GstElement *element, gpointer user)
 {
     struct wg_parser *parser = user;
@@ -598,6 +631,13 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
             break;
         }
 
+        /* decodebin collects EOS and sends them only when all streams are EOS.
+         * In place it sends stream-group-done notifications for individual
+         * streams. This is mainly meant to accommodate chained OGGs. However,
+         * Windows is generally capable of reading from arbitrary streams while
+         * ignoring others, and should still send EOS in that case.
+         * Therefore translate stream-group-done back to EOS. */
+        case GST_EVENT_STREAM_GROUP_DONE:
         case GST_EVENT_EOS:
             pthread_mutex_lock(&parser->mutex);
             stream->eos = true;
@@ -1802,6 +1842,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
     g_signal_connect(element, "autoplug-continue", G_CALLBACK(autoplug_continue_cb), parser);
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
+    g_signal_connect(element, "autoplug-query", G_CALLBACK(autoplug_query_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
     g_signal_connect(element, "deep-element-added", G_CALLBACK(deep_element_added_cb), parser);
 

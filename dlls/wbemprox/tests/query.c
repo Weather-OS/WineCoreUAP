@@ -1703,6 +1703,15 @@ static void test_Win32_PhysicalMemory( IWbemServices *services )
 
         type = 0xdeadbeef;
         VariantInit( &val );
+        hr = IWbemClassObject_Get( obj, L"Manufacturer", 0, &val, &type, NULL );
+        ok( hr == S_OK, "got %#lx\n", hr );
+        ok( V_VT( &val ) == VT_BSTR || V_VT( &val ) == VT_NULL, "unexpected variant type %#x\n", V_VT( &val ) );
+        ok( type == CIM_STRING, "unexpected type %#lx\n", type );
+        trace( "Manufacturer %s\n", wine_dbgstr_w(V_BSTR( &val )) );
+        VariantClear( &val );
+
+        type = 0xdeadbeef;
+        VariantInit( &val );
         hr = IWbemClassObject_Get( obj, L"PartNumber", 0, &val, &type, NULL );
         ok( hr == S_OK, "got %#lx\n", hr );
         ok( V_VT( &val ) == VT_BSTR || V_VT( &val ) == VT_NULL, "unexpected variant type %#x\n", V_VT( &val ) );
@@ -1718,6 +1727,53 @@ static void test_Win32_PhysicalMemory( IWbemServices *services )
         ok( type == CIM_STRING, "unexpected type %#lx\n", type );
         trace( "SerialNumber %s\n", wine_dbgstr_w(V_BSTR( &val )) );
         VariantClear( &val );
+
+        IWbemClassObject_Release( obj );
+    }
+
+    IEnumWbemClassObject_Release( result );
+    SysFreeString( query );
+    SysFreeString( wql );
+}
+
+static void test_Win32_PhysicalMemoryArray( IWbemServices *services )
+{
+    BSTR wql = SysAllocString( L"wql" ), query = SysAllocString( L"SELECT * FROM Win32_PhysicalMemoryArray" );
+    IEnumWbemClassObject *result;
+    IWbemClassObject *obj;
+    CIMTYPE type;
+    VARIANT val;
+    DWORD count;
+    HRESULT hr;
+
+    hr = IWbemServices_ExecQuery( services, wql, query, 0, NULL, &result );
+    if (hr != S_OK)
+    {
+        win_skip( "Win32_PhysicalMemoryArray not available\n" );
+        return;
+    }
+
+    for (;;)
+    {
+        hr = IEnumWbemClassObject_Next( result, 10000, 1, &obj, &count );
+        if (hr != S_OK) break;
+
+        check_property( obj, L"Caption", VT_BSTR, CIM_STRING );
+        check_property( obj, L"MaxCapacity", VT_I4, CIM_UINT32 );
+        check_property( obj, L"Model", VT_NULL, CIM_STRING );
+        check_property( obj, L"Name", VT_BSTR, CIM_STRING );
+        check_property( obj, L"Status", VT_NULL, CIM_STRING );
+
+        type = 0xdeadbeef;
+        VariantInit( &val );
+        hr = IWbemClassObject_Get( obj, L"MaxCapacityEx", 0, &val, &type, NULL );
+        ok( hr == S_OK || broken(hr == WBEM_E_NOT_FOUND) /* < win10 */, "got %#lx\n", hr );
+        if (hr == S_OK)
+        {
+            ok( V_VT( &val ) == VT_BSTR, "unexpected variant type %#x\n", V_VT( &val ) );
+            ok( type == CIM_UINT64, "unexpected type %#lx\n", type );
+            VariantClear( &val );
+        }
 
         IWbemClassObject_Release( obj );
     }
@@ -1817,6 +1873,39 @@ static void test_Win32_Processor( IWbemServices *services )
     SysFreeString( wql );
 }
 
+static void test_Win32_CacheMemory( IWbemServices *services )
+{
+    BSTR wql = SysAllocString( L"wql" ), query = SysAllocString( L"SELECT * FROM Win32_CacheMemory" );
+    IEnumWbemClassObject *result;
+    IWbemClassObject *obj;
+    DWORD count;
+    HRESULT hr;
+
+    hr = IWbemServices_ExecQuery( services, wql, query, 0, NULL, &result );
+    ok( hr == S_OK, "got %#lx\n", hr );
+
+    for (;;)
+    {
+        hr = IEnumWbemClassObject_Next( result, 10000, 1, &obj, &count );
+        if (hr != S_OK) break;
+
+        check_property( obj, L"BlockSize", VT_BSTR, CIM_UINT64 );
+        check_property( obj, L"CacheSpeed", VT_I4, CIM_UINT32 );
+        check_property( obj, L"CacheType", VT_I4, CIM_UINT16 );
+        check_property( obj, L"DeviceID", VT_BSTR, CIM_STRING );
+        check_property( obj, L"InstalledSize", VT_I4, CIM_UINT32 );
+        check_property( obj, L"Level", VT_I4, CIM_UINT16 );
+        check_property( obj, L"MaxCacheSize", VT_I4, CIM_UINT32 );
+        check_property( obj, L"NumberOfBlocks", VT_BSTR, CIM_UINT64 );
+        check_property( obj, L"Status", VT_BSTR, CIM_STRING );
+        IWbemClassObject_Release( obj );
+    }
+
+    IEnumWbemClassObject_Release( result );
+    SysFreeString( query );
+    SysFreeString( wql );
+}
+
 static void test_Win32_VideoController( IWbemServices *services )
 {
     BSTR wql = SysAllocString( L"wql" ), query = SysAllocString( L"SELECT * FROM Win32_VideoController" );
@@ -1849,8 +1938,28 @@ static void test_Win32_VideoController( IWbemServices *services )
         check_property( obj, L"__SERVER", VT_BSTR, CIM_STRING );
         check_property( obj, L"AdapterCompatibility", VT_BSTR, CIM_STRING );
         check_property( obj, L"Availability", VT_I4, CIM_UINT16 );
+        check_property( obj, L"Caption", VT_BSTR, CIM_STRING );
         check_property( obj, L"ConfigManagerErrorCode", VT_I4, CIM_UINT32 );
         check_property( obj, L"DriverDate", VT_BSTR, CIM_DATETIME );
+        check_property( obj, L"DriverVersion", VT_BSTR, CIM_STRING );
+        check_property( obj, L"Status", VT_BSTR, CIM_STRING );
+
+        type = 0xdeadbeef;
+        VariantInit( &val );
+        hr = IWbemClassObject_Get( obj, L"AdapterDACType", 0, &val, &type, NULL );
+        ok( hr == S_OK, "got %#lx\n", hr );
+        ok( V_VT( &val ) == VT_BSTR || V_VT( &val ) == VT_NULL, "unexpected variant type 0x%x\n", V_VT( &val ) );
+        ok( type == CIM_STRING, "unexpected type %#lx\n", type );
+        trace( "AdapterDACType %s\n", wine_dbgstr_w(V_BSTR( &val )) );
+        VariantClear( &val );
+
+        type = 0xdeadbeef;
+        VariantInit( &val );
+        hr = IWbemClassObject_Get( obj, L"AdapterRAM", 0, &val, &type, NULL );
+        ok( hr == S_OK, "got %#lx\n", hr );
+        ok( V_VT( &val ) == VT_I4 || V_VT( &val ) == VT_NULL, "unexpected variant type 0x%x\n", V_VT( &val ) );
+        ok( type == CIM_UINT32, "unexpected type %#lx\n", type );
+        trace( "AdapterRAM %lu\n", V_UI4( &val ) );
 
         type = 0xdeadbeef;
         VariantInit( &val );
@@ -1861,7 +1970,6 @@ static void test_Win32_VideoController( IWbemServices *services )
         trace( "installeddisplaydrivers %s\n", wine_dbgstr_w(V_BSTR( &val )) );
         VariantClear( &val );
 
-        check_property( obj, L"Status", VT_BSTR, CIM_STRING );
         IWbemClassObject_Release( obj );
     }
 
@@ -2477,6 +2585,7 @@ START_TEST(query)
     test_StdRegProv( services );
     test_SystemSecurity( services );
     test_Win32_Baseboard( services );
+    test_Win32_CacheMemory( services );
     test_Win32_ComputerSystem( services );
     test_Win32_ComputerSystemProduct( services );
     test_Win32_Bios( services );
@@ -2490,6 +2599,7 @@ START_TEST(query)
     test_Win32_OperatingSystem( services );
     test_Win32_PageFileUsage( services );
     test_Win32_PhysicalMemory( services );
+    test_Win32_PhysicalMemoryArray( services );
     test_Win32_PnPEntity( services );
     test_Win32_Printer( services );
     test_Win32_Process( services, FALSE );

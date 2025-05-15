@@ -143,6 +143,7 @@ _ACRTIMP void   __cdecl rewind(FILE*);
 _ACRTIMP void   __cdecl setbuf(FILE*,char*);
 _ACRTIMP int    __cdecl setvbuf(FILE*,char*,int,size_t);
 _ACRTIMP FILE*  __cdecl tmpfile(void);
+_ACRTIMP errno_t __cdecl tmpfile_s(FILE**);
 _ACRTIMP char*  __cdecl tmpnam(char*);
 _ACRTIMP int    __cdecl ungetc(int,FILE*);
 _ACRTIMP unsigned int __cdecl _get_output_format(void);
@@ -467,6 +468,7 @@ _ACRTIMP int __cdecl scanf(const char*,...) __WINE_CRT_SCANF_ATTR(1, 2);
 _ACRTIMP int __cdecl scanf_s(const char*,...) __WINE_CRT_SCANF_ATTR(1, 2);
 _ACRTIMP int __cdecl sscanf(const char*,const char*,...) __WINE_CRT_SCANF_ATTR(2, 3);
 _ACRTIMP int __cdecl sscanf_s(const char*,const char*,...) __WINE_CRT_SCANF_ATTR(2, 3);
+_ACRTIMP int __cdecl vsscanf(const char*, const char*, va_list) __WINE_CRT_SCANF_ATTR(2, 0);
 
 #endif /* _UCRT && !_NO_CRT_STDIO_INLINE */
 

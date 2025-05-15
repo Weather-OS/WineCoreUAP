@@ -821,13 +821,13 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetHandleInformation( HANDLE handle, DWORD *flags 
  */
 DWORD WINAPI DECLSPEC_HOTPATCH GetPriorityClass( HANDLE process )
 {
-    PROCESS_BASIC_INFORMATION pbi;
+    PROCESS_PRIORITY_CLASS priority;
 
-    if (!set_ntstatus( NtQueryInformationProcess( process, ProcessBasicInformation,
-                                                  &pbi, sizeof(pbi), NULL )))
+    if (!set_ntstatus( NtQueryInformationProcess( process, ProcessPriorityClass,
+                                                  &priority, sizeof(priority), NULL )))
         return 0;
 
-    switch (pbi.BasePriority)
+    switch (priority.PriorityClass)
     {
     case PROCESS_PRIOCLASS_IDLE: return IDLE_PRIORITY_CLASS;
     case PROCESS_PRIOCLASS_BELOW_NORMAL: return BELOW_NORMAL_PRIORITY_CLASS;
@@ -1093,12 +1093,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH OpenProcess( DWORD access, BOOL inherit, DWORD i
 
     if (GetVersion() & 0x80000000) access = PROCESS_ALL_ACCESS;
 
-    attr.Length = sizeof(OBJECT_ATTRIBUTES);
-    attr.RootDirectory = 0;
-    attr.Attributes = inherit ? OBJ_INHERIT : 0;
-    attr.ObjectName = NULL;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, NULL, inherit ? OBJ_INHERIT : 0, 0, NULL );
 
     cid.UniqueProcess = ULongToHandle(id);
     cid.UniqueThread  = 0;

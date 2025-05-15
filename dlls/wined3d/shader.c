@@ -2728,8 +2728,7 @@ void find_vs_compile_args(const struct wined3d_state *state, const struct wined3
         args->fog_src = VS_FOG_COORD;
     }
 
-    args->clip_enabled = state->render_states[WINED3D_RS_CLIPPING]
-            && state->render_states[WINED3D_RS_CLIPPLANEENABLE];
+    args->clip_enabled = !!state->extra_vs_args.clip_planes;
     args->point_size = state->primitive_type == WINED3D_PT_POINTLIST;
     args->next_shader_type = hull_shader ? WINED3D_SHADER_TYPE_HULL
             : geometry_shader ? WINED3D_SHADER_TYPE_GEOMETRY : WINED3D_SHADER_TYPE_PIXEL;
@@ -2893,7 +2892,7 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
     {
         for (i = 0; i < shader->limits->sampler; ++i)
         {
-            uint32_t flags = state->texture_states[i][WINED3D_TSS_TEXTURE_TRANSFORM_FLAGS];
+            uint32_t flags = state->extra_ps_args.texture_transform_flags[i];
 
             if (flags & WINED3D_TTFF_PROJECTED)
             {
@@ -2903,7 +2902,7 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
                 {
                     enum wined3d_shader_resource_type resource_type = shader->reg_maps.resource_info[i].type;
                     unsigned int j;
-                    unsigned int index = state->texture_states[i][WINED3D_TSS_TEXCOORD_INDEX];
+                    unsigned int index = state->extra_ps_args.texcoord_index[i];
                     uint32_t max_valid = WINED3D_TTFF_COUNT4;
 
                     for (j = 0; j < state->vertex_declaration->element_count; ++j)
@@ -3064,9 +3063,9 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
     else
     {
         args->vp_mode = WINED3D_VP_MODE_SHADER;
-        if (state->render_states[WINED3D_RS_FOGENABLE])
+        if (state->extra_ps_args.fog_enable)
         {
-            switch (state->render_states[WINED3D_RS_FOGTABLEMODE])
+            switch (state->extra_ps_args.fog_mode)
             {
                 case WINED3D_FOG_NONE:
                 case WINED3D_FOG_LINEAR: args->fog = WINED3D_FFP_PS_FOG_LINEAR; break;
@@ -3095,10 +3094,9 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
             else
             {
                 const struct wined3d_stream_info *si = &context->stream_info;
-                unsigned int coord_idx = state->texture_states[i][WINED3D_TSS_TEXCOORD_INDEX];
+                unsigned int coord_idx = state->extra_ps_args.texcoord_index[i];
 
-                if ((state->texture_states[i][WINED3D_TSS_TEXCOORD_INDEX] >> WINED3D_FFP_TCI_SHIFT)
-                        & WINED3D_FFP_TCI_MASK
+                if (((state->extra_ps_args.texcoord_index[i] >> WINED3D_FFP_TCI_SHIFT) & WINED3D_FFP_TCI_MASK)
                         || (coord_idx < WINED3D_MAX_FFP_TEXTURES && (si->use_map & (1u << (WINED3D_FFP_TEXCOORD0 + coord_idx)))))
                     args->texcoords_initialized |= 1u << i;
             }
@@ -3109,18 +3107,16 @@ void find_ps_compile_args(const struct wined3d_state *state, const struct wined3
         args->texcoords_initialized = wined3d_mask_from_size(WINED3D_MAX_FFP_TEXTURES);
     }
 
-    args->pointsprite = state->render_states[WINED3D_RS_POINTSPRITEENABLE]
+    args->pointsprite = state->extra_ps_args.point_sprite
             && state->primitive_type == WINED3D_PT_POINTLIST;
 
     if (d3d_info->ffp_alpha_test)
         args->alpha_test_func = WINED3D_CMP_ALWAYS - 1;
     else
-        args->alpha_test_func = (state->render_states[WINED3D_RS_ALPHATESTENABLE]
-                ? wined3d_sanitize_cmp_func(state->render_states[WINED3D_RS_ALPHAFUNC])
-                : WINED3D_CMP_ALWAYS) - 1;
+        args->alpha_test_func = state->extra_ps_args.alpha_func - 1;
 
     if (d3d_info->emulated_flatshading)
-        args->flatshading = state->render_states[WINED3D_RS_SHADEMODE] == WINED3D_SHADE_FLAT;
+        args->flatshading = state->extra_ps_args.flat_shading;
 
     for (i = 0; i < ARRAY_SIZE(state->fb.render_targets); ++i)
     {

@@ -42,8 +42,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(cryptui);
 
 static HINSTANCE hInstance;
 
-static const WCHAR empty[] = {0};
-
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
     TRACE("(0x%p, %ld, %p)\n", hinstDLL, fdwReason, lpvReserved);
@@ -780,8 +778,7 @@ static void cert_mgr_clear_cert_selection(HWND hwnd)
     EnableWindow(GetDlgItem(hwnd, IDC_MGR_EXPORT), FALSE);
     EnableWindow(GetDlgItem(hwnd, IDC_MGR_REMOVE), FALSE);
     EnableWindow(GetDlgItem(hwnd, IDC_MGR_VIEW), FALSE);
-    SendMessageW(GetDlgItem(hwnd, IDC_MGR_PURPOSES), WM_SETTEXT, 0,
-     (LPARAM)empty);
+    SendMessageW(GetDlgItem(hwnd, IDC_MGR_PURPOSES), WM_SETTEXT, 0, (LPARAM)L"");
     refresh_store_certs(hwnd);
 }
 
@@ -1148,8 +1145,7 @@ static INT_PTR CALLBACK cert_mgr_dlg_proc(HWND hwnd, UINT msg, WPARAM wp,
             if (numSelected == 1)
                 cert_mgr_show_cert_usages(hwnd, nm->iItem);
             else
-                SendMessageW(GetDlgItem(hwnd, IDC_MGR_PURPOSES), WM_SETTEXT, 0,
-                 (LPARAM)empty);
+                SendMessageW(GetDlgItem(hwnd, IDC_MGR_PURPOSES), WM_SETTEXT, 0, (LPARAM)L"");
             break;
         }
         case NM_DBLCLK:
@@ -1453,17 +1449,18 @@ static void free_store_info(HWND tree)
     }
 }
 
+static WCHAR selected_store_title[MAX_STRING_LEN];
+
 static HCERTSTORE selected_item_to_store(HWND tree, HTREEITEM hItem)
 {
-    WCHAR buf[MAX_STRING_LEN];
     TVITEMW item;
     HCERTSTORE store;
 
     memset(&item, 0, sizeof(item));
     item.mask = TVIF_HANDLE | TVIF_PARAM | TVIF_TEXT;
     item.hItem = hItem;
-    item.cchTextMax = ARRAY_SIZE(buf);
-    item.pszText = buf;
+    item.cchTextMax = ARRAY_SIZE(selected_store_title);
+    item.pszText = selected_store_title;
     SendMessageW(tree, TVM_GETITEMW, 0, (LPARAM)&item);
     if (item.lParam)
     {
@@ -1477,7 +1474,7 @@ static HCERTSTORE selected_item_to_store(HWND tree, HTREEITEM hItem)
     else
     {
         /* It's implicitly a system store */
-        store = CertOpenSystemStoreW(0, buf);
+        store = CertOpenSystemStoreW(0, selected_store_title);
     }
     return store;
 }
@@ -5071,17 +5068,14 @@ static INT_PTR CALLBACK import_store_dlg_proc(HWND hwnd, UINT msg, WPARAM wp,
         }
         else
         {
-            WCHAR storeTitle[MAX_STRING_LEN];
-
             SendMessageW(GetDlgItem(hwnd, IDC_IMPORT_SPECIFY_STORE), BM_CLICK,
              0, 0);
             EnableWindow(GetDlgItem(hwnd, IDC_IMPORT_STORE), TRUE);
             EnableWindow(GetDlgItem(hwnd, IDC_IMPORT_BROWSE_STORE), TRUE);
             EnableWindow(GetDlgItem(hwnd, IDC_IMPORT_SPECIFY_STORE),
              !(data->dwFlags & CRYPTUI_WIZ_IMPORT_NO_CHANGE_DEST_STORE));
-            LoadStringW(hInstance, IDS_IMPORT_DEST_DETERMINED, storeTitle, ARRAY_SIZE(storeTitle));
-            SendMessageW(GetDlgItem(hwnd, IDC_IMPORT_STORE), WM_SETTEXT,
-             0, (LPARAM)storeTitle);
+            LoadStringW(hInstance, IDS_IMPORT_DEST_DETERMINED, selected_store_title, ARRAY_SIZE(selected_store_title));
+            SendMessageW(GetDlgItem(hwnd, IDC_IMPORT_STORE), WM_SETTEXT, 0, (LPARAM)selected_store_title);
         }
         break;
     }
@@ -5145,12 +5139,7 @@ static INT_PTR CALLBACK import_store_dlg_proc(HWND hwnd, UINT msg, WPARAM wp,
             selectInfo.pfnSelectedStoreCallback = NULL;
             if ((store = CryptUIDlgSelectStoreW(&selectInfo)))
             {
-                WCHAR storeTitle[MAX_STRING_LEN];
-
-                LoadStringW(hInstance, IDS_IMPORT_DEST_DETERMINED, storeTitle,
-                 ARRAY_SIZE(storeTitle));
-                SendMessageW(GetDlgItem(hwnd, IDC_IMPORT_STORE), WM_SETTEXT,
-                 0, (LPARAM)storeTitle);
+                SendMessageW(GetDlgItem(hwnd, IDC_IMPORT_STORE), WM_SETTEXT, 0, (LPARAM)selected_store_title);
                 data->hDestCertStore = store;
                 data->freeDest = TRUE;
             }
@@ -5178,11 +5167,12 @@ static void show_import_details(HWND lv, struct ImportWizData *data)
     if (data->autoDest)
         LoadStringW(hInstance, IDS_IMPORT_DEST_AUTOMATIC, text, ARRAY_SIZE(text));
     else
-        LoadStringW(hInstance, IDS_IMPORT_DEST_DETERMINED, text, ARRAY_SIZE(text));
+        item.pszText = selected_store_title;
     SendMessageW(lv, LVM_SETITEMTEXTW, item.iItem, (LPARAM)&item);
     item.iItem = SendMessageW(lv, LVM_GETITEMCOUNT, 0, 0);
     item.iSubItem = 0;
     LoadStringW(hInstance, IDS_IMPORT_CONTENT, text, ARRAY_SIZE(text));
+    item.pszText = text;
     SendMessageW(lv, LVM_INSERTITEMW, 0, (LPARAM)&item);
     switch (data->contentType)
     {

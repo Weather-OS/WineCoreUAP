@@ -320,8 +320,8 @@ static const tid_t DocumentType_iface_tids[] = {
 };
 
 dispex_static_data_t DocumentType_dispex = {
-    .id           = PROT_DocumentType,
-    .prototype_id = PROT_Node,
+    .id           = OBJID_DocumentType,
+    .prototype_id = OBJID_Node,
     .vtbl         = &DocumentType_event_target_vtbl.dispex_vtbl,
     .disp_tid     = DispDOMDocumentType_tid,
     .iface_tids   = DocumentType_iface_tids,
@@ -816,7 +816,7 @@ static HRESULT WINAPI HTMLDocument_get_frames(IHTMLDocument2 *iface, IHTMLFrames
         /* Not implemented by IE */
         return E_NOTIMPL;
     }
-    if(!This->window->base.outer_window)
+    if(is_detached_window(This->window))
         return E_FAIL;
     return IHTMLWindow2_get_frames(&This->window->base.outer_window->base.IHTMLWindow2_iface, p);
 }
@@ -1000,7 +1000,7 @@ static HRESULT WINAPI HTMLDocument_put_URL(IHTMLDocument2 *iface, BSTR v)
 
     TRACE("(%p)->(%s)\n", This, debugstr_w(v));
 
-    if(!This->window || !This->window->base.outer_window) {
+    if(!This->window || is_detached_window(This->window)) {
         FIXME("No window available\n");
         return E_FAIL;
     }
@@ -1015,7 +1015,7 @@ static HRESULT WINAPI HTMLDocument_get_URL(IHTMLDocument2 *iface, BSTR *p)
 
     TRACE("(%p)->(%p)\n", iface, p);
 
-    if(This->window && !This->window->base.outer_window) {
+    if(This->window && is_detached_window(This->window)) {
         WARN("detached document\n");
         return E_FAIL;
     }
@@ -1064,7 +1064,7 @@ static HRESULT WINAPI HTMLDocument_get_domain(IHTMLDocument2 *iface, BSTR *p)
         return E_NOTIMPL;
     }
 
-    if(This->window && (!This->window->base.outer_window || !This->window->base.outer_window->uri))
+    if(This->window && (is_detached_window(This->window) || !This->window->base.outer_window->uri))
         return E_FAIL;
 
     nsAString_Init(&nsstr, NULL);
@@ -1094,7 +1094,7 @@ static HRESULT WINAPI HTMLDocument_put_cookie(IHTMLDocument2 *iface, BSTR v)
 
     if(!This->window)
         return S_OK;
-    if(!This->window->base.outer_window)
+    if(is_detached_window(This->window))
         return E_FAIL;
 
     bret = InternetSetCookieExW(This->window->base.outer_window->url, NULL, v, 0, 0);
@@ -1118,7 +1118,7 @@ static HRESULT WINAPI HTMLDocument_get_cookie(IHTMLDocument2 *iface, BSTR *p)
         *p = NULL;
         return S_OK;
     }
-    if(!This->window->base.outer_window)
+    if(is_detached_window(This->window))
         return E_FAIL;
 
     size = 0;
@@ -1367,7 +1367,7 @@ static HRESULT WINAPI HTMLDocument_open(IHTMLDocument2 *iface, BSTR url, VARIANT
 
     *pomWindowResult = NULL;
 
-    if(!This->window || !This->window->base.outer_window)
+    if(!This->window || is_detached_window(This->window))
         return E_FAIL;
 
     if(!This->dom_document) {
@@ -2224,7 +2224,7 @@ static HRESULT WINAPI HTMLDocument3_get_documentElement(IHTMLDocument3 *iface, I
     TRACE("(%p)->(%p)\n", This, p);
 
     if(This->window) {
-        if(!This->window->base.outer_window)
+        if(is_detached_window(This->window))
             return E_FAIL;
         if(This->window->base.outer_window->readystate == READYSTATE_UNINITIALIZED) {
             *p = NULL;
@@ -4493,7 +4493,7 @@ static void HTMLDocumentNode_on_advise(IUnknown *iface, cp_static_data_t *cp)
 {
     HTMLDocumentNode *This = CONTAINING_RECORD((IHTMLDocument2*)iface, HTMLDocumentNode, IHTMLDocument2_iface);
 
-    if(This->window && This->window->base.outer_window)
+    if(This->window && !is_detached_window(This->window))
         update_doc_cp_events(This, cp);
 }
 
@@ -5446,7 +5446,7 @@ static HRESULT HTMLDocumentNode_disp_invoke(DispatchEx *dispex, DISPID id, LCID 
     return S_FALSE;
 }
 
-static HRESULT HTMLDocumentNode_next_dispid(DispatchEx *dispex, DISPID id, DISPID *pid)
+static HRESULT HTMLDocumentNode_next_dispid(DispatchEx *dispex, DISPID id, BOOL enum_all_own_props, DISPID *pid)
 {
     DWORD idx = (id == DISPID_STARTENUM) ? 0 : id - MSHTML_DISPID_CUSTOM_MIN + 1;
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
@@ -5589,7 +5589,7 @@ static HRESULT HTMLDocumentNode_location_hook(DispatchEx *dispex, WORD flags, DI
 
     if(!(flags & DISPATCH_PROPERTYPUT) || !This->window)
         return S_FALSE;
-    if(!This->window->base.outer_window)
+    if(is_detached_window(This->window))
         return E_FAIL;
 
     return IWineJSDispatchHost_InvokeEx(&This->window->event_target.dispex.IWineJSDispatchHost_iface,
@@ -5758,21 +5758,23 @@ static void HTMLDocumentNode_init_dispex_info(dispex_data_t *info, compat_mode_t
 }
 
 dispex_static_data_t Document_dispex = {
-    .id           = PROT_Document,
-    .prototype_id = PROT_Node,
+    .id           = OBJID_Document,
+    .prototype_id = OBJID_Node,
     .vtbl         = &HTMLDocument_event_target_vtbl.dispex_vtbl,
     .disp_tid     = DispHTMLDocument_tid,
     .iface_tids   = HTMLDocumentNode_iface_tids,
     .init_info    = HTMLDocumentNode_init_dispex_info,
+    .js_flags     = HOSTOBJ_VOLATILE_FILL,
 };
 
 dispex_static_data_t HTMLDocument_dispex = {
-    .id           = PROT_HTMLDocument,
-    .prototype_id = PROT_Document,
+    .id           = OBJID_HTMLDocument,
+    .prototype_id = OBJID_Document,
     .vtbl         = &HTMLDocument_event_target_vtbl.dispex_vtbl,
     .disp_tid     = DispHTMLDocument_tid,
     .iface_tids   = HTMLDocumentNode_iface_tids,
     .init_info    = HTMLDocumentNode_init_dispex_info,
+    .js_flags     = HOSTOBJ_VOLATILE_FILL,
     .min_compat_mode = COMPAT_MODE_IE11,
 };
 
@@ -5900,12 +5902,13 @@ static const tid_t DocumentFragment_iface_tids[] = {
     0
 };
 dispex_static_data_t DocumentFragment_dispex = {
-    .id           = PROT_DocumentFragment,
-    .prototype_id = PROT_Node,
+    .id           = OBJID_DocumentFragment,
+    .prototype_id = OBJID_Node,
     .vtbl         = &HTMLDocument_event_target_vtbl.dispex_vtbl,
     .disp_tid     = DispHTMLDocument_tid,
     .iface_tids   = DocumentFragment_iface_tids,
     .init_info    = DocumentFragment_init_dispex_info,
+    .js_flags     = HOSTOBJ_VOLATILE_FILL,
 };
 
 static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *doc_node, HTMLDocumentNode **ret)

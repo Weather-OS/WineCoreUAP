@@ -1954,21 +1954,10 @@ RETURN_CODE WCMD_move(void)
 RETURN_CODE WCMD_pause(void)
 {
   RETURN_CODE return_code = NO_ERROR;
-  DWORD oldmode;
-  BOOL have_console;
-  DWORD count;
-  WCHAR key;
-  HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
-
-  have_console = GetConsoleMode(hIn, &oldmode);
-  if (have_console)
-      SetConsoleMode(hIn, 0);
-
   WCMD_output_asis(anykey);
-  if (!WCMD_ReadFile(hIn, &key, 1, &count) || !count)
-      return_code = ERROR_INVALID_FUNCTION;
-  if (have_console)
-    SetConsoleMode(hIn, oldmode);
+  return_code = WCMD_wait_for_input(GetStdHandle(STD_INPUT_HANDLE));
+  WCMD_output_asis(L"\r\n");
+
   return return_code;
 }
 
@@ -3449,7 +3438,7 @@ RETURN_CODE WCMD_type(WCHAR *args)
     if (!argN) break;
 
     WINE_TRACE("type: Processing arg '%s'\n", wine_dbgstr_w(thisArg));
-    h = CreateFileW(thisArg, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+    h = CreateFileW(thisArg, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
 		FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) {
       WCMD_print_error ();

@@ -52,6 +52,11 @@ static BOOL is_wow64;
 
 static SYSTEM_BASIC_INFORMATION sbi;
 
+static inline void *get_rva( HMODULE module, DWORD va )
+{
+    return (void *)((char *)module + va);
+}
+
 static HANDLE create_target_process(const char *arg)
 {
     char **argv;
@@ -1014,8 +1019,8 @@ static DWORD WINAPI test_stack_size_thread(void *ptr)
     ok( mbi.AllocationBase == NtCurrentTeb()->DeallocationStack, "unexpected AllocationBase %p, expected %p\n", mbi.AllocationBase, NtCurrentTeb()->DeallocationStack );
     ok( mbi.AllocationProtect == PAGE_READWRITE, "unexpected AllocationProtect %#lx, expected %#x\n", mbi.AllocationProtect, PAGE_READWRITE );
     ok( mbi.BaseAddress == addr, "unexpected BaseAddress %p, expected %p\n", mbi.BaseAddress, addr );
-    todo_wine ok( mbi.State == MEM_RESERVE, "unexpected State %#lx, expected %#x\n", mbi.State, MEM_RESERVE );
-    todo_wine ok( mbi.Protect == 0, "unexpected Protect %#lx, expected %#x\n", mbi.Protect, 0 );
+    ok( mbi.State == MEM_RESERVE, "unexpected State %#lx, expected %#x\n", mbi.State, MEM_RESERVE );
+    ok( mbi.Protect == 0, "unexpected Protect %#lx, expected %#x\n", mbi.Protect, 0 );
     ok( mbi.Type == MEM_PRIVATE, "unexpected Type %#lx, expected %#x\n", mbi.Type, MEM_PRIVATE );
 
 
@@ -1035,8 +1040,8 @@ static DWORD WINAPI test_stack_size_thread(void *ptr)
     ok( mbi.AllocationBase == NtCurrentTeb()->DeallocationStack, "unexpected AllocationBase %p, expected %p\n", mbi.AllocationBase, NtCurrentTeb()->DeallocationStack );
     ok( mbi.AllocationProtect == PAGE_READWRITE, "unexpected AllocationProtect %#lx, expected %#x\n", mbi.AllocationProtect, PAGE_READWRITE );
     ok( mbi.BaseAddress == addr, "unexpected BaseAddress %p, expected %p\n", mbi.BaseAddress, addr );
-    todo_wine ok( mbi.State == MEM_RESERVE, "unexpected State %#lx, expected %#x\n", mbi.State, MEM_RESERVE );
-    todo_wine ok( mbi.Protect == 0, "unexpected Protect %#lx, expected %#x\n", mbi.Protect, 0 );
+    ok( mbi.State == MEM_RESERVE, "unexpected State %#lx, expected %#x\n", mbi.State, MEM_RESERVE );
+    ok( mbi.Protect == 0, "unexpected Protect %#lx, expected %#x\n", mbi.Protect, 0 );
     ok( mbi.Type == MEM_PRIVATE, "unexpected Type %#lx, expected %#x\n", mbi.Type, MEM_PRIVATE );
 
     guard_size = reserved - committed - mbi.RegionSize;
@@ -1249,11 +1254,13 @@ static void test_RtlCreateUserStack(void)
     struct test_stack_size_thread_args args;
     SIZE_T default_commit = nt->OptionalHeader.SizeOfStackCommit;
     SIZE_T default_reserve = nt->OptionalHeader.SizeOfStackReserve;
+    MEMORY_BASIC_INFORMATION mbi;
     INITIAL_TEB stack = {0};
     unsigned int i;
     NTSTATUS ret;
     HANDLE thread;
     CLIENT_ID id;
+    SIZE_T szret;
 
     struct
     {
@@ -1267,6 +1274,7 @@ static void test_RtlCreateUserStack(void)
         {       0, 0x200000,      1,        1, default_commit, 0x200000},
         {  0x4000, 0x200000,      1,        1,         0x4000, 0x200000},
         {0x100000, 0x100000,      1,        1,       0x100000, 0x100000},
+        { 0xff000, 0x100000,      1,        1,        0xff000, 0x100000},
         { 0x20000,  0x20000,      1,        1,        0x20000, 0x100000},
 
         {       0, 0x110000,      1,        1, default_commit, 0x110000},
@@ -1299,6 +1307,24 @@ static void test_RtlCreateUserStack(void)
                 "%u: got reserve %#Ix\n", i, (ULONG_PTR)stack.StackBase - (ULONG_PTR)stack.DeallocationStack);
         todo_wine ok((ULONG_PTR)stack.StackBase - (ULONG_PTR)stack.StackLimit == tests[i].expect_commit,
                 "%u: got commit %#Ix\n", i, (ULONG_PTR)stack.StackBase - (ULONG_PTR)stack.StackLimit);
+        szret = VirtualQuery(stack.DeallocationStack, &mbi, sizeof(mbi));
+        ok(szret == sizeof(mbi), "got %Iu.\n", szret);
+        ok(mbi.AllocationBase == stack.DeallocationStack, "got %p, %p.\n", mbi.AllocationBase, stack.DeallocationStack);
+        if (tests[i].commit + 2 * page_size <= max( tests[i].reserve, 0x100000))
+        {
+            ok(mbi.State == MEM_RESERVE, "%u: got %#lx.\n", i, mbi.State);
+            ok(!mbi.Protect, "%u: got %#lx.\n", i, mbi.Protect);
+        }
+        else if (tests[i].commit + page_size <= max( tests[i].reserve, 0x100000))
+        {
+            todo_wine ok(mbi.State == MEM_COMMIT, "%u: got %#lx.\n", i, mbi.State);
+            todo_wine ok(mbi.Protect == (PAGE_READWRITE | PAGE_GUARD), "%u: got %#lx.\n", i, mbi.Protect);
+        }
+        else
+        {
+            todo_wine ok(mbi.State == MEM_COMMIT, "%u: got %#lx.\n", i, mbi.State);
+            todo_wine ok(mbi.Protect == PAGE_READWRITE, "%u: got %#lx.\n", i, mbi.Protect);
+        }
         pRtlFreeUserStack(stack.DeallocationStack);
     }
 
@@ -1604,7 +1630,6 @@ static void test_NtMapViewOfSection(void)
         offset.QuadPart = 0;
         status = NtMapViewOfSection(mapping, process, &ptr2, 0, 0, &offset,
                                     &size, 1, AT_ROUND_TO_PAGE, PAGE_READWRITE);
-        todo_wine
         ok(status == STATUS_INVALID_PARAMETER_9 || status == STATUS_INVALID_PARAMETER,
            "NtMapViewOfSection returned %08lx\n", status);
     }
@@ -1784,9 +1809,7 @@ static void test_NtMapViewOfSectionEx(void)
         size = 0;
         offset.QuadPart = 0;
         status = pNtMapViewOfSectionEx(mapping, process, &ptr2, &offset, &size, AT_ROUND_TO_PAGE, PAGE_READWRITE, NULL, 0);
-        todo_wine
-        ok(status == STATUS_INVALID_PARAMETER_9 || status == STATUS_INVALID_PARAMETER,
-           "NtMapViewOfSection returned %08lx\n", status);
+        ok(status == STATUS_INVALID_PARAMETER, "NtMapViewOfSectionEx returned %08lx\n", status);
     }
 
     status = NtUnmapViewOfSection(process, ptr);
@@ -2194,6 +2217,207 @@ static void test_syscalls(void)
     }
     CloseHandle( file );
     UnmapViewOfFile( ptr );
+}
+
+static void test_invalid_syscalls(void)
+{
+    HMODULE module = GetModuleHandleW( L"ntdll.dll" );
+    NTSTATUS (WINAPI *pNtImpersonateAnonymousToken)( HANDLE thread );
+    NTSTATUS status;
+    DWORD prot, i;
+    LONG old_id, new_id, *id;
+
+    /* grab a syscall that's unlikely to be used while we are testing */
+    pNtImpersonateAnonymousToken = (void *)GetProcAddress( module, "NtImpersonateAnonymousToken" );
+    if (!pNtImpersonateAnonymousToken)
+    {
+        win_skip( "NtImpersonateAnonymousToken not supported\n" );
+        return;
+    }
+    status = pNtImpersonateAnonymousToken( 0 );
+    ok( status == STATUS_INVALID_HANDLE || status == STATUS_NOT_IMPLEMENTED, "wrong status %lx\n", status );
+    VirtualProtect( pNtImpersonateAnonymousToken, 32, PAGE_EXECUTE_READWRITE, &prot );
+    for (i = 0; i < 4; i++)
+    {
+        new_id = 0x666 | (i << 12);
+        winetest_push_context( "%04lx", new_id );
+#ifdef __i386__
+        id = (LONG *)((BYTE *)pNtImpersonateAnonymousToken + 1);
+        new_id = (*id & ~0xffff) | new_id;
+#elif defined __x86_64__
+        id = (LONG *)pNtImpersonateAnonymousToken + 1;
+        new_id = (*id & ~0xffff) | new_id;
+#elif defined __aarch64__
+        id = (LONG *)pNtImpersonateAnonymousToken;
+        new_id = (*id & ~(0xffff << 5)) | (new_id << 5);
+#elif defined __arm__
+        id = (LONG *)(((ULONG_PTR)pNtImpersonateAnonymousToken & ~1) + 2);
+        new_id = 0x0c00f240 | ((new_id & 0xff) << 16) | ((new_id & 0xf00) << 20) | (new_id >> 12); /* movw ip, #0xnnn */
+#endif
+        old_id = *id;
+        *id = new_id;
+        NtFlushInstructionCache( GetCurrentProcess(), pNtImpersonateAnonymousToken, 32 );
+        status = pNtImpersonateAnonymousToken( 0 );
+        ok( status == STATUS_INVALID_SYSTEM_SERVICE, "wrong status %lx\n", status );
+        *id = old_id;
+        NtFlushInstructionCache( GetCurrentProcess(), pNtImpersonateAnonymousToken, 32 );
+        winetest_pop_context();
+    }
+    VirtualProtect( pNtImpersonateAnonymousToken, 32, prot, &prot );
+}
+
+struct syscall_export
+{
+    UINT        rva;
+    int         id;
+    const char *name;
+};
+
+static int CDECL sort_syscalls( const void *a, const void *b )
+{
+    const struct syscall_export *exp_a = a;
+    const struct syscall_export *exp_b = b;
+    int ret = exp_a->rva - exp_b->rva;
+    if (!ret) ret = strcmp( exp_a->name, exp_b->name );
+    return ret;
+}
+
+static int get_syscall_id( void *code )
+{
+#ifdef __i386__
+    static const BYTE patterns[][18] =
+    {
+        { 0xb8, 0, 0, 0, 0, 0xba, 0, 0, 0, 0, 0xff, 0xd2 }, /* >= win10 */
+        { 0xb8, 0, 0, 0, 0, 0xba, 0, 0, 0, 0, 0xff, 0x12 }, /* winxp */
+        { 0xb8, 0, 0, 0, 0, 0x64, 0xff, 0x15, 0xc0, 0, 0, 0 },  /* nt */
+        { 0xb8, 0, 0, 0, 0, 0x8d, 0x54, 0x24, 0x04, 0xcd, 0x2e }, /* nt */
+        { 0xb8, 0, 0, 0, 0, 0xb9, 0, 0, 0, 0, 0x8d, 0x54, 0x24, 0x04, 0x64, 0xff, 0x15, 0xc0 }, /* vista */
+        { 0xb8, 0, 0, 0, 0, 0x33, 0xc9, 0x8d, 0x54, 0x24, 0x04, 0x64, 0xff, 0x15, 0xc0 }, /* vista */
+        { 0xb8, 0, 0, 0, 0, 0xe8, 0, 0, 0, 0, 0x8d, 0x54, 0x24, 0x04, 0x64, 0xff, 0x15, 0xc0 }, /* win8 */
+        { 0xb8, 0, 0, 0, 0, 0xe8, 0x01, 0, 0, 0, 0xc3, 0x8b, 0xd4, 0x0f, 0x34, 0xc3 },  /* win8 */
+        { 0xb8, 0, 0, 0, 0, 0xe8, 0x03, 0, 0, 0, 0xc2, 0, 0, 0x8b, 0xd4, 0x0f, 0x34, 0xc3 }, /* win8 */
+    };
+    const BYTE *instr = code;
+    UINT i, j;
+
+    for (i = 0; i < ARRAY_SIZE(patterns); i++)
+    {
+        for (j = 0; j < ARRAY_SIZE(patterns[0]); j++)
+            if (patterns[i][j] && patterns[i][j] != instr[j]) break;
+        if (j == ARRAY_SIZE(patterns[0]))
+            return *(UINT *)(instr + 1);
+    }
+#elif defined __x86_64__
+    static const BYTE patterns[][20] =
+    {
+        { 0x4c, 0x8b, 0xd1, 0xb8, 0, 0, 0, 0, 0xf6, 0x04, 0x25, 0x08, 0x03, 0xfe,
+          0x7f, 0x01, 0x75, 0x03, 0x0f, 0x05 },  /* >= win10 */
+        { 0x4c, 0x8b, 0xd1, 0xb8, 0, 0, 0, 0, 0x0f, 0x05, 0xc3 }, /* < win10 */
+    };
+    const BYTE *instr = code;
+    UINT i, j;
+
+    for (i = 0; i < ARRAY_SIZE(patterns); i++)
+    {
+        for (j = 0; j < ARRAY_SIZE(patterns[0]); j++)
+            if (patterns[i][j] && patterns[i][j] != instr[j]) break;
+        if (j == ARRAY_SIZE(patterns[0]))
+            return ((UINT *)instr)[1];
+    }
+#elif defined __aarch64__
+    const UINT *instr = code;
+
+    if ((instr[0] & 0xffe0001f) == 0xd4000001 && instr[1] == 0xd65f03c0)  /* windows */
+        return (instr[0] >> 5) & 0xffff;
+    if ((instr[0] & 0xffe0001f) == 0xd2800008 && instr[1] == 0xaa1e03e9 &&
+        instr[3] == 0xf9400210 && instr[4] == 0xd63f0200 && instr[5] == 0xd65f03c0) /* wine */
+        return (instr[0] >> 5) & 0xffff;
+#elif defined __arm__
+    const USHORT *instr = code;
+
+    if (instr[0] == 0xb40f && (instr[2] & 0x0f00) == 0x0c00 &&
+        ((instr[3] == 0xdef8 && instr[4] == 0xb004 && instr[5] == 0x4770) ||  /* windows */
+         (instr[3] == 0x4673 && instr[6] == 0xb004 && instr[7] == 0x4770)))  /* wine */
+    {
+        USHORT imm = ((instr[1] & 0x400) << 1) | (instr[2] & 0xff) | ((instr[2] >> 4) & 0x0700);
+        if ((instr[1] & 0xfbf0) == 0xf240)  /* T3 */
+        {
+            return imm | (instr[1] & 0x0f) << 12;
+        }
+        else if ((instr[1] & 0xfbf0) == 0xf040)  /* T2 */
+        {
+            switch (imm >> 8)
+            {
+            case 0: return imm;
+            case 1: return (imm & 0xff);
+            case 2: return (imm & 0xff) << 8;
+            case 3: return (imm & 0xff) | ((imm & 0xff) << 8);
+            default: return (0x80 | (imm & 0x7f)) << (32 - (imm >> 7));
+            }
+        }
+    }
+#endif
+    return -1;
+}
+
+static void test_syscall_numbers(void)
+{
+    struct syscall_export syscalls[4096];
+    HMODULE module = GetModuleHandleA( "ntdll.dll" );
+    IMAGE_EXPORT_DIRECTORY *exports;
+    ULONG size;
+    int pos;
+    const WORD *ordinals;
+    const DWORD *names, *functions;
+    static const char *prefix[] = { "Nt", "Zw" };
+
+    exports = RtlImageDirectoryEntryToData( module, TRUE, IMAGE_DIRECTORY_ENTRY_EXPORT, &size );
+    names = get_rva( module, exports->AddressOfNames );
+    ordinals = get_rva( module, exports->AddressOfNameOrdinals );
+    functions = get_rva( module, exports->AddressOfFunctions );
+
+    for (unsigned int test = 0; test < ARRAY_SIZE(prefix); test++)
+    {
+        for (int i = pos = 0; i < exports->NumberOfNames; i++)
+        {
+            char *name = get_rva( module, names[i] );
+            if (strncmp( name, prefix[test], strlen(prefix[test]) )) continue;
+            if (!strcmp( name, "NtGetTickCount" ) ||
+                !strcmp( name, "NtCurrentTeb" ) ||
+                !strncmp( name, "NtdllDialogWndProc", 18 ) ||
+                !strncmp( name, "NtdllDefWindowProc", 18 ))
+                continue;  /* these are special */
+            syscalls[pos].rva  = functions[ordinals[i]];
+#ifdef __arm__
+            syscalls[pos].rva &= ~1; /* thumb */
+#endif
+            syscalls[pos].id   = get_syscall_id( get_rva( module, syscalls[pos].rva ));
+            syscalls[pos].name = name;
+            pos++;
+        }
+        ok( pos, "no syscalls found\n" );
+        qsort( syscalls, pos, sizeof(*syscalls), sort_syscalls );
+        for (int i = 0, expect = 0; i < pos; i++, expect++)
+        {
+            if (syscalls[i].id == -1)
+            {
+                /* these may not be real syscalls */
+                ok( !strcmp( syscalls[i].name + strlen(prefix[test]), "QuerySystemTime" ) ||
+                    !strcmp( syscalls[i].name + strlen(prefix[test]), "QueryInformationProcess" ),
+                    "not a syscall %04x %s\n", i, syscalls[i].name );
+            }
+            else if (LOWORD(syscalls[i].id) > expect)
+            {
+                ok( 0, "missing syscall %04x\n", expect );
+                i--;
+            }
+            else
+            {
+                ok( LOWORD(syscalls[i].id) == expect, "wrong id %04x / %04x for %s\n",
+                    syscalls[i].id, expect, syscalls[i].name );
+            }
+        }
+    }
 }
 
 static void test_NtFreeVirtualMemory(void)
@@ -3033,6 +3257,8 @@ START_TEST(virtual)
     test_prefetch();
     test_user_shared_data();
     test_syscalls();
+    test_invalid_syscalls();
+    test_syscall_numbers();
     test_query_region_information();
     test_query_image_information();
     test_exec_memory_writes();

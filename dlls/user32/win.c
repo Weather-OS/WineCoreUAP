@@ -862,15 +862,6 @@ BOOL WINAPI AnimateWindow( HWND hwnd, DWORD time, DWORD flags )
 
 
 /***********************************************************************
- *           BeginDeferWindowPos (USER32.@)
- */
-HDWP WINAPI BeginDeferWindowPos( INT count )
-{
-    return NtUserBeginDeferWindowPos( count );
-}
-
-
-/***********************************************************************
  *           DeferWindowPos (USER32.@)
  */
 HDWP WINAPI DeferWindowPos( HDWP hdwp, HWND hwnd, HWND after, INT x, INT y,
@@ -1267,6 +1258,17 @@ BOOL WINAPI IsWindowVisible( HWND hwnd )
 }
 
 
+/***********************************************************************
+ *		IsWindowArranged (USER32.@)
+ */
+BOOL WINAPI IsWindowArranged( HWND hwnd )
+{
+    FIXME( "hwnd %p stub.\n", hwnd );
+
+    return FALSE;
+}
+
+
 /*******************************************************************
  *		GetTopWindow (USER32.@)
  */
@@ -1502,12 +1504,7 @@ BOOL WINAPI UpdateLayeredWindow( HWND hwnd, HDC hdcDst, POINT *pptDst, SIZE *psi
  */
 BOOL WINAPI GetProcessDefaultLayout( DWORD *layout )
 {
-    if (!layout)
-    {
-        SetLastError( ERROR_NOACCESS );
-        return FALSE;
-    }
-    *layout = NtUserGetProcessDefaultLayout();
+    if (!NtUserGetProcessDefaultLayout( layout )) return FALSE;
     if (*layout == ~0u)
     {
         WCHAR *str, buffer[MAX_PATH];

@@ -204,15 +204,8 @@ void set_native_thread_name( DWORD tid, const char *name )
 
     if (tid != -1)
     {
-        OBJECT_ATTRIBUTES attr;
+        OBJECT_ATTRIBUTES attr = { .Length = sizeof(attr) };
         CLIENT_ID cid;
-
-        attr.Length = sizeof(attr);
-        attr.RootDirectory = 0;
-        attr.Attributes = 0;
-        attr.ObjectName = NULL;
-        attr.SecurityDescriptor = NULL;
-        attr.SecurityQualityOfService = NULL;
 
         cid.UniqueProcess = 0;
         cid.UniqueThread = ULongToHandle( tid );
@@ -340,10 +333,9 @@ NTSTATUS WINAPI RtlCreateUserStack( SIZE_T commit, SIZE_T reserve, ULONG zero_bi
                                       &alloc, sizeof(alloc) );
     if (!status)
     {
-        void *addr = alloc.StackBase;
+        void *addr;
         SIZE_T size = page_size;
 
-        NtAllocateVirtualMemory( GetCurrentProcess(), &addr, 0, &size, MEM_COMMIT, PAGE_NOACCESS );
         addr = (char *)alloc.StackBase + page_size;
         NtAllocateVirtualMemory( GetCurrentProcess(), &addr, 0, &size, MEM_COMMIT, PAGE_READWRITE | PAGE_GUARD );
         addr = (char *)alloc.StackBase + 2 * page_size;

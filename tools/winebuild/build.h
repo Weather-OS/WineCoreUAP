@@ -177,7 +177,7 @@ static inline unsigned int get_ptr_size(void)
 
 static inline int is_pe(void)
 {
-    return target.platform == PLATFORM_MINGW || target.platform == PLATFORM_WINDOWS;
+    return is_pe_target( target );
 }
 
 /* entry point flags */
@@ -291,7 +291,7 @@ extern const char *get_stub_name( const ORDDEF *odp, const DLLSPEC *spec );
 extern const char *get_abi_name( const ORDDEF *odp, const char *name );
 extern const char *get_link_name( const ORDDEF *odp );
 extern int sort_func_list( ORDDEF **list, int count, int (*compare)(const void *, const void *) );
-extern unsigned int get_page_size(void);
+extern unsigned int get_section_alignment(void);
 extern unsigned int get_args_size( const ORDDEF *odp );
 extern const char *asm_name( const char *func );
 extern const char *arm64_name( const char *func );

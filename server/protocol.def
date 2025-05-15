@@ -843,6 +843,7 @@ struct pe_image_info
     mem_size_t     stack_commit;
     unsigned int   entry_point;
     unsigned int   map_size;
+    unsigned int   alignment;
     unsigned int   zerobits;
     unsigned int   subsystem;
     unsigned short subsystem_minor;
@@ -860,6 +861,7 @@ struct pe_image_info
     unsigned char  image_flags;
     unsigned int   loader_flags;
     unsigned int   header_size;
+    unsigned int   header_map_size;
     unsigned int   file_size;
     unsigned int   checksum;
     unsigned int   dbg_offset;
@@ -1021,6 +1023,11 @@ typedef volatile struct
     object_shm_t         shm;              /* object shared data */
 } shared_object_t;
 
+typedef volatile struct
+{
+    struct user_entry user_entries[MAX_USER_HANDLES];
+} session_shm_t;
+
 struct obj_locator
 {
     object_id_t          id;               /* object unique id, object data is valid if != 0 */
@@ -1156,6 +1163,7 @@ struct obj_locator
     unsigned int session_id;       /* process session id */
     int          exit_code;        /* process exit code */
     int          priority;         /* priority class */
+    unsigned short base_priority;  /* process base priority */
     unsigned short machine;        /* process architecture */
     VARARG(image,pe_image_info);   /* image info for main exe */
 @END
@@ -1198,14 +1206,16 @@ struct obj_locator
 /* Set a process information */
 @REQ(set_process_info)
     obj_handle_t handle;       /* process handle */
-    int          mask;         /* setting mask (see below) */
     int          priority;     /* priority class */
+    int          base_priority; /* process base priority */
     affinity_t   affinity;     /* affinity mask */
     obj_handle_t token;        /* primary token */
+    int          mask;         /* setting mask (see below) */
 @END
-#define SET_PROCESS_INFO_PRIORITY 0x01
-#define SET_PROCESS_INFO_AFFINITY 0x02
-#define SET_PROCESS_INFO_TOKEN    0x04
+#define SET_PROCESS_INFO_PRIORITY      0x01
+#define SET_PROCESS_INFO_BASE_PRIORITY 0x02
+#define SET_PROCESS_INFO_AFFINITY      0x04
+#define SET_PROCESS_INFO_TOKEN         0x08
 
 
 /* Retrieve information about a thread */
@@ -1219,8 +1229,8 @@ struct obj_locator
     client_ptr_t entry_point;   /* thread entry point */
     affinity_t   affinity;      /* thread affinity mask */
     int          exit_code;     /* thread exit code */
-    int          priority;      /* thread priority level */
-    int          last;          /* last thread in process */
+    int          priority;      /* current thread priority */
+    int          base_priority; /* base priority level (relative to process base priority class) */
     int          suspend_count; /* thread suspend count */
     unsigned int flags;         /* GET_THREAD_INFO_FLAG_ flags */
     data_size_t  desc_len;      /* description length in bytes */
@@ -1228,6 +1238,7 @@ struct obj_locator
 @END
 #define GET_THREAD_INFO_FLAG_DBG_HIDDEN 0x01
 #define GET_THREAD_INFO_FLAG_TERMINATED 0x02
+#define GET_THREAD_INFO_FLAG_LAST       0x04
 
 
 /* Retrieve information about thread times */
@@ -1244,19 +1255,21 @@ struct obj_locator
 /* Set a thread information */
 @REQ(set_thread_info)
     obj_handle_t handle;       /* thread handle */
-    int          mask;         /* setting mask (see below) */
-    int          priority;     /* priority class */
+    int          priority;     /* current thread priority */
+    int          base_priority;/* base priority level (relative to process base priority class) */
     affinity_t   affinity;     /* affinity mask */
     client_ptr_t entry_point;  /* thread entry point */
     obj_handle_t token;        /* impersonation token */
+    unsigned int mask;         /* setting mask (see below) */
     VARARG(desc,unicode_str);  /* description string */
 @END
-#define SET_THREAD_INFO_PRIORITY    0x01
-#define SET_THREAD_INFO_AFFINITY    0x02
-#define SET_THREAD_INFO_TOKEN       0x04
-#define SET_THREAD_INFO_ENTRYPOINT  0x08
-#define SET_THREAD_INFO_DESCRIPTION 0x10
-#define SET_THREAD_INFO_DBG_HIDDEN  0x20
+#define SET_THREAD_INFO_PRIORITY        0x01
+#define SET_THREAD_INFO_BASE_PRIORITY   0x02
+#define SET_THREAD_INFO_AFFINITY        0x04
+#define SET_THREAD_INFO_TOKEN           0x08
+#define SET_THREAD_INFO_ENTRYPOINT      0x10
+#define SET_THREAD_INFO_DESCRIPTION     0x20
+#define SET_THREAD_INFO_DBG_HIDDEN      0x40
 
 
 /* Suspend a thread */
@@ -2569,11 +2582,7 @@ enum message_type
 @REQ(get_window_info)
     user_handle_t  handle;      /* handle to the window */
 @REPLY
-    user_handle_t  full_handle; /* full 32-bit handle */
     user_handle_t  last_active; /* last active popup */
-    process_id_t   pid;         /* process owning the window */
-    thread_id_t    tid;         /* thread owning the window */
-    atom_t         atom;        /* class atom */
     int            is_unicode;  /* ANSI or unicode */
     unsigned int   dpi_context; /* window DPI context */
 @END
@@ -3773,7 +3782,8 @@ struct handle_info
     unsigned int   session_id;    /* token session id */
     int            primary;       /* is the token primary or impersonation? */
     int            impersonation_level; /* level of impersonation */
-    int            elevation;     /* elevation type */
+    int            elevation_type; /* elevation type (TokenElevation*) */
+    int            is_elevated;   /* is the token elevated as per GetTokenInformation(TokenElevation) */
     int            group_count;   /* the number of groups the token is a member of */
     int            privilege_count; /* the number of privileges the token has */
 @END
@@ -3922,6 +3932,7 @@ struct handle_info
 
 /* Allocate an arbitrary user handle */
 @REQ(alloc_user_handle)
+    unsigned short type;          /* user object type */
 @REPLY
     user_handle_t  handle;        /* allocated handle */
 @END
@@ -3929,6 +3940,7 @@ struct handle_info
 
 /* Free an arbitrary user handle */
 @REQ(free_user_handle)
+    unsigned short type;          /* user object type */
     user_handle_t  handle;        /* handle to free*/
 @END
 
@@ -4058,6 +4070,15 @@ struct handle_info
     obj_handle_t handle;       /* process handle */
 @END
 
+/* Itererate processes using global process list */
+@REQ(get_next_process)
+    obj_handle_t last;         /* process handle to start with */
+    unsigned int access;       /* desired access for returned handle */
+    unsigned int attributes;   /* returned handle attributes */
+    unsigned int flags;        /* controls iteration direction */
+@REPLY
+    obj_handle_t handle;       /* next process handle */
+@END
 
 /* Iterate thread list for process */
 @REQ(get_next_thread)

@@ -2,6 +2,7 @@
  * Support for communicating with BlueZ over DBus.
  *
  * Copyright 2024 Vibhav Pant
+ * Copyright 2025 Vibhav Pant
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +30,9 @@
 #include <dlfcn.h>
 #include <assert.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <errno.h>
+#include <string.h>
 
 #ifdef SONAME_LIBDBUS_1
 #include <dbus/dbus.h>
@@ -41,6 +45,8 @@
 #include <winbase.h>
 #include <bthsdpdef.h>
 #include <bluetoothapis.h>
+#include <bthdef.h>
+#include <wine/winebth.h>
 
 #include <wine/debug.h>
 
@@ -110,6 +116,9 @@ const int bluez_timeout = -1;
 
 #define BLUEZ_DEST "org.bluez"
 #define BLUEZ_INTERFACE_ADAPTER "org.bluez.Adapter1"
+#define BLUEZ_INTERFACE_DEVICE  "org.bluez.Device1"
+#define BLUEZ_INTERFACE_AGENT_MANAGER "org.bluez.AgentManager1"
+#define BLUEZ_INTERFACE_AGENT "org.bluez.Agent1"
 
 #define DO_FUNC( f ) typeof( f ) (*p_##f)
 DBUS_FUNCS;
@@ -175,6 +184,39 @@ static const char *bluez_next_dict_entry( DBusMessageIter *iter, DBusMessageIter
     p_dbus_message_iter_next( &sub );
     p_dbus_message_iter_recurse( &sub, variant );
     return name;
+}
+
+/* Adds an entry to a dict iterator of type {sv} */
+static BOOL bluez_variant_dict_add_entry( DBusMessageIter *dict, const char *key, int value_type,
+                                          const char *value_type_str, const void *value )
+{
+    DBusMessageIter entry, variant;
+
+    if (!p_dbus_message_iter_open_container( dict, DBUS_TYPE_DICT_ENTRY, NULL, &entry )) return FALSE;
+    if (!p_dbus_message_iter_append_basic( &entry, DBUS_TYPE_STRING, &key ))
+    {
+        p_dbus_message_iter_abandon_container( dict, &entry );
+        return FALSE;
+    }
+
+    if (!p_dbus_message_iter_open_container( &entry, DBUS_TYPE_VARIANT, value_type_str, &variant ))
+    {
+        p_dbus_message_iter_abandon_container( dict, &entry );
+        return FALSE;
+    }
+    if (!p_dbus_message_iter_append_basic( &variant, value_type, value ))
+    {
+        p_dbus_message_iter_abandon_container( &entry, &variant );
+        p_dbus_message_iter_abandon_container( dict, &entry );
+        return FALSE;
+    }
+    if (!p_dbus_message_iter_close_container( &entry, &variant ))
+    {
+        p_dbus_message_iter_abandon_container( dict, &entry );
+        return FALSE;
+    }
+
+    return !!p_dbus_message_iter_close_container( dict, &entry );
 }
 
 static const char *dbgstr_dbus_message( DBusMessage *message )
@@ -264,6 +306,313 @@ static void parse_mac_address( const char *addr_str, BYTE dest[6] )
         dest[i] = addr[i];
 }
 
+static void bluez_dbus_wait_for_reply_callback( DBusPendingCall *pending_call, void *wait )
+{
+    sem_post( wait );
+}
+
+static NTSTATUS bluez_dbus_pending_call_wait( DBusPendingCall *pending_call, DBusMessage **reply, DBusError *error )
+{
+    sem_t wait;
+
+    sem_init( &wait, 0, 0 );
+    if (!p_dbus_pending_call_set_notify( pending_call, bluez_dbus_wait_for_reply_callback, &wait, NULL ))
+    {
+        sem_destroy( &wait );
+        p_dbus_pending_call_unref( pending_call );
+        return STATUS_NO_MEMORY;
+    }
+    for (;;)
+    {
+        int ret = sem_wait( &wait );
+        if (!ret)
+        {
+            *reply = p_dbus_pending_call_steal_reply( pending_call );
+            if (p_dbus_set_error_from_message( error, *reply ))
+            {
+                p_dbus_message_unref( *reply );
+                *reply = NULL;
+            }
+            p_dbus_pending_call_unref( pending_call );
+            sem_destroy( &wait );
+            return STATUS_SUCCESS;
+        }
+        if (errno == EINTR)
+            continue;
+
+        ERR( "Failed to wait for DBus method reply: %s\n", debugstr_a( strerror( errno ) ) );
+        sem_destroy( &wait );
+        p_dbus_pending_call_cancel( pending_call );
+        p_dbus_pending_call_unref( pending_call );
+        return STATUS_INTERNAL_ERROR;
+    }
+}
+
+/* Like dbus_connection_send_with_reply_and_block, but it does not acquire a lock on the connection, instead relying on
+ * the main loop in bluez_dbus_loop. This is faster than send_with_reply_and_block.
+ * This takes ownership of the request, so there is no need to unref it. */
+static NTSTATUS bluez_dbus_send_and_wait_for_reply( DBusConnection *connection, DBusMessage *request, DBusMessage **reply,
+                                                    DBusError *error )
+{
+    DBusPendingCall *pending_call;
+    dbus_bool_t success;
+
+    success = p_dbus_connection_send_with_reply( connection, request, &pending_call, bluez_timeout );
+    p_dbus_message_unref( request );
+
+    if (!success)
+        return STATUS_NO_MEMORY;
+    return bluez_dbus_pending_call_wait( pending_call, reply, error );
+}
+
+static NTSTATUS bluez_adapter_set_discovery_filter( void *connection, const char *adapter_path,
+                                                    const char *transport_str )
+{
+    DBusMessage *request, *reply;
+    DBusMessageIter iter, dict_iter;
+    DBusError error;
+    NTSTATUS status;
+
+    TRACE( "(%p, %s, %s)\n", connection, debugstr_a( adapter_path ), debugstr_a( transport_str ) );
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, adapter_path, BLUEZ_INTERFACE_ADAPTER,
+                                              "SetDiscoveryFilter" );
+    if (!request) return STATUS_NO_MEMORY;
+
+    p_dbus_message_iter_init_append( request, &iter );
+    if (!p_dbus_message_iter_open_container( &iter, DBUS_TYPE_ARRAY, "{sv}", &dict_iter ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!bluez_variant_dict_add_entry( &dict_iter, "Transport", DBUS_TYPE_STRING,
+                                       DBUS_TYPE_STRING_AS_STRING, &transport_str ))
+    {
+        p_dbus_message_iter_abandon_container( &iter, &dict_iter );
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!p_dbus_message_iter_close_container( &iter, &dict_iter ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+
+    p_dbus_error_init ( &error );
+
+    TRACE( "Setting discovery filter on %s to use transport %s\n", debugstr_a( adapter_path ),
+           debugstr_a( transport_str ) );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        WARN( "Failed to set discovery filter: %s: %s\n", debugstr_a( error.name ), debugstr_a( error.message ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_message_unref( reply );
+    p_dbus_error_free( &error );
+
+    return STATUS_SUCCESS;
+
+}
+
+NTSTATUS bluez_adapter_start_discovery( void *connection, const char *adapter_path )
+{
+    DBusMessage *request, *reply;
+    DBusError error;
+    NTSTATUS status;
+
+    TRACE( "(%p, %s)\n", connection, debugstr_a( adapter_path ) );
+
+    status = bluez_adapter_set_discovery_filter( connection, adapter_path, "bredr" );
+    if (status != STATUS_SUCCESS) return status;
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, adapter_path, BLUEZ_INTERFACE_ADAPTER,
+                                              "StartDiscovery" );
+    if (!request) return STATUS_NO_MEMORY;
+
+    TRACE( "Starting discovery on %s\n", debugstr_a( adapter_path ) );
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        ERR( "Failed to start discovery on adapter %s: %s: %s", debugstr_a( adapter_path ),
+             debugstr_a( error.message ), debugstr_a( error.name ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_error_free( &error );
+    p_dbus_message_unref( reply );
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS bluez_adapter_stop_discovery( void *connection, const char *adapter_path )
+{
+    DBusMessage *request, *reply;
+    DBusError error;
+    NTSTATUS status;
+
+    TRACE( "(%p, %s)\n", connection, debugstr_a( adapter_path ) );
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, adapter_path, BLUEZ_INTERFACE_ADAPTER,
+                                              "StopDiscovery" );
+    if (!request) return STATUS_NO_MEMORY;
+
+    TRACE( "Stopping discovery on %s\n", debugstr_a( adapter_path ) );
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        ERR( "Failed to stop discovery on adapter %s: %s: %s", debugstr_a( adapter_path ),
+             debugstr_a( error.message ), debugstr_a( error.name ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_error_free( &error );
+    p_dbus_message_unref( reply );
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS bluez_adapter_remove_device( void *connection, const char *adapter_path, const char *device_path )
+{
+    DBusMessage *request, *reply = NULL;
+    DBusError error;
+    NTSTATUS status;
+
+    TRACE( "(%p, %s, %s)\n", connection, debugstr_a( adapter_path ), debugstr_a( device_path ) );
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, adapter_path, BLUEZ_INTERFACE_ADAPTER, "RemoveDevice" );
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    if (!p_dbus_message_append_args( request, DBUS_TYPE_OBJECT_PATH, &device_path, DBUS_TYPE_INVALID ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        ERR( "Failed to remove device %s on adapter %s: %s: %s\n", debugstr_a( device_path ),
+             debugstr_a( adapter_path ), debugstr_a( error.name ), debugstr_a( error.message ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_message_unref( reply );
+    p_dbus_error_free( &error );
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS bluez_adapter_set_prop( void *connection, struct bluetooth_adapter_set_prop_params *params )
+{
+    DBusMessage *request, *reply;
+    DBusMessageIter iter, sub_iter;
+    DBusError error;
+    DBusBasicValue val;
+    int val_type;
+    static const char *adapter_iface = BLUEZ_INTERFACE_ADAPTER;
+    const char *prop_name;
+    NTSTATUS status;
+
+    TRACE( "(%p, %p)\n", connection, params );
+
+    switch (params->prop_flag)
+    {
+    case LOCAL_RADIO_CONNECTABLE:
+        prop_name = "Connectable";
+        val.bool_val = params->prop->boolean;
+        val_type = DBUS_TYPE_BOOLEAN;
+        break;
+    case LOCAL_RADIO_DISCOVERABLE:
+        prop_name = "Discoverable";
+        val.bool_val = params->prop->boolean;
+        val_type = DBUS_TYPE_BOOLEAN;
+        break;
+    default:
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    TRACE( "Setting property %s for adapter %s\n", debugstr_a( prop_name ), debugstr_a( params->adapter->str ) );
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, params->adapter->str,
+                                              DBUS_INTERFACE_PROPERTIES, "Set" );
+    if (!request) return STATUS_NO_MEMORY;
+
+    p_dbus_message_iter_init_append( request, &iter );
+    if (!p_dbus_message_iter_append_basic( &iter, DBUS_TYPE_STRING, &adapter_iface ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!p_dbus_message_iter_append_basic( &iter, DBUS_TYPE_STRING, &prop_name ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!p_dbus_message_iter_open_container( &iter, DBUS_TYPE_VARIANT, DBUS_TYPE_BOOLEAN_AS_STRING, &sub_iter ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!p_dbus_message_iter_append_basic( &sub_iter, val_type, &val ))
+    {
+        p_dbus_message_iter_abandon_container( &iter, &sub_iter );
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+    if (!p_dbus_message_iter_close_container( &iter, &sub_iter ))
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        ERR( "Failed to set property %s for adapter %s: %s: %s\n", debugstr_a( prop_name ),
+             debugstr_a( params->adapter->str ), debugstr_a( error.name ), debugstr_a( error.message ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_error_free( &error );
+    p_dbus_message_unref( reply );
+
+    return STATUS_SUCCESS;
+}
+
 static void bluez_radio_prop_from_dict_entry( const char *prop_name, DBusMessageIter *variant,
                                               struct winebluetooth_radio_properties *props,
                                               winebluetooth_radio_props_mask_t *props_mask,
@@ -272,6 +621,18 @@ static void bluez_radio_prop_from_dict_entry( const char *prop_name, DBusMessage
     TRACE_(dbus)( "(%s, %p, %p, %p, %#x)\n", debugstr_a( prop_name ), variant, props, props_mask,
                   wanted_props_mask );
 
+    if (wanted_props_mask & WINEBLUETOOTH_RADIO_PROPERTY_NAME &&
+        !strcmp( prop_name, "Name" ) &&
+        p_dbus_message_iter_get_arg_type( variant ))
+    {
+        const char *name_str;
+        SIZE_T len;
+        p_dbus_message_iter_get_basic( variant, &name_str );
+        len = strlen( name_str );
+        memcpy( props->name, name_str, min( len + 1, ARRAYSIZE( props->name )));
+        props->name[ARRAYSIZE( props->name ) - 1] = '\0';
+        *props_mask |= WINEBLUETOOTH_RADIO_PROPERTY_NAME;
+    }
     if (wanted_props_mask & WINEBLUETOOTH_RADIO_PROPERTY_ADDRESS &&
         !strcmp( prop_name, "Address" ) &&
         p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_STRING)
@@ -344,6 +705,87 @@ static void bluez_radio_prop_from_dict_entry( const char *prop_name, DBusMessage
     }
 }
 
+static void bluez_device_prop_from_dict_entry( const char *prop_name, DBusMessageIter *variant,
+                                               struct winebluetooth_device_properties *props,
+                                               winebluetooth_device_props_mask_t *props_mask,
+                                               winebluetooth_device_props_mask_t wanted_props_mask )
+{
+    TRACE_( dbus )( "(%s, %p, %p, %p, %#x)\n", debugstr_a( prop_name ), variant, props, props_mask,
+                    wanted_props_mask );
+
+
+    if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_NAME &&
+        !strcmp( prop_name, "Name" ) &&
+        p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_STRING)
+    {
+        const char *name_str;
+        SIZE_T len;
+
+        p_dbus_message_iter_get_basic( variant, &name_str );
+        len = strlen( name_str );
+        memcpy( props->name, name_str, min( len + 1, ARRAYSIZE( props->name ) ) );
+        props->name[ARRAYSIZE( props->name ) - 1] = '\0';
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_NAME;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_ADDRESS &&
+        !strcmp( prop_name, "Address" ) &&
+        p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_STRING)
+    {
+        const char *addr_str;
+
+        p_dbus_message_iter_get_basic( variant, &addr_str );
+        parse_mac_address( addr_str, props->address.rgBytes );
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_ADDRESS;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_CONNECTED &&
+             !strcmp( prop_name, "Connected" ) &&
+             p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_BOOLEAN)
+    {
+        dbus_bool_t connected;
+
+        p_dbus_message_iter_get_basic( variant, &connected );
+        props->connected = !!connected;
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_CONNECTED;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_PAIRED &&
+             !strcmp( prop_name, "Paired" ) &&
+             p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_BOOLEAN)
+    {
+        dbus_bool_t paired;
+
+        p_dbus_message_iter_get_basic( variant, &paired );
+        props->paired = !!paired;
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_PAIRED;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_LEGACY_PAIRING &&
+             !strcmp( prop_name, "LegacyPairing" ) &&
+             p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_BOOLEAN)
+    {
+        dbus_bool_t legacy;
+
+        p_dbus_message_iter_get_basic( variant, &legacy );
+        props->legacy_pairing = !!legacy;
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_LEGACY_PAIRING;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_TRUSTED &&
+             !strcmp( prop_name, "Trusted" ) &&
+             p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_BOOLEAN)
+    {
+        dbus_bool_t trusted;
+
+        p_dbus_message_iter_get_basic( variant, &trusted );
+        props->trusted = !!trusted;
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_TRUSTED;
+    }
+    else if (wanted_props_mask & WINEBLUETOOTH_DEVICE_PROPERTY_CLASS &&
+             !strcmp( prop_name, "Class" ) &&
+             p_dbus_message_iter_get_arg_type( variant ) == DBUS_TYPE_UINT32)
+    {
+        p_dbus_message_iter_get_basic( variant, &props->class );
+        *props_mask |= WINEBLUETOOTH_DEVICE_PROPERTY_CLASS;
+    }
+}
+
 static NTSTATUS bluez_adapter_get_props_async( void *connection, const char *radio_object_path,
                                                DBusPendingCall **call )
 {
@@ -367,15 +809,77 @@ static NTSTATUS bluez_adapter_get_props_async( void *connection, const char *rad
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS bluez_device_get_props_by_path_async( DBusConnection *connection,
+                                                      const char *device_path,
+                                                      DBusPendingCall **pending_call )
+{
+    DBusMessage *request;
+    static const char *adapter_iface = BLUEZ_INTERFACE_DEVICE;
+    dbus_bool_t ret;
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, device_path,
+                                              DBUS_INTERFACE_PROPERTIES, "GetAll" );
+    if (!request) return STATUS_NO_MEMORY;
+
+    p_dbus_message_append_args( request, DBUS_TYPE_STRING, &adapter_iface, DBUS_TYPE_INVALID );
+    ret = p_dbus_connection_send_with_reply( connection, request, pending_call, bluez_timeout );
+    p_dbus_message_unref( request );
+    if (!ret)
+        return STATUS_NO_MEMORY;
+    if (!*pending_call)
+        return STATUS_INTERNAL_ERROR;
+
+    return STATUS_SUCCESS;
+}
+
 struct bluez_watcher_ctx
 {
     void *init_device_list_call;
 
     /* struct bluez_init_entry */
     struct list initial_radio_list;
+    /* struct bluez_init_entry */
+    struct list initial_device_list;
 
     /* struct bluez_watcher_event */
     struct list event_list;
+};
+
+struct bluez_init_entry
+{
+    union {
+        struct winebluetooth_watcher_event_radio_added radio;
+        struct winebluetooth_watcher_event_device_added device;
+    } object;
+    struct list entry;
+};
+
+/* The status of a pairing session initiated by BlueZ. */
+enum bluez_pairing_session_status
+{
+    /* No pairing session is active. */
+    BLUEZ_PAIRING_SESSION_NONE,
+    /* We have received an authentication request from BlueZ, which should be queued to the PE driver. */
+    BLUEZ_PAIRING_SESSION_INCOMING,
+    /* The authentication request has been relayed to the driver, and we're waiting for a response from userspace. */
+    BLUEZ_PAIRING_SESSION_PENDING_REPLY,
+    /* The authentication request has been cancelled by BlueZ. */
+    BLUEZ_PAIRING_SESSION_CANCELLED,
+};
+
+struct bluez_auth_agent_ctx
+{
+    LONG refcnt;
+
+    pthread_mutex_t lock; /* Guards all fields below. */
+    enum bluez_pairing_session_status status;
+    struct unix_name *device;
+    BLUETOOTH_AUTHENTICATION_METHOD method;
+    UINT32 passkey;
+    /* The auth request we received from BlueZ. */
+    DBusMessage *auth_request;
+    DBusPreallocatedSend *preallocate_send;
+    DBusConnection *connection;
 };
 
 void *bluez_dbus_init( void )
@@ -412,6 +916,354 @@ void bluez_dbus_free( void *connection )
     TRACE_(dbus)( "(%s)\n", dbgstr_dbus_connection( connection ) );
 
     p_dbus_connection_unref( connection );
+}
+
+static struct bluez_auth_agent_ctx *bluez_auth_agent_ctx_incref( struct bluez_auth_agent_ctx *ctx )
+{
+    InterlockedIncrement( &ctx->refcnt );
+    return ctx;
+}
+
+static void bluez_auth_agent_ctx_decref( struct bluez_auth_agent_ctx *ctx )
+{
+    if (InterlockedDecrement( &ctx->refcnt ))
+        return;
+
+    if (ctx->status != BLUEZ_PAIRING_SESSION_NONE)
+    {
+        unix_name_free( ctx->device );
+        if (ctx->status != BLUEZ_PAIRING_SESSION_CANCELLED)
+        {
+            p_dbus_connection_free_preallocated_send( ctx->connection, ctx->preallocate_send );
+            p_dbus_message_unref( ctx->auth_request );
+            p_dbus_connection_unref( ctx->connection );
+        }
+    }
+    pthread_mutex_destroy( &ctx->lock );
+    free( ctx );
+}
+
+static DBusHandlerResult bluez_auth_agent_vtable_message_handler( DBusConnection *connection, DBusMessage *message,
+                                                                  void *data )
+{
+    struct bluez_auth_agent_ctx *ctx = data;
+    DBusPreallocatedSend *prealloc_send;
+    DBusMessage *reply;
+
+    TRACE_(dbus)( "(%s, %s, %p)\n", dbgstr_dbus_connection( connection ), dbgstr_dbus_message( message ),
+                  data );
+
+    prealloc_send = p_dbus_connection_preallocate_send( connection );
+    if (!prealloc_send)
+        return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+    if (p_dbus_message_is_method_call( message, BLUEZ_INTERFACE_AGENT, "RequestConfirmation" ))
+    {
+        struct unix_name *device;
+        const char *device_path;
+        dbus_uint32_t passkey;
+        DBusError error;
+
+        p_dbus_error_init( &error );
+        if (!p_dbus_message_get_args( message, &error, DBUS_TYPE_OBJECT_PATH, &device_path, DBUS_TYPE_UINT32, &passkey,
+                                      DBUS_TYPE_INVALID ))
+        {
+            ERR( "Failed to get message args: %s: %s\n", debugstr_a( error.name ), debugstr_a( error.message ) );
+            p_dbus_error_free( &error );
+            p_dbus_connection_free_preallocated_send( connection, prealloc_send );
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        }
+        p_dbus_error_free( &error );
+        device = unix_name_get_or_create( device_path );
+        if (!device)
+        {
+            ERR( "Failed to allocate memory for device path %s\n", device_path );
+            p_dbus_connection_free_preallocated_send( connection, prealloc_send );
+            return DBUS_HANDLER_RESULT_NEED_MEMORY;
+        }
+
+        TRACE( "Received a numeric confirmation request for device %s\n", debugstr_a( device_path ) );
+        pthread_mutex_lock( &ctx->lock );
+        ctx->status = BLUEZ_PAIRING_SESSION_INCOMING;
+        ctx->device = device;
+        ctx->method = BLUETOOTH_AUTHENTICATION_METHOD_NUMERIC_COMPARISON;
+        ctx->passkey = passkey;
+        ctx->auth_request = p_dbus_message_ref( message );
+        ctx->preallocate_send = prealloc_send;
+        ctx->connection = p_dbus_connection_ref( connection );
+        pthread_mutex_unlock( &ctx->lock );
+
+        return DBUS_HANDLER_RESULT_HANDLED;
+    }
+    if (p_dbus_message_is_method_call( message, BLUEZ_INTERFACE_AGENT, "AuthorizeService" ))
+        /* Services are handled by BlueZ and other services, so we can just allow them here, as
+         * this method only gets called for authenticated devices. */
+        reply = p_dbus_message_new_method_return( message );
+    else if (p_dbus_message_is_method_call( message, BLUEZ_INTERFACE_AGENT, "Cancel" ))
+    {
+        pthread_mutex_lock( &ctx->lock );
+        if (ctx->status == BLUEZ_PAIRING_SESSION_INCOMING || ctx->status == BLUEZ_PAIRING_SESSION_PENDING_REPLY)
+        {
+            TRACE( "Cancelling authentication request from device %s\n", debugstr_a( ctx->device->str ) );
+            ctx->status = BLUEZ_PAIRING_SESSION_CANCELLED;
+            unix_name_free( ctx->device );
+            p_dbus_message_unref( ctx->auth_request );
+            p_dbus_connection_free_preallocated_send( ctx->connection, ctx->preallocate_send );
+            p_dbus_connection_unref( ctx->connection );
+        }
+        pthread_mutex_unlock( &ctx->lock );
+        reply = p_dbus_message_new_method_return( message );
+    }
+    else
+    {
+        FIXME( "Unsupported method call: %s\n", debugstr_a( p_dbus_message_get_member( message ) ) );
+        reply = p_dbus_message_new_error( message, "org.bluez.Error.Rejected", "" );
+    }
+
+    if (!reply)
+    {
+        p_dbus_connection_free_preallocated_send( connection, prealloc_send );
+        return DBUS_HANDLER_RESULT_NEED_MEMORY;
+    }
+    p_dbus_connection_send_preallocated( connection, prealloc_send, reply, NULL );
+    p_dbus_message_unref( reply );
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+const static struct DBusObjectPathVTable bluez_auth_agent_object_vtable = {
+    .message_function = bluez_auth_agent_vtable_message_handler };
+
+#define WINE_BLUEZ_AUTH_AGENT_PATH "/org/winehq/wine/winebth/AuthAgent"
+
+NTSTATUS bluez_auth_agent_start( void *connection, void **auth_agent_ctx )
+{
+    static const char *wine_bluez_auth_agent_path = WINE_BLUEZ_AUTH_AGENT_PATH;
+    static const char *capability = "KeyboardDisplay";
+    struct bluez_auth_agent_ctx *ctx;
+    DBusMessage *request;
+    dbus_bool_t success;
+    DBusError error;
+    NTSTATUS status;
+
+    TRACE( "(%s, %p)\n", dbgstr_dbus_connection( connection ), auth_agent_ctx );
+
+    ctx = malloc( sizeof( *ctx ) );
+    if (!ctx)
+        return STATUS_NO_MEMORY;
+
+    pthread_mutex_init( &ctx->lock, NULL );
+    ctx->status = BLUEZ_PAIRING_SESSION_NONE;
+    ctx->refcnt = 1;
+
+    p_dbus_error_init( &error );
+    TRACE_(dbus)( "Registering an org.bluez.Agent1 object at %s\n", WINE_BLUEZ_AUTH_AGENT_PATH );
+    /* No need to increase the reference count on the auth agent context here, as the vtable handlers only get called
+     * inside bluez_dbus_loop, where the reference count gets incremented at start. */
+    success = p_dbus_connection_try_register_object_path( connection, WINE_BLUEZ_AUTH_AGENT_PATH,
+                                                          &bluez_auth_agent_object_vtable, ctx, &error );
+    if (!success)
+    {
+        ERR_(dbus)( "Failed to register object: %s: %s\n", debugstr_a( error.name ),
+                    debugstr_a( error.message ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        bluez_auth_agent_ctx_decref( ctx );
+        goto done;
+    }
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, "/org/bluez", BLUEZ_INTERFACE_AGENT_MANAGER,
+                                              "RegisterAgent" );
+    if (!request)
+    {
+        status = STATUS_NO_MEMORY;
+        goto failure;
+    }
+
+    success = p_dbus_message_append_args( request, DBUS_TYPE_OBJECT_PATH, &wine_bluez_auth_agent_path, DBUS_TYPE_STRING,
+                                          &capability, DBUS_TYPE_INVALID );
+    if (!success)
+    {
+        status = STATUS_NO_MEMORY;
+        goto failure;
+    }
+
+    success = p_dbus_connection_send( connection, request, NULL );
+    p_dbus_message_unref( request );
+    if (!success)
+    {
+        status = STATUS_NO_MEMORY;
+        goto failure;
+    }
+    status = STATUS_SUCCESS;
+    *auth_agent_ctx = ctx;
+    goto done;
+
+failure:
+    p_dbus_connection_unregister_object_path( connection, WINE_BLUEZ_AUTH_AGENT_PATH );
+    bluez_auth_agent_ctx_decref( ctx );
+done:
+    p_dbus_error_free( &error );
+    return status;
+}
+
+NTSTATUS bluez_auth_agent_stop( void *connection, void *auth_agent_ctx )
+{
+    static const char *wine_bluez_auth_agent_path = WINE_BLUEZ_AUTH_AGENT_PATH;
+    struct bluez_auth_agent_ctx *ctx = auth_agent_ctx;
+    DBusMessage *request;
+    dbus_bool_t success;
+
+    TRACE( "(%s, %p)\n", dbgstr_dbus_connection( connection ), auth_agent_ctx );
+
+    bluez_auth_agent_ctx_decref( ctx );
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, "/org/bluez", BLUEZ_INTERFACE_AGENT_MANAGER,
+                                              "UnregisterAgent" );
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    success = p_dbus_message_append_args( request, DBUS_TYPE_OBJECT_PATH, &wine_bluez_auth_agent_path,
+                                          DBUS_TYPE_INVALID );
+    if (!success)
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+
+    success = p_dbus_connection_send( connection, request, NULL );
+    p_dbus_message_unref( request );
+    if (!success)
+        return STATUS_NO_MEMORY;
+
+    success = p_dbus_connection_unregister_object_path( connection, WINE_BLUEZ_AUTH_AGENT_PATH );
+    return success ? STATUS_SUCCESS : STATUS_NO_MEMORY;
+}
+
+NTSTATUS bluez_auth_agent_request_default( void *connection )
+{
+    static const char *wine_bluez_auth_agent_path = WINE_BLUEZ_AUTH_AGENT_PATH;
+    DBusMessage *request, *reply;
+    dbus_bool_t success;
+    NTSTATUS status;
+    DBusError error;
+
+    TRACE( "(%p)\n", connection );
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, "/org/bluez", BLUEZ_INTERFACE_AGENT_MANAGER,
+                                              "RequestDefaultAgent" );
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    success = p_dbus_message_append_args( request, DBUS_TYPE_OBJECT_PATH, &wine_bluez_auth_agent_path,
+                                          DBUS_TYPE_INVALID );
+    if (!success)
+    {
+        p_dbus_message_unref( request );
+        return STATUS_NO_MEMORY;
+    }
+
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_message_unref( request );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        status = bluez_dbus_error_to_ntstatus( &error );
+        ERR( "RequestDefaultAgent failed: %s: %s\n", debugstr_a( error.name ), debugstr_a( error.message ) );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_error_free( &error );
+    p_dbus_message_unref( reply );
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS bluez_auth_agent_send_response( void *auth_agent, struct unix_name *device,
+                                         BLUETOOTH_AUTHENTICATION_METHOD method, UINT32 numeric_or_passkey,
+                                         BOOL negative, BOOL *authenticated )
+{
+    struct bluez_auth_agent_ctx *ctx = auth_agent;
+    NTSTATUS ret;
+
+    TRACE( "auth_agent=%p device=%s negative=%d\n", auth_agent, debugstr_a( device->str ), negative );
+
+    pthread_mutex_lock( &ctx->lock );
+    switch (ctx->status)
+    {
+    case BLUEZ_PAIRING_SESSION_PENDING_REPLY:
+    {
+        DBusMessage *reply;
+        if (device != ctx->device)
+        {
+            ret = STATUS_DEVICE_NOT_CONNECTED;
+            goto done;
+        }
+        if (numeric_or_passkey != ctx->passkey || method != ctx->method)
+            negative = TRUE;
+
+        reply = negative ? p_dbus_message_new_error( ctx->auth_request, "org.bluez.Rejected", "" )
+                         : p_dbus_message_new_method_return( ctx->auth_request );
+        if (!reply)
+        {
+            ret = STATUS_NO_MEMORY;
+            goto done;
+        }
+        p_dbus_connection_send_preallocated( ctx->connection, ctx->preallocate_send, reply, NULL );
+
+        unix_name_free( ctx->device );
+        p_dbus_message_unref( ctx->auth_request );
+        p_dbus_connection_unref( ctx->connection );
+        ctx->status = BLUEZ_PAIRING_SESSION_NONE;
+        *authenticated = !negative;
+        ret = STATUS_SUCCESS;
+        break;
+    }
+    case BLUEZ_PAIRING_SESSION_CANCELLED:
+        ret = STATUS_CANCELLED;
+        break;
+    default:
+        ret = STATUS_DEVICE_NOT_READY;
+        break;
+    }
+done:
+    pthread_mutex_unlock( &ctx->lock );
+    return ret;
+}
+
+NTSTATUS bluez_device_disconnect( void *connection, const char *device_path )
+{
+    DBusMessage *request, *reply = NULL;
+    NTSTATUS status;
+    DBusError error;
+
+    TRACE( "(%p, %s)\n", connection, debugstr_a( device_path ) );
+
+    request = p_dbus_message_new_method_call( BLUEZ_DEST, device_path, BLUEZ_INTERFACE_DEVICE, "Disconnect" );
+    if (!request)
+        return STATUS_NO_MEMORY;
+
+    p_dbus_error_init( &error );
+    status = bluez_dbus_send_and_wait_for_reply( connection, request, &reply, &error );
+    if (status)
+    {
+        p_dbus_error_free( &error );
+        return status;
+    }
+    if (!reply)
+    {
+        ERR( "Failed to disconnect device %s: %s: %s\n", debugstr_a( device_path ), debugstr_a( error.name ),
+             debugstr_a( error.message ) );
+        status = bluez_dbus_error_to_ntstatus( &error );
+        p_dbus_error_free( &error );
+        return status;
+    }
+    p_dbus_message_unref( reply );
+    p_dbus_error_free( &error );
+
+    return STATUS_SUCCESS;
 }
 
 struct bluez_watcher_event
@@ -487,6 +1339,42 @@ static void bluez_filter_radio_props_changed_callback( DBusPendingCall *call, vo
     {
         bluez_radio_prop_from_dict_entry( prop_name, &variant, &changed->props,
                                           &changed->changed_props_mask, changed->invalid_props_mask );
+    }
+    changed->invalid_props_mask &= ~changed->changed_props_mask;
+    p_dbus_message_unref( reply );
+}
+
+static void bluez_filter_device_props_changed_callback( DBusPendingCall *call, void *user_data )
+{
+    union winebluetooth_watcher_event_data *event = user_data;
+    struct winebluetooth_watcher_event_device_props_changed *changed = &event->device_props_changed;
+    const struct unix_name *device = (struct unix_name *)event->device_props_changed.device.handle;
+    DBusMessage *reply;
+    DBusMessageIter dict, prop_iter, variant;
+    const char *prop_name;
+    DBusError error;
+
+    TRACE( "call %p, device %s\n", call, debugstr_a( device->str ) );
+
+    reply = p_dbus_pending_call_steal_reply( call );
+    p_dbus_error_init( &error );
+    if (p_dbus_set_error_from_message( &error, reply ))
+    {
+        ERR( "Failed to get device properties for %s: %s: %s\n", debugstr_a( device->str ), debugstr_a( error.name ),
+             debugstr_a( error.message ) );
+        p_dbus_error_free( &error );
+        p_dbus_message_unref( reply );
+        return;
+    }
+    p_dbus_error_free( &error );
+
+    p_dbus_message_iter_init( reply, &dict );
+    p_dbus_message_iter_recurse( &dict, &prop_iter );
+    while((prop_name = bluez_next_dict_entry( &prop_iter, &variant )))
+    {
+        bluez_device_prop_from_dict_entry( prop_name, &variant, &changed->props,
+                                           &changed->changed_props_mask,
+                                           changed->invalid_props_mask );
     }
     changed->invalid_props_mask &= ~changed->changed_props_mask;
     p_dbus_message_unref( reply );
@@ -583,6 +1471,64 @@ static DBusHandlerResult bluez_filter( DBusConnection *conn, DBusMessage *msg, v
                         unix_name_free( radio );
                 }
             }
+            else if (!strcmp( iface_name, BLUEZ_INTERFACE_DEVICE ))
+            {
+                struct winebluetooth_watcher_event_device_added device_added = {0};
+                struct unix_name *device_name, *radio_name = NULL;
+                DBusMessageIter props_iter, variant;
+                const char *prop_name;
+
+                device_name = unix_name_get_or_create( object_path );
+                device_added.device.handle = (UINT_PTR)device_name;
+                if (!device_name)
+                {
+                    ERR("Failed to allocate memory for device path %s\n", debugstr_a( object_path ));
+                    break;
+                }
+                p_dbus_message_iter_next( &iface_entry );
+                p_dbus_message_iter_recurse( &iface_entry, &props_iter );
+
+                while((prop_name = bluez_next_dict_entry( &props_iter, &variant )))
+                {
+                    if (!strcmp( prop_name, "Adapter" ) &&
+                        p_dbus_message_iter_get_arg_type( &variant ) == DBUS_TYPE_OBJECT_PATH)
+                    {
+                        const char *path;
+
+                        p_dbus_message_iter_get_basic( &variant, &path );
+                        radio_name = unix_name_get_or_create( path );
+                        if (!radio_name)
+                        {
+                            unix_name_free( device_name );
+                            ERR("Failed to allocate memory for radio path %s\n", debugstr_a( path ));
+                            break;
+                        }
+                        device_added.radio.handle = (UINT_PTR)radio_name;
+                    }
+                    else
+                        bluez_device_prop_from_dict_entry( prop_name, &variant, &device_added.props,
+                                                           &device_added.known_props_mask,
+                                                           WINEBLUETOOTH_DEVICE_ALL_PROPERTIES );
+                }
+
+                if (!radio_name)
+                {
+                    unix_name_free( device_name );
+                    ERR( "Could not find the associated adapter for device %s\n", debugstr_a( object_path ) );
+                    break;
+                }
+                else
+                {
+                    union winebluetooth_watcher_event_data event = { .device_added = device_added };
+                    TRACE( "New BlueZ org.bluez.Device1 object added at %s: %p\n", debugstr_a( object_path ),
+                           device_name );
+                    if (!bluez_event_list_queue_new_event( event_list, BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_ADDED, event ))
+                    {
+                        unix_name_free( device_name );
+                        unix_name_free( radio_name );
+                    }
+                }
+            }
             p_dbus_message_iter_next( &ifaces_iter );
         }
     }
@@ -627,6 +1573,22 @@ static DBusHandlerResult bluez_filter( DBusConnection *conn, DBusMessage *msg, v
                 if (!bluez_event_list_queue_new_event(
                         event_list, BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_REMOVED, event ))
                     unix_name_free( radio_name );
+            }
+            else if (!strcmp( interfaces[i], BLUEZ_INTERFACE_DEVICE ))
+            {
+                struct unix_name *device;
+                union winebluetooth_watcher_event_data event;
+
+                device = unix_name_get_or_create( object_path );
+                if (!device)
+                {
+                    ERR( "Failed to allocate memory for adapter path %s\n", object_path );
+                    continue;
+                }
+                event.device_removed.device.handle = (UINT_PTR)device;
+                if (!bluez_event_list_queue_new_event( event_list, BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_REMOVED,
+                                                       event ))
+                    unix_name_free( device );
             }
         }
         p_dbus_free_string_array( interfaces );
@@ -725,6 +1687,85 @@ static DBusHandlerResult bluez_filter( DBusConnection *conn, DBusMessage *msg, v
                 }
             }
         }
+        else if (strcmp( iface, BLUEZ_INTERFACE_DEVICE ) == 0)
+        {
+            struct winebluetooth_watcher_event_device_props_changed props_changed = {0};
+            struct unix_name *device;
+            const char *prop_name, *object_path;
+            union winebluetooth_watcher_event_data event;
+            DBusMessageIter changed_props_iter, invalid_props_iter, variant;
+            const static struct bluez_object_property_masks device_prop_masks[] = {
+                { "Name", WINEBLUETOOTH_DEVICE_PROPERTY_NAME },
+                { "Address", WINEBLUETOOTH_DEVICE_PROPERTY_ADDRESS },
+                { "Connected", WINEBLUETOOTH_DEVICE_PROPERTY_CONNECTED },
+                { "Paired", WINEBLUETOOTH_DEVICE_PROPERTY_PAIRED },
+                { "LegacyPairing", WINEBLUETOOTH_DEVICE_PROPERTY_LEGACY_PAIRING },
+                { "Trusted", WINEBLUETOOTH_DEVICE_PROPERTY_TRUSTED },
+                { "Class", WINEBLUETOOTH_DEVICE_PROPERTY_CLASS }
+            };
+
+            p_dbus_message_iter_next( &iter );
+            p_dbus_message_iter_recurse( &iter, &changed_props_iter );
+            while ((prop_name = bluez_next_dict_entry( &changed_props_iter, &variant )))
+            {
+                bluez_device_prop_from_dict_entry( prop_name, &variant, &props_changed.props,
+                                                   &props_changed.changed_props_mask,
+                                                   WINEBLUETOOTH_DEVICE_ALL_PROPERTIES );
+            }
+            p_dbus_message_iter_next( &iter );
+            p_dbus_message_iter_recurse( &iter, &invalid_props_iter );
+            props_changed.invalid_props_mask = bluez_dbus_get_invalidated_properties_from_iter(
+                &invalid_props_iter, device_prop_masks, ARRAY_SIZE( device_prop_masks ) );
+            /* No properties that we're interested in have changed or been invalidated. */
+            if (!props_changed.changed_props_mask && !props_changed.invalid_props_mask)
+                return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+            object_path = p_dbus_message_get_path( msg );
+            TRACE( "Properties changed for device %s, changed %#x, invalidated %#x\n", debugstr_a( object_path ),
+                   props_changed.changed_props_mask, props_changed.invalid_props_mask );
+
+            device = unix_name_get_or_create( object_path );
+            if (!device)
+            {
+                ERR( "Failed to allocate memory for device path %s\n", object_path );
+                return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+            }
+            props_changed.device.handle = (UINT_PTR)device;
+            event.device_props_changed = props_changed;
+
+            if (props_changed.invalid_props_mask != 0)
+            {
+                DBusPendingCall *pending_call = NULL;
+                NTSTATUS status;
+
+                status = bluez_device_get_props_by_path_async( conn, device->str, &pending_call );
+                if (status)
+                {
+                    ERR( "Failed to create async call to get device properties: %#x\n", (int)status );
+                    unix_name_free( device );
+                    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+                }
+
+                if (!bluez_event_list_queue_new_event_with_call( event_list,
+                                                                 BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_PROPERTIES_CHANGED,
+                                                                 event, pending_call,
+                                                                 bluez_filter_device_props_changed_callback ))
+                {
+                    unix_name_free( device );
+                    p_dbus_pending_call_cancel( pending_call );
+                    p_dbus_pending_call_unref( pending_call );
+                    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+                }
+            }
+            else if (!bluez_event_list_queue_new_event( event_list,
+                                                        BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_PROPERTIES_CHANGED,
+                                                        event ))
+            {
+
+                unix_name_free( device );
+                return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+            }
+        }
     }
 
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -740,6 +1781,56 @@ static const char BLUEZ_MATCH_PROPERTIES[] = "type='signal',"
                                              "sender='"BLUEZ_DEST"',";
 
 static const char *BLUEZ_MATCH_RULES[] = { BLUEZ_MATCH_OBJECTMANAGER, BLUEZ_MATCH_PROPERTIES };
+
+/* Free up the watcher alongside any remaining events and initial devices and other associated resources. */
+static void bluez_watcher_free( struct bluez_watcher_ctx *watcher )
+{
+    struct bluez_watcher_event *event1, *event2;
+    struct bluez_init_entry *entry1, *entry2;
+
+    if (watcher->init_device_list_call)
+    {
+        p_dbus_pending_call_cancel( watcher->init_device_list_call );
+        p_dbus_pending_call_unref( watcher->init_device_list_call );
+    }
+
+    LIST_FOR_EACH_ENTRY_SAFE( entry1, entry2, &watcher->initial_radio_list, struct bluez_init_entry, entry )
+    {
+        list_remove( &entry1->entry );
+        unix_name_free( (struct unix_name *)entry1->object.radio.radio.handle );
+        free( entry1 );
+    }
+
+    LIST_FOR_EACH_ENTRY_SAFE( event1, event2, &watcher->event_list, struct bluez_watcher_event, entry )
+    {
+        list_remove( &event1->entry );
+        switch (event1->event_type)
+        {
+        case BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_ADDED:
+            unix_name_free( (struct unix_name *)event1->event.radio_added.radio.handle );
+            break;
+        case BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_REMOVED:
+            unix_name_free( (struct unix_name *)event1->event.radio_removed.handle );
+            break;
+        case BLUETOOTH_WATCHER_EVENT_TYPE_RADIO_PROPERTIES_CHANGED:
+            unix_name_free( (struct unix_name *)event1->event.radio_props_changed.radio.handle );
+            break;
+        case BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_ADDED:
+            unix_name_free( (struct unix_name *)event1->event.device_added.radio.handle );
+            unix_name_free( (struct unix_name *)event1->event.device_added.device.handle );
+            break;
+        case BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_REMOVED:
+            unix_name_free( (struct unix_name *)event1->event.device_removed.device.handle );
+            break;
+        case BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_PROPERTIES_CHANGED:
+            unix_name_free( (struct unix_name *)event1->event.device_props_changed.device.handle );
+            break;
+        }
+        free( event1 );
+    }
+
+    free( watcher );
+}
 
 NTSTATUS bluez_watcher_init( void *connection, void **ctx )
 {
@@ -760,10 +1851,13 @@ NTSTATUS bluez_watcher_init( void *connection, void **ctx )
     }
     watcher_ctx->init_device_list_call = call;
     list_init( &watcher_ctx->initial_radio_list );
-
+    list_init( &watcher_ctx->initial_device_list );
     list_init( &watcher_ctx->event_list );
 
-    if (!p_dbus_connection_add_filter( connection, bluez_filter, watcher_ctx, free ))
+    /* The bluez_dbus_loop thread will free up the watcher when the disconnect message is processed (i.e,
+     * dbus_connection_read_write_dispatch returns false). Using a free-function with dbus_connection_add_filter
+     * is racy as the filter is removed from a different thread. */
+    if (!p_dbus_connection_add_filter( connection, bluez_filter, watcher_ctx, NULL ))
     {
         p_dbus_pending_call_cancel( call );
         p_dbus_pending_call_unref( call );
@@ -812,15 +1906,8 @@ void bluez_watcher_close( void *connection, void *ctx )
     p_dbus_connection_remove_filter( connection, bluez_filter, ctx );
 }
 
-struct bluez_init_entry
-{
-    union {
-        struct winebluetooth_watcher_event_radio_added radio;
-    } object;
-    struct list entry;
-};
-
-static NTSTATUS bluez_build_initial_device_lists( DBusMessage *reply, struct list *adapter_list )
+static NTSTATUS bluez_build_initial_device_lists( DBusMessage *reply, struct list *adapter_list,
+                                                  struct list *device_list )
 {
     DBusMessageIter dict, paths_iter, iface_iter, prop_iter;
     const char *path;
@@ -872,10 +1959,66 @@ static NTSTATUS bluez_build_initial_device_lists( DBusMessage *reply, struct lis
                        debugstr_a( radio_name->str ), radio_name );
                 break;
             }
+            else if (!strcmp( iface, BLUEZ_INTERFACE_DEVICE ))
+            {
+                const char *prop_name;
+                DBusMessageIter variant;
+                struct bluez_init_entry *init_device;
+                struct unix_name *device_name, *radio_name = NULL;
+
+                init_device = calloc( 1, sizeof( *init_device ) );
+                if (!init_device)
+                {
+                    status = STATUS_NO_MEMORY;
+                    goto done;
+                }
+                device_name = unix_name_get_or_create( path );
+                if (!device_name)
+                {
+                    free( init_device );
+                    status = STATUS_NO_MEMORY;
+                    goto done;
+                }
+                init_device->object.device.device.handle = (UINT_PTR)device_name;
+                init_device->object.device.init_entry = TRUE;
+
+                while((prop_name = bluez_next_dict_entry( &prop_iter, &variant )))
+                {
+                    if (!strcmp( prop_name, "Adapter" ) &&
+                        p_dbus_message_iter_get_arg_type( &variant ) == DBUS_TYPE_OBJECT_PATH)
+                    {
+                        const char *path;
+                        p_dbus_message_iter_get_basic( &variant, &path );
+                        radio_name = unix_name_get_or_create( path );
+                        if (!radio_name)
+                        {
+                            unix_name_free( device_name );
+                            free( init_device );
+                            status = STATUS_NO_MEMORY;
+                            goto done;
+                        }
+                        init_device->object.device.radio.handle = (UINT_PTR)radio_name;
+                    }
+                    else
+                        bluez_device_prop_from_dict_entry( prop_name, &variant, &init_device->object.device.props,
+                                                           &init_device->object.device.known_props_mask,
+                                                           WINEBLUETOOTH_DEVICE_ALL_PROPERTIES );
+                }
+                if (!init_device->object.device.radio.handle)
+                {
+                    unix_name_free( device_name );
+                    free( init_device );
+                    ERR( "Could not find the associated adapter for device %s\n", debugstr_a( path ) );
+                    break;
+                }
+                list_add_tail( device_list, &init_device->entry );
+                TRACE( "Found BlueZ org.bluez.Device1 object %s: %p\n", debugstr_a( path ), device_name );
+                break;
+            }
         }
     }
 
-    TRACE( "Initial device list: radios: %d\n", list_count( adapter_list ) );
+    TRACE( "Initial device list: radios: %d, devices: %d\n", list_count( adapter_list ), list_count( device_list ) );
  done:
     return status;
 }
@@ -891,6 +2034,17 @@ static BOOL bluez_watcher_event_queue_ready( struct bluez_watcher_ctx *ctx, stru
         event->event_data.radio_added = radio->object.radio;
         list_remove( &radio->entry );
         free( radio );
+        return TRUE;
+    }
+    if (!list_empty( &ctx->initial_device_list ))
+    {
+        struct bluez_init_entry *device;
+
+        device = LIST_ENTRY( list_head( &ctx->initial_device_list ), struct bluez_init_entry, entry );
+        event->event_type = BLUETOOTH_WATCHER_EVENT_TYPE_DEVICE_ADDED;
+        event->event_data.device_added = device->object.device;
+        list_remove( &device->entry );
+        free( device );
         return TRUE;
     }
     if (!list_empty( &ctx->event_list ))
@@ -912,11 +2066,32 @@ static BOOL bluez_watcher_event_queue_ready( struct bluez_watcher_ctx *ctx, stru
     return FALSE;
 }
 
-NTSTATUS bluez_dbus_loop( void *c, void *watcher,
+static BOOL bluez_auth_agent_ctx_have_event( struct bluez_auth_agent_ctx *ctx,
+                                             struct winebluetooth_auth_event *event )
+{
+    BOOL have_event = FALSE;
+
+    pthread_mutex_lock( &ctx->lock );
+    if (ctx->status == BLUEZ_PAIRING_SESSION_INCOMING)
+    {
+        event->device.handle = (UINT_PTR)unix_name_dup( ctx->device );
+        event->method = ctx->method;
+        event->numeric_value_or_passkey = ctx->passkey;
+
+        ctx->status = BLUEZ_PAIRING_SESSION_PENDING_REPLY;
+        have_event = TRUE;
+    }
+    pthread_mutex_unlock( &ctx->lock );
+
+    return have_event;
+}
+
+NTSTATUS bluez_dbus_loop( void *c, void *watcher, void *auth_agent,
                           struct winebluetooth_event *result )
 {
     DBusConnection *connection;
     struct bluez_watcher_ctx *watcher_ctx = watcher;
+    auth_agent = bluez_auth_agent_ctx_incref( auth_agent );
 
     TRACE( "(%p, %p, %p)\n", c, watcher, result );
     connection = p_dbus_connection_ref( c );
@@ -927,10 +2102,20 @@ NTSTATUS bluez_dbus_loop( void *c, void *watcher,
         {
             result->status = WINEBLUETOOTH_EVENT_WATCHER_EVENT;
             p_dbus_connection_unref( connection );
+            bluez_auth_agent_ctx_decref( auth_agent );
+            return STATUS_PENDING;
+        }
+        else if (bluez_auth_agent_ctx_have_event( auth_agent, &result->data.auth_event ))
+        {
+            result->status = WINEBLUETOOTH_EVENT_AUTH_EVENT;
+            p_dbus_connection_unref( connection );
+            bluez_auth_agent_ctx_decref( auth_agent );
             return STATUS_PENDING;
         }
         else if (!p_dbus_connection_read_write_dispatch( connection, 100 ))
         {
+            bluez_watcher_free( watcher_ctx );
+            bluez_auth_agent_ctx_decref( auth_agent );
             p_dbus_connection_unref( connection );
             TRACE( "Disconnected from DBus\n" );
             return STATUS_SUCCESS;
@@ -954,14 +2139,17 @@ NTSTATUS bluez_dbus_loop( void *c, void *watcher,
                 p_dbus_error_free( &error );
                 p_dbus_message_unref( reply );
                 p_dbus_connection_unref( connection );
+                bluez_auth_agent_ctx_decref( auth_agent );
                 return STATUS_NO_MEMORY;
             }
-            status = bluez_build_initial_device_lists( reply, &watcher_ctx->initial_radio_list );
+            status = bluez_build_initial_device_lists( reply, &watcher_ctx->initial_radio_list,
+                                                       &watcher_ctx->initial_device_list );
             p_dbus_message_unref( reply );
             if (status != STATUS_SUCCESS)
             {
                 WARN( "Error building initial bluetooth devices list: %#x\n", (int)status );
                 p_dbus_connection_unref( connection );
+                bluez_auth_agent_ctx_decref( auth_agent );
                 return status;
             }
         }
@@ -973,7 +2161,37 @@ void *bluez_dbus_init( void ) { return NULL; }
 void bluez_dbus_close( void *connection ) {}
 void bluez_dbus_free( void *connection ) {}
 NTSTATUS bluez_watcher_init( void *connection, void **ctx ) { return STATUS_NOT_SUPPORTED; }
-NTSTATUS bluez_dbus_loop( void *c, void *watcher, struct winebluetooth_event *result )
+void bluez_watcher_close( void *connection, void *ctx ) {}
+NTSTATUS bluez_dbus_loop( void *c, void *watcher, void *auth_agent, struct winebluetooth_event *result )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_adapter_set_prop( void *connection, struct bluetooth_adapter_set_prop_params *params )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_adapter_start_discovery( void *connection, const char *adapter_path )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_adapter_stop_discovery( void *connection, const char *adapter_path )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_adapter_remove_device( void *connection, const char *adapter_path, const char *device_path )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_auth_agent_start( void *connection, void **ctx ) { return STATUS_NOT_SUPPORTED; }
+NTSTATUS bluez_auth_agent_stop( void *connection, void *ctx ) { return STATUS_NOT_SUPPORTED; }
+NTSTATUS bluez_auth_agent_request_default( void *connection ) { return STATUS_NOT_SUPPORTED; }
+NTSTATUS bluez_auth_agent_send_response( void *auth_agent, struct unix_name *device,
+                                         BLUETOOTH_AUTHENTICATION_METHOD method, UINT32 numeric_or_passkey,
+                                         BOOL negative, BOOL *authenticated )
+{
+    return STATUS_NOT_SUPPORTED;
+}
+NTSTATUS bluez_device_disconnect( void *connection, const char *device_path )
 {
     return STATUS_NOT_SUPPORTED;
 }

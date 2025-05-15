@@ -159,12 +159,7 @@ static void create_file_test(void)
 
     GetCurrentDirectoryW( MAX_PATH, path );
     pRtlDosPathNameToNtPathName_U( path, &nameW, NULL, NULL );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
 
     /* try various open modes and options on directories */
     status = pNtCreateFile( &dir, GENERIC_READ|GENERIC_WRITE, &attr, &io, NULL, 0,
@@ -253,12 +248,7 @@ static void create_file_test(void)
     pRtlFreeUnicodeString( &nameW );
 
     pRtlInitUnicodeString( &nameW, systemrootW );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = NULL;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
     dir = NULL;
     status = pNtCreateFile( &dir, FILE_APPEND_DATA, &attr, &io, NULL, FILE_ATTRIBUTE_NORMAL, 0,
                             FILE_OPEN_IF, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0 );
@@ -348,12 +338,7 @@ static void open_file_test(void)
 
     len = GetWindowsDirectoryW( path, MAX_PATH );
     pRtlDosPathNameToNtPathName_U( path, &nameW, NULL, NULL );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.ObjectName = &nameW;
-    attr.Attributes = 0;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, 0, 0, NULL );
     status = pNtOpenFile( &dir, SYNCHRONIZE|FILE_LIST_DIRECTORY, &attr, &io,
                           FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT );
     ok( !status, "open %s failed %lx\n", wine_dbgstr_w(nameW.Buffer), status );
@@ -512,12 +497,7 @@ static void open_file_test(void)
     CloseHandle( root );
 
     pRtlDosPathNameToNtPathName_U( tmpfile, &nameW, NULL, NULL );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
     status = pNtOpenFile( &file, SYNCHRONIZE|FILE_LIST_DIRECTORY, &attr, &io,
                          FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_NONALERT );
     ok( !status, "open %s failed %lx\n", wine_dbgstr_w(nameW.Buffer), status );
@@ -604,12 +584,7 @@ static void delete_file_test(void)
 	return;
     }
 
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.ObjectName = &nameW;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
 
     /* test NtDeleteFile on an empty directory */
     ret = pNtDeleteFile(&attr);
@@ -751,7 +726,10 @@ static void read_file_test(void)
     CloseHandle( handle );
 
     if (!(handle = create_temp_file(FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING)))
+    {
+        CloseHandle(event);
         return;
+    }
 
     apc_count = 0;
     offset.QuadPart = 0;
@@ -1337,13 +1315,16 @@ static void test_file_io_completion(void)
 static void test_file_full_size_information(void)
 {
     IO_STATUS_BLOCK io;
+    FILE_FS_FULL_SIZE_INFORMATION_EX ffsie;
     FILE_FS_FULL_SIZE_INFORMATION ffsi;
     FILE_FS_SIZE_INFORMATION fsi;
+    ULONGLONG expected;
     HANDLE h;
     NTSTATUS res;
 
     if(!(h = create_temp_file(0))) return ;
 
+    memset(&ffsie,0,sizeof(ffsie));
     memset(&ffsi,0,sizeof(ffsi));
     memset(&fsi,0,sizeof(fsi));
 
@@ -1382,6 +1363,73 @@ static void test_file_full_size_information(void)
     /* Assume file system is NTFS */
     ok(ffsi.BytesPerSector == 512, "[ffsi] BytesPerSector expected 512, got %ld\n",ffsi.BytesPerSector);
     ok(ffsi.SectorsPerAllocationUnit == 8, "[ffsi] SectorsPerAllocationUnit expected 8, got %ld\n",ffsi.SectorsPerAllocationUnit);
+
+    /* FileFsFullSizeInformationEx is supported on Windows 10 build 1809 and later */
+    res = pNtQueryVolumeInformationFile(h, &io, &ffsie, sizeof ffsie, FileFsFullSizeInformationEx);
+    if (res == STATUS_NOT_IMPLEMENTED || res == STATUS_INVALID_PARAMETER || res == STATUS_INVALID_INFO_CLASS)
+    {
+        win_skip( "FileFsFullSizeInformationEx not supported.\n" );
+        CloseHandle( h );
+        return;
+    }
+    ok(res == STATUS_SUCCESS, "cannot get attributes, res %lx\n", res);
+
+    expected = ffsie.ActualAvailableAllocationUnits + ffsie.ActualPoolUnavailableAllocationUnits
+            + ffsie.UsedAllocationUnits + ffsie.TotalReservedAllocationUnits;
+    ok(ffsie.ActualTotalAllocationUnits == expected,
+        "[ffsie] ActualTotalAllocationUnits expected 0x%s, got 0x%s\n", wine_dbgstr_longlong(expected),
+        wine_dbgstr_longlong(ffsie.ActualTotalAllocationUnits));
+    expected = ffsie.ActualTotalAllocationUnits - ffsie.UsedAllocationUnits - ffsie.TotalReservedAllocationUnits;
+    ok(ffsie.ActualAvailableAllocationUnits == expected,
+        "[ffsie] ActualAvailableAllocationUnits expected 0x%s, got 0x%s\n",
+        wine_dbgstr_longlong(expected), wine_dbgstr_longlong(ffsie.ActualAvailableAllocationUnits));
+    ok(ffsie.ActualPoolUnavailableAllocationUnits == 0,
+        "[ffsie] ActualPoolUnavailableAllocationUnits expected zero, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.ActualPoolUnavailableAllocationUnits));
+    expected = ffsie.CallerAvailableAllocationUnits + ffsie.CallerPoolUnavailableAllocationUnits
+            + ffsie.UsedAllocationUnits + ffsie.TotalReservedAllocationUnits;
+    ok(ffsie.CallerTotalAllocationUnits == expected,
+        "[ffsie] CallerTotalAllocationUnits expected 0x%s, got 0x%s\n", wine_dbgstr_longlong(expected),
+        wine_dbgstr_longlong(ffsie.CallerTotalAllocationUnits));
+    ok((LONGLONG)ffsie.CallerAvailableAllocationUnits > 0,
+        "[ffsie] CallerAvailableAllocationUnits expected positive, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.CallerAvailableAllocationUnits));
+    ok(ffsie.CallerPoolUnavailableAllocationUnits == 0,
+        "[ffsie] CallerPoolUnavailableAllocationUnits expected zero, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.CallerPoolUnavailableAllocationUnits));
+    ok((LONGLONG)ffsie.UsedAllocationUnits > 0, "[ffsie] UsedAllocationUnits expected positive, got 0x%s\n",
+            wine_dbgstr_longlong(ffsie.UsedAllocationUnits));
+    ok((LONGLONG)ffsie.TotalReservedAllocationUnits >= 0,
+        "[ffsie] TotalReservedAllocationUnits expected >= 0, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.TotalReservedAllocationUnits));
+    ok(ffsie.VolumeStorageReserveAllocationUnits <= ffsie.TotalReservedAllocationUnits,
+        "[ffsie] VolumeStorageReserveAllocationUnits expected <= 0x%s, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.TotalReservedAllocationUnits),
+        wine_dbgstr_longlong(ffsie.VolumeStorageReserveAllocationUnits));
+    ok(ffsie.AvailableCommittedAllocationUnits == 0
+            /* in win10 can be (0 - UsedAllocationUnits - TotalReservedAllocationUnits) */
+            || broken((LONGLONG)ffsie.AvailableCommittedAllocationUnits < 0),
+        "[ffsie] AvailableCommittedAllocationUnits expected zero, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.AvailableCommittedAllocationUnits));
+    ok(ffsie.PoolAvailableAllocationUnits == 0,
+        "[ffsie] PoolAvailableAllocationUnits expected zero, got 0x%s\n",
+        wine_dbgstr_longlong(ffsie.PoolAvailableAllocationUnits));
+    ok(ffsie.ActualTotalAllocationUnits == ffsi.TotalAllocationUnits.QuadPart,
+        "[ffsie] TotalAllocationUnits error ffsi:0x%s, ffsie:0x%s\n",
+        wine_dbgstr_longlong(ffsi.TotalAllocationUnits.QuadPart),
+        wine_dbgstr_longlong(ffsie.ActualTotalAllocationUnits));
+    ok(ffsie.CallerAvailableAllocationUnits == ffsi.CallerAvailableAllocationUnits.QuadPart,
+        "[ffsie] CallerAvailableAllocationUnits error ffsi:0x%s, ffsie:0x%s\n",
+        wine_dbgstr_longlong(ffsi.CallerAvailableAllocationUnits.QuadPart),
+        wine_dbgstr_longlong(ffsie.CallerAvailableAllocationUnits));
+    ok(ffsie.ActualAvailableAllocationUnits == ffsi.ActualAvailableAllocationUnits.QuadPart,
+        "[ffsie] ActualAvailableAllocationUnits error ffsi:0x%s, ffsie:0x%s\n",
+        wine_dbgstr_longlong(ffsi.ActualAvailableAllocationUnits.QuadPart),
+        wine_dbgstr_longlong(ffsie.ActualAvailableAllocationUnits));
+
+    /* Assume file system is NTFS */
+    ok(ffsie.BytesPerSector == 512, "[ffsie] BytesPerSector expected 512, got %ld\n",ffsie.BytesPerSector);
+    ok(ffsie.SectorsPerAllocationUnit == 8, "[ffsie] SectorsPerAllocationUnit expected 8, got %ld\n",ffsie.SectorsPerAllocationUnit);
 
     CloseHandle( h );
 }
@@ -3217,13 +3265,7 @@ static NTSTATUS nt_get_file_attrs(const char *name, DWORD *attrs)
     if (!pRtlDosPathNameToNtPathName_U( nameW, &nt_name, NULL, NULL ))
         return STATUS_UNSUCCESSFUL;
 
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.ObjectName = &nt_name;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
-
+    InitializeObjectAttributes( &attr, &nt_name, OBJ_CASE_INSENSITIVE, 0, NULL );
     status = pNtQueryAttributesFile( &attr, &info );
     pRtlFreeUnicodeString( &nt_name );
 
@@ -4658,15 +4700,9 @@ static void test_file_mode(void)
     mountmgr_dev_name.Length = sizeof(mountmgr_devW);
     mountmgr_dev_name.MaximumLength = sizeof(mountmgr_devW);
 
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
-
     for (i = 0; i < ARRAY_SIZE(option_tests); i++)
     {
-        attr.ObjectName = option_tests[i].file_name;
+        InitializeObjectAttributes( &attr, option_tests[i].file_name, OBJ_CASE_INSENSITIVE, 0, NULL );
         access = SYNCHRONIZE;
 
         if (option_tests[i].file_name == &file_name)
@@ -4707,12 +4743,7 @@ static void test_query_volume_information_file(void)
 
     GetWindowsDirectoryW( path, MAX_PATH );
     pRtlDosPathNameToNtPathName_U( path, &nameW, NULL, NULL );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
 
     status = pNtOpenFile( &dir, SYNCHRONIZE|FILE_LIST_DIRECTORY, &attr, &io,
                           FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT );
@@ -4757,13 +4788,7 @@ static void test_query_attribute_information_file(void)
 
     GetWindowsDirectoryW( path, MAX_PATH );
     pRtlDosPathNameToNtPathName_U( path, &nameW, NULL, NULL );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = 0;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
-
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
     status = pNtOpenFile( &dir, SYNCHRONIZE|FILE_LIST_DIRECTORY, &attr, &io,
                           FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT );
     ok( !status, "open %s failed %lx\n", wine_dbgstr_w(nameW.Buffer), status );
@@ -4830,13 +4855,7 @@ static void test_NtCreateFile(void)
     GetTempFileNameW(path, fooW, 0, path);
     DeleteFileW(path);
     pRtlDosPathNameToNtPathName_U(path, &nameW, NULL, NULL);
-
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = NULL;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
 
     for (i = 0; i < ARRAY_SIZE(td); i++)
     {
@@ -4886,6 +4905,7 @@ static void test_NtCreateFile(void)
                             0, FILE_SHARE_READ|FILE_SHARE_WRITE, FILE_CREATE,
                             FILE_DIRECTORY_FILE, NULL, 0);
     ok( !status, "failed %s %lx\n", debugstr_w(nameW.Buffer), status );
+    pRtlFreeUnicodeString( &nameW );
     RemoveDirectoryW( path );
 }
 
@@ -5841,14 +5861,7 @@ static void test_file_readonly_access(void)
     GetTempFileNameW(path, fooW, 0, path);
     DeleteFileW(path);
     pRtlDosPathNameToNtPathName_U(path, &nameW, NULL, NULL);
-
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = NULL;
-    attr.ObjectName = &nameW;
-    attr.Attributes = OBJ_CASE_INSENSITIVE;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
-
+    InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
     status = pNtCreateFile(&handle, FILE_GENERIC_WRITE, &attr, &io, NULL, FILE_ATTRIBUTE_READONLY, default_sharing,
                            FILE_CREATE, 0, NULL, 0);
     ok(status == STATUS_SUCCESS, "expected STATUS_SUCCESS, got %#lx.\n", status);

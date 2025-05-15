@@ -79,6 +79,7 @@ typedef struct SYSLINK_INFO SYSLINK_INFO;
 typedef struct
 {
     IAccessible IAccessible_iface;
+    IOleWindow IOleWindow_iface;
     struct SYSLINK_INFO *infoPtr;
     LONG refcount;
 } SYSLINK_ACC;
@@ -113,6 +114,11 @@ static inline SYSLINK_ACC *impl_from_IAccessible(IAccessible *iface)
     return CONTAINING_RECORD(iface, SYSLINK_ACC, IAccessible_iface);
 }
 
+static inline SYSLINK_ACC *impl_from_IOleWindow(IOleWindow *iface)
+{
+    return CONTAINING_RECORD(iface, SYSLINK_ACC, IOleWindow_iface);
+}
+
 static HRESULT WINAPI Accessible_QueryInterface(IAccessible *iface, REFIID iid, void **ppv)
 {
     SYSLINK_ACC *This = impl_from_IAccessible(iface);
@@ -124,6 +130,10 @@ static HRESULT WINAPI Accessible_QueryInterface(IAccessible *iface, REFIID iid, 
         IsEqualIID(&IID_IAccessible, iid))
     {
         *ppv = &This->IAccessible_iface;
+    }
+    else if (IsEqualIID(&IID_IOleWindow, iid))
+    {
+        *ppv = &This->IOleWindow_iface;
     }
     else
     {
@@ -205,6 +215,8 @@ static HRESULT Accessible_FindChild(SYSLINK_ACC *This, VARIANT childid, DOC_ITEM
 
     LIST_FOR_EACH_ENTRY(current, &This->infoPtr->Items, DOC_ITEM, entry)
     {
+        if (current->Type != slLink)
+            continue;
         if (!--index)
         {
             *result = current;
@@ -224,20 +236,97 @@ static HRESULT WINAPI Accessible_get_accParent(IAccessible *iface, IDispatch** d
 
 static HRESULT WINAPI Accessible_get_accChildCount(IAccessible *iface, LONG *count)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    DOC_ITEM *current;
+    LONG result = 0;
+
+    TRACE("%p\n", iface);
+
+    if (!This->infoPtr)
+    {
+        WARN("control was destroyed\n");
+        return E_FAIL;
+    }
+
+    LIST_FOR_EACH_ENTRY(current, &This->infoPtr->Items, DOC_ITEM, entry)
+    {
+        if (current->Type == slLink)
+            result++;
+    }
+
+    *count = result;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI Accessible_get_accChild(IAccessible *iface, VARIANT childid, IDispatch **disp)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    *disp = NULL;
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    if (item)
+        return S_FALSE;
+    else
+        return E_INVALIDARG;
 }
 
 static HRESULT WINAPI Accessible_get_accName(IAccessible *iface, VARIANT childid, BSTR *name)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+    BSTR result;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    if (!name)
+        return E_POINTER;
+
+    *name = NULL;
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    if (item)
+    {
+        result = SysAllocString(item->Text);
+        if (!result)
+            return E_OUTOFMEMORY;
+    }
+    else
+    {
+        UINT total_length = 0, i;
+
+        LIST_FOR_EACH_ENTRY(item, &This->infoPtr->Items, DOC_ITEM, entry)
+        {
+            total_length += item->nText;
+        }
+
+        result = SysAllocStringLen(NULL, total_length);
+        if (!result)
+            return E_OUTOFMEMORY;
+
+        i = 0;
+        LIST_FOR_EACH_ENTRY(item, &This->infoPtr->Items, DOC_ITEM, entry)
+        {
+            memcpy(&result[i], item->Text, item->nText * sizeof(*result));
+            i += item->nText;
+        }
+    }
+
+    *name = result;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI Accessible_get_accValue(IAccessible *iface, VARIANT childid, BSTR *value)
@@ -276,8 +365,46 @@ static HRESULT WINAPI Accessible_get_accRole(IAccessible *iface, VARIANT childid
 
 static HRESULT WINAPI Accessible_get_accState(IAccessible *iface, VARIANT childid, VARIANT *state)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+    GUITHREADINFO info;
+    BOOL focused = 0;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    V_VT(state) = VT_I4;
+    V_I4(state) = 0;
+
+    info.cbSize = sizeof(info);
+    if(GetGUIThreadInfo(0, &info) && info.hwndFocus == This->infoPtr->Self)
+        focused = 1;
+
+    if (item)
+    {
+        V_I4(state) |= STATE_SYSTEM_FOCUSABLE|STATE_SYSTEM_LINKED;
+        if (focused && (item->u.Link.state & LIS_FOCUSED) == LIS_FOCUSED)
+            V_I4(state) |= STATE_SYSTEM_FOCUSED;
+    }
+    else
+    {
+        LONG style = GetWindowLongW(This->infoPtr->Self, GWL_STYLE);
+
+        if (style & WS_DISABLED)
+            V_I4(state) |= STATE_SYSTEM_UNAVAILABLE;
+        else
+            V_I4(state) |= STATE_SYSTEM_FOCUSABLE;
+        if (!(style & WS_VISIBLE))
+            V_I4(state) |= STATE_SYSTEM_INVISIBLE;
+        if (focused)
+            V_I4(state) |= STATE_SYSTEM_FOCUSED;
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI Accessible_get_accHelp(IAccessible *iface, VARIANT childid, BSTR *help)
@@ -312,8 +439,32 @@ static HRESULT WINAPI Accessible_get_accSelection(IAccessible *iface, VARIANT *c
 
 static HRESULT WINAPI Accessible_get_accDefaultAction(IAccessible *iface, VARIANT childid, BSTR *action)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    if (!action)
+        return E_POINTER;
+
+    *action = NULL;
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    if (item)
+    {
+        *action = SysAllocString(L"Click");
+        if (!*action)
+            return E_OUTOFMEMORY;
+        return S_OK;
+    }
+    else
+    {
+        return S_FALSE;
+    }
 }
 
 static HRESULT WINAPI Accessible_accSelect(IAccessible *iface, LONG flags, VARIANT childid)
@@ -324,8 +475,46 @@ static HRESULT WINAPI Accessible_accSelect(IAccessible *iface, LONG flags, VARIA
 
 static HRESULT WINAPI Accessible_accLocation(IAccessible *iface, LONG *left, LONG *top, LONG *width, LONG *height, VARIANT childid)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+    RECT rc = {0};
+    POINT point;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    if (item)
+    {
+        int n = item->nText;
+        PDOC_TEXTBLOCK block = item->Blocks;
+
+        while (n > 0)
+        {
+            UnionRect(&rc, &rc, &block->rc);
+            n -= block->nChars + block->nSkip;
+            block++;
+        }
+    }
+    else
+    {
+        GetClientRect(This->infoPtr->Self, &rc);
+    }
+
+    point.x = rc.left;
+    point.y = rc.top;
+    MapWindowPoints(This->infoPtr->Self, NULL, &point, 1);
+    *left = point.x;
+    *top = point.y;
+    *width = rc.right - rc.left;
+    *height = rc.bottom - rc.top;
+
+    TRACE("<-- (%li,%li,%li,%li)\n", *left, *top, *width, *height);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI Accessible_accNavigate(IAccessible *iface, LONG dir, VARIANT start, VARIANT *end)
@@ -340,10 +529,27 @@ static HRESULT WINAPI Accessible_accHitTest(IAccessible *iface, LONG left, LONG 
     return E_NOTIMPL;
 }
 
+static LRESULT SYSLINK_SendParentNotify (const SYSLINK_INFO *infoPtr, UINT code, const DOC_ITEM *Link, int iLink);
+
 static HRESULT WINAPI Accessible_accDoDefaultAction(IAccessible *iface, VARIANT childid)
 {
-    FIXME("%p\n", iface);
-    return E_NOTIMPL;
+    SYSLINK_ACC *This = impl_from_IAccessible(iface);
+    HRESULT hr;
+    DOC_ITEM* item;
+
+    TRACE("%p, %s\n", iface, debugstr_variant(&childid));
+
+    hr = Accessible_FindChild(This, childid, &item);
+    if (FAILED(hr))
+        return hr;
+
+    if (!item)
+        /* Not supported for whole control. */
+        return E_INVALIDARG;
+
+    SYSLINK_SendParentNotify(This->infoPtr, NM_CLICK, item, V_I4(&childid) - 1);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI Accessible_put_accName(IAccessible *iface, VARIANT childid, BSTR name)
@@ -389,6 +595,51 @@ static const IAccessibleVtbl Accessible_Vtbl = {
     Accessible_put_accValue
 };
 
+static HRESULT WINAPI Accessible_Window_QueryInterface(IOleWindow *iface, REFIID iid, void **ppv)
+{
+    SYSLINK_ACC *This = impl_from_IOleWindow(iface);
+    return IAccessible_QueryInterface(&This->IAccessible_iface, iid, ppv);
+}
+
+static ULONG WINAPI Accessible_Window_AddRef(IOleWindow *iface)
+{
+    SYSLINK_ACC *This = impl_from_IOleWindow(iface);
+    return IAccessible_AddRef(&This->IAccessible_iface);
+}
+
+static ULONG WINAPI Accessible_Window_Release(IOleWindow *iface)
+{
+    SYSLINK_ACC *This = impl_from_IOleWindow(iface);
+    return IAccessible_Release(&This->IAccessible_iface);
+}
+
+static HRESULT WINAPI Accessible_GetWindow(IOleWindow *iface, HWND *hwnd)
+{
+    SYSLINK_ACC *This = impl_from_IOleWindow(iface);
+
+    TRACE("%p\n", This);
+
+    if (!This->infoPtr)
+        return E_FAIL;
+
+    *hwnd = This->infoPtr->Self;
+    return S_OK;
+}
+
+static HRESULT WINAPI Accessible_ContextSensitiveHelp(IOleWindow *This, BOOL fEnterMode)
+{
+    FIXME("%p\b", This);
+    return E_NOTIMPL;
+}
+
+static const IOleWindowVtbl Accessible_Window_Vtbl = {
+    Accessible_Window_QueryInterface,
+    Accessible_Window_AddRef,
+    Accessible_Window_Release,
+    Accessible_GetWindow,
+    Accessible_ContextSensitiveHelp
+};
+
 static void Accessible_Create(SYSLINK_INFO* infoPtr)
 {
     SYSLINK_ACC *This;
@@ -397,6 +648,7 @@ static void Accessible_Create(SYSLINK_INFO* infoPtr)
     if (!This) return;
 
     This->IAccessible_iface.lpVtbl = &Accessible_Vtbl;
+    This->IOleWindow_iface.lpVtbl = &Accessible_Window_Vtbl;
     This->infoPtr = infoPtr;
     This->refcount = 1;
     infoPtr->AccessibleImpl = This;

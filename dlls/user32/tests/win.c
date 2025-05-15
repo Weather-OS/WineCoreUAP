@@ -3315,7 +3315,7 @@ static void test_SetWindowPos(HWND hwnd, HWND hwnd2)
     ret = SetWindowPos(hwnd_child, NULL, 0, 0, 0, 0, SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE|SWP_SHOWWINDOW);
     ok(ret, "Got %d\n", ret);
     flush_events( TRUE );
-    flaky todo_wine check_active_state(hwnd2, hwnd2, hwnd2);
+    flaky check_active_state(hwnd2, hwnd2, hwnd2);
     DestroyWindow(hwnd_child);
 }
 
@@ -3657,7 +3657,7 @@ static LRESULT WINAPI set_focus_on_activate_proc(HWND hwnd, UINT msg, WPARAM wp,
 
 static void test_SetFocus(HWND hwnd)
 {
-    HWND child, child2, ret;
+    HWND child, child2, ret, other;
     WNDPROC old_wnd_proc;
 
     /* check if we can set focus to non-visible windows */
@@ -3666,21 +3666,26 @@ static void test_SetFocus(HWND hwnd)
     SetFocus(0);
     SetFocus(hwnd);
     ok( GetFocus() == hwnd, "Failed to set focus to visible window %p\n", hwnd );
+    ok( GetForegroundWindow() == hwnd, "got foreground %p\n", GetForegroundWindow() );
     ok( GetWindowLongA(hwnd,GWL_STYLE) & WS_VISIBLE, "Window %p not visible\n", hwnd );
     ShowWindow(hwnd, SW_HIDE);
     SetFocus(0);
     SetFocus(hwnd);
     ok( GetFocus() == hwnd, "Failed to set focus to invisible window %p\n", hwnd );
+    ok( GetForegroundWindow() == hwnd, "got foreground %p\n", GetForegroundWindow() );
     ok( !(GetWindowLongA(hwnd,GWL_STYLE) & WS_VISIBLE), "Window %p still visible\n", hwnd );
     child = CreateWindowExA(0, "static", NULL, WS_CHILD, 0, 0, 0, 0, hwnd, 0, 0, NULL);
     assert(child);
     SetFocus(child);
     ok( GetFocus() == child, "Failed to set focus to invisible child %p\n", child );
+    ok( GetForegroundWindow() == hwnd, "got foreground %p\n", GetForegroundWindow() );
     ok( !(GetWindowLongA(child,GWL_STYLE) & WS_VISIBLE), "Child %p is visible\n", child );
     ShowWindow(child, SW_SHOW);
+    ok( GetForegroundWindow() == hwnd, "got foreground %p\n", GetForegroundWindow() );
     ok( GetWindowLongA(child,GWL_STYLE) & WS_VISIBLE, "Child %p is not visible\n", child );
     ok( GetFocus() == child, "Focus no longer on child %p\n", child );
     ShowWindow(child, SW_HIDE);
+    ok( GetForegroundWindow() == hwnd, "got foreground %p\n", GetForegroundWindow() );
     ok( !(GetWindowLongA(child,GWL_STYLE) & WS_VISIBLE), "Child %p is visible\n", child );
     ok( GetFocus() == hwnd, "Focus should be on parent %p, not %p\n", hwnd, GetFocus() );
     ShowWindow(child, SW_SHOW);
@@ -3760,6 +3765,27 @@ static void test_SetFocus(HWND hwnd)
 
     DestroyWindow( child2 );
     DestroyWindow( child );
+
+    SetForegroundWindow( GetDesktopWindow() );
+
+    other = CreateWindowExA( 0, "static", NULL, WS_OVERLAPPEDWINDOW, 100, 100, 200, 200, 0, 0, NULL, NULL );
+    ok( !!other, "CreateWindowExA failed, error %lu\n", GetLastError() );
+    flush_events( TRUE );
+
+    ShowWindow( other, SW_SHOWNA );
+    flush_events( TRUE );
+    ok( GetFocus() == 0, "got focus %p\n", GetFocus() );
+    ok( GetActiveWindow() == 0, "got active %p\n", GetActiveWindow() );
+    todo_wine ok( GetForegroundWindow() == 0, "got foreground %p\n", GetForegroundWindow() );
+
+    SetFocus( other );
+    ok( GetFocus() == other, "got focus %p\n", GetFocus() );
+    ok( GetActiveWindow() == other, "got active %p\n", GetActiveWindow() );
+    todo_wine ok( GetForegroundWindow() == 0, "got foreground %p\n", GetForegroundWindow() );
+
+    SetForegroundWindow( hwnd );
+    DestroyWindow( other );
+    flush_events( TRUE );
 }
 
 static void test_SetActiveWindow_0_proc( char **argv )
@@ -7465,7 +7491,17 @@ static void test_ShowWindow(void)
         WS_OVERLAPPED | WS_VISIBLE | WS_SYSMENU | WS_THICKFRAME,
         WS_OVERLAPPED | WS_VISIBLE | WS_SYSMENU,
         WS_OVERLAPPED | WS_VISIBLE | WS_THICKFRAME,
-        WS_OVERLAPPED | WS_VISIBLE
+        WS_OVERLAPPED | WS_VISIBLE,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU | WS_THICKFRAME,
+        WS_POPUP | WS_VISIBLE | WS_SYSMENU,
+        WS_POPUP | WS_VISIBLE | WS_THICKFRAME,
+        WS_POPUP | WS_VISIBLE
     };
 
     SetRect(&rcClient, 0, 0, 90, 90);
@@ -7737,6 +7773,12 @@ static void test_ShowWindow(void)
                                0, 0, 0, NULL);
         ok(hwnd != NULL, "Test %u: failed to create window with error %lu\n", i, GetLastError());
 
+        if (test_style[i] & WS_POPUP)
+        {
+            style = GetWindowLongW(hwnd, GWL_STYLE);
+            ok((style & WS_CAPTION) != WS_CAPTION, "Test %u: got unexpected WS_CAPTION.\n", i);
+        }
+
         GetWindowRect(hwnd, &rcMain);
         ok(rcMain.left   > mon_info.rcMonitor.left   &&
            rcMain.right  < mon_info.rcMonitor.right  &&
@@ -7744,7 +7786,7 @@ static void test_ShowWindow(void)
            rcMain.bottom < mon_info.rcMonitor.bottom,
            "Test %u: window should not be fullscreen\n", i);
 
-        rcMaximized = (test_style[i] & WS_MAXIMIZEBOX) ? mon_info.rcWork : mon_info.rcMonitor;
+        rcMaximized = (test_style[i] & WS_MAXIMIZEBOX && !(test_style[i] & WS_POPUP)) ? mon_info.rcWork : mon_info.rcMonitor;
         AdjustWindowRectEx(&rcMaximized, GetWindowLongA(hwnd, GWL_STYLE) & ~WS_BORDER,
                            0, GetWindowLongA(hwnd, GWL_EXSTYLE));
 
@@ -7773,8 +7815,27 @@ static void test_ShowWindow(void)
         ok(EqualRect(&rcMain, &rc), "Test %u: expected %s, got %s\n",
            i, wine_dbgstr_rect(&rcMain), wine_dbgstr_rect(&rc));
 
-        DestroyWindow(hwnd);
+        /* Remove the implicitly added WS_CAPTION when WS_POPUP and WS_CHILD are both not set */
+        if (!(test_style[i] & WS_POPUP))
+        {
+            style = GetWindowLongW(hwnd, GWL_STYLE);
+            SetWindowLongW(hwnd, GWL_STYLE, style & ~WS_CAPTION);
+            style = GetWindowLongW(hwnd, GWL_STYLE);
+            ok((style & WS_CAPTION) != WS_CAPTION, "Test %u: got unexpected WS_CAPTION.\n", i);
 
+            rcMaximized = mon_info.rcMonitor;
+            AdjustWindowRectEx(&rcMaximized, style & ~WS_BORDER, 0, GetWindowLongA(hwnd, GWL_EXSTYLE));
+
+            ret = ShowWindow(hwnd, SW_MAXIMIZE);
+            ok(ret, "Test %u: ShowWindow failed, error %lu.\n", i, GetLastError());
+            style = GetWindowLongA(hwnd, GWL_STYLE);
+            ok(style & WS_MAXIMIZE, "Test %u: window should be maximized.\n", i);
+            GetWindowRect(hwnd, &rc);
+            ok(EqualRect(&rcMaximized, &rc), "Test %u: expected %s, got %s.\n", i,
+               wine_dbgstr_rect(&rcMaximized), wine_dbgstr_rect(&rc));
+        }
+
+        DestroyWindow(hwnd);
         flush_events(TRUE);
     }
 }
@@ -7912,11 +7973,37 @@ static void test_ShowWindow_owned(HWND hwndMain)
 
 static void test_ShowWindow_child(HWND hwndMain)
 {
-    RECT rect, orig, expect, nc;
+    RECT rect, orig, expect, nc, maximized_rect;
     LPARAM ret;
+    MONITORINFO mon_info;
     HWND hwnd, hwnd2;
-    LONG style;
+    unsigned int i;
     POINT pt = {0};
+    DWORD style;
+
+    static const DWORD test_style[] =
+    {
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU | WS_THICKFRAME,
+        WS_CHILD | WS_VISIBLE | WS_SYSMENU,
+        WS_CHILD | WS_VISIBLE | WS_THICKFRAME,
+        WS_CHILD | WS_VISIBLE,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX | WS_THICKFRAME,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_MAXIMIZEBOX,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU | WS_THICKFRAME,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_SYSMENU,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE | WS_THICKFRAME,
+        WS_CHILD | WS_CAPTION | WS_VISIBLE,
+    };
 
     SetRect(&orig, 20, 20, 210, 110);
     hwnd = CreateWindowA("MainWindowClass", "child", WS_CAPTION | WS_SYSMENU |
@@ -8011,8 +8098,8 @@ static void test_ShowWindow_child(HWND hwndMain)
     style = GetWindowLongA(hwnd, GWL_STYLE);
     ok(!(style & WS_DISABLED), "window should not be disabled\n");
     ok(style & WS_VISIBLE, "window should be visible\n");
-    ok(!(style & WS_MINIMIZE), "window should be minimized\n");
-    ok(style & WS_MAXIMIZE, "window should not be maximized\n");
+    ok(!(style & WS_MINIMIZE), "window should not be minimized\n");
+    ok(style & WS_MAXIMIZE, "window should be maximized\n");
     GetWindowRect(hwnd, &rect);
     GetClientRect(hwndMain, &expect);
     AdjustWindowRectEx(&expect, GetWindowLongA(hwnd, GWL_STYLE) & ~WS_BORDER,
@@ -8041,6 +8128,55 @@ static void test_ShowWindow_child(HWND hwndMain)
        wine_dbgstr_rect(&orig), wine_dbgstr_rect(&rect));
 
     DestroyWindow(hwnd2);
+    DestroyWindow(hwnd);
+
+    mon_info.cbSize = sizeof(mon_info);
+    SetRect(&rect, 0, 0, 1, 1);
+    GetMonitorInfoW(MonitorFromRect(&rect, MONITOR_DEFAULTTOPRIMARY), &mon_info);
+
+    hwnd = CreateWindowA("MainWindowClass", NULL, WS_POPUP | WS_VISIBLE, 0, 0,
+                         GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, NULL);
+
+    for (i = 0; i < ARRAY_SIZE(test_style); ++i)
+    {
+        winetest_push_context("Test %u", i);
+
+        hwnd2 = CreateWindowExA(0, "MainWindowClass", NULL, test_style[i], 1, 1, 100, 100, hwnd, 0, 0, NULL);
+        ok(hwnd2 != NULL, "CreateWindowExA failed, error %lu.\n", GetLastError());
+
+        style = GetWindowLongA(hwnd2, GWL_STYLE);
+        ok(style == test_style[i], "expected style %#lx, got %#lx.\n", test_style[i], style);
+
+        GetWindowRect(hwnd2, &rect);
+        ok(rect.left > mon_info.rcMonitor.left && rect.right < mon_info.rcMonitor.right
+           && rect.top > mon_info.rcMonitor.top && rect.bottom < mon_info.rcMonitor.bottom,
+           "window should not be fullscreen, rect %s.\n", wine_dbgstr_rect(&rect));
+        orig = rect;
+
+        maximized_rect = mon_info.rcMonitor;
+        AdjustWindowRectEx(&maximized_rect, GetWindowLongA(hwnd2, GWL_STYLE) & ~WS_BORDER,
+                           0, GetWindowLongA(hwnd2, GWL_EXSTYLE));
+
+        ret = ShowWindow(hwnd2, SW_MAXIMIZE);
+        ok(ret, "ShowWindow failed, error %lu.\n", GetLastError());
+        style = GetWindowLongA(hwnd2, GWL_STYLE);
+        ok(style & WS_MAXIMIZE, "window should be maximized.\n");
+        GetWindowRect(hwnd2, &rect);
+        ok(EqualRect(&maximized_rect, &rect), "expected %s, got %s.\n",
+           wine_dbgstr_rect(&maximized_rect), wine_dbgstr_rect(&rect));
+
+        ret = ShowWindow(hwnd2, SW_RESTORE);
+        ok(ret, "ShowWindow failed, error %lu.\n", GetLastError());
+        style = GetWindowLongA(hwnd2, GWL_STYLE);
+        ok(!(style & WS_MAXIMIZE), "window should not be maximized\n");
+        GetWindowRect(hwnd2, &rect);
+        ok(EqualRect(&orig, &rect), "expected %s, got %s.\n", wine_dbgstr_rect(&orig), wine_dbgstr_rect(&rect));
+
+        DestroyWindow(hwnd2);
+        flush_events(TRUE);
+        winetest_pop_context();
+    }
+
     DestroyWindow(hwnd);
 }
 
@@ -12714,6 +12850,78 @@ static void test_window_placement(void)
     ret = SetWindowPlacement(hwnd, &wp);
     ok(!ret, "SetWindowPlacement should have failed\n");
     ok(GetLastError() == ERROR_INVALID_PARAMETER, "wrong error %lu\n", GetLastError());
+
+    DestroyWindow(hwnd);
+
+    /* Test that when forgetting the maximized position for top level windows covering the work
+     * area, the work area means the monitor work area, not the the work area that a maximized
+     * window can cover depending on style. For example, a maximized WS_POPUP window can cover the
+     * whole screen when maximized. Also see See win32u/window.c#update_maximized_pos() */
+    hwnd = CreateWindowA("MainWindowClass", "wp", WS_POPUP, orig.left, orig.top,
+        orig.right - orig.left, orig.bottom - orig.top, 0, 0, 0, 0);
+    ok(!!hwnd, "failed to create window, error %lu\n", GetLastError());
+    ShowWindow(hwnd, SW_MAXIMIZE);
+
+    GetWindowRect(hwnd, &rect);
+    ok(EqualRect(&rect, &mon_info.rcMonitor), "got unexpected maximized rect %s\n", wine_dbgstr_rect(&rect));
+
+    ret = GetWindowPlacement(hwnd, &wp);
+    ok(ret, "failed to get window placement, error %lu\n", GetLastError());
+    ok(wp.showCmd == SW_SHOWMAXIMIZED, "got show cmd %u\n", wp.showCmd);
+    ok(wp.ptMinPosition.x == -1 && wp.ptMinPosition.y == -1,
+        "got minimized pos (%ld,%ld)\n", wp.ptMinPosition.x, wp.ptMinPosition.y);
+    ok(wp.ptMaxPosition.x == -1 && wp.ptMaxPosition.y == -1,
+        "got maximized pos (%ld,%ld)\n", wp.ptMaxPosition.x, wp.ptMaxPosition.y);
+    ok(EqualRect(&wp.rcNormalPosition, &orig), "got normal pos %s\n",
+        wine_dbgstr_rect(&wp.rcNormalPosition));
+
+    SetWindowPos(hwnd, 0, 100, 100, 100, 100, SWP_NOZORDER | SWP_NOACTIVATE);
+
+    ret = GetWindowPlacement(hwnd, &wp);
+    ok(ret, "failed to get window placement, error %lu\n", GetLastError());
+    ok(wp.showCmd == SW_SHOWMAXIMIZED, "got show cmd %u\n", wp.showCmd);
+    ok(wp.ptMinPosition.x == -1 && wp.ptMinPosition.y == -1,
+        "got minimized pos (%ld,%ld)\n", wp.ptMinPosition.x, wp.ptMinPosition.y);
+    ok(wp.ptMaxPosition.x == 100 && wp.ptMaxPosition.y == 100,
+        "got maximized pos (%ld,%ld)\n", wp.ptMaxPosition.x, wp.ptMaxPosition.y);
+    ok(EqualRect(&wp.rcNormalPosition, &orig), "got normal pos %s\n",
+        wine_dbgstr_rect(&wp.rcNormalPosition));
+
+    SetWindowPos(hwnd, 0, work_rect.left, work_rect.top, work_rect.right - work_rect.left,
+        work_rect.bottom - work_rect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    ret = GetWindowPlacement(hwnd, &wp);
+    ok(ret, "failed to get window placement, error %lu\n", GetLastError());
+    ok(wp.showCmd == SW_SHOWMAXIMIZED, "got show cmd %u\n", wp.showCmd);
+    ok(wp.ptMinPosition.x == -1 && wp.ptMinPosition.y == -1,
+        "got minimized pos (%ld,%ld)\n", wp.ptMinPosition.x, wp.ptMinPosition.y);
+    ok(wp.ptMaxPosition.x == -1 && wp.ptMaxPosition.y == -1,
+        "got maximized pos (%ld,%ld)\n", wp.ptMaxPosition.x, wp.ptMaxPosition.y);
+    ok(EqualRect(&wp.rcNormalPosition, &orig), "got normal pos %s\n",
+        wine_dbgstr_rect(&wp.rcNormalPosition));
+
+    SetWindowPos(hwnd, 0, work_rect.left, work_rect.top, work_rect.right - work_rect.left - 1,
+        work_rect.bottom - work_rect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    ret = GetWindowPlacement(hwnd, &wp);
+    ok(ret, "failed to get window placement, error %lu\n", GetLastError());
+    ok(wp.showCmd == SW_SHOWMAXIMIZED, "got show cmd %u\n", wp.showCmd);
+    ok(wp.ptMinPosition.x == -1 && wp.ptMinPosition.y == -1,
+        "got minimized pos (%ld,%ld)\n", wp.ptMinPosition.x, wp.ptMinPosition.y);
+    ok(wp.ptMaxPosition.x == work_rect.left && wp.ptMaxPosition.y == work_rect.top,
+        "got maximized pos (%ld,%ld)\n", wp.ptMaxPosition.x, wp.ptMaxPosition.y);
+    ok(EqualRect(&wp.rcNormalPosition, &orig), "got normal pos %s\n",
+        wine_dbgstr_rect(&wp.rcNormalPosition));
+
+    SetWindowPos(hwnd, 0, work_rect.left, work_rect.top, work_rect.right - work_rect.left,
+        work_rect.bottom - work_rect.top - 1, SWP_NOZORDER | SWP_NOACTIVATE);
+    ret = GetWindowPlacement(hwnd, &wp);
+    ok(ret, "failed to get window placement, error %lu\n", GetLastError());
+    ok(wp.showCmd == SW_SHOWMAXIMIZED, "got show cmd %u\n", wp.showCmd);
+    ok(wp.ptMinPosition.x == -1 && wp.ptMinPosition.y == -1,
+        "got minimized pos (%ld,%ld)\n", wp.ptMinPosition.x, wp.ptMinPosition.y);
+    ok(wp.ptMaxPosition.x == work_rect.left && wp.ptMaxPosition.y == work_rect.top,
+        "got maximized pos (%ld,%ld)\n", wp.ptMaxPosition.x, wp.ptMaxPosition.y);
+    ok(EqualRect(&wp.rcNormalPosition, &orig), "got normal pos %s\n",
+        wine_dbgstr_rect(&wp.rcNormalPosition));
 
     DestroyWindow(hwnd);
 }

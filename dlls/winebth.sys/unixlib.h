@@ -2,6 +2,7 @@
  * Unix interface definitions
  *
  * Copyright 2024 Vibhav Pant
+ * Copyright 2025 Vibhav Pant
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -48,12 +49,55 @@ struct bluetooth_adapter_free_params
     unix_name_t adapter;
 };
 
+struct bluetooth_device_free_params
+{
+    unix_name_t device;
+};
+
+struct bluetooth_device_disconnect_params
+{
+    unix_name_t device;
+};
+
 struct bluetooth_adapter_get_unique_name_params
 {
     unix_name_t adapter;
 
     char *buf;
     SIZE_T buf_size;
+};
+
+struct bluetooth_adapter_set_prop_params
+{
+    unix_name_t adapter;
+    ULONG prop_flag;
+
+    union winebluetooth_property *prop;
+};
+
+struct bluetooth_adapter_start_discovery_params
+{
+    unix_name_t adapter;
+};
+
+struct bluetooth_adapter_stop_discovery_params
+{
+    unix_name_t adapter;
+};
+
+struct bluetooth_adapter_remove_device_params
+{
+    unix_name_t adapter;
+    unix_name_t device;
+};
+
+struct bluetooth_auth_send_response_params
+{
+    unix_name_t device;
+    BLUETOOTH_AUTHENTICATION_METHOD method;
+    UINT32 numeric_or_passkey;
+    BOOL negative;
+    BOOL *authenticated;
 };
 
 struct bluetooth_get_event_params
@@ -66,8 +110,18 @@ enum bluetoothapis_funcs
     unix_bluetooth_init,
     unix_bluetooth_shutdown,
 
+    unix_bluetooth_adapter_set_prop,
     unix_bluetooth_adapter_get_unique_name,
+    unix_bluetooth_adapter_start_discovery,
+    unix_bluetooth_adapter_stop_discovery,
+    unix_bluetooth_adapter_remove_device,
     unix_bluetooth_adapter_free,
+
+    unix_bluetooth_device_free,
+    unix_bluetooth_device_disconnect,
+
+    unix_bluetooth_auth_agent_enable_incoming,
+    unix_bluetooth_auth_send_response,
 
     unix_bluetooth_get_event,
 

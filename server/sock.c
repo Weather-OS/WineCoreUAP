@@ -87,6 +87,14 @@
 # define HAS_IRDA
 #endif
 
+#ifdef HAVE_BLUETOOTH_BLUETOOTH_H
+# include <bluetooth/bluetooth.h>
+# ifdef HAVE_BLUETOOTH_RFCOMM_H
+#  include <bluetooth/rfcomm.h>
+#  define HAS_BLUETOOTH
+# endif
+#endif
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -98,6 +106,10 @@
 #include "tcpmib.h"
 #include "wsipx.h"
 #include "af_irda.h"
+#include "bthsdpdef.h"
+#include "bluetoothapis.h"
+#include "bthdef.h"
+#include "ws2bth.h"
 #include "wine/afd.h"
 #include "wine/rbtree.h"
 
@@ -147,6 +159,9 @@ union unix_sockaddr
 #endif
 #ifdef HAS_IRDA
     struct sockaddr_irda irda;
+#endif
+#ifdef HAS_BLUETOOTH
+    struct sockaddr_rc rfcomm;
 #endif
 };
 
@@ -569,6 +584,21 @@ static int sockaddr_from_unix( const union unix_sockaddr *uaddr, struct WS_socka
     }
 #endif
 
+#ifdef HAS_BLUETOOTH
+    case AF_BLUETOOTH:
+    {
+        SOCKADDR_BTH win = {0};
+        BLUETOOTH_ADDRESS addr = {0};
+
+        if (wsaddrlen < sizeof(win)) return -1;
+        win.addressFamily = WS_AF_BTH;
+
+        memcpy( addr.rgBytes, uaddr->rfcomm.rc_bdaddr.b, sizeof( addr.rgBytes ));
+        win.btAddr = addr.ullLong;
+        win.port = uaddr->rfcomm.rc_channel;
+        return sizeof(win);
+    }
+#endif
     case AF_UNSPEC:
         return 0;
 
@@ -645,6 +675,24 @@ static socklen_t sockaddr_to_unix( const struct WS_sockaddr *wsaddr, int wsaddrl
         }
         memcpy( &uaddr->irda.sir_addr, win.irdaDeviceID, sizeof(win.irdaDeviceID) );
         return sizeof(uaddr->irda);
+    }
+#endif
+
+#ifdef HAS_BLUETOOTH
+    case WS_AF_BTH:
+    {
+        SOCKADDR_BTH win = {0};
+        BLUETOOTH_ADDRESS addr = {0};
+
+        if (wsaddrlen != sizeof(win)) return 0;
+        memcpy( &win, wsaddr, sizeof(win) );
+        addr.ullLong = win.btAddr;
+
+        uaddr->rfcomm.rc_family = AF_BLUETOOTH;
+        memcpy( &uaddr->rfcomm.rc_bdaddr, addr.rgBytes, sizeof( addr.rgBytes ) );
+        /* There can only be a maximum of 30 RFCOMM channels, so UINT8_MAX is safe to use here. */
+        uaddr->rfcomm.rc_channel = win.port == BT_PORT_ANY ? UINT8_MAX : win.port;
+        return sizeof(uaddr->rfcomm);
     }
 #endif
 
@@ -1795,6 +1843,9 @@ static int get_unix_family( int family )
 #ifdef AF_IRDA
         case WS_AF_IRDA: return AF_IRDA;
 #endif
+#ifdef AF_BLUETOOTH
+        case WS_AF_BTH: return AF_BLUETOOTH;
+#endif
         case WS_AF_UNSPEC: return AF_UNSPEC;
         default: return -1;
     }
@@ -1811,10 +1862,15 @@ static int get_unix_type( int type )
     }
 }
 
-static int get_unix_protocol( int protocol )
+static int get_unix_protocol( int family, int protocol )
 {
     if (protocol >= WS_NSPROTO_IPX && protocol <= WS_NSPROTO_IPX + 255)
         return protocol;
+
+#ifdef HAS_BLUETOOTH
+    if (family == WS_AF_BTH)
+        return protocol == WS_BTHPROTO_RFCOMM ? BTPROTO_RFCOMM : -1;
+#endif
 
     switch (protocol)
     {
@@ -1868,11 +1924,13 @@ static int init_socket( struct sock *sock, int family, int type, int protocol )
 
     unix_family = get_unix_family( family );
     unix_type = get_unix_type( type );
-    unix_protocol = get_unix_protocol( protocol );
+    unix_protocol = get_unix_protocol( family, protocol );
 
     if (unix_protocol < 0)
     {
-        if (type && unix_type < 0)
+        if (family && unix_family < 0)
+            set_win32_error( WSAEAFNOSUPPORT );
+        else if (type && unix_type < 0)
             set_win32_error( WSAESOCKTNOSUPPORT );
         else
             set_win32_error( WSAEPROTONOSUPPORT );
@@ -1908,6 +1966,10 @@ static int init_socket( struct sock *sock, int family, int type, int protocol )
     if (sockfd == -1)
     {
         if (errno == EINVAL) set_win32_error( WSAESOCKTNOSUPPORT );
+#ifdef AF_BLUETOOTH
+        else if (errno == ESOCKTNOSUPPORT && unix_family == AF_BLUETOOTH)
+            set_win32_error( WSAEAFNOSUPPORT );
+#endif
         else set_win32_error( sock_get_error( errno ));
         return -1;
     }
@@ -3021,6 +3083,40 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
         if (check_addr_usage( sock, &bind_addr, v6only ))
             return;
 
+#ifdef HAS_BLUETOOTH
+        if (unix_addr.rfcomm.rc_family == AF_BLUETOOTH
+            && !(unix_addr.rfcomm.rc_channel >= 1 && unix_addr.rfcomm.rc_channel <= 30))
+        {
+            int i;
+            if (unix_addr.rfcomm.rc_channel != UINT8_MAX)
+            {
+                set_error( sock_get_ntstatus( EADDRNOTAVAIL ) );
+                return;
+            }
+            /* If the RFCOMM channel was set to BT_PORT_ANY, we need to find an available RFCOMM
+             *  channel. The Linux kernel has a similar mechanism, but the channel is only assigned
+             *  on listen(), which we cannot call yet. The other, albeit hacky/race-y way to find an available
+             *  channel is to loop through all valid channel values (1 to 30) until bind() succeeds.
+             */
+            for (i = 1; i <= 30; i++)
+            {
+                bind_addr.rfcomm.rc_channel = i;
+                if (!bind( unix_fd, &bind_addr.addr, unix_len ))
+                    break;
+                if (errno != EADDRINUSE)
+                {
+                    set_error( sock_get_ntstatus( errno ) );
+                    return;
+                }
+            }
+            if (i > 30)
+            {
+                set_error( sock_get_ntstatus( EADDRINUSE ) );
+                return;
+            }
+        }
+        else
+#endif
         if (bind( unix_fd, &bind_addr.addr, unix_len ) < 0)
         {
             if (errno == EADDRINUSE && sock->reuseaddr)

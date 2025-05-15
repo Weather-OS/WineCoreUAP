@@ -51,7 +51,6 @@ use File::Basename;
 # Files to generate
 #
 my $spec_file = "opengl32.spec";
-my $wgl_driver_file = "../../include/wine/wgl_driver.h";
 my $wgl_file = "../../include/wine/wgl.h";
 
 # If set to 1, generate TRACEs for each OpenGL function
@@ -356,7 +355,7 @@ sub generate_unix_thunk($$$)
     {
         my $pname = get_arg_name( ${$func->[1]}[0] );
         $ret .= "    const struct opengl_funcs *funcs = get_dc_funcs( params->$pname );\n";
-        $ret .= "    if (!funcs || !funcs->$prefix.p_$name) return STATUS_NOT_IMPLEMENTED;\n";
+        $ret .= "    if (!funcs || !funcs->p_$name) return STATUS_NOT_IMPLEMENTED;\n";
     }
     else
     {
@@ -365,7 +364,7 @@ sub generate_unix_thunk($$$)
     $ret .= "    ";
     $ret .= "params->ret = " unless is_void_func( $func );
     $ret .= "($func_ret)" if defined $remap_types{$func_ret};
-    $ret .= "funcs->$prefix.p_$name($call_args);\n";
+    $ret .= "funcs->p_$name($call_args);\n";
     $ret .= "    return STATUS_SUCCESS;\n";
     $ret .= "}\n\n";
 
@@ -521,19 +520,18 @@ sub generate_null_func($$)
     my $func_ret = get_func_ret( $func, 1 );
     my $ret = "";
 
-    return "" if $name eq "glDebugEntry";
-
-    $ret .= "static $func_ret null_$name($decl_args)";
-    $ret .= " {";
+    $ret .= "static $func_ret null_$name($decl_args)\n";
+    $ret .= "{\n";
+    $ret .= "    ERR( \"unsupported\\n\" );\n";
     if ($name eq "glGetError")
     {
-        $ret .= " return GL_INVALID_OPERATION;";
+        $ret .= "    return GL_INVALID_OPERATION;\n";
     }
     elsif (!is_void_func( $func ))
     {
-        $ret .= " return 0;";
+        $ret .= "    return 0;\n";
     }
-    $ret .= " }\n";
+    $ret .= "}\n";
     return $ret;
 }
 
@@ -859,114 +857,25 @@ parse_file( "$cache/wgl-$commit.xml" );
 parse_file( "winegl.xml" );
 
 #
-# Get the current wgl_driver.h version
-#
-my $wgl_version = 0;
-open HEADER, "<$wgl_driver_file" or die "cannot open $wgl_driver_file";
-while (<HEADER>)
-{
-    next unless /^#define WINE_WGL_DRIVER_VERSION (\d+)/;
-    $wgl_version = $1;
-    last;
-}
-close HEADER;
-
-#
-# Generate the wgl_driver.h file
-#
-open HEADER, ">$wgl_driver_file" or die "cannot create $wgl_driver_file";
-print HEADER "/* Automatically generated from http://www.opengl.org/registry files; DO NOT EDIT! */\n\n";
-print HEADER "#ifndef __WINE_WGL_DRIVER_H\n";
-print HEADER "#define __WINE_WGL_DRIVER_H\n\n";
-print HEADER "#ifndef WINE_GLAPI\n";
-print HEADER "#define WINE_GLAPI\n";
-print HEADER "#endif\n\n";
-
-printf HEADER "#define WINE_WGL_DRIVER_VERSION %u\n\n", $wgl_version + 1;
-
-print HEADER "struct wgl_context;\n";
-print HEADER "struct wgl_pbuffer;\n\n";
-
-print HEADER "struct wgl_pixel_format\n";
-print HEADER "{\n";
-print HEADER "    PIXELFORMATDESCRIPTOR pfd;\n";
-print HEADER "    int swap_method;\n";
-print HEADER "    int transparent;\n";
-print HEADER "    int pixel_type;\n";
-print HEADER "    int draw_to_pbuffer;\n";
-print HEADER "    int max_pbuffer_pixels;\n";
-print HEADER "    int max_pbuffer_width;\n";
-print HEADER "    int max_pbuffer_height;\n";
-print HEADER "    int transparent_red_value;\n";
-print HEADER "    int transparent_red_value_valid;\n";
-print HEADER "    int transparent_green_value;\n";
-print HEADER "    int transparent_green_value_valid;\n";
-print HEADER "    int transparent_blue_value;\n";
-print HEADER "    int transparent_blue_value_valid;\n";
-print HEADER "    int transparent_alpha_value;\n";
-print HEADER "    int transparent_alpha_value_valid;\n";
-print HEADER "    int transparent_index_value;\n";
-print HEADER "    int transparent_index_value_valid;\n";
-print HEADER "    int sample_buffers;\n";
-print HEADER "    int samples;\n";
-print HEADER "    int bind_to_texture_rgb;\n";
-print HEADER "    int bind_to_texture_rgba;\n";
-print HEADER "    int bind_to_texture_rectangle_rgb;\n";
-print HEADER "    int bind_to_texture_rectangle_rgba;\n";
-print HEADER "    int framebuffer_srgb_capable;\n";
-print HEADER "    int float_components;\n";
-print HEADER "};\n\n";
-
-print HEADER "struct opengl_funcs\n{\n";
-print HEADER "    struct\n    {\n";
-foreach (sort keys %wgl_functions)
-{
-    next if defined $manual_win_functions{$_};
-    my $decl_args = get_func_args( $wgl_functions{$_}, 1, 1, "" );
-    my $func_ret = get_func_ret( $wgl_functions{$_}, 1 );
-    printf HEADER "        %-10s (WINE_GLAPI *p_$_)($decl_args);\n", $func_ret;
-}
-printf HEADER "        %-10s (WINE_GLAPI *p_get_pixel_formats)( struct wgl_pixel_format *formats, UINT max_formats, UINT *num_formats, UINT *num_onscreen_formats );\n", "void";
-print HEADER "    } wgl;\n\n";
-
-print HEADER "    struct\n    {\n";
-foreach (sort keys %norm_functions)
-{
-    next if defined $manual_win_functions{$_};
-    my $decl_args = get_func_args( $norm_functions{$_}, 1, 1, "" );
-    my $func_ret = get_func_ret( $norm_functions{$_}, 1 );
-    printf HEADER "        %-10s (WINE_GLAPI *p_$_)($decl_args);\n", $func_ret;
-}
-print HEADER "    } gl;\n\n";
-
-print HEADER "    struct\n    {\n";
-foreach (sort keys %ext_functions)
-{
-    next if defined $manual_win_functions{$_};
-    my $decl_args = get_func_args( $ext_functions{$_}, 1, 1, "" );
-    my $func_ret = get_func_ret( $ext_functions{$_}, 1 );
-    printf HEADER "        %-10s (WINE_GLAPI *p_$_)($decl_args);\n", $func_ret;
-}
-print HEADER "    } ext;\n";
-print HEADER "};\n\n";
-
-print HEADER "#define ALL_WGL_FUNCS";
-foreach (sort keys %norm_functions)
-{
-    next if defined $manual_win_functions{$_};
-    printf HEADER " \\\n    USE_GL_FUNC(\%s)", $_;
-}
-print HEADER "\n\n";
-print HEADER "#endif /* __WINE_WGL_DRIVER_H */\n";
-close HEADER;
-
-#
 # Generate the wgl.h file
 #
 open HEADER, ">$wgl_file" or die "cannot create $wgl_file";
 print HEADER "/* Automatically generated from http://www.opengl.org/registry files; DO NOT EDIT! */\n\n";
 print HEADER "#ifndef __WINE_WGL_H\n";
 print HEADER "#define __WINE_WGL_H\n\n";
+
+print HEADER "#include <stdarg.h>\n";
+print HEADER "#include <stddef.h>\n";
+print HEADER "#include <windef.h>\n";
+print HEADER "#include <winbase.h>\n";
+print HEADER "#include <wingdi.h>\n";
+print HEADER "\n";
+
+print HEADER "#ifdef WINE_UNIX_LIB\n";
+print HEADER "#define GL_NO_PROTOTYPES\n";
+print HEADER "#define GLAPIENTRY\n";
+print HEADER "#endif\n";
+print HEADER "\n";
 
 print HEADER "#ifndef GLAPIENTRY\n";
 print HEADER "#define GLAPIENTRY __stdcall\n";
@@ -988,14 +897,66 @@ foreach (sort keys %gl_enums)
 }
 print HEADER "\n";
 
+print HEADER "#ifndef GL_NO_PROTOTYPES\n";
 foreach (sort keys %norm_functions)
 {
     my $decl_args = get_func_args( $norm_functions{$_}, 1, 0, "" );
     my $func_ret = get_func_ret( $norm_functions{$_}, 0 );
     printf HEADER "%-10s GLAPIENTRY $_($decl_args);\n", $func_ret;
 }
+print HEADER "#endif\n\n";
 
-print HEADER "\n#endif /* __WINE_WGL_H */\n";
+foreach (sort keys %wgl_functions)
+{
+    my $decl_args = get_func_args( $wgl_functions{$_}, 1, 0, "" );
+    my $func_ret = get_func_ret( $wgl_functions{$_}, 0 );
+    printf HEADER "typedef %-10s (GLAPIENTRY *PFN_$_)($decl_args);\n", $func_ret;
+}
+
+foreach (sort keys %norm_functions)
+{
+    my $decl_args = get_func_args( $norm_functions{$_}, 1, 0, "" );
+    my $func_ret = get_func_ret( $norm_functions{$_}, 0 );
+    printf HEADER "typedef %-10s (GLAPIENTRY *PFN_$_)($decl_args);\n", $func_ret;
+}
+
+foreach (sort keys %ext_functions)
+{
+    my $decl_args = get_func_args( $ext_functions{$_}, 1, 0, "" );
+    my $func_ret = get_func_ret( $ext_functions{$_}, 0 );
+    printf HEADER "typedef %-10s (GLAPIENTRY *PFN_$_)($decl_args);\n", $func_ret;
+}
+print HEADER "\n";
+
+print HEADER "#define ALL_WGL_FUNCS";
+foreach (sort keys %wgl_functions)
+{
+    printf HEADER " \\\n    USE_GL_FUNC(\%s)", $_;
+}
+print HEADER "\n\n";
+print HEADER "#define ALL_WGL_EXT_FUNCS";
+foreach (sort keys %ext_functions)
+{
+    next unless $_ =~ /^wgl/;
+    printf HEADER " \\\n    USE_GL_FUNC(\%s)", $_;
+}
+print HEADER "\n\n";
+print HEADER "#define ALL_GL_FUNCS";
+foreach (sort keys %norm_functions)
+{
+    next if $_ =~ /^glDebugEntry/; # windows-specific function
+    printf HEADER " \\\n    USE_GL_FUNC(\%s)", $_;
+}
+print HEADER "\n\n";
+print HEADER "#define ALL_GL_EXT_FUNCS";
+foreach (sort keys %ext_functions)
+{
+    next unless $_ =~ /^gl/;
+    printf HEADER " \\\n    USE_GL_FUNC(\%s)", $_;
+}
+print HEADER "\n\n";
+
+print HEADER "#endif /* __WINE_WGL_H */\n";
 close HEADER;
 
 #
@@ -1189,9 +1150,7 @@ print OUT "#include \"unixlib.h\"\n";
 print OUT "#include \"unix_private.h\"\n\n";
 print OUT "#include \"wine/debug.h\"\n\n";
 
-print OUT "#ifdef _WIN64\n";
 print OUT "WINE_DEFAULT_DEBUG_CHANNEL(opengl);\n";
-print OUT "#endif\n\n";
 
 print OUT "extern NTSTATUS process_attach( void *args );\n";
 print OUT "extern NTSTATUS thread_attach( void *args );\n";
@@ -1338,6 +1297,12 @@ foreach (sort keys %wgl_functions)
     next if defined $manual_win_functions{$_};
     print OUT generate_null_func($_, $wgl_functions{$_});
 }
+printf OUT "static void null_get_pixel_formats( struct wgl_pixel_format *formats, UINT max_formats,\n";
+printf OUT "                                    UINT *num_formats, UINT *num_onscreen_formats )\n";
+printf OUT "{\n";
+printf OUT "    ERR( \"unsupported\\n\" );\n";
+printf OUT "    *num_formats = *num_onscreen_formats = 0;\n";
+printf OUT "}\n";
 foreach (sort keys %norm_functions)
 {
     next if defined $manual_win_functions{$_};
@@ -1352,27 +1317,22 @@ print OUT "\n";
 
 print OUT "struct opengl_funcs null_opengl_funcs =\n";
 print OUT "{\n";
-print OUT "    {\n";
+print OUT "    .p_get_pixel_formats = null_get_pixel_formats,\n";
 foreach (sort keys %wgl_functions)
 {
     next if defined $manual_win_functions{$_};
-    print OUT "        null_$_,\n";
+    print OUT "    .p_$_ = null_$_,\n";
 }
-print OUT "    },\n";
-print OUT "    {\n";
 foreach (sort keys %norm_functions)
 {
     next if defined $manual_win_functions{$_};
-    print OUT "        null_$_,\n";
+    print OUT "    .p_$_ = null_$_,\n";
 }
-print OUT "    },\n";
-print OUT "    {\n";
 foreach (sort keys %ext_functions)
 {
     next if defined $manual_win_functions{$_};
-    print OUT "        null_$_,\n";
+    print OUT "    .p_$_ = null_$_,\n";
 }
-print OUT "    },\n";
 print OUT "};\n";
 
 # Then the table giving the string <-> function correspondence */
@@ -1383,7 +1343,7 @@ print OUT "{\n";
 foreach (sort keys %ext_functions)
 {
     my $func = $ext_functions{$_};
-    printf OUT "    { \"%s\", \"%s\" },\n", $_, join(" ", sort @{$func->[2]});
+    printf OUT "    { \"%s\", \"%s\", offsetof(struct opengl_funcs, p_$_) },\n", $_, join(" ", sort @{$func->[2]});
 }
 print OUT "};\n";
 

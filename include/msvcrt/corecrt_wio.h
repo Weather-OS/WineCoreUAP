@@ -8,7 +8,7 @@
 
 #include <corecrt.h>
 
-#include <pshpack8.h>
+#pragma pack(push,8)
 
 typedef __msvcrt_ulong _fsize_t;
 
@@ -101,12 +101,13 @@ _ACRTIMP wchar_t* __cdecl _wmktemp(wchar_t*);
 _ACRTIMP int      __cdecl _wopen(const wchar_t*,int,...);
 _ACRTIMP int      __cdecl _wrename(const wchar_t*,const wchar_t*);
 _ACRTIMP int      __cdecl _wsopen(const wchar_t*,int,int,...);
+_ACRTIMP errno_t  __cdecl _wsopen_s(int*,const wchar_t*,int,int,int);
 _ACRTIMP int      __cdecl _wunlink(const wchar_t*);
 
 #ifdef __cplusplus
 }
 #endif
 
-#include <poppack.h>
+#pragma pack(pop)
 
 #endif /* _WIO_DEFINED */

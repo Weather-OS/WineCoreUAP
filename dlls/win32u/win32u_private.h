@@ -122,7 +122,6 @@ extern void track_keyboard_menu_bar( HWND hwnd, UINT wparam, WCHAR ch );
 extern void track_mouse_menu_bar( HWND hwnd, INT ht, int x, int y );
 
 /* message.c */
-extern BOOL kill_system_timer( HWND hwnd, UINT_PTR id );
 extern NTSTATUS send_hardware_message( HWND hwnd, UINT flags, const INPUT *input, LPARAM lparam );
 extern LRESULT send_internal_message_timeout( DWORD dest_pid, DWORD dest_tid, UINT msg, WPARAM wparam,
                                               LPARAM lparam, UINT flags, UINT timeout,
@@ -213,12 +212,20 @@ struct object_lock
 };
 #define OBJECT_LOCK_INIT {0}
 
+#if defined(__i386__) || defined(__x86_64__)
+/* this prevents compilers from incorrectly reordering non-volatile reads (e.g., memcpy) from shared memory */
+#define __SHARED_READ_FENCE do { __asm__ __volatile__( "" ::: "memory" ); } while (0)
+#else
+#define __SHARED_READ_FENCE __atomic_thread_fence( __ATOMIC_ACQUIRE )
+#endif
+
 /* Get shared session object's data pointer, must be called in a loop while STATUS_PENDING
  * is returned, lock must be initialized with OBJECT_LOCK_INIT.
  *
  * The data read from the objects may be transient and no logic should be executed based
  * on it, within the loop, or after, unless the function has returned STATUS_SUCCESS.
  */
+extern const session_shm_t *shared_session;
 extern NTSTATUS get_shared_desktop( struct object_lock *lock, const desktop_shm_t **desktop_shm );
 extern NTSTATUS get_shared_queue( struct object_lock *lock, const queue_shm_t **queue_shm );
 extern NTSTATUS get_shared_input( UINT tid, struct object_lock *lock, const input_shm_t **input_shm );
@@ -227,7 +234,6 @@ extern BOOL is_virtual_desktop(void);
 
 /* window.c */
 struct tagWND;
-extern HDWP begin_defer_window_pos( INT count );
 extern BOOL client_to_screen( HWND hwnd, POINT *pt );
 extern void destroy_thread_windows(void);
 extern LRESULT destroy_window( HWND hwnd );
@@ -250,6 +256,8 @@ extern BOOL is_window_enabled( HWND hwnd );
 extern BOOL is_window_unicode( HWND hwnd );
 extern BOOL is_window_visible( HWND hwnd );
 extern BOOL is_zoomed( HWND hwnd );
+extern BOOL set_window_pixel_format( HWND hwnd, int format, BOOL internal );
+extern int get_window_pixel_format( HWND hwnd, BOOL internal );
 extern DWORD get_window_long( HWND hwnd, INT offset );
 extern ULONG_PTR get_window_long_ptr( HWND hwnd, INT offset, BOOL ansi );
 extern BOOL get_window_rect( HWND hwnd, RECT *rect, UINT dpi );
@@ -279,6 +287,8 @@ static inline void release_win_ptr( struct tagWND *ptr )
     user_unlock();
 }
 
+extern SYSTEM_BASIC_INFORMATION system_info;
+extern void shared_session_init(void);
 extern void gdi_init(void);
 extern void winstation_init(void);
 extern void sysparams_init(void);

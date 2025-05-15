@@ -7,7 +7,7 @@
   variables:
     GIT_STRATEGY: none
     GECKO_VER: 2.47.4
-    MONO_VER: 9.4.0
+    MONO_VER: 10.0.0
   cache:
     - key: wine-gecko-$GECKO_VER
       paths:
@@ -50,7 +50,7 @@
 test-linux-64:
   extends: .wine-test
   variables:
-    INCLUDE_TESTS: "dinput"
+    INCLUDE_TESTS: "dinput ntoskrnl.exe"
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   needs:

@@ -9944,6 +9944,135 @@ static void test_elems(IHTMLDocument2 *doc)
     IHTMLWindow2_Release(window);
 }
 
+static void test_attr_node(IHTMLDOMAttribute *test_attr, IHTMLDocument2 *doc)
+{
+    IHTMLDOMNode *node, *elem_node;
+    IHTMLDOMAttribute2 *attr;
+    IHTMLDOMAttribute *clone;
+    IHTMLDocument2 *doc_node;
+    IHTMLWindow2 *window;
+    IHTMLElement *elem;
+    VARIANT_BOOL vbool;
+    VARIANT v, v_clone;
+    IDispatch *disp;
+    HRESULT hres;
+    BSTR bstr;
+    LONG type;
+
+    hres = IHTMLDOMAttribute_QueryInterface(test_attr, &IID_IHTMLDOMAttribute2, (void**)&attr);
+    ok(hres == S_OK, "Could not get IHTMLDOMAttribute2 iface: %08lx\n", hres);
+
+    hres = IHTMLDOMAttribute2_get_nodeType(attr, &type);
+    ok(hres == S_OK, "get_nodeType failed: %08lx\n", hres);
+    ok(type == 2, "nodeType = %ld\n", type);
+
+    hres = IHTMLDOMAttribute2_get_attributes(attr, &disp);
+    ok(hres == S_OK, "get_attributes failed: %08lx\n", hres);
+    ok(!disp, "attributes != NULL\n");
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+    hres = IHTMLWindow2_get_document(window, &doc_node);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+    IHTMLWindow2_Release(window);
+
+    hres = IHTMLDOMAttribute2_get_ownerDocument(attr, &disp);
+    ok(hres == S_OK, "get_ownerDocument failed: %08lx\n", hres);
+    ok(disp != NULL, "ownerDocument == NULL\n");
+    ok(!iface_cmp((IUnknown*)disp, (IUnknown*)doc), "ownerDocument == doc\n");
+    ok(iface_cmp((IUnknown*)disp, (IUnknown*)doc_node), "ownerDocument != doc_node\n");
+    IHTMLDocument2_Release(doc_node);
+    IDispatch_Release(disp);
+
+    hres = IHTMLDOMAttribute2_cloneNode(attr, VARIANT_TRUE, &clone);
+    ok(hres == S_OK, "cloneNode failed: %08lx\n", hres);
+    ok(!iface_cmp((IUnknown*)attr, (IUnknown*)clone), "attr == cloned attr\n");
+
+    V_VT(&v) = VT_EMPTY;
+    V_VT(&v_clone) = VT_EMPTY;
+    hres = IHTMLDOMAttribute_get_nodeValue(test_attr, &v);
+    ok(hres == S_OK, "get_nodeValue failed: %08lx\n", hres);
+    hres = IHTMLDOMAttribute_get_nodeValue(clone, &v_clone);
+    ok(hres == S_OK, "get_nodeValue failed: %08lx\n", hres);
+    if(V_VT(&v) == VT_BSTR)
+        ok(VarCmp(&v, &v_clone, 0, 0) == VARCMP_EQ, "attr value %s != cloned attr value %s\n", wine_dbgstr_variant(&v), wine_dbgstr_variant(&v_clone));
+    else {
+        todo_wine
+        ok(V_VT(&v_clone) == VT_BSTR, "unexpected cloned attr value %s for non-string attr value %s\n", wine_dbgstr_variant(&v), wine_dbgstr_variant(&v_clone));
+    }
+    IHTMLDOMAttribute_Release(clone);
+    VariantClear(&v_clone);
+    VariantClear(&v);
+
+    hres = IHTMLDOMAttribute2_hasChildNodes(attr, &vbool);
+    ok(hres == S_OK, "hasChildNodes failed: %08lx\n", hres);
+    ok(vbool == VARIANT_FALSE, "hasChildNodes returned %d\n", vbool);
+
+    hres = IHTMLDOMAttribute2_get_childNodes(attr, &disp);
+    ok(hres == S_OK, "get_childNodes failed: %08lx\n", hres);
+    ok(!disp, "childNodes != NULL\n");
+
+    hres = IHTMLDOMAttribute2_get_firstChild(attr, &node);
+    ok(hres == S_OK, "get_firstChild failed: %08lx\n", hres);
+    ok(!node, "firstChild != NULL\n");
+
+    hres = IHTMLDOMAttribute2_get_lastChild(attr, &node);
+    ok(hres == S_OK, "get_lastChild failed: %08lx\n", hres);
+    ok(!node, "lastChild != NULL\n");
+
+    hres = IHTMLDOMAttribute2_get_previousSibling(attr, &node);
+    ok(hres == S_OK, "get_previousSibling failed: %08lx\n", hres);
+    ok(!node, "previousSibling != NULL\n");
+
+    hres = IHTMLDOMAttribute2_get_nextSibling(attr, &node);
+    ok(hres == S_OK, "get_nextSibling failed: %08lx\n", hres);
+    ok(!node, "nextSibling != NULL\n");
+
+    bstr = SysAllocString(L"div");
+    hres = IHTMLDocument2_createElement(doc, bstr, &elem);
+    ok(hres == S_OK, "createElement failed: %08lx\n", hres);
+    hres = IHTMLElement_QueryInterface(elem, &IID_IHTMLDOMNode, (void**)&elem_node);
+    ok(hres == S_OK, "Could not get IHTMLDOMNode iface: %08lx\n", hres);
+    IHTMLElement_Release(elem);
+    SysFreeString(bstr);
+
+    hres = IHTMLDOMAttribute2_appendChild(attr, elem_node, &node);
+    ok(hres == S_OK, "appendChild failed: %08lx\n", hres);
+    ok(!node, "appended child != NULL\n");
+
+    V_VT(&v) = VT_NULL;
+    hres = IHTMLDOMAttribute2_insertBefore(attr, elem_node, v, &node);
+    ok(hres == S_OK, "insertBefore failed: %08lx\n", hres);
+    ok(!node, "inserted node != NULL\n");
+
+    hres = IHTMLDOMAttribute2_hasChildNodes(attr, &vbool);
+    ok(hres == S_OK, "hasChildNodes failed: %08lx\n", hres);
+    ok(vbool == VARIANT_FALSE, "hasChildNodes returned %d\n", vbool);
+
+    hres = IHTMLDOMAttribute2_get_firstChild(attr, &node);
+    ok(hres == S_OK, "get_firstChild failed: %08lx\n", hres);
+    ok(!node, "firstChild != NULL\n");
+
+    hres = IHTMLDOMAttribute2_replaceChild(attr, elem_node, NULL, &node);
+    ok(hres == S_OK, "replaceChild failed: %08lx\n", hres);
+    ok(!node, "replaced node != NULL\n");
+
+    hres = IHTMLDOMAttribute2_replaceChild(attr, elem_node, elem_node, &node);
+    ok(hres == S_OK, "replaceChild failed: %08lx\n", hres);
+    ok(!node, "replaced node != NULL\n");
+
+    hres = IHTMLDOMAttribute2_removeChild(attr, NULL, &node);
+    ok(hres == S_OK, "removeChild failed: %08lx\n", hres);
+    ok(!node, "removed node != NULL\n");
+
+    hres = IHTMLDOMAttribute2_removeChild(attr, elem_node, &node);
+    ok(hres == S_OK, "removeChild failed: %08lx\n", hres);
+    ok(!node, "removed node != NULL\n");
+
+    IHTMLDOMNode_Release(elem_node);
+    IHTMLDOMAttribute2_Release(attr);
+}
+
 static void test_attr(IHTMLDocument2 *doc, IHTMLElement *elem)
 {
     IHTMLDOMAttribute *attr, *attr2, *attr3;
@@ -9985,6 +10114,7 @@ static void test_attr(IHTMLDocument2 *doc, IHTMLElement *elem)
     ok(!lstrcmpW(V_BSTR(&v), L"divid3"), "V_BSTR(v) = %s\n", wine_dbgstr_w(V_BSTR(&v)));
     VariantClear(&v);
 
+    test_attr_node(attr, doc);
     IHTMLDOMAttribute_Release(attr);
 
     attr = get_elem_attr_node((IUnknown*)elem, L"emptyattr", TRUE);
@@ -10004,6 +10134,7 @@ static void test_attr(IHTMLDocument2 *doc, IHTMLElement *elem)
     VariantClear(&v);
 
     test_attr_specified(attr, VARIANT_TRUE);
+    test_attr_node(attr, doc);
     IHTMLDOMAttribute_Release(attr);
 
     V_VT(&v) = VT_I4;
@@ -10026,11 +10157,13 @@ static void test_attr(IHTMLDocument2 *doc, IHTMLElement *elem)
     ok(!lstrcmpW(V_BSTR(&v), L"160"), "V_BSTR(v) = %s\n", wine_dbgstr_w(V_BSTR(&v)));
     VariantClear(&v);
 
+    test_attr_node(attr, doc);
     IHTMLDOMAttribute_Release(attr);
 
     attr = get_elem_attr_node((IUnknown*)elem, L"tabIndex", TRUE);
     test_attr_specified(attr, VARIANT_FALSE);
     test_attr_expando(attr, VARIANT_FALSE);
+    test_attr_node(attr, doc);
     IHTMLDOMAttribute_Release(attr);
 
     /* Test created, detached attribute. */
@@ -10102,6 +10235,7 @@ static void test_attr(IHTMLDocument2 *doc, IHTMLElement *elem)
     test_elem_attr(elem, L"Test", L"new replace value");
     test_attr_value(attr, L"new value2");
     test_attr_value(attr3, L"new replace value");
+    test_attr_node(attr, doc);
 
     /* Attached attributes cause errors. */
     hres = IHTMLElement4_setAttributeNode(elem4, attr3, &attr2);

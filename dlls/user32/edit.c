@@ -3178,6 +3178,9 @@ static LRESULT EDIT_WM_Char(EDITSTATE *es, WCHAR c)
 {
         BOOL control;
 
+	if (es->bCaptureState)
+		return 1;
+
 	control = NtUserGetKeyState(VK_CONTROL) & 0x8000;
 
 	switch (c) {
@@ -3449,6 +3452,9 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 {
 	BOOL shift;
 	BOOL control;
+
+	if (es->bCaptureState)
+		return 1;
 
 	if (NtUserGetKeyState(VK_MENU) & 0x8000)
 		return 0;
@@ -5057,6 +5063,10 @@ LRESULT EditWndProc_common( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, B
 	case WM_VSCROLL:
 		result = EDIT_WM_VScroll(es, LOWORD(wParam), (short)HIWORD(wParam));
 		break;
+
+        case WM_CAPTURECHANGED:
+            es->bCaptureState = FALSE;
+            break;
 
         case WM_MOUSEWHEEL:
                 {

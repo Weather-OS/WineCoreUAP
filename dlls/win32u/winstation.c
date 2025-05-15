@@ -71,6 +71,7 @@ struct session_block
 
 static pthread_mutex_t session_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list session_blocks = LIST_INIT(session_blocks);
+const session_shm_t *shared_session;
 
 static struct session_thread_data *get_session_thread_data(void)
 {
@@ -78,13 +79,6 @@ static struct session_thread_data *get_session_thread_data(void)
     if (!thread_info->session_data) thread_info->session_data = calloc(1, sizeof(*thread_info->session_data));
     return thread_info->session_data;
 }
-
-#if defined(__i386__) || defined(__x86_64__)
-/* this prevents compilers from incorrectly reordering non-volatile reads (e.g., memcpy) from shared memory */
-#define __SHARED_READ_FENCE do { __asm__ __volatile__( "" ::: "memory" ); } while (0)
-#else
-#define __SHARED_READ_FENCE __atomic_thread_fence( __ATOMIC_ACQUIRE )
-#endif
 
 static void shared_object_acquire_seqlock( const shared_object_t *object, UINT64 *seq )
 {
@@ -181,8 +175,8 @@ static NTSTATUS find_shared_session_block( SIZE_T offset, SIZE_T size, struct se
 
 static const shared_object_t *find_shared_session_object( struct obj_locator locator )
 {
+    struct session_block *block = NULL;
     const shared_object_t *object;
-    struct session_block *block;
     NTSTATUS status;
 
     if (locator.id && !(status = find_shared_session_block( locator.offset, sizeof(*object), &block )))
@@ -193,6 +187,17 @@ static const shared_object_t *find_shared_session_object( struct obj_locator loc
     }
 
     return NULL;
+}
+
+void shared_session_init(void)
+{
+    struct session_block *block;
+    UINT status;
+
+    if ((status = find_shared_session_block( 0, sizeof(*shared_session), &block )))
+        ERR( "Failed to map initial shared session block, status %#x\n", status );
+    else
+        shared_session = (const session_shm_t *)block->data;
 }
 
 NTSTATUS get_shared_desktop( struct object_lock *lock, const desktop_shm_t **desktop_shm )
@@ -577,12 +582,12 @@ HDESK WINAPI NtUserOpenInputDesktop( DWORD flags, BOOL inherit, ACCESS_MASK acce
 {
     HANDLE ret = 0;
 
-    TRACE( "(%x,%i,%x)\n", (int)flags, inherit, (int)access );
+    TRACE( "(%x,%i,%x)\n", flags, inherit, access );
 
     access |= DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS;
 
     if (flags)
-        FIXME( "partial stub flags %08x\n", (int)flags );
+        FIXME( "partial stub flags %08x\n", flags );
 
     SERVER_START_REQ( open_input_desktop )
     {
@@ -899,7 +904,7 @@ static HANDLE get_winstations_dir_handle(void)
     NTSTATUS status;
     HANDLE dir;
 
-    snprintf( bufferA, sizeof(bufferA), "\\Sessions\\%u\\Windows\\WindowStations", (int)NtCurrentTeb()->Peb->SessionId );
+    snprintf( bufferA, sizeof(bufferA), "\\Sessions\\%u\\Windows\\WindowStations", NtCurrentTeb()->Peb->SessionId );
     str.Buffer = buffer;
     str.MaximumLength = asciiz_to_unicode( buffer, bufferA );
     str.Length = str.MaximumLength - sizeof(WCHAR);

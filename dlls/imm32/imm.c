@@ -948,6 +948,7 @@ static HWND get_ime_ui_window(void)
     {
         imc->ui_hwnd = CreateWindowExW( WS_EX_TOOLWINDOW, ime->ui_class, NULL, WS_POPUP, 0, 0, 1, 1,
                                         ImmGetDefaultIMEWnd( 0 ), 0, ime->module, 0 );
+        SetWindowPos( imc->ui_hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
         SetWindowLongPtrW( imc->ui_hwnd, IMMGWL_IMC, (LONG_PTR)NtUserGetWindowInputContext( GetFocus() ) );
     }
     return imc->ui_hwnd;
@@ -3340,4 +3341,24 @@ BOOL WINAPI CtfImmIsCiceroEnabled(void)
     FIXME("(): stub\n");
     SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
     return FALSE;
+}
+
+/***********************************************************************
+ *      CtfImmHideToolbarWnd (IMM32.@)
+ */
+DWORD WINAPI CtfImmHideToolbarWnd(void)
+{
+    FIXME("(): stub\n");
+    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+    return 0;
+}
+
+/***********************************************************************
+ *      CtfImmRestoreToolbarWnd (IMM32.@)
+ */
+DWORD WINAPI CtfImmRestoreToolbarWnd(DWORD unknown)
+{
+    FIXME("%lx: stub\n", unknown);
+    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+    return 0;
 }

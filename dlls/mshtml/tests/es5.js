@@ -1356,7 +1356,6 @@ sync_test("getOwnPropertyNames", function() {
     ok(names === "defined,test", "names = " + names);
 
     names = Object.getOwnPropertyNames([]).sort().join();
-    todo_wine.
     ok(names === "length", "names = " + names);
 
     ok(Object.getOwnPropertyNames.length === 1, "Object.getOwnPropertyNames.length = " + Object.getOwnPropertyNames.length);
@@ -2845,9 +2844,9 @@ async_test("script_global", function() {
     // Created documents share script global, so their objects are instances of Object from
     // the current script context.
     var doc = document.implementation.createHTMLDocument("test");
-    todo_wine.
     ok(doc instanceof Object, "created doc is not an instance of Object");
     ok(doc.implementation instanceof Object, "created doc.implementation is not an instance of Object");
+    ok(doc.implementation instanceof DOMImplementation, "created doc.implementation is not an instance of DOMImplementation");
 
     document.body.innerHTML = "";
     var iframe = document.createElement("iframe");
@@ -2858,10 +2857,32 @@ async_test("script_global", function() {
         var doc = iframe.contentWindow.document;
         ok(!(doc instanceof Object), "doc is an instance of Object");
         ok(!(doc.implementation instanceof Object), "doc.implementation is an instance of Object");
+        ok(!(doc.implementation instanceof DOMImplementation), "doc.implementation is an instance of DOMImplementation");
+        ok(doc.implementation instanceof iframe.contentWindow.DOMImplementation, "doc.implementation is not an instance of iframe's DOMImplementation");
+        ok(Object.getPrototypeOf(doc) !== Object.getPrototypeOf(document), "doc's prototype same as doc prototype");
+        ok(Object.getPrototypeOf(doc) === iframe.contentWindow.HTMLDocument.prototype, "doc's prototype not iframe's HTMLDocument.prototype");
 
         doc = doc.implementation.createHTMLDocument("test");
         ok(!(doc instanceof Object), "created iframe doc is an instance of Object");
         ok(!(doc.implementation instanceof Object), "created iframe doc.implementation is an instance of Object");
+        ok(!(doc.implementation instanceof DOMImplementation), "created iframe doc.implementation is an instance of DOMImplementation");
+        ok(doc.implementation instanceof iframe.contentWindow.DOMImplementation, "created iframe doc.implementation is not an instance of iframe's DOMImplementation");
+        ok(Object.getPrototypeOf(doc) !== Object.getPrototypeOf(document), "created iframe doc's prototype same as doc prototype");
+        ok(Object.getPrototypeOf(doc) === iframe.contentWindow.HTMLDocument.prototype, "created iframe doc's prototype not iframe's HTMLDocument.prototype");
+
+        Object.defineProperty(doc, "winetest", { writable: true, enumerable: true, configurable: true, value: 42 });
+        test_own_data_prop_desc(doc, "winetest", true, true, true);
+
+        ok(Object.isFrozen(doc) === false, "created iframe doc isFrozen is not false");
+        ok(Object.isSealed(doc) === false, "created iframe doc isSealed is not false");
+        Object.freeze(doc);
+        ok(Object.isFrozen(doc) === true, "created iframe doc isFrozen is not true after freezing it");
+        ok(Object.isSealed(doc) === true, "created iframe doc isSealed is not true after freezing it");
+
+        var r = Object.prototype.toString.call(iframe.contentWindow);
+        ok(r === "[object Window]", "iframe's Window toString = " + r);
+        r = Object.prototype.toString.call(iframe.contentWindow.DOMImplementation);
+        ok(r === "[object DOMImplementation]", "iframe's DOMImplementation toString = " + r);
 
         next_test();
     });

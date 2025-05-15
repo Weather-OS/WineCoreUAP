@@ -169,12 +169,7 @@ static DWORD WINAPI init_debug_lists( RTL_RUN_ONCE *once, void *param, void **co
     HANDLE root, hkey;
 
     RtlOpenCurrentUser( KEY_ALL_ACCESS, &root );
-    attr.Length = sizeof(attr);
-    attr.RootDirectory = root;
-    attr.ObjectName = &name;
-    attr.Attributes = 0;
-    attr.SecurityDescriptor = NULL;
-    attr.SecurityQualityOfService = NULL;
+    InitializeObjectAttributes( &attr, &name, OBJ_CASE_INSENSITIVE, root, NULL );
 
     /* @@ Wine registry key: HKCU\Software\Wine\Debug */
     if (NtOpenKey( &hkey, KEY_ALL_ACCESS, &attr )) hkey = 0;
@@ -939,7 +934,7 @@ void RELAY_SetupDLL( HMODULE module )
 WINE_DECLARE_DEBUG_CHANNEL(seh);
 WINE_DECLARE_DEBUG_CHANNEL(snoop);
 
-#include "pshpack1.h"
+#pragma pack(push,1)
 
 typedef	struct
 {
@@ -979,7 +974,7 @@ typedef struct tagSNOOP_RETURNENTRIES {
 	struct tagSNOOP_RETURNENTRIES	*next;
 } SNOOP_RETURNENTRIES;
 
-#include "poppack.h"
+#pragma pack(pop)
 
 extern void WINAPI SNOOP_Entry(void);
 extern void WINAPI SNOOP_Return(void);

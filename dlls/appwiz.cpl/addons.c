@@ -56,10 +56,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(appwizcpl);
 #define GECKO_SHA "???"
 #endif
 
-#define MONO_VERSION "9.4.0"
+#define MONO_VERSION "10.0.0"
 #if defined(__i386__) || defined(__x86_64__)
 #define MONO_ARCH "x86"
-#define MONO_SHA "cf6173ae94b79e9de13d9a74cdb2560a886fc3d271f9489acb1cfdbd961cacb2"
+#define MONO_SHA "dbaca73e5d09f7a3a7c157ad04289af9ca47c3ced7012d46544a607046902b87"
 #else
 #define MONO_ARCH ""
 #define MONO_SHA "???"
@@ -459,6 +459,8 @@ static HRESULT WINAPI InstallCallback_OnProgress(IBindStatusCallback *iface, ULO
 static HRESULT WINAPI InstallCallback_OnStopBinding(IBindStatusCallback *iface,
         HRESULT hresult, LPCWSTR szError)
 {
+    WCHAR message[256];
+
     if(dwl_binding) {
         IBinding_Release(dwl_binding);
         dwl_binding = NULL;
@@ -467,6 +469,12 @@ static HRESULT WINAPI InstallCallback_OnStopBinding(IBindStatusCallback *iface,
     if(FAILED(hresult)) {
         if(hresult == E_ABORT)
             TRACE("Binding aborted\n");
+        else if (hresult == INET_E_DOWNLOAD_FAILURE)
+        {
+            if(LoadStringW(hInst, IDS_DOWNLOAD_FAILED, message, ARRAY_SIZE(message)))
+                MessageBoxW(install_dialog, message, NULL, MB_ICONERROR);
+            EndDialog(install_dialog, IDCANCEL);
+        }
         else
             ERR("Binding failed %08lx\n", hresult);
         return S_OK;
@@ -491,8 +499,6 @@ static HRESULT WINAPI InstallCallback_OnStopBinding(IBindStatusCallback *iface,
             free(cache_file_name);
         }
     }else {
-        WCHAR message[256];
-
         if(LoadStringW(hInst, IDS_INVALID_SHA, message, ARRAY_SIZE(message)))
             MessageBoxW(NULL, message, NULL, MB_ICONERROR);
     }

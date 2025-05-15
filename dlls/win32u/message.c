@@ -390,13 +390,9 @@ static BOOL init_window_call_params( struct win_proc_params *params, HWND hwnd, 
 
     user_check_not_lock();
 
+    if (!is_current_thread_window( hwnd )) return FALSE;
     if (!(win = get_win_ptr( hwnd ))) return FALSE;
     if (win == WND_OTHER_PROCESS || win == WND_DESKTOP) return FALSE;
-    if (win->tid != GetCurrentThreadId())
-    {
-        release_win_ptr( win );
-        return FALSE;
-    }
     params->func = win->winproc;
     params->ansi_dst = !(win->flags & WIN_ISUNICODE);
     is_dialog = win->dlgInfo != NULL;
@@ -420,11 +416,14 @@ static LRESULT dispatch_win_proc_params( struct win_proc_params *params, size_t 
     LRESULT result = 0;
     void *ret_ptr;
     ULONG ret_len;
+    NTSTATUS status;
 
     if (thread_info->recursion_count > MAX_WINPROC_RECURSION) return 0;
     thread_info->recursion_count++;
-    KeUserModeCallback( NtUserCallWinProc, params, size, &ret_ptr, &ret_len );
+    status = KeUserModeCallback( NtUserCallWinProc, params, size, &ret_ptr, &ret_len );
     thread_info->recursion_count--;
+
+    if (status) return result;
 
     if (ret_len >= sizeof(result))
     {
@@ -2177,15 +2176,18 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
     {
         UINT state_cmd, config_cmd;
         RECT window_rect;
+        HWND foreground;
 
-        if (!user_driver->pGetWindowStateUpdates( hwnd, &state_cmd, &config_cmd, &window_rect )) return 0;
+        if (!user_driver->pGetWindowStateUpdates( hwnd, &state_cmd, &config_cmd, &window_rect, &foreground )) return 0;
+        if (foreground) NtUserSetForegroundWindow( foreground );
         if (state_cmd)
         {
             if (LOWORD(state_cmd) == SC_RESTORE && HIWORD(state_cmd)) NtUserSetActiveWindow( hwnd );
             send_message( hwnd, WM_SYSCOMMAND, LOWORD(state_cmd), 0 );
 
             /* state change might have changed the window config already, check again */
-            user_driver->pGetWindowStateUpdates( hwnd, &state_cmd, &config_cmd, &window_rect );
+            user_driver->pGetWindowStateUpdates( hwnd, &state_cmd, &config_cmd, &window_rect, &foreground );
+            if (foreground) NtUserSetForegroundWindow( foreground );
             if (state_cmd) WARN( "window %p state needs another update, ignoring\n", hwnd );
         }
         if (config_cmd)
@@ -2939,8 +2941,8 @@ int peek_message( MSG *msg, const struct peek_message_filter *filter )
                 hook.time        = info.msg.time;
                 hook.dwExtraInfo = msg_data->hardware.info;
                 TRACE( "calling keyboard LL hook vk %x scan %x flags %x time %u info %lx\n",
-                       (int)hook.vkCode, (int)hook.scanCode, (int)hook.flags,
-                       (int)hook.time, (long)hook.dwExtraInfo );
+                       hook.vkCode, hook.scanCode, hook.flags,
+                       hook.time, hook.dwExtraInfo );
                 result = call_hooks( WH_KEYBOARD_LL, HC_ACTION, info.msg.wParam,
                                      (LPARAM)&hook, sizeof(hook) );
             }
@@ -2954,8 +2956,8 @@ int peek_message( MSG *msg, const struct peek_message_filter *filter )
                 hook.time        = info.msg.time;
                 hook.dwExtraInfo = msg_data->hardware.info;
                 TRACE( "calling mouse LL hook pos %d,%d data %x flags %x time %u info %lx\n",
-                       (int)hook.pt.x, (int)hook.pt.y, (int)hook.mouseData, (int)hook.flags,
-                       (int)hook.time, (long)hook.dwExtraInfo );
+                       hook.pt.x, hook.pt.y, hook.mouseData, hook.flags,
+                       hook.time, hook.dwExtraInfo );
                 result = call_hooks( WH_MOUSE_LL, HC_ACTION, info.msg.wParam,
                                      (LPARAM)&hook, sizeof(hook) );
             }
@@ -3981,8 +3983,7 @@ static LRESULT call_messageAtoW( winproc_callback_t callback, HWND hwnd, UINT ms
 {
     LRESULT ret = 0;
 
-    TRACE( "(hwnd=%p,msg=%s,wp=%#lx,lp=%#lx)\n", hwnd, debugstr_msg_name( msg, hwnd ),
-           (long)wparam, (long)lparam );
+    TRACE( "(hwnd=%p,msg=%s,wp=%#lx,lp=%#lx)\n", hwnd, debugstr_msg_name( msg, hwnd ), (long)wparam, lparam );
 
     switch(msg)
     {
@@ -4295,8 +4296,10 @@ BOOL WINAPI NtUserKillTimer( HWND hwnd, UINT_PTR id )
     return ret;
 }
 
-/* see KillSystemTimer */
-BOOL kill_system_timer( HWND hwnd, UINT_PTR id )
+/***********************************************************************
+ *           NtUserKillSystemTimer (win32u.@)
+ */
+BOOL WINAPI NtUserKillSystemTimer( HWND hwnd, UINT_PTR id )
 {
     BOOL ret;
 
@@ -4567,7 +4570,7 @@ LRESULT WINAPI NtUserMessageCall( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
         return post_dde_message_call( hwnd, msg, wparam, lparam, result_info );
 
     default:
-        FIXME( "%p %x %lx %lx %p %x %x\n", hwnd, msg, (long)wparam, lparam, result_info, (int)type, ansi );
+        FIXME( "%p %x %lx %lx %p %x %x\n", hwnd, msg, (long)wparam, lparam, result_info, type, ansi );
     }
     return 0;
 }

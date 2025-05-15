@@ -27,6 +27,7 @@
 
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,9 @@
 #include <errno.h>
 #ifdef HAVE_SYS_SYSCTL_H
 # include <sys/sysctl.h>
+#endif
+#ifdef __APPLE__
+# include <mach-o/dyld.h>
 #endif
 
 #ifdef _WIN32
@@ -137,7 +141,7 @@ static inline char *xstrdup( const char *str )
     return strcpy( xmalloc( strlen(str)+1 ), str );
 }
 
-static inline int strendswith( const char *str, const char *end )
+static inline bool strendswith( const char *str, const char *end )
 {
     int l = strlen( str );
     int m = strlen( end );
@@ -193,17 +197,17 @@ static inline void strarray_addall( struct strarray *array, struct strarray adde
     for (i = 0; i < added.count; i++) strarray_add( array, added.str[i] );
 }
 
-static inline int strarray_exists( const struct strarray *array, const char *str )
+static inline bool strarray_exists( struct strarray array, const char *str )
 {
     unsigned int i;
 
-    for (i = 0; i < array->count; i++) if (!strcmp( array->str[i], str )) return 1;
-    return 0;
+    for (i = 0; i < array.count; i++) if (!strcmp( array.str[i], str )) return true;
+    return false;
 }
 
 static inline void strarray_add_uniq( struct strarray *array, const char *str )
 {
-    if (!strarray_exists( array, str )) strarray_add( array, str );
+    if (!strarray_exists( *array, str )) strarray_add( array, str );
 }
 
 static inline void strarray_addall_uniq( struct strarray *array, struct strarray added )
@@ -257,12 +261,12 @@ static inline void strarray_qsort( struct strarray *array, int (*func)(const cha
     if (array->count) qsort( array->str, array->count, sizeof(*array->str), (void *)func );
 }
 
-static inline const char *strarray_bsearch( const struct strarray *array, const char *str,
+static inline const char *strarray_bsearch( struct strarray array, const char *str,
                                             int (*func)(const char **, const char **) )
 {
     char **res = NULL;
 
-    if (array->count) res = bsearch( &str, array->str, array->count, sizeof(*array->str), (void *)func );
+    if (array.count) res = bsearch( &str, array.str, array.count, sizeof(*array.str), (void *)func );
     return res ? *res : NULL;
 }
 
@@ -274,8 +278,9 @@ static inline void strarray_trace( struct strarray args )
     {
         if (strpbrk( args.str[i], " \t\n\r")) printf( "\"%s\"", args.str[i] );
         else printf( "%s", args.str[i] );
-        putchar( i < args.count - 1 ? ' ' : '\n' );
+        if (i < args.count - 1) putchar( ' ' );
     }
+    putchar( '\n' );
 }
 
 static inline int strarray_spawn( struct strarray args )
@@ -547,6 +552,14 @@ static inline void set_target_ptr_size( struct target *target, unsigned int size
 }
 
 
+static inline bool is_pe_target( struct target target )
+{
+    return (target.platform == PLATFORM_WINDOWS ||
+            target.platform == PLATFORM_MINGW ||
+            target.platform == PLATFORM_CYGWIN);
+}
+
+
 static inline int get_cpu_from_name( const char *name )
 {
     static const struct
@@ -616,19 +629,10 @@ static inline const char *get_arch_dir( struct target target )
     };
 
     if (!cpu_names[target.cpu]) return "";
-
-    switch (target.platform)
-    {
-    case PLATFORM_WINDOWS:
-    case PLATFORM_CYGWIN:
-    case PLATFORM_MINGW:
-        return strmake( "/%s-windows", cpu_names[target.cpu] );
-    default:
-        return strmake( "/%s-unix", cpu_names[target.cpu] );
-    }
+    return strmake( "/%s-%s", cpu_names[target.cpu], is_pe_target( target ) ? "windows" : "unix" );
 }
 
-static inline int parse_target( const char *name, struct target *target )
+static inline bool parse_target( const char *name, struct target *target )
 {
     int res;
     char *p, *spec = xstrdup( name );
@@ -643,7 +647,7 @@ static inline int parse_target( const char *name, struct target *target )
         if ((res = get_cpu_from_name( spec )) == -1)
         {
             free( spec );
-            return 0;
+            return false;
         }
         target->cpu = res;
     }
@@ -655,7 +659,7 @@ static inline int parse_target( const char *name, struct target *target )
     else
     {
         free( spec );
-        return 0;
+        return false;
     }
 
     /* get the OS part */
@@ -673,7 +677,7 @@ static inline int parse_target( const char *name, struct target *target )
     }
 
     free( spec );
-    return 1;
+    return true;
 }
 
 
@@ -703,6 +707,12 @@ static inline char *get_bindir( const char *argv0 )
     size_t path_size = PATH_MAX;
     char *path = xmalloc( path_size );
     if (!sysctl( pathname, ARRAY_SIZE(pathname), path, &path_size, NULL, 0 ))
+        dir = realpath( path, NULL );
+    free( path );
+#elif defined(__APPLE__)
+    uint32_t path_size = PATH_MAX;
+    char *path = xmalloc( path_size );
+    if (!_NSGetExecutablePath( path, &path_size ))
         dir = realpath( path, NULL );
     free( path );
 #endif
@@ -846,7 +856,7 @@ static inline void flush_output_buffer( const char *name )
 struct long_option
 {
     const char *name;
-    int has_arg;
+    bool has_arg;
     int val;
 };
 
