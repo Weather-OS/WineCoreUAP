@@ -35,6 +35,12 @@
 
 extern const struct IApplicationDataContainerVtbl application_data_container_vtbl;
 
+/**
+ * Developer note: you may be wondering why we don't automate registry operations by
+ * assigning every container with it's own key. The reason is that we can't trust the client
+ * to release the container object.
+ */
+
 struct application_data_container
 {
     //Derivatives
@@ -44,10 +50,21 @@ struct application_data_container
     IPropertySet *Values;
     IMap_HSTRING_ApplicationDataContainer *Containers;
 
-    HKEY containerKey;
+    WCHAR hivePath[MAX_PATH];
+    WCHAR containerPath[MAX_PATH];
+    HSTRING appDataPath;
     LONG ref;
 };
 
-struct application_data *impl_from_IApplicationData( IApplicationData *iface );
+struct event_handler_data
+{
+    WCHAR hivePath[MAX_PATH];
+    WCHAR containerPath[MAX_PATH];
+};
+
+struct application_data_container *impl_from_IApplicationDataContainer( IApplicationDataContainer *iface );
+
+HRESULT WINAPI application_data_AssignAndTrackContainer( HSTRING appDataPath, LPCWSTR containerPath, IApplicationDataContainer **container );
+HRESULT WINAPI application_data_container_CreateAndTrackContainer( IApplicationDataContainer *iface, HSTRING name, ApplicationDataCreateDisposition composition, IApplicationDataContainer **outContainer );
 
 #endif

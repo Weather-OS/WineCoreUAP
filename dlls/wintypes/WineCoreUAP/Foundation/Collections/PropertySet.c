@@ -48,8 +48,7 @@ static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID 
 
     if (IsEqualGUID( iid, &IID_IPropertySet))
     {
-        *out = &impl->IPropertySet_iface;
-        IInspectable_AddRef( *out );
+        IActivationFactory_ActivateInstance( iface, (IInspectable **)out );
         return S_OK;
     }
 
@@ -94,8 +93,15 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, instance );
-    return E_NOTIMPL;
+    struct property_set *impl;
+    if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
+    impl->IPropertySet_iface.lpVtbl = &property_set_vtbl;
+    impl->map = NULL;
+    impl->ref = 1;
+
+    *instance = (IInspectable *)&impl->IPropertySet_iface;
+
+    return S_OK;
 }
 
 static const struct IActivationFactoryVtbl factory_vtbl =
@@ -114,7 +120,6 @@ static const struct IActivationFactoryVtbl factory_vtbl =
 static struct property_set_statics property_set_statics =
 {
     {&factory_vtbl},
-    {&property_set_vtbl},
     1,
 };
 

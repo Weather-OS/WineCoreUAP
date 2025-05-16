@@ -1309,9 +1309,9 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
      * Windows.Foundation 
     */
     if (!wcscmp( buffer, RuntimeClass_Windows_Foundation_Collections_PropertySet ))
-        //(@WinTypes.dll)
+        //(@WinTypes.dll)        
         IActivationFactory_QueryInterface( property_set_factory, &IID_IActivationFactory, (void **)factory );
-    
+
     /**
      * Windows.Storage.Streams
     */

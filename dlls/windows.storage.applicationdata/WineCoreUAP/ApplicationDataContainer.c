@@ -91,6 +91,7 @@ static HRESULT WINAPI application_data_container_GetTrustLevel( IApplicationData
 static HRESULT WINAPI application_data_container_get_Name( IApplicationDataContainer *iface, HSTRING *value )
 {
     struct application_data_container *impl = impl_from_IApplicationDataContainer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Name;
     return S_OK;
 }
@@ -98,6 +99,7 @@ static HRESULT WINAPI application_data_container_get_Name( IApplicationDataConta
 static HRESULT WINAPI application_data_container_get_Locality( IApplicationDataContainer *iface, ApplicationDataLocality *value )
 {
     struct application_data_container *impl = impl_from_IApplicationDataContainer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Locality;
     return S_OK;
 }
@@ -105,6 +107,7 @@ static HRESULT WINAPI application_data_container_get_Locality( IApplicationDataC
 static HRESULT WINAPI application_data_container_get_Values( IApplicationDataContainer *iface, IPropertySet **value )
 {
     struct application_data_container *impl = impl_from_IApplicationDataContainer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     *value = impl->Values;
     return S_OK;
 }
@@ -112,18 +115,20 @@ static HRESULT WINAPI application_data_container_get_Values( IApplicationDataCon
 static HRESULT WINAPI application_data_container_get_Containers( IApplicationDataContainer *iface, IMapView_HSTRING_ApplicationDataContainer **value )
 {
     struct application_data_container *impl = impl_from_IApplicationDataContainer( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
     return IMap_HSTRING_ApplicationDataContainer_GetView( impl->Containers, value );
 }
 
 static HRESULT WINAPI application_data_container_CreateContainer( IApplicationDataContainer *iface, HSTRING name, ApplicationDataCreateDisposition disposition, IApplicationDataContainer **container )
 {
-    FIXME( "iface %p, %p name, disposition %d stub!\n", iface, name, disposition );
-    return E_NOTIMPL;
+    TRACE( "iface %p, name %s\n", iface, debugstr_hstring(name) );
+    return application_data_container_CreateAndTrackContainer( iface, name, disposition, container );
 }
 
 static HRESULT WINAPI application_data_container_DeleteContainer( IApplicationDataContainer *iface, HSTRING name )
 {
     struct application_data_container *impl = impl_from_IApplicationDataContainer( iface );
+    TRACE( "iface %p, name %s\n", iface, debugstr_hstring(name) );
     return IMap_HSTRING_ApplicationDataContainer_Remove( impl->Containers, name );
 }
 

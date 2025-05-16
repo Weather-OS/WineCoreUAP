@@ -79,6 +79,15 @@ struct async_operation_iids
     const GUID *operation;
 };
 
+//All of this fits together to form IPropertySet and IValueSet
+struct property_set
+{
+    IPropertySet IPropertySet_iface;
+    //Inheritence tree
+        IObservableMap_HSTRING_IInspectable *map;
+    LONG ref;
+};
+
 typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 
 typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );

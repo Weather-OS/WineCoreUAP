@@ -72,7 +72,9 @@ typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown 
 
 typedef HRESULT (WINAPI *observable_vector_callback)( IObservableVector_IInspectable *invoker, IVectorChangedEventArgs *args );
 
-typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );
+typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IUnknown *data, IMapChangedEventArgs_HSTRING *args );
+
+typedef HRESULT (WINAPI *typed_event_handler_callback)( IUnknown *invoker, IUnknown *data, IUnknown *args);
 
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
@@ -88,7 +90,7 @@ extern HRESULT hstring_map_create( const struct map_iids *iids, void **out );
 
 extern HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out );
 
-extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
+extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, OPTIONAL IUnknown *data, IMapChangedEventHandler_HSTRING_IInspectable **out );
 
 #define DEFINE_VECTOR_IIDS( interface ) \
     struct vector_iids interface##_iids = {.iterable = &IID_IIterable_##interface, .iterator = &IID_IIterator_##interface, .vector = &IID_IVector_##interface, .view = &IID_IVectorView_##interface, .observableVector = &IID_IObservableVector_##interface };

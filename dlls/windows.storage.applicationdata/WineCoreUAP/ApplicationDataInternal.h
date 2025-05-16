@@ -33,7 +33,7 @@
 #define SETTINGS_PATH L"Settings"
 #define SETTINGS_DATA_PATH L"settings.dat"
 #define ROAMING_DATA_PATH L"roaming.lock"
-#define rootKeyName L"Software\\Microsoft\\Windows\\CurrentVersion\\Appx"
+#define rootKeyName L"ApplicationData"
 
 extern const struct ISetVersionRequestVtbl set_version_vtbl;
 extern const struct ISetVersionDeferralVtbl set_version_deferral_vtbl;

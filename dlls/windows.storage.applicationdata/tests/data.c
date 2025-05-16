@@ -33,6 +33,26 @@
 
 #include "wine/test.h"
 
+#define ACTIVATE_INSTANCE( instance_name, instance_object, instance_iid )                                                   \
+    {                                                                                                                       \
+        HSTRING _str;                                                                                                       \
+        HRESULT _hr;                                                                                                        \
+        _hr = WindowsCreateString( instance_name, wcslen( instance_name ), &_str );                                         \
+        ok( _hr == S_OK, "got hr %#lx.\n", _hr );                                                                           \
+                                                                                                                            \
+        _hr = RoGetActivationFactory( _str, &instance_iid, (void **)&instance_object );                                     \
+        WindowsDeleteString( _str );                                                                                        \
+        ok( _hr == S_OK || broken( _hr == REGDB_E_CLASSNOTREG ), "got hr %#lx.\n", _hr );                                   \
+        if (_hr == REGDB_E_CLASSNOTREG)                                                                                     \
+        {                                                                                                                   \
+            win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( instance_name ) );                \
+        }                                                                                                                   \
+        check_interface( instance_object, &IID_IUnknown );                                                                  \
+        check_interface( instance_object, &IID_IInspectable );                                                              \
+                                                                                                                            \
+        ok( _hr == S_OK, "got hr %#lx.\n", _hr );                                                                           \
+    }
+
 WINE_DEFAULT_DEBUG_CHANNEL(data);
 
 struct application_data_set_version_handler
@@ -210,14 +230,26 @@ static void check_interface_( unsigned int line, void *obj, const IID *iid )
 static void test_ApplicationDataStatics(void)
 {
     static const WCHAR *application_data_statics_name = L"Windows.Storage.ApplicationData";
+    IApplicationDataContainer *container;
+    IApplicationDataContainer *subContainer;
     IApplicationDataStatics *application_data_statics;
     IApplicationData *application_data = NULL;
     IAsyncAction *asyncAction;
+    IPropertySet *values;
+    IPropertyValueStatics *propertyValueStatics;
+    IPropertyValue *boxedPropValue;
+    PropertyType propertyType;
+    IInspectable *boxedValue;
     IAsyncActionCompletedHandler *asyncActionCompletedHandler;
+    IMap_HSTRING_IInspectable *valueMap;
+    IMapView_HSTRING_ApplicationDataContainer *containerMapView;
     IActivationFactory *factory;
     HSTRING str;
+    BOOLEAN replaced;
     HRESULT hr;
     UINT32 currentVersion;
+    INT32 propertyValue;
+    INT64 propertyValue2;
     DWORD ret;
     LONG ref;
 
@@ -234,6 +266,8 @@ static void test_ApplicationDataStatics(void)
         win_skip( "%s runtimeclass not registered, skipping tests.\n", wine_dbgstr_w( application_data_statics_name ) );
         return;
     }
+
+    ACTIVATE_INSTANCE(RuntimeClass_Windows_Foundation_PropertyValue, propertyValueStatics, IID_IPropertyValueStatics);
 
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
@@ -283,6 +317,96 @@ static void test_ApplicationDataStatics(void)
     ok( ref == 2, "got ref %ld.\n", ref );
     ref = IActivationFactory_Release( factory );
     ok( ref == 1, "got ref %ld.\n", ref );
+
+    /**
+     * IApplicationData_LocalSettings
+    */
+    hr = IApplicationData_get_LocalSettings( application_data, &container );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    WindowsCreateString( L"subContainer", wcslen( L"subContainer" ), &str );
+    hr = IApplicationDataContainer_CreateContainer( container, str, ApplicationDataCreateDisposition_Always, &subContainer );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IApplicationDataContainer_get_Values( container, &values );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertySet_QueryInterface( values, &IID_IMap_HSTRING_IInspectable, (void **)&valueMap );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertyValueStatics_CreateInt32( propertyValueStatics, 1337, &boxedValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( L"testvalue", wcslen( L"testvalue" ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IMap_HSTRING_IInspectable_Insert( valueMap, str, boxedValue, &replaced );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IApplicationDataContainer_get_Values( subContainer, &values );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertySet_QueryInterface( values, &IID_IMap_HSTRING_IInspectable, (void **)&valueMap );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertyValueStatics_CreateInt64( propertyValueStatics, 6969, &boxedValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( L"testvalue2", wcslen( L"testvalue2" ), &str );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IMap_HSTRING_IInspectable_Insert( valueMap, str, boxedValue, &replaced );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    // Re-fetch that value for verification
+    hr = IApplicationData_get_LocalSettings( application_data, &container );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IApplicationDataContainer_get_Values( container, &values );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertySet_QueryInterface( values, &IID_IMap_HSTRING_IInspectable, (void **)&valueMap );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = WindowsCreateString( L"testvalue", wcslen( L"testvalue" ), &str );
+    hr = IMap_HSTRING_IInspectable_Lookup( valueMap, str, &boxedValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IInspectable_QueryInterface( boxedValue, &IID_IPropertyValue, (void **)&boxedPropValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IPropertyValue_get_Type( boxedPropValue, &propertyType );
+    ok( propertyType == PropertyType_Int32, "unexpected property type %d\n", propertyType );
+
+    IPropertyValue_GetInt32( boxedPropValue, &propertyValue );
+    ok ( propertyValue == 1337, "unexpected property value %d\n", propertyValue );
+
+    hr = IApplicationDataContainer_get_Containers( container, &containerMapView );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    WindowsCreateString( L"subContainer", wcslen( L"subContainer" ), &str );
+    hr = IMapView_HSTRING_ApplicationDataContainer_Lookup( containerMapView, str, &subContainer );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IApplicationDataContainer_get_Values( subContainer, &values );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IPropertySet_QueryInterface( values, &IID_IMap_HSTRING_IInspectable, (void **)&valueMap );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    WindowsCreateString( L"testvalue2", wcslen( L"testvalue2" ), &str );
+    hr = IMap_HSTRING_IInspectable_Lookup( valueMap, str, &boxedValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    hr = IInspectable_QueryInterface( boxedValue, &IID_IPropertyValue, (void **)&boxedPropValue );
+    ok( hr == S_OK, "got hr %#lx.\n", hr );
+
+    IPropertyValue_get_Type( boxedPropValue, &propertyType );
+    ok( propertyType == PropertyType_Int64, "unexpected property type %d\n", propertyType );
+
+    IPropertyValue_GetInt64( boxedPropValue, &propertyValue2 );
+    ok ( propertyValue2 == 6969, "unexpected property value %lld\n", propertyValue2 );
+
 }
 
 START_TEST(data)

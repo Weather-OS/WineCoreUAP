@@ -18,6 +18,7 @@
  */
 
 #include "ApplicationDataInternal.h"
+#include "ApplicationDataContainerInternal.h"
 
 _ENABLE_DEBUGGING_
 
@@ -224,14 +225,15 @@ static HRESULT WINAPI application_data_ClearAsync( IApplicationData *iface, Appl
 
 static HRESULT WINAPI application_data_get_LocalSettings( IApplicationData *iface, IApplicationDataContainer **value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;
+    struct application_data *impl = impl_from_IApplicationData( iface );
+    TRACE( "iface %p, value %p\n", iface, value );
+    return application_data_AssignAndTrackContainer( impl->appDataPath, L"ApplicationData\\LocalState", value );
 }
 
 static HRESULT WINAPI application_data_get_RoamingSettings( IApplicationData *iface, IApplicationDataContainer **value )
 {
     //Client should use Azure App Service instead.
-    TRACE( "iface %p, value %p client should use Azure app Service!\n", iface, value );
+    TRACE( "iface %p, value %p client should use Azure App Service!\n", iface, value );
     return E_NOTIMPL;
 }
 

@@ -30,7 +30,6 @@ extern struct IPropertySetVtbl property_set_vtbl;
 struct property_set_statics
 {
     IActivationFactory IActivationFactory_iface;
-    IPropertySet IPropertySet_iface;
     LONG ref;
 };
 

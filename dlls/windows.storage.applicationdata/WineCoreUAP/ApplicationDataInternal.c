@@ -111,6 +111,9 @@ HRESULT WINAPI application_data_Init( IApplicationData **value )
     status = setSePrivilege( SE_BACKUP_NAME, TRUE );
     if ( FAILED( status ) ) return status;
 
+    // Guard against re-entry
+    RegDeleteTreeW( HKEY_LOCAL_MACHINE, rootKeyName );
+
     if ( PathFileExistsW( path ) )
     {
         hiveStatus = RegLoadKeyW( HKEY_LOCAL_MACHINE, rootKeyName, path );

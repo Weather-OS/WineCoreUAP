@@ -42,7 +42,7 @@ static HRESULT WINAPI hstring_key_QueryInterface( IKeyValuePair_HSTRING_IInspect
 {
     struct hstring_key *impl = impl_from_IKeyValuePair_HSTRING_IInspectable( iface );
 
-    TRACE( "iface %p, iid %s, out %p.n", iface, debugstr_guid( iid ), out );
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
     if (IsEqualGUID( iid, &IID_IUnknown ) ||
         IsEqualGUID( iid, &IID_IInspectable ) ||
@@ -53,7 +53,7 @@ static HRESULT WINAPI hstring_key_QueryInterface( IKeyValuePair_HSTRING_IInspect
         return S_OK;
     }
 
-    FIXME( "%s not implemented, returning E_NOINTERFACE.n", debugstr_guid( iid ) );
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
 }
@@ -62,7 +62,7 @@ static ULONG WINAPI hstring_key_AddRef( IKeyValuePair_HSTRING_IInspectable *ifac
 {
     struct hstring_key *impl = impl_from_IKeyValuePair_HSTRING_IInspectable( iface );
     ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.n", iface, ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
     return ref;
 }
 
@@ -71,7 +71,7 @@ static ULONG WINAPI hstring_key_Release( IKeyValuePair_HSTRING_IInspectable *ifa
     struct hstring_key *impl = impl_from_IKeyValuePair_HSTRING_IInspectable( iface );
     ULONG ref = InterlockedDecrement( &impl->ref );
 
-    TRACE( "iface %p decreasing refcount to %lu.n", iface, ref );
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
 
     if (!ref)
         free( impl );
@@ -81,19 +81,19 @@ static ULONG WINAPI hstring_key_Release( IKeyValuePair_HSTRING_IInspectable *ifa
 
 static HRESULT WINAPI hstring_key_GetIids( IKeyValuePair_HSTRING_IInspectable *iface, ULONG *iid_count, IID **iids )
 {
-    FIXME( "iface %p, iid_count %p, iids %p stub!n", iface, iid_count, iids );
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI hstring_key_GetRuntimeClassName( IKeyValuePair_HSTRING_IInspectable *iface, HSTRING *class_name )
 {
-    FIXME( "iface %p, class_name %p stub!n", iface, class_name );
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI hstring_key_GetTrustLevel( IKeyValuePair_HSTRING_IInspectable *iface, TrustLevel *trust_level )
 {
-    FIXME( "iface %p, trust_level %p stub!n", iface, trust_level );
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
     return E_NOTIMPL;
 }
 
@@ -107,7 +107,7 @@ static HRESULT WINAPI hstring_key_get_Value( IKeyValuePair_HSTRING_IInspectable 
 {
     struct hstring_key *impl = impl_from_IKeyValuePair_HSTRING_IInspectable( iface );
 
-    TRACE( "iface %p, value %p.n", iface, value );
+    TRACE( "iface %p, value %p.\n", iface, value );
 
     *value = impl->Value;
     return S_OK;
@@ -147,7 +147,7 @@ static HRESULT WINAPI hstring_map_view_QueryInterface( IMapView_HSTRING_IInspect
 {
     struct hstring_map_view *impl = impl_from_IMapView_HSTRING_IInspectable( iface );
 
-    TRACE( "iface %p, iid %s, out %p.n", iface, debugstr_guid( iid ), out );
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
 
     if (IsEqualGUID( iid, &IID_IUnknown ) ||
         IsEqualGUID( iid, &IID_IInspectable ) ||
@@ -164,7 +164,7 @@ static HRESULT WINAPI hstring_map_view_QueryInterface( IMapView_HSTRING_IInspect
         return S_OK;
     }
 
-    FIXME( "%s not implemented, returning E_NOINTERFACE.n", debugstr_guid( iid ) );
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
     *out = NULL;
     return E_NOINTERFACE;
 }
@@ -173,7 +173,7 @@ static ULONG WINAPI hstring_map_view_AddRef( IMapView_HSTRING_IInspectable *ifac
 {
     struct hstring_map_view *impl = impl_from_IMapView_HSTRING_IInspectable( iface );
     ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.n", iface, ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
     return ref;
 }
 
@@ -182,7 +182,7 @@ static ULONG WINAPI hstring_map_view_Release( IMapView_HSTRING_IInspectable *ifa
     struct hstring_map_view *impl = impl_from_IMapView_HSTRING_IInspectable( iface );
     ULONG i, ref = InterlockedDecrement( &impl->ref );
 
-    TRACE( "iface %p decreasing refcount to %lu.n", iface, ref );
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
 
     if (!ref)
     {
@@ -195,19 +195,19 @@ static ULONG WINAPI hstring_map_view_Release( IMapView_HSTRING_IInspectable *ifa
 
 static HRESULT WINAPI hstring_map_view_GetIids( IMapView_HSTRING_IInspectable *iface, ULONG *iid_count, IID **iids )
 {
-    FIXME( "iface %p, iid_count %p, iids %p stub!n", iface, iid_count, iids );
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI hstring_map_view_GetRuntimeClassName( IMapView_HSTRING_IInspectable *iface, HSTRING *class_name )
 {
-    FIXME( "iface %p, class_name %p stub!n", iface, class_name );
+    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI hstring_map_view_GetTrustLevel( IMapView_HSTRING_IInspectable *iface, TrustLevel *trust_level )
 {
-    FIXME( "iface %p, trust_level %p stub!n", iface, trust_level );
+    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
     return E_NOTIMPL;
 }
 
@@ -219,7 +219,7 @@ static HRESULT WINAPI hstring_map_view_Lookup( IMapView_HSTRING_IInspectable *if
     UINT32 i;
     INT32 comparisonResult;
 
-    TRACE( "iface %p, value %p.n", iface, value );
+    TRACE( "iface %p, value %p.\n", iface, value );
 
     for ( i = 0; i < impl->size; i++ )
     {
@@ -232,14 +232,14 @@ static HRESULT WINAPI hstring_map_view_Lookup( IMapView_HSTRING_IInspectable *if
         }
     }
 
-    return S_OK;
+    return E_BOUNDS;
 }
 
 static HRESULT WINAPI hstring_map_view_get_Size( IMapView_HSTRING_IInspectable *iface, UINT32 *value )
 {
     struct hstring_map_view *impl = impl_from_IMapView_HSTRING_IInspectable( iface );
 
-    TRACE( "iface %p, value %p.n", iface, value );
+    TRACE( "iface %p, value %p.\n", iface, value );
 
     *value = impl->size;
     return S_OK;
@@ -514,7 +514,7 @@ static HRESULT WINAPI hstring_map_Lookup( IMap_HSTRING_IInspectable *iface, HSTR
     UINT32 i;
     INT32 comparisonResult;
 
-    TRACE( "iface %p, value %p.n", iface, value );
+    TRACE( "iface %p, value %p.\n", iface, value );
 
     for ( i = 0; i < impl->size; i++ )
     {
@@ -527,7 +527,7 @@ static HRESULT WINAPI hstring_map_Lookup( IMap_HSTRING_IInspectable *iface, HSTR
         }
     }
 
-    return S_OK;
+    return E_BOUNDS;
 }
 
 static HRESULT WINAPI hstring_map_get_Size( IMap_HSTRING_IInspectable *iface, UINT32 *value )
@@ -569,7 +569,6 @@ static HRESULT WINAPI hstring_map_GetView( IMap_HSTRING_IInspectable *iface, IMa
 {
     struct hstring_map *impl = impl_from_IMap_HSTRING_IInspectable( iface );
     struct hstring_map_view *view;
-    ULONG i;
 
     TRACE( "iface %p, value %p.\n", iface, value );
 
@@ -577,9 +576,10 @@ static HRESULT WINAPI hstring_map_GetView( IMap_HSTRING_IInspectable *iface, IMa
     view->IMapView_HSTRING_IInspectable_iface.lpVtbl = &hstring_map_view_vtbl;
     view->IIterable_IKeyValuePair_HSTRING_IInspectable_iface.lpVtbl = &iterable_hstring_map_view_vtbl;
     view->iids = impl->iids;
+    view->size = impl->size;
     view->ref = 1;
 
-    for (i = 0; i < impl->size; ++i) IKeyValuePair_HSTRING_IInspectable_AddRef( (view->elements[view->size++] = impl->elements[i]) );
+    view->elements = impl->elements;
 
     *value = &view->IMapView_HSTRING_IInspectable_iface;
     return S_OK;
@@ -588,6 +588,7 @@ static HRESULT WINAPI hstring_map_GetView( IMap_HSTRING_IInspectable *iface, IMa
 static HRESULT WINAPI hstring_map_Insert( IMap_HSTRING_IInspectable* iface, HSTRING key, IInspectable *value, boolean *replaced )
 {
     UINT32 eventIterator;
+    UINT32 newCapacity;
     boolean keyExists = FALSE;
     UINT32 i;
     INT32 comparisonResult;
@@ -596,7 +597,7 @@ static HRESULT WINAPI hstring_map_Insert( IMap_HSTRING_IInspectable* iface, HSTR
     struct hstring_key *newKey;
     struct hstring_map_changed_event_args *changedArgs;
 
-    IKeyValuePair_HSTRING_IInspectable **tmp = impl->elements;
+    IKeyValuePair_HSTRING_IInspectable **tmp;
 
     TRACE( "iface %p, value %p.\n", iface, value );
 
@@ -626,11 +627,16 @@ static HRESULT WINAPI hstring_map_Insert( IMap_HSTRING_IInspectable* iface, HSTR
     {
         impl->capacity = max( 32, impl->capacity * 3 / 2 );
 
-        if (!(impl->elements = realloc( impl->elements, impl->capacity * sizeof(*impl->elements) )))
-        {
-            impl->elements = tmp;
+        newCapacity = impl->capacity + (impl->capacity >> 1);
+        if (newCapacity <= impl->capacity)
+            newCapacity = impl->capacity + 1;
+
+        tmp = realloc(impl->elements, newCapacity * sizeof(*tmp));
+        if (!tmp)
             return E_OUTOFMEMORY;
-        }
+
+        impl->elements = tmp;
+        impl->capacity = newCapacity;
 
         if (!(newKey = calloc( 1, sizeof(*newKey) ))) return E_OUTOFMEMORY;
 
@@ -638,9 +644,11 @@ static HRESULT WINAPI hstring_map_Insert( IMap_HSTRING_IInspectable* iface, HSTR
         WindowsDuplicateString( key, &newKey->Key );
         newKey->Value = value;
 
+        impl->elements[impl->size++] = &newKey->IKeyValuePair_HSTRING_IInspectable_iface;
+
         changedArgs->Change = CollectionChange_ItemInserted;
 
-        *replaced = FALSE;
+        if ( replaced ) *replaced = FALSE;
     } else
     {
         return E_BOUNDS;
@@ -912,6 +920,7 @@ struct hstring_map_event_handler
 {
     IMapChangedEventHandler_HSTRING_IInspectable IMapChangedEventHandler_HSTRING_IInspectable_iface;
     observable_hstring_map_callback callback;
+    IUnknown *data;
     LONG ref;
 };
 
@@ -920,7 +929,7 @@ DEFINE_IUNKNOWN( hstring_map_event_handler, IMapChangedEventHandler_HSTRING_IIns
 static HRESULT WINAPI hstring_map_event_handler_Invoke( IMapChangedEventHandler_HSTRING_IInspectable *iface, IObservableMap_HSTRING_IInspectable *sender, IMapChangedEventArgs_HSTRING *args )
 {
     struct hstring_map_event_handler *impl = impl_from_IMapChangedEventHandler_HSTRING_IInspectable( iface );
-    return impl->callback( sender, args );
+    return impl->callback( sender, impl->data, args );
 }
 
 static const struct IMapChangedEventHandler_HSTRING_IInspectableVtbl hstring_map_event_handler_vtbl =
@@ -967,7 +976,7 @@ HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out )
     return S_OK;
 }
 
-HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out )
+HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, OPTIONAL IUnknown *data, IMapChangedEventHandler_HSTRING_IInspectable **out )
 {
     struct hstring_map_event_handler *impl;
 
@@ -976,6 +985,7 @@ HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callba
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
     impl->IMapChangedEventHandler_HSTRING_IInspectable_iface.lpVtbl = &hstring_map_event_handler_vtbl;
     impl->callback = callback;
+    impl->data = data;
     impl->ref = 1;
 
     *out = &impl->IMapChangedEventHandler_HSTRING_IInspectable_iface;
