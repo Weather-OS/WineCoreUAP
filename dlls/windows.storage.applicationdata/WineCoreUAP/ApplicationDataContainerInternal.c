@@ -676,8 +676,11 @@ HRESULT WINAPI application_data_container_CreateAndTrackContainer( IApplicationD
     WCHAR newContainerPath[MAX_PATH];
     HRESULT status = S_OK;
     LSTATUS hiveStatus;
+    BOOLEAN keyFound = FALSE;
 
     struct application_data_container *appdata_container = impl_from_IApplicationDataContainer( iface );
+
+    TRACE( "iface %p, name %s, composition %d, outContainer %p\n", iface, debugstr_hstring(name), composition, outContainer );
 
     status = setSePrivilege( SE_RESTORE_NAME, TRUE );
     if ( FAILED( status ) ) return status;
@@ -686,8 +689,8 @@ HRESULT WINAPI application_data_container_CreateAndTrackContainer( IApplicationD
     if ( FAILED( status ) ) return status;
 
     // Check if the sub container exists or not, if so, return that.
-    status = IMap_HSTRING_ApplicationDataContainer_Lookup( appdata_container->Containers, name, outContainer );
-    if ( FAILED( status ) )
+    IMap_HSTRING_ApplicationDataContainer_HasKey( appdata_container->Containers, name, &keyFound );
+    if ( !keyFound )
     {
         switch ( composition )
         {
@@ -742,6 +745,9 @@ HRESULT WINAPI application_data_container_CreateAndTrackContainer( IApplicationD
         setSePrivilege( SE_RESTORE_NAME, FALSE );
         setSePrivilege( SE_BACKUP_NAME, FALSE );
         status = application_data_AssignAndTrackContainer( appdata_container->appDataPath, newContainerPath, outContainer );
+    } else
+    {
+        status = IMap_HSTRING_ApplicationDataContainer_Lookup( appdata_container->Containers, name, outContainer );
     }
 
 _CLEANUP:

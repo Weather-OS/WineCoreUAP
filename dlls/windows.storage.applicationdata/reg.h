@@ -11,7 +11,7 @@
 #define REG_DOUBLE      0x5f5e109
 #define REG_BOOL        0x5f5e10b
 #define REG_STRING      0x5f5e10c
-#define REG_COMPOSITE   0x5f5e10d
+#define REG_COMPOSITE   0x5f5e10d // Not yet supported
 #define REG_DATETIME    0x5f5e10e
 #define REG_TIMESPAN    0x5f5e10f
 #define REG_GUID        0x5f5e110

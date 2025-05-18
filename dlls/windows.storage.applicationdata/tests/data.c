@@ -349,7 +349,7 @@ static void test_ApplicationDataStatics(void)
     hr = IPropertySet_QueryInterface( values, &IID_IMap_HSTRING_IInspectable, (void **)&valueMap );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
-    hr = IPropertyValueStatics_CreateInt64( propertyValueStatics, 6969, &boxedValue );
+    hr = IPropertyValueStatics_CreateInt64( propertyValueStatics, 1234, &boxedValue );
     ok( hr == S_OK, "got hr %#lx.\n", hr );
 
     hr = WindowsCreateString( L"testvalue2", wcslen( L"testvalue2" ), &str );
@@ -405,7 +405,7 @@ static void test_ApplicationDataStatics(void)
     ok( propertyType == PropertyType_Int64, "unexpected property type %d\n", propertyType );
 
     IPropertyValue_GetInt64( boxedPropValue, &propertyValue2 );
-    ok ( propertyValue2 == 6969, "unexpected property value %lld\n", propertyValue2 );
+    ok ( propertyValue2 == 1234, "unexpected property value %lld\n", propertyValue2 );
 
 }
 

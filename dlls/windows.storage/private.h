@@ -118,7 +118,7 @@ typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, IUnknown 
 
 typedef HRESULT (WINAPI *async_operation_with_progress_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, IWineAsyncOperationProgressHandler *progress );
 
-typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IMapChangedEventArgs_HSTRING *args );
+typedef HRESULT (WINAPI *observable_hstring_map_callback)( IObservableMap_HSTRING_IInspectable *invoker, IUnknown *data, IMapChangedEventArgs_HSTRING *args );
 
 extern HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback, 
                                               IInspectable *outer, IWineAsyncInfoImpl **out );
@@ -152,7 +152,7 @@ extern HRESULT hstring_map_create( const struct map_iids *iids, void **out );
 
 extern HRESULT observable_hstring_map_create( const struct map_iids *iids, void **out );
 
-extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, IMapChangedEventHandler_HSTRING_IInspectable **out );
+extern HRESULT hstring_map_event_handler_create( observable_hstring_map_callback callback, OPTIONAL IUnknown *data, IMapChangedEventHandler_HSTRING_IInspectable **out );
 
 extern HRESULT property_set_create( const struct map_iids *iids, IPropertySet **out );
 

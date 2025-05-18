@@ -1,6 +1,7 @@
 /* WinRT Windows.Storage.ApplicationData ApplicationData Implementation
  *
  * Copyright (C) 2023 Mohamad Al-Jaf
+ * Modified by Weather
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -373,12 +374,14 @@ static HRESULT WINAPI application_data_get_TemporaryFolder( IApplicationData *if
 static HRESULT WINAPI application_data_add_DataChanged( IApplicationData *iface, ITypedEventHandler_ApplicationData_IInspectable *handler,
                                                         EventRegistrationToken *token )
 {
+    //Since Windows 11 dropped Roaming data support, this quite literally serves no purpose.
     FIXME( "iface %p, handler %p, token %p stub!\n", iface, handler, token );
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI application_data_remove_DataChanged( IApplicationData *iface, EventRegistrationToken token )
 {
+    //Since Windows 11 dropped Roaming data support, this quite literally serves no purpose.
     FIXME( "iface %p, token %#I64x stub!\n", iface, token.value );
     return E_NOTIMPL;
 }
@@ -391,7 +394,8 @@ static HRESULT WINAPI application_data_SignalDataChanged( IApplicationData *ifac
 
 static HRESULT WINAPI application_data_get_RoamingStorageQuota( IApplicationData *iface, UINT64 *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
+    //Client should use Azure App Service instead.
+    TRACE( "iface %p, value %p client should use Azure App Service!\n", iface, value );
     return E_NOTIMPL;
 }
 
