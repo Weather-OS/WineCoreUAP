@@ -83,10 +83,10 @@ static ULONG WINAPI restricted_errorinfo_Release( IRestrictedErrorInfo *iface )
 
     if ( !refcount )
     {
-        free( restricted_error_info->description );
-        free( restricted_error_info->restricted_description );
-        free( restricted_error_info->capability_sid );
-        free( restricted_error_info->reference );
+        SysFreeString( restricted_error_info->description );
+        SysFreeString( restricted_error_info->restricted_description );
+        SysFreeString( restricted_error_info->capability_sid );
+        SysFreeString( restricted_error_info->reference );
         free( restricted_error_info );
     }
 
