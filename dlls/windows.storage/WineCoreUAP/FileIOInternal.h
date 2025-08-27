@@ -37,7 +37,7 @@ struct file_io_statics
 };
 
 /**
- * Parametizred structs
+ * Parametized structs
  */
 struct file_io_read_text_options
 {
@@ -48,12 +48,13 @@ struct file_io_read_text_options
 struct file_io_write_text_options
 {
     HSTRING contents;
+    BOOLEAN withEncoding;
     IStorageFile *file;
     UnicodeEncoding encoding;
 };
 
 struct file_io_write_buffer_options
-{    
+{
     IStorageFile *file;
     IBuffer *buffer;
 };

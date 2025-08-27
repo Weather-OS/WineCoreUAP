@@ -25,100 +25,104 @@ _ENABLE_DEBUGGING_
 
 // File Input Output Operations
 
-static struct file_io_statics *impl_from_IActivationFactory( IActivationFactory *iface )
-{
-    return CONTAINING_RECORD( iface, struct file_io_statics, IActivationFactory_iface );
-}
-
-static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
-{
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
-
-    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
-
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IActivationFactory ))
-    {
-        *out = &impl->IActivationFactory_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    if (IsEqualGUID( iid, &IID_IFileIOStatics ))
-    {
-        *out = &impl->IFileIOStatics_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
-{
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
-    ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static ULONG WINAPI factory_Release( IActivationFactory *iface )
-{
-    struct file_io_statics *impl = impl_from_IActivationFactory( iface );
-    ULONG ref = InterlockedDecrement( &impl->ref );
-    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static HRESULT WINAPI factory_GetIids( IActivationFactory *iface, ULONG *iid_count, IID **iids )
-{
-    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_GetRuntimeClassName( IActivationFactory *iface, HSTRING *class_name )
-{
-    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLevel *trust_level )
-{
-    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
-{
-    FIXME( "iface %p, instance %p stub!\n", iface, instance );
-    return E_NOTIMPL;
-}
-
-static const struct IActivationFactoryVtbl factory_vtbl =
-{
-    factory_QueryInterface,
-    factory_AddRef,
-    factory_Release,
-    /* IInspectable methods */
-    factory_GetIids,
-    factory_GetRuntimeClassName,
-    factory_GetTrustLevel,
-    /* IActivationFactory methods */
-    factory_ActivateInstance,
-};
+DEFINE_IACTIVATIONFACTORY( struct file_io_statics, IFileIOStatics_iface, IID_IFileIOStatics )
 
 DEFINE_IINSPECTABLE( file_io_statics, IFileIOStatics, struct file_io_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_HSTRING **textOperation )
-{
+static HRESULT WINAPI
+Unpack_IIterable_HSTRING(
+    IIterable_HSTRING *iter,
+    HSTRING *out
+) {
+    HRESULT hr;
+    HSTRING *strings = NULL;
+    BOOLEAN strExists;
+    LPWSTR combinedString = NULL;
+    UINT32 vectorSize = 0;
+    UINT32 totalSize = 0;
+    UINT32 i;
+
+    IIterator_HSTRING *hstringIterator;
+
+    TRACE( "iter %p, out %p\n", iter, out );
+
+    if ( !iter || !out ) return E_INVALIDARG;
+
+    hr = IIterable_HSTRING_First( iter, &hstringIterator );
+    if ( FAILED( hr ) )
+        return hr;
+
+    IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
+    while ( strExists )
+    {
+        vectorSize++;
+        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
+    }
+
+    IIterator_HSTRING_Release( hstringIterator );
+
+    if ( vectorSize == 0 )
+        return E_INVALIDARG;
+
+    strings = (HSTRING *)CoTaskMemAlloc( vectorSize * sizeof( HSTRING ) );
+    if ( !strings ) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_First( iter, &hstringIterator );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
+        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
+
+        totalSize += WindowsGetStringLen( strings[i] ) + 1; /* +1 for newline */
+    }
+
+    combinedString = (LPWSTR)CoTaskMemAlloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+    if ( !combinedString )
+    {
+        hr = E_OUTOFMEMORY;
+        goto _CLEANUP;
+    }
+    combinedString[0] = L'\0';
+
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        wcscat( combinedString, WindowsGetStringRawBuffer( strings[i], NULL ) );
+        wcscat( combinedString, L"\n" );
+    }
+
+    if ( wcslen( combinedString ) > 0 )
+        combinedString[ wcslen( combinedString ) - 1 ] = L'\0';
+
+    if ( combinedString )
+        hr = WindowsCreateString( combinedString, wcslen( combinedString ), out );
+
+_CLEANUP:
+    if ( hstringIterator )
+        IIterator_HSTRING_Release( hstringIterator );
+    CoTaskMemFree( combinedString );
+    for ( i = 0; i < vectorSize; i++ )
+        WindowsDeleteString( strings[i] );
+    CoTaskMemFree( strings );
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncOperation<HSTRING> IFileIOStatics::ReadTextAsync
+ *      Description: Reads text from an IStorageFile* then returns all the contents of the file
+ *      within a packed HSTRING.
+ */
+static HRESULT WINAPI
+file_io_statics_ReadTextAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IAsyncOperation_HSTRING **textOperation
+) {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, operation %p\n", iface, file, textOperation );
 
     //Arguments
     if ( !file ) return E_INVALIDARG;
@@ -128,19 +132,32 @@ static HRESULT WINAPI file_io_statics_ReadTextAsync( IFileIOStatics *iface, ISto
 
     read_text_options->encoding = UnicodeEncoding_Utf8;
     read_text_options->file = file;
+ 
+    hr = async_operation_hstring_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)read_text_options, 
+        file_io_statics_ReadText,
+        textOperation );
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
-
-    free( read_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_HSTRING **textOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<HSTRING> IFileIOStatics::ReadTextWithEncodingAsync
+ *      Description: Reads text from an IStorageFile* then returns all the contents of the file
+ *      within a packed HSTRING with the specified encoding.
+ */
+static HRESULT WINAPI
+file_io_statics_ReadTextWithEncodingAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    UnicodeEncoding encoding,
+    IAsyncOperation_HSTRING **textOperation
+) {
     HRESULT hr;
     struct file_io_read_text_options *read_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, encoding %d, operation %p\n", iface, file, encoding, textOperation );
 
     //Arguments
     if ( !file ) return E_INVALIDARG;
@@ -151,18 +168,31 @@ static HRESULT WINAPI file_io_statics_ReadTextWithEncodingAsync( IFileIOStatics 
     read_text_options->encoding = encoding;
     read_text_options->file = file;
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadText, textOperation );
-    
-    free( read_text_options );
+    hr = async_operation_hstring_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)read_text_options, 
+        file_io_statics_ReadText, 
+        textOperation );
+
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteTextAsync
+ *      Description: Overwrites the contents of an IStorageFile* with the given
+ *      packed HSTRING.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteTextAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    HSTRING contents,
+    IAsyncAction **textOperation
+) {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, contents %s, operation %p\n", iface, file, debugstr_hstring(contents), textOperation );
 
     //Arguments
     if ( !file || !contents ) return E_INVALIDARG;
@@ -171,21 +201,36 @@ static HRESULT WINAPI file_io_statics_WriteTextAsync( IFileIOStatics *iface, ISt
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
+    write_text_options->withEncoding = FALSE;
     write_text_options->file = file;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+    hr = async_action_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)write_text_options, 
+        file_io_statics_WriteText, 
+        textOperation );
 
-    free( write_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteTextWithEncodingAsync
+ *      Description: Overwrites the contents of an IStorageFile* with the given
+ *      packed HSTRING with the specified encoding.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteTextWithEncodingAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    HSTRING contents,
+    UnicodeEncoding encoding,
+    IAsyncAction **textOperation
+) {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, contents %s, encoding %d, operation %p\n", iface, file, debugstr_hstring(contents), encoding, textOperation );
 
     //Arguments
     if ( !file || !contents ) return E_INVALIDARG;
@@ -194,21 +239,35 @@ static HRESULT WINAPI file_io_statics_WriteTextWithEncodingAsync( IFileIOStatics
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
+    // A UTF-8 BOM header is forcefully appended when using this routine when the client uses `UnicodeEncoding::Utf8`
+    write_text_options->withEncoding = TRUE;
     write_text_options->file = file;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, textOperation );
+    hr = async_action_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)write_text_options, 
+        file_io_statics_WriteText, 
+        textOperation );
 
-    free( write_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::AppendTextAsync
+ *      Description: Appends a packed HSTRING to the contents of an IStorageFile*.
+ */
+static HRESULT WINAPI
+file_io_statics_AppendTextAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    HSTRING contents,
+    IAsyncAction **textOperation
+) {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, contents %s, operation %p\n", iface, file, debugstr_hstring(contents), textOperation );
 
     //Arguments
     if ( !file || !contents ) return E_INVALIDARG;
@@ -217,21 +276,37 @@ static HRESULT WINAPI file_io_statics_AppendTextAsync( IFileIOStatics *iface, IS
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = UnicodeEncoding_Utf8;
+    // The unicode encoding of the file is auto detected instead.
+    write_text_options->withEncoding = FALSE;
     write_text_options->file = file;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+    hr = async_action_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)write_text_options, 
+        file_io_statics_AppendText, 
+        textOperation );
 
-    free( write_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::AppendTextWithEncodingAsync
+ *      Description: Appends a packed HSTRING with the specified encoding to
+ *      the contents of an IStorageFile*.
+ */
+static HRESULT WINAPI
+file_io_statics_AppendTextWithEncodingAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    HSTRING contents,
+    UnicodeEncoding encoding,
+    IAsyncAction **textOperation
+) {
     HRESULT hr;
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    TRACE( "iface %p, file %p, contents %s, encoding %d, operation %p\n", iface, file, debugstr_hstring(contents), encoding, textOperation );
 
     //Arguments
     if ( !file || !contents ) return E_INVALIDARG;
@@ -240,23 +315,36 @@ static HRESULT WINAPI file_io_statics_AppendTextWithEncodingAsync( IFileIOStatic
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
     write_text_options->encoding = encoding;
+    write_text_options->withEncoding = TRUE;
     write_text_options->file = file;
     write_text_options->contents = contents;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, textOperation );
+    hr = async_action_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)write_text_options, 
+        file_io_statics_AppendText, 
+        textOperation );
 
-    free( write_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, IStorageFile *file, IAsyncOperation_IVector_HSTRING **linesOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<IVector <HSTRING>*> IFileIOStatics::ReadLinesAsync
+ *      Description: Reads the contents of an IStorageFile* line by line and appends it to
+ *      an HSTRING Vector.
+ */
+static HRESULT WINAPI
+file_io_statics_ReadLinesAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IAsyncOperation_IVector_HSTRING **linesOperation
+) {
     HRESULT hr;
 
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct file_io_read_text_options *read_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+    TRACE( "iface %p, file %p, operation %p\n", iface, file, linesOperation );
 
     //Arguments
     if ( !file ) return E_INVALIDARG;
@@ -267,19 +355,33 @@ static HRESULT WINAPI file_io_statics_ReadLinesAsync( IFileIOStatics *iface, ISt
     read_text_options->encoding = UnicodeEncoding_Utf8;
     read_text_options->file = file;
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+    hr = async_operation_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)read_text_options,
+        file_io_statics_ReadLines, 
+        iids, 
+        (IAsyncOperation_IInspectable **)linesOperation );
 
-    free( read_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<IVector <HSTRING>*> IFileIOStatics::ReadLinesWithEncodingAsync
+ *      Description: Reads the contents of an IStorageFile* line by line and appends it to
+ *      an HSTRING Vector with the specified encoding.
+ */
+static HRESULT WINAPI
+file_io_statics_ReadLinesWithEncodingAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    UnicodeEncoding encoding,
+    IAsyncOperation_IVector_HSTRING **linesOperation
+) {
     HRESULT hr;
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
     struct file_io_read_text_options *read_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+    TRACE( "iface %p, file %p, encoding %d, operation %p\n", iface, file, encoding, linesOperation );
 
     //Arguments
     if ( !file ) return E_INVALIDARG;
@@ -290,29 +392,33 @@ static HRESULT WINAPI file_io_statics_ReadLinesWithEncodingAsync( IFileIOStatics
     read_text_options->encoding = encoding;
     read_text_options->file = file;
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, file_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
+    hr = async_operation_create( 
+        (IUnknown *)iface, 
+        (IUnknown *)read_text_options, 
+        file_io_statics_ReadLines, 
+        iids, 
+        (IAsyncOperation_IInspectable **)linesOperation );
 
-    free( read_text_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteLinesAsync
+ *      Description: Overwrites the contents of an IStorageFile* with the given
+ *      HSTRING vector.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteLinesAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IIterable_HSTRING *lines,
+    IAsyncAction **operation
+) {
     HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr = NULL;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-
-    IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, lines %p, operation %p\n", iface, file, lines, operation );
 
     //Arguments
     if ( !file || !lines ) return E_INVALIDARG;
@@ -320,79 +426,40 @@ static HRESULT WINAPI file_io_statics_WriteLinesAsync( IFileIOStatics *iface, IS
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
+    hr = Unpack_IIterable_HSTRING( lines, &write_text_options->contents );
+    if ( FAILED( hr ) )
     {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
         free( write_text_options );
         return hr;
     }
 
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
+    write_text_options->withEncoding = FALSE;
     write_text_options->encoding = UnicodeEncoding_Utf8;
     write_text_options->file = file;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
 
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-        if ( strings[i] != NULL )
-            WindowsDeleteString( strings[i] );
-    free( strings );
-
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteLinesWithEncodingAsync
+ *      Description: Overwrites the contents of an IStorageFile* with the given
+ *      HSTRING vector with the specified encoding.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteLinesWithEncodingAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IIterable_HSTRING *lines,
+    UnicodeEncoding encoding,
+    IAsyncAction **operation
+) {
     HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr = NULL;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-
-    IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, lines %p, encoding %d, operation %p\n", iface, file, lines, encoding, operation );
 
     //Arguments
     if ( !file || !lines ) return E_INVALIDARG;
@@ -400,79 +467,38 @@ static HRESULT WINAPI file_io_statics_WriteLinesWithEncodingAsync( IFileIOStatic
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
+    hr = Unpack_IIterable_HSTRING( lines, &write_text_options->contents );
+    if ( FAILED( hr ) )
     {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
         free( write_text_options );
         return hr;
     }
 
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
+    write_text_options->withEncoding = TRUE;
     write_text_options->encoding = encoding;
     write_text_options->file = file;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_WriteText, operation );
 
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-        if ( strings[i] != NULL )
-            WindowsDeleteString( strings[i] );
-    free( strings );
-
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::AppendLinesAsync
+ *      Description: Appends an HSTRING vector to the contents of an IStorageFile*.
+ */
+static HRESULT WINAPI
+file_io_statics_AppendLinesAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IIterable_HSTRING *lines,
+    IAsyncAction **operation
+) {
     HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr = NULL;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-
-    IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, lines %p, operation %p\n", iface, file, lines, operation );
 
     //Arguments
     if ( !file || !lines ) return E_INVALIDARG;
@@ -480,79 +506,40 @@ static HRESULT WINAPI file_io_statics_AppendLinesAsync( IFileIOStatics *iface, I
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
+    hr = Unpack_IIterable_HSTRING( lines, &write_text_options->contents );
+    if ( FAILED( hr ) )
     {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
         free( write_text_options );
         return hr;
     }
 
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
+    write_text_options->withEncoding = FALSE;
     write_text_options->encoding = UnicodeEncoding_Utf8;
     write_text_options->file = file;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-        if ( strings[i] != NULL )
-            WindowsDeleteString( strings[i] );
-    free( strings );
 
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStatics *iface, IStorageFile *file, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::AppendLinesWithEncodingAsync
+ *      Description: Appends an HSTRING vector with the given
+ *      encoding to the contents of an IStorageFile*.
+ */
+static HRESULT WINAPI 
+file_io_statics_AppendLinesWithEncodingAsync( 
+    IFileIOStatics *iface, 
+    IStorageFile *file, 
+    IIterable_HSTRING *lines,
+    UnicodeEncoding encoding, 
+    IAsyncAction **operation 
+) {
     HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr = NULL;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-
-    IIterator_HSTRING *hstringIterator;
 
     struct file_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, lines %p, encoding %d, operation %p\n", iface, file, lines, encoding, operation );
 
     //Arguments
     if ( !file || !lines ) return E_INVALIDARG;
@@ -560,86 +547,65 @@ static HRESULT WINAPI file_io_statics_AppendLinesWithEncodingAsync( IFileIOStati
 
     if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
+    hr = Unpack_IIterable_HSTRING( lines, &write_text_options->contents );
+    if ( FAILED( hr ) )
     {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-
-            free( tmpStr );
-        }
-    } else {
         free( write_text_options );
         return hr;
     }
 
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
+    write_text_options->withEncoding = TRUE;
     write_text_options->encoding = encoding;
     write_text_options->file = file;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, file_io_statics_AppendText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-        if ( strings[i] != NULL )
-            WindowsDeleteString( strings[i] );
-    free( strings );
 
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_ReadBufferAsync( IFileIOStatics *iface, IStorageFile* file, IAsyncOperation_IBuffer **operation )
-{
+/***********************************************************************
+ *      IAsyncOperation<IBuffer *> IFileIOStatics::ReadBufferAsync
+ *      Description: Reads the contents of an IStoragFile* and
+ *      appends it to an IBuffer.
+ */
+static HRESULT WINAPI
+file_io_statics_ReadBufferAsync(
+    IFileIOStatics *iface,
+    IStorageFile* file,
+    IAsyncOperation_IBuffer **operation
+) {
     HRESULT hr;
 
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IBuffer };
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, operation %p\n", iface, file, operation );
 
     //Arguments
     if ( !file ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
-   
+
     hr = async_operation_create( (IUnknown *)iface, (IUnknown *)file, file_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
     TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
 
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, IStorageFile *file, IBuffer* buffer, IAsyncAction **operation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteBufferAsync
+ *      Description: Overwrites the contents of an IStorageFile* with
+ *      the given IBuffer.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteBufferAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    IBuffer* buffer,
+    IAsyncAction **operation
+) {
     HRESULT hr;
     struct file_io_write_buffer_options *write_buffer_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, buffer %p, operation %p\n", iface, file, buffer, operation );
 
     //Arguments
     if ( !file || !buffer ) return E_INVALIDARG;
@@ -652,16 +618,26 @@ static HRESULT WINAPI file_io_statics_WriteBufferAsync( IFileIOStatics *iface, I
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_buffer_options, file_io_statics_WriteBuffer, operation );
 
-    free( write_buffer_options );
     return hr;
 }
 
-static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IStorageFile *file, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
-{
+/***********************************************************************
+ *      IAsyncAction IFileIOStatics::WriteBytesAsync
+ *      Description: Overwrites the contents of an IStorageFile* with
+ *      the given byte byffer.
+ */
+static HRESULT WINAPI
+file_io_statics_WriteBytesAsync(
+    IFileIOStatics *iface,
+    IStorageFile *file,
+    UINT32 __bufferSize,
+    BYTE *buffer,
+    IAsyncAction **operation
+) {
     HRESULT hr;
     struct file_io_write_bytes_options *write_bytes_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, file %p, __bufferSize %d, buffer %p, operation %p\n", iface, file, __bufferSize, &buffer, operation );
 
     //Arguments
     if ( !file || !buffer ) return E_INVALIDARG;
@@ -675,7 +651,6 @@ static HRESULT WINAPI file_io_statics_WriteBytesAsync( IFileIOStatics *iface, IS
 
     hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_bytes_options, file_io_statics_WriteBytes, operation );
 
-    free( write_bytes_options );
     return hr;
 }
 

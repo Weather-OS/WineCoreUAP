@@ -23,522 +23,579 @@
 
 _ENABLE_DEBUGGING_
 
-HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
+DEFINE_ASYNC_COMPLETED_HANDLER( async_random_access_stream_handler, IAsyncOperationCompletedHandler_IRandomAccessStream, IAsyncOperation_IRandomAccessStream )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_uint32_handler, IAsyncOperationCompletedHandler_UINT32, IAsyncOperation_UINT32 )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_boolean_handler, IAsyncOperationCompletedHandler_boolean, IAsyncOperation_boolean )
+DEFINE_ASYNC_COMPLETED_HANDLER( async_hstring_handler, IAsyncOperationCompletedHandler_HSTRING, IAsyncOperation_HSTRING )
+
+static HRESULT WINAPI
+AutoDetectEncoding(
+    IN IStorageFile *file,
+    OUT UnicodeEncoding *encoding
+) {
     HRESULT status = S_OK;
-    HSTRING filePath;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;    
-    LPWSTR fileBufferWChar = NULL;
-    LPWSTR outputBuffer = NULL;
-    LPSTR fileBufferChar = NULL;
-    DWORD fileSize;
-    DWORD bytesRead;
-    ULONG i;
-    BOOL readResult;
-
-    IStorageItem *item = NULL;
-
-    struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
-
-    //Parameters    
-    UnicodeEncoding unicodeEncoding = read_text_options->encoding;
-    IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
-
-    TRACE( "iface %p, value %p\n", invoker, result );
-
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
-
-    fileSize = GetFileSize( fileHandle, NULL );
-
-    if ( fileSize == INVALID_FILE_SIZE )
-    {
-        status = E_INVALIDARG;
-        goto _CLEANUP;
-    }
-
-    outputBuffer = (LPWSTR)malloc( fileSize );
-
-    if ( !outputBuffer )
-    {
-        status = E_OUTOFMEMORY;
-        goto _CLEANUP;
-    }
-
-    if ( unicodeEncoding == UnicodeEncoding_Utf8 )
-    {
-        fileBufferChar = (LPSTR)malloc( fileSize );
-        if ( !fileBufferChar )
-        {
-            status = E_OUTOFMEMORY;
-            goto _CLEANUP;
-        }
-        readResult = ReadFile( fileHandle, (LPVOID)fileBufferChar, fileSize, &bytesRead, NULL );
-    } else
-    {
-        fileBufferWChar = (LPWSTR)malloc( fileSize );
-        if ( !fileBufferWChar )
-        {
-            status = E_OUTOFMEMORY;
-            goto _CLEANUP;
-        }
-        readResult = ReadFile( fileHandle, (LPVOID)fileBufferWChar, fileSize, &bytesRead, NULL );
-    }
-
-    if ( !readResult || bytesRead != fileSize )
-    {
-        status = HRESULT_FROM_WIN32( GetLastError() );
-        goto _CLEANUP;
-    }
-
-    if ( unicodeEncoding != UnicodeEncoding_Utf8 )
-    {
-        if ( fileSize % 2 != 0 )
-        {
-            status = E_FAIL;
-            goto _CLEANUP;
-        }
-    }
-
-    switch ( unicodeEncoding )
-    {
-        case UnicodeEncoding_Utf8:
-            MultiByteToWideChar( CP_UTF8, 0, fileBufferChar, -1, outputBuffer, fileSize );
-            if ( !outputBuffer )
-                status = E_OUTOFMEMORY;
-            break;
-
-        case UnicodeEncoding_Utf16LE:
-            wcscpy( outputBuffer, fileBufferWChar );
-            break;
-
-        case UnicodeEncoding_Utf16BE:
-            for ( i = 0; i < fileSize / sizeof( WCHAR ); i++ )
-                fileBufferWChar[i] = ( fileBufferWChar[i] >> 8 ) | ( fileBufferWChar[i] << 8 );
-
-            wcscpy( outputBuffer, fileBufferWChar );
-            break;
-
-        default:
-            status = E_INVALIDARG;
-    }
-
-    outputBuffer[ fileSize ] = '\0';
-
-    if ( SUCCEEDED ( status ) )
-    {
-        result->vt = VT_LPWSTR;
-        result->pwszVal = outputBuffer;
-    }
-
-_CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( fileBufferChar )
-        free( fileBufferChar );
-    if ( fileBufferWChar )
-        free( fileBufferWChar );
-    if ( FAILED(status) && outputBuffer )
-        free( outputBuffer );
-    if ( item )
-        IStorageItem_Release(item);
-
-    return status;
-}
-
-HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
-    HRESULT status = S_OK;
-    HSTRING filePath;
-    HSTRING contents;
-    HANDLE fileHandle;
-    LPSTR writeBufferChar = NULL;
-    LPWSTR contentsBE = NULL;
-    DWORD bytesWritten;
-    ULONG i;
+    BOOLEAN canRead;
+    UINT64 fileSize;
+    DWORD asyncRes;
+    BYTE byteOrder[3];
     BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
     BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
+    BYTE UTF8BOM[] = { 0xEF, 0xBB, 0xBF };
 
-    IStorageItem *item = NULL;
+    IAsyncOperation_IRandomAccessStream *readStreamOperation = NULL;
+    IAsyncOperation_UINT32 *loadOperation = NULL;
+    IRandomAccessStream *readStream = NULL;
+    IDataReaderFactory *dataReaderFactory = NULL;
+    IInputStream *inputStream = NULL;
+    IDataReader *dataReader = NULL;
 
-    struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, dataReaderFactory, IID_IDataReaderFactory );
+    
+    TRACE( "file %p, encoding %p\n", file, encoding );
 
-    //Parameters    
-    UnicodeEncoding unicodeEncoding = write_text_options->encoding;
-    IStorageFile_QueryInterface( write_text_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
-    WindowsDuplicateString( write_text_options->contents, &contents );
+    status = IStorageFile_OpenAsync( file, FileAccessMode_Read, &readStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    TRACE( "iface %p, value %p\n", invoker, result );
-
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
-    //Clear the file
-    if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( readStreamOperation, INFINITE );
+    if ( asyncRes )
     {
         status = E_UNEXPECTED;
         goto _CLEANUP;
     }
 
-    if ( !SetEndOfFile( fileHandle ) ) 
+    status = IAsyncOperation_IRandomAccessStream_GetResults( readStreamOperation, &readStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanRead( readStream, &canRead );
+    if ( !canRead )
     {
-        status = HRESULT_FROM_WIN32( GetLastError() );
+        status = E_ACCESSDENIED;
         goto _CLEANUP;
     }
 
-    switch ( unicodeEncoding )
+    IRandomAccessStream_get_Size( readStream, &fileSize );
+    if ( fileSize < 2 )
     {
-        case UnicodeEncoding_Utf8:
-            writeBufferChar = (LPSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
-            if ( !writeBufferChar )
-            {
-                status = E_OUTOFMEMORY;
-                goto _CLEANUP;
-            }
-
-            WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( contents, NULL ), -1, writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), NULL, NULL );
-            
-            if ( !WriteFile( fileHandle, (LPCVOID)writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        case UnicodeEncoding_Utf16LE:
-            if ( !WriteFile( fileHandle, (LPCVOID)UTF16LEBOM, sizeof( UTF16LEBOM ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-
-            if ( !WriteFile( fileHandle, (LPCVOID)WindowsGetStringRawBuffer( contents, NULL ), 
-                        ( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        case UnicodeEncoding_Utf16BE:
-            contentsBE = (LPWSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
-            if ( !contentsBE )
-            {
-                status = E_OUTOFMEMORY;
-                goto _CLEANUP;
-            }
-
-            if ( !WriteFile( fileHandle, (LPCVOID)UTF16BEBOM, sizeof( UTF16BEBOM ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-
-            for ( i = 0; i < wcslen( WindowsGetStringRawBuffer( contents, NULL ) ); i++ ) 
-                contentsBE[i] = ( WindowsGetStringRawBuffer( contents, NULL )[i] >> 8) | ( WindowsGetStringRawBuffer( contents, NULL )[i] << 8 );
-
-            if ( !WriteFile( fileHandle, (LPCVOID)contentsBE, 
-                        ( wcslen( contentsBE ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) ) {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        default:
-            status = E_INVALIDARG;
+        status = E_FAIL;
+        goto _CLEANUP;
     }
 
+    status = IRandomAccessStream_GetInputStreamAt( readStream, 0, &inputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataReaderFactory_CreateDataReader( dataReaderFactory, inputStream, &dataReader );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataReader_LoadAsync( dataReader, 3, &loadOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( loadOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    if ( fileSize >= 3 )
+    {
+        status = IDataReader_ReadBytes( dataReader, 3, byteOrder );
+        if ( FAILED( status ) ) goto _CLEANUP;
+    } else
+    {
+        status = IDataReader_ReadBytes( dataReader, 2, byteOrder );
+        if ( FAILED( status ) ) goto _CLEANUP;
+    }
+
+    if ( memcmp( byteOrder, UTF16LEBOM, 2 ) == 0 )
+        *encoding = UnicodeEncoding_Utf16LE;
+    else if ( memcmp( byteOrder, UTF16BEBOM, 2 ) == 0 )
+        *encoding = UnicodeEncoding_Utf16BE;
+    else if ( fileSize >= 3 && memcmp( byteOrder, UTF8BOM, 3 ) == 0 )
+        *encoding = UnicodeEncoding_Utf8;
+    else
+        status = E_FAIL;
+
 _CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( writeBufferChar )
-        free( writeBufferChar );
-    if ( contentsBE )
-        free( contentsBE );
-    if ( item )
-        IStorageItem_Release( item );
-    WindowsDeleteString( contents );
+    if ( readStream )
+        IRandomAccessStream_Release( readStream );
+    if ( readStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( readStreamOperation );
+    if ( loadOperation )
+        IAsyncOperation_UINT32_Release( loadOperation );
+    if ( inputStream )
+        IInputStream_Release( inputStream );
+    if ( dataReader )
+        IDataReader_Release( dataReader );
+    if ( dataReaderFactory )
+        IDataReaderFactory_Release( dataReaderFactory );
 
     return status;
 }
 
-HRESULT WINAPI file_io_statics_AppendText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
+HRESULT WINAPI 
+file_io_statics_ReadText( 
+    IUnknown *invoker, 
+    IUnknown *param, 
+    PROPVARIANT *result 
+) {
     HRESULT status = S_OK;
-    HSTRING filePath;
-    HSTRING contents;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    LPSTR writeBufferChar = NULL;
-    LPWSTR contentsBE = NULL;
-    DWORD bytesWritten;
-    ULONG i;
-    BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
-    BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
-    
-    IStorageItem *item = NULL;
+    BOOLEAN canRead;
+    HSTRING readData = NULL;
+    LPCWSTR readDataStr = NULL;
+    UINT32 readDataStrLen;
+    UINT64 fileSize;
+    DWORD asyncRes;
 
-    struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
-
-    //Parameters   
-    UnicodeEncoding unicodeEncoding = write_text_options->encoding;
-    IStorageFile_QueryInterface( write_text_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
-    WindowsDuplicateString( write_text_options->contents, &contents );
-
-    TRACE( "iface %p, value %p\n", invoker, result );
-
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), FILE_APPEND_DATA, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );    
-
-    switch ( unicodeEncoding )
-    {
-        case UnicodeEncoding_Utf8:
-            writeBufferChar = (LPSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
-            if ( !writeBufferChar )
-            {
-                status = E_OUTOFMEMORY;
-                goto _CLEANUP;
-            }
-
-            WideCharToMultiByte( CP_UTF8, 0, WindowsGetStringRawBuffer( contents, NULL ), -1, writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), NULL, NULL );
-            
-            if ( !WriteFile( fileHandle, (LPCVOID)writeBufferChar, wcslen( WindowsGetStringRawBuffer( contents, NULL ) ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        case UnicodeEncoding_Utf16LE:
-            if ( !WriteFile( fileHandle, (LPCVOID)UTF16LEBOM, sizeof( UTF16LEBOM ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-
-            if ( !WriteFile( fileHandle, (LPCVOID)WindowsGetStringRawBuffer( contents, NULL ), 
-                        ( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        case UnicodeEncoding_Utf16BE:
-            contentsBE = (LPWSTR)malloc( wcslen( WindowsGetStringRawBuffer( contents, NULL ) ) + 1 );
-            if ( !contentsBE )
-            {
-                status = E_OUTOFMEMORY;
-                goto _CLEANUP;
-            }
-
-            if ( !WriteFile( fileHandle, (LPCVOID)UTF16BEBOM, sizeof( UTF16BEBOM ), &bytesWritten, NULL ) )
-            {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-
-            for ( i = 0; i < wcslen( WindowsGetStringRawBuffer( contents, NULL ) ); i++ ) 
-                contentsBE[i] = ( WindowsGetStringRawBuffer( contents, NULL )[i] >> 8) | ( WindowsGetStringRawBuffer( contents, NULL )[i] << 8 );
-
-            if ( !WriteFile( fileHandle, (LPCVOID)contentsBE, 
-                        ( wcslen( contentsBE ) + 1 ) * sizeof( WCHAR ), &bytesWritten, NULL) ) {
-                status = HRESULT_FROM_WIN32( GetLastError() );
-                goto _CLEANUP;
-            }
-            break;
-
-        default:
-            status = E_INVALIDARG;
-            goto _CLEANUP;
-    }
-
-_CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( writeBufferChar )
-        free( writeBufferChar );
-    if ( contentsBE )
-        free( contentsBE );
-    if ( item )
-        IStorageItem_Release( item );
-    WindowsDeleteString( contents );
-
-    return status;
-}
-
-//I only managed to hit my head against the wall twice while writing this function
-
-HRESULT WINAPI file_io_statics_ReadLines( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
-{
-    HRESULT status = S_OK;
-    HSTRING filePath;
-    HSTRING vectorElement;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;    
-    LPWSTR fileBufferWChar = NULL;
-    LPWSTR outputBuffer = NULL;
-    LPWSTR tmpBuffer = NULL;
-    LPSTR fileBufferChar = NULL;
-    DWORD fileSize;
-    DWORD bytesRead;
-    ULONG i;
-    ULONG currChar;
-    BOOL readResult;
-    size_t INITIAL_BUFFER_SIZE = 100;    
-    
-    IVector_HSTRING *vector = NULL;
-    IStorageItem *item = NULL;
+    IAsyncOperation_IRandomAccessStream *readStreamOperation = NULL;
+    IAsyncOperation_UINT32 *loadOperation = NULL;
+    IRandomAccessStream *readStream = NULL;
+    IDataReaderFactory *dataReaderFactory = NULL;
+    IInputStream *inputStream = NULL;
+    IDataReader *dataReader = NULL;
 
     struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
 
     //Parameters    
     UnicodeEncoding unicodeEncoding = read_text_options->encoding;
-    IStorageFile_QueryInterface( read_text_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, dataReaderFactory, IID_IDataReaderFactory );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    // Windows prioritizes integrity over client choice.
+    // UnicodeEncoding is overwritten if a different encoding is detected.
+    AutoDetectEncoding( read_text_options->file, &unicodeEncoding );
+
+    status = IStorageFile_OpenAsync( read_text_options->file, FileAccessMode_Read, &readStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( readStreamOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_IRandomAccessStream_GetResults( readStreamOperation, &readStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanRead( readStream, &canRead );
+    if ( !canRead )
+    {
+        status = E_ACCESSDENIED;
+        goto _CLEANUP;
+    }
+
+    IRandomAccessStream_get_Size( readStream, &fileSize );
+    if ( fileSize > __UINT32_MAX__ /* ~4 Gigabytes */)
+    {
+        ERR( "fileSize for stream %p exceeds the uint32 limit, which is outside the range of an HSTRING.\n", readStream );
+        status = E_BOUNDS;
+        goto _CLEANUP;
+    }
+
+    status = IRandomAccessStream_GetInputStreamAt( readStream, 0, &inputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataReaderFactory_CreateDataReader( dataReaderFactory, inputStream, &dataReader );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataReader_put_UnicodeEncoding( dataReader, unicodeEncoding );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    // We have verified that fileSize doesn't exceed the uint32 limit.
+    status = IDataReader_LoadAsync( dataReader, (UINT32)fileSize, &loadOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( loadOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IDataReader_ReadString( dataReader, (UINT32)(fileSize / sizeof(WCHAR)), &readData );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    if ( SUCCEEDED( status ) )
+    {
+        readDataStr = WindowsGetStringRawBuffer( readData, &readDataStrLen );
+
+        result->pwszVal = CoTaskMemAlloc( (readDataStrLen + 1) * sizeof(WCHAR) );
+        if ( !result->pwszVal )
+        {
+            status = E_OUTOFMEMORY;
+            goto _CLEANUP;
+        }
+        
+        result->vt = VT_LPWSTR;
+        CopyMemory( result->pwszVal, readDataStr, readDataStrLen * sizeof(WCHAR) );
+        result->pwszVal[readDataStrLen] = L'\0';
+    }
+
+_CLEANUP:
+    if ( readData )
+        WindowsDeleteString( readData );
+    if ( readStream )
+        IRandomAccessStream_Release( readStream );
+    if ( readStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( readStreamOperation );
+    if ( loadOperation )
+        IAsyncOperation_UINT32_Release( loadOperation );
+    if ( inputStream )
+        IInputStream_Release( inputStream );
+    if ( dataReader )
+        IDataReader_Release( dataReader );
+    if ( dataReaderFactory )
+        IDataReaderFactory_Release( dataReaderFactory );
+    free( read_text_options );
+
+    return status;
+}
+
+HRESULT WINAPI 
+file_io_statics_WriteText( 
+    IUnknown *invoker, 
+    IUnknown *param, 
+    PROPVARIANT *result 
+) {
+    HRESULT status = S_OK;
+    BOOLEAN canWrite;
+    UINT32 bytesWritten;
+    UINT32 stringWriteLen;
+    DWORD asyncRes;
+    BYTE UTF16LEBOM[] = { 0xFF, 0xFE };
+    BYTE UTF16BEBOM[] = { 0xFE, 0xFF };
+    BYTE UTF8BOM[] = { 0xEF, 0xBB, 0xBB };
+
+    IAsyncOperation_IRandomAccessStream *writeStreamOperation = NULL;
+    IAsyncOperation_boolean *flushOperation = NULL;
+    IAsyncOperation_UINT32 *storeOperation = NULL;
+    IRandomAccessStream *writeStream = NULL;
+    IDataWriterFactory *dataWriterFactory = NULL;
+    IOutputStream *outputStream = NULL;
+    IDataWriter *dataWriter = NULL;
+
+    struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
+
+    //Parameters    
+    UnicodeEncoding unicodeEncoding = write_text_options->encoding;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataWriter, dataWriterFactory, IID_IDataWriterFactory );
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    status = IStorageFile_OpenAsync( write_text_options->file, FileAccessMode_ReadWrite, &writeStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( writeStreamOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_IRandomAccessStream_GetResults( writeStreamOperation, &writeStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanWrite( writeStream, &canWrite );
+    if ( !canWrite )
+    {
+        status = E_ACCESSDENIED;
+        goto _CLEANUP;
+    }
+
+    // Clear out the file
+    status = IRandomAccessStream_put_Size( writeStream, 0 );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IRandomAccessStream_GetOutputStreamAt( writeStream, 0, &outputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriterFactory_CreateDataWriter( dataWriterFactory, outputStream, &dataWriter );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    // Writing the BOM headers
+    if ( unicodeEncoding == UnicodeEncoding_Utf16LE )
+    {
+        status = IDataWriter_WriteBytes( dataWriter, 2, UTF16LEBOM );
+        if ( FAILED( status ) ) goto _CLEANUP;
+    } else if ( unicodeEncoding == UnicodeEncoding_Utf16BE )
+    {
+        status = IDataWriter_WriteBytes( dataWriter, 2, UTF16BEBOM );
+        if ( FAILED( status ) ) goto _CLEANUP;
+    } else if ( write_text_options->withEncoding )
+    {
+        // A UTF-8 BOM header is forcefully appended when using the routine `FileIO::WriteTextWithEncoding`
+        //  when using `UnicodeEncoding::Utf8`
+        status = IDataWriter_WriteBytes( dataWriter, 3, UTF8BOM );
+        if ( FAILED( status ) ) goto _CLEANUP;
+    }
+
+    status = IDataWriter_put_UnicodeEncoding( dataWriter, unicodeEncoding );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_WriteString( dataWriter, write_text_options->contents, &stringWriteLen );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_StoreAsync( dataWriter, &storeOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( storeOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_UINT32_GetResults( storeOperation, &bytesWritten );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_FlushAsync( dataWriter, &flushOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_boolean( flushOperation, INFINITE );
+    if ( asyncRes ) status = E_UNEXPECTED;
+
+_CLEANUP:
+    if ( writeStream )
+        IRandomAccessStream_Release( writeStream );
+    if ( writeStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( writeStreamOperation );
+    if ( storeOperation )
+        IAsyncOperation_UINT32_Release( storeOperation );
+    if ( flushOperation )
+        IAsyncOperation_boolean_Release( flushOperation );
+    if ( outputStream )
+        IOutputStream_Release( outputStream );
+    if ( dataWriter )
+        IDataWriter_Release( dataWriter );
+    if ( dataWriterFactory )
+        IDataWriterFactory_Release( dataWriterFactory );
+    free( write_text_options );
+
+    return status;
+}
+
+HRESULT WINAPI 
+file_io_statics_AppendText( 
+    IUnknown *invoker, 
+    IUnknown *param, 
+    PROPVARIANT *result 
+) {
+    HRESULT status = S_OK;
+    BOOLEAN canWrite;
+    BOOLEAN flushResult;
+    UINT64 fileSize;
+    UINT32 bytesWritten;
+    UINT32 stringWriteLen;
+    DWORD asyncRes;
+
+    IAsyncOperation_IRandomAccessStream *writeStreamOperation = NULL;
+    IAsyncOperation_boolean *flushOperation = NULL;
+    IAsyncOperation_UINT32 *storeOperation = NULL;
+    IRandomAccessStream *writeStream = NULL;
+    IDataWriterFactory *dataWriterFactory = NULL;
+    IOutputStream *outputStream = NULL;
+    IDataWriter *dataWriter = NULL;
+
+    struct file_io_write_text_options *write_text_options = (struct file_io_write_text_options *)param;
+
+    //Parameters    
+    UnicodeEncoding unicodeEncoding = write_text_options->encoding;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataWriter, dataWriterFactory, IID_IDataWriterFactory);
+
+    TRACE( "iface %p, value %p\n", invoker, result );
+
+    // Unlike read related functions, the file's encoding doesn't take priority here.
+    if ( !write_text_options->withEncoding )
+        AutoDetectEncoding( write_text_options->file, &unicodeEncoding );
+
+
+    status = IStorageFile_OpenAsync( write_text_options->file, FileAccessMode_ReadWrite, &writeStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( writeStreamOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_IRandomAccessStream_GetResults( writeStreamOperation, &writeStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanWrite( writeStream, &canWrite );
+    if ( !canWrite )
+    {
+        status = E_ACCESSDENIED;
+        goto _CLEANUP;
+    }
+
+    status = IRandomAccessStream_get_Size( writeStream, &fileSize);
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IRandomAccessStream_GetOutputStreamAt( writeStream, fileSize, &outputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriterFactory_CreateDataWriter( dataWriterFactory, outputStream, &dataWriter );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    // Notes: `FileIO::AppendTextAsync` does not append BOM headers on an empty file.
+
+    status = IDataWriter_put_UnicodeEncoding( dataWriter, unicodeEncoding );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_WriteString( dataWriter, write_text_options->contents, &stringWriteLen );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_StoreAsync( dataWriter, &storeOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( storeOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_UINT32_GetResults( storeOperation, &bytesWritten );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_FlushAsync( dataWriter, &flushOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_boolean( flushOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IAsyncOperation_boolean_GetResults( flushOperation, &flushResult );
+    if ( FAILED( status ) ) goto _CLEANUP;
+    if ( !flushResult ) status = E_FAIL;
+
+_CLEANUP:    
+    if ( dataWriterFactory )
+        IDataWriterFactory_Release( dataWriterFactory );
+    if ( dataWriter )
+        IDataWriter_Release( dataWriter );
+    if ( outputStream )
+        IOutputStream_Release( outputStream );    
+    if ( writeStream )
+        IRandomAccessStream_Release( writeStream );    
+    if ( writeStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( writeStreamOperation );
+    if ( storeOperation )
+        IAsyncOperation_UINT32_Release( storeOperation );
+    if ( flushOperation )
+        IAsyncOperation_boolean_Release( flushOperation );
+    free( write_text_options );
+
+    return status;
+}
+
+HRESULT WINAPI 
+file_io_statics_ReadLines( 
+    IUnknown *invoker, 
+    IUnknown *param, 
+    PROPVARIANT *result 
+) {
+    HRESULT status = S_OK;
+    HSTRING fileContents;
+    HSTRING currentLine;
+    LPCWSTR fileContentsBuffer;
+    UINT32 fileContentsBufferSize;
+    UINT32 iterator;
+    UINT32 lineIndexStart;
+    UINT32 lineIndexEnd;
+    DWORD asyncRes;
+    WCHAR currentWChar;
+    
+    IAsyncOperation_HSTRING *textReadOperation = NULL;
+    IVector_HSTRING *vector = NULL;
+
+    struct file_io_read_text_options *read_text_options = (struct file_io_read_text_options *)param;
+
+    //Parameters    
+    UnicodeEncoding unicodeEncoding = read_text_options->encoding;
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
     status = hstring_vector_create( &vector );
     if ( FAILED( status ) ) goto _CLEANUP;
 
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+    //Read the file first, then we'll split the packed HSTRING into individual lines.
+    status = IFileIOStatics_ReadTextWithEncodingAsync( (IFileIOStatics *)invoker, read_text_options->file, unicodeEncoding, &textReadOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    fileSize = GetFileSize( fileHandle, NULL );
-
-    if ( fileSize == INVALID_FILE_SIZE )
+    asyncRes = await_IAsyncOperation_HSTRING( textReadOperation, INFINITE );
+    if ( asyncRes )
     {
-        status = E_INVALIDARG;
+        status = E_UNEXPECTED;
         goto _CLEANUP;
     }
 
-    outputBuffer = (LPWSTR)malloc( fileSize );
+    status = IAsyncOperation_HSTRING_GetResults( textReadOperation, &fileContents );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    if ( !outputBuffer )
+    fileContentsBuffer = WindowsGetStringRawBuffer( fileContents, &fileContentsBufferSize );
+
+    lineIndexStart = 0;
+
+    if ( fileContentsBufferSize != 0 )
     {
-        status = E_OUTOFMEMORY;
-        goto _CLEANUP;
-    }
-
-    tmpBuffer = (LPWSTR)malloc( sizeof(wchar_t) * INITIAL_BUFFER_SIZE );
-
-    if ( !tmpBuffer )
-    {
-        status = E_OUTOFMEMORY;
-        goto _CLEANUP;
-    }
-
-    if ( unicodeEncoding == UnicodeEncoding_Utf8 )
-    {
-        fileBufferChar = (LPSTR)malloc( fileSize );
-        if ( !fileBufferChar )
+        for ( iterator = 0; iterator <= fileContentsBufferSize; iterator++ )
         {
-            status = E_OUTOFMEMORY;
-            goto _CLEANUP;
-        }
-        readResult = ReadFile( fileHandle, (LPVOID)fileBufferChar, fileSize, &bytesRead, NULL );
-    } else
-    {
-        fileBufferWChar = (LPWSTR)malloc( fileSize );
-        if ( !fileBufferWChar )
-        {
-            status = E_OUTOFMEMORY;
-            goto _CLEANUP;
-        }
-        readResult = ReadFile( fileHandle, (LPVOID)fileBufferWChar, fileSize, &bytesRead, NULL );
-    }
+            if ( iterator < fileContentsBufferSize ) 
+                currentWChar = fileContentsBuffer[iterator];
+            else
+                currentWChar = L'\0';
 
-    if ( !readResult || bytesRead != fileSize )
-    {
-        status = HRESULT_FROM_WIN32( GetLastError() );
-        goto _CLEANUP;
-    }
-
-    if ( unicodeEncoding != UnicodeEncoding_Utf8 )
-    {
-        if ( fileSize % 2 != 0 )
-        {
-            status = E_INVALIDARG;
-            goto _CLEANUP;
-        }
-    }
-
-    switch ( unicodeEncoding )
-    {
-        case UnicodeEncoding_Utf8:
-            MultiByteToWideChar( CP_UTF8, 0, fileBufferChar, -1, outputBuffer, fileSize );
-            if ( !outputBuffer )
+            if ( currentWChar == L'\r' || currentWChar == L'\n' || currentWChar == L'\0' )
             {
-                status = E_OUTOFMEMORY;
-                goto _CLEANUP;
+                lineIndexEnd = iterator;
+                if ( lineIndexEnd > lineIndexStart )
+                {
+                    status = WindowsCreateString( 
+                        fileContentsBuffer + lineIndexStart, 
+                        lineIndexEnd - lineIndexStart,
+                        &currentLine
+                    );
+                    if ( FAILED( status ) ) goto _CLEANUP;
+                } else 
+                    WindowsCreateString( NULL, 0, &currentLine );
+
+                status = IVector_HSTRING_Append( vector, currentLine );
+                if ( FAILED( status ) ) goto _CLEANUP;
+
+                WindowsDeleteString( currentLine );
+
+                //skip crlf
+                if ( currentWChar == L'\r' && ( iterator + 1 ) < fileContentsBufferSize && fileContentsBuffer[ iterator + 1 ] == L'\n' )
+                    iterator++; 
+
+                lineIndexStart = iterator + 1;
             }
-            break;
-
-        case UnicodeEncoding_Utf16LE:
-            wcscpy( outputBuffer, fileBufferWChar );
-            break;
-
-        case UnicodeEncoding_Utf16BE:
-            for ( i = 0; i < fileSize / sizeof( WCHAR ); i++ )
-                fileBufferWChar[i] = ( fileBufferWChar[i] >> 8 ) | ( fileBufferWChar[i] << 8 );
-
-            wcscpy( outputBuffer, fileBufferWChar );
-            break;
-
-        default:
-            status = E_INVALIDARG;
-            goto _CLEANUP;
-    }
-
-    outputBuffer[ fileSize ] = L'\0';
-    tmpBuffer[0] = L'\0';
-
-    for ( currChar = 0; currChar < wcslen( outputBuffer ); currChar++ )
-    {
-        if ( outputBuffer[ currChar ] == L'\n' )
-        {
-            WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &vectorElement );
-            IVector_HSTRING_Append( vector, vectorElement );
-            tmpBuffer = (LPWSTR)malloc(sizeof(wchar_t) * INITIAL_BUFFER_SIZE);
-        } else
-        {
-            //Append the current character to tmpBuffer. We'll use tmpBuffer once control reaches line break.
-            size_t tmpBufferLen = wcslen(tmpBuffer);
-            if (tmpBufferLen + 1 >= INITIAL_BUFFER_SIZE) {
-                // Grow the buffer if necessary.
-                INITIAL_BUFFER_SIZE *= 2;
-                tmpBuffer = (LPWSTR)realloc(tmpBuffer, sizeof(wchar_t) * INITIAL_BUFFER_SIZE);
-            }
-            tmpBuffer[ tmpBufferLen ] = outputBuffer[ currChar ];
-            tmpBuffer[ tmpBufferLen + 1 ] = L'\0';
         }
     }
 
-    if ( tmpBuffer )
+    if ( SUCCEEDED( status ) )
     {
-        WindowsCreateString( tmpBuffer, wcslen( tmpBuffer ), &vectorElement );
-        IVector_HSTRING_Append( vector, vectorElement );
-    }
-
-    if ( SUCCEEDED ( status ) )
-    {
-        IVector_HSTRING_AddRef( vector );
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)vector;
     }
 
 _CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( fileBufferChar )
-        free( fileBufferChar );
-    if ( fileBufferWChar )
-        free( fileBufferWChar );
-    if ( outputBuffer )
-        free( outputBuffer );
-    if ( tmpBuffer )
-        free( tmpBuffer );
-    if ( item )
-        IStorageItem_Release( item );
-    if ( FAILED( status ) && vector )
-        IVector_HSTRING_Release( vector );
+    if ( FAILED( status ) )
+        if ( vector )
+            IVector_HSTRING_Release( vector );
+    if ( textReadOperation )
+        IAsyncOperation_HSTRING_Release( textReadOperation );
+    WindowsDeleteString( currentLine );
+    free( read_text_options );
 
     return status;
 }
@@ -546,73 +603,92 @@ _CLEANUP:
 HRESULT WINAPI file_io_statics_ReadBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
-    HSTRING filePath;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    DWORD fileSize;
-    DWORD bytesRead;    
-    BYTE *outputBuffer = NULL;
-    BOOL readResult;    
-    
-    IBufferByteAccess *buffer_byte_access = NULL;
-    IBufferFactory *buffer_factory = NULL;
-    IStorageItem *item = NULL;
+    BOOLEAN canRead;
+    UINT64 fileSize;
+    DWORD asyncRes;
+
+    IAsyncOperation_IRandomAccessStream *readStreamOperation = NULL;
+    IAsyncOperation_UINT32 *loadOperation = NULL;
+    IRandomAccessStream *readStream = NULL;
+    IDataReaderFactory *dataReaderFactory = NULL;
+    IInputStream *inputStream = NULL;
+    IDataReader *dataReader = NULL;
     IBuffer *buffer = NULL;
 
-    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_Buffer, buffer_factory, IID_IBufferFactory );
-
-    //Parameters
-    IStorageFile_QueryInterface( (IStorageFile *)param, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataReader, dataReaderFactory, IID_IDataReaderFactory );
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_READ, 0 , NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+    status = IStorageFile_OpenAsync( (IStorageFile *)param, FileAccessMode_Read, &readStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    fileSize = GetFileSize( fileHandle, NULL );
-
-    if ( fileSize == INVALID_FILE_SIZE )
-    {
-        status = E_INVALIDARG;
-        goto _CLEANUP;
-    }
-
-
-    status = IBufferFactory_Create( buffer_factory, fileSize, &buffer );
-    if ( FAILED( status ) )
-        goto _CLEANUP;
-
-    status = IBuffer_QueryInterface( buffer, &IID_IBufferByteAccess, (void **)&buffer_byte_access );
-    if ( FAILED( status ) )
-        goto _CLEANUP;
-
-    status = IBufferByteAccess_Buffer( buffer_byte_access, &outputBuffer );
-    if ( FAILED( status ) )
-        goto _CLEANUP;
-
-    readResult = ReadFile( fileHandle, (LPVOID)outputBuffer, fileSize, &bytesRead, NULL );
-
-    if ( !readResult || bytesRead != fileSize )
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( readStreamOperation, INFINITE );
+    if ( asyncRes )
     {
         status = E_UNEXPECTED;
         goto _CLEANUP;
     }
 
-    if ( SUCCEEDED ( status ) )
+    status = IAsyncOperation_IRandomAccessStream_GetResults( readStreamOperation, &readStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanRead( readStream, &canRead );
+    if ( !canRead )
     {
-        IBuffer_put_Length( buffer, fileSize );
+        status = E_ACCESSDENIED;
+        goto _CLEANUP;
+    }
+
+    IRandomAccessStream_get_Size( readStream, &fileSize );
+    if ( fileSize > __UINT32_MAX__ /* ~4 Gigabytes */)
+    {
+        ERR( "fileSize for stream %p exceeds the uint32 limit, which is outside the range of an IBuffer.\n", readStream );
+        status = E_BOUNDS;
+        goto _CLEANUP;
+    }
+
+    status = IRandomAccessStream_GetInputStreamAt( readStream, 0, &inputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataReaderFactory_CreateDataReader( dataReaderFactory, inputStream, &dataReader );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    // We have verified that fileSize doesn't exceed the uint32 limit.
+    status = IDataReader_LoadAsync( dataReader, (UINT32)fileSize, &loadOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( loadOperation, INFINITE );
+    if ( asyncRes )
+    {
+        status = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    status = IDataReader_ReadBuffer( dataReader, (UINT32)fileSize, &buffer );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    if ( SUCCEEDED( status ) )
+    {
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)buffer;
     }
 
 _CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( outputBuffer && FAILED(status) )
-        free( outputBuffer );
-    if ( item )
-        IStorageItem_Release( item );
-    if ( buffer && FAILED(status) )
-        IBuffer_Release( buffer );
+    if ( FAILED( status ) )
+        if ( buffer )
+            IBuffer_Release( buffer );
+    if ( readStream )
+        IRandomAccessStream_Release( readStream );
+    if ( readStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( readStreamOperation );
+    if ( loadOperation )
+        IAsyncOperation_UINT32_Release( loadOperation );
+    if ( inputStream )
+        IInputStream_Release( inputStream );
+    if ( dataReader )
+        IDataReader_Release( dataReader );
+    if ( dataReaderFactory )
+        IDataReaderFactory_Release( dataReaderFactory );
 
     return status;
 }
@@ -620,55 +696,101 @@ _CLEANUP:
 HRESULT WINAPI file_io_statics_WriteBuffer( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {
     HRESULT status = S_OK;
-    HSTRING filePath;
-    UINT32 bufferLength;
-    BYTE *contents;
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    DWORD bytesWritten;    
-    
-    IBufferByteAccess *bufferByteAccess = NULL;
-    IStorageItem *item = NULL;
+    BOOLEAN canWrite;
+    UINT32 bytesWritten;
+    UINT32 bufferLen;
+    DWORD asyncRes;
+
+    IAsyncOperation_IRandomAccessStream *writeStreamOperation = NULL;
+    IAsyncOperation_boolean *flushOperation = NULL;
+    IAsyncOperation_UINT32 *storeOperation = NULL;
+    IRandomAccessStream *writeStream = NULL;
+    IDataWriterFactory *dataWriterFactory = NULL;
+    IOutputStream *outputStream = NULL;
+    IDataWriter *dataWriter = NULL;
 
     struct file_io_write_buffer_options *write_buffer_options = (struct file_io_write_buffer_options *)param;
 
-    //Parameters
-    IStorageFile_QueryInterface( write_buffer_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataWriter, dataWriterFactory, IID_IDataWriterFactory );
 
     TRACE( "iface %p, value %p\n", invoker, result );
 
-    IBuffer_QueryInterface( write_buffer_options->buffer, &IID_IBufferByteAccess, (void **)&bufferByteAccess );
-    IBufferByteAccess_Buffer( bufferByteAccess, &contents );
+    status = IStorageFile_OpenAsync( write_buffer_options->file, FileAccessMode_ReadWrite, &writeStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
-    //Clear the file
-    if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( writeStreamOperation, INFINITE );
+    if ( asyncRes )
     {
         status = E_UNEXPECTED;
         goto _CLEANUP;
     }
 
-    if ( !SetEndOfFile( fileHandle ) ) 
+    status = IAsyncOperation_IRandomAccessStream_GetResults( writeStreamOperation, &writeStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanWrite( writeStream, &canWrite );
+    if ( !canWrite )
     {
-        status = HRESULT_FROM_WIN32( GetLastError() );
+        status = E_ACCESSDENIED;
         goto _CLEANUP;
     }
 
-    IBuffer_get_Length( write_buffer_options->buffer, &bufferLength );
+    // Clear out the file
+    status = IRandomAccessStream_put_Size( writeStream, 0 );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    if ( !WriteFile( fileHandle, (LPCVOID)contents, bufferLength, &bytesWritten, NULL ) )
+    status = IRandomAccessStream_GetOutputStreamAt( writeStream, 0, &outputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriterFactory_CreateDataWriter( dataWriterFactory, outputStream, &dataWriter );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_WriteBuffer( dataWriter, write_buffer_options->buffer );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_StoreAsync( dataWriter, &storeOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( storeOperation, INFINITE );
+    if ( asyncRes )
     {
-        status = HRESULT_FROM_WIN32( GetLastError() );
+        status = E_UNEXPECTED;
         goto _CLEANUP;
     }
+
+    status = IAsyncOperation_UINT32_GetResults( storeOperation, &bytesWritten );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IBuffer_get_Length( write_buffer_options->buffer, &bufferLen );
+
+    if ( bytesWritten != bufferLen )
+    {
+        status = E_FAIL;
+        goto _CLEANUP;
+    }
+
+    status = IDataWriter_FlushAsync( dataWriter, &flushOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_boolean( flushOperation, INFINITE );
+    if ( asyncRes ) status = E_UNEXPECTED;
 
 _CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( item )
-        IStorageItem_Release( item );
-    if ( bufferByteAccess )
-        IBufferByteAccess_Release( bufferByteAccess );
+    if ( writeStream )
+        IRandomAccessStream_Release( writeStream );
+    if ( writeStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( writeStreamOperation );
+    if ( storeOperation )
+        IAsyncOperation_UINT32_Release( storeOperation );
+    if ( flushOperation )
+        IAsyncOperation_boolean_Release( flushOperation );
+    if ( outputStream )
+        IOutputStream_Release( outputStream );
+    if ( dataWriter )
+        IDataWriter_Release( dataWriter );
+    if ( dataWriterFactory )
+        IDataWriterFactory_Release( dataWriterFactory );
+    free( write_buffer_options );
 
     return status;
 }
@@ -676,48 +798,98 @@ _CLEANUP:
 HRESULT WINAPI file_io_statics_WriteBytes( IUnknown *invoker, IUnknown *param, PROPVARIANT *result )
 {    
     HRESULT status = S_OK;
-    HSTRING filePath;    
-    HANDLE fileHandle = INVALID_HANDLE_VALUE;
-    DWORD bytesWritten;
-    BYTE *contents;
-    
-    IStorageItem *item = NULL;
+    BOOLEAN canWrite;
+    UINT32 bytesWritten;
+    DWORD asyncRes;
+
+    IAsyncOperation_IRandomAccessStream *writeStreamOperation = NULL;
+    IAsyncOperation_boolean *flushOperation = NULL;
+    IAsyncOperation_UINT32 *storeOperation = NULL;
+    IRandomAccessStream *writeStream = NULL;
+    IDataWriterFactory *dataWriterFactory = NULL;
+    IOutputStream *outputStream = NULL;
+    IDataWriter *dataWriter = NULL;
 
     struct file_io_write_bytes_options *write_bytes_options = (struct file_io_write_bytes_options *)param;
 
-    //Parameters
-    IStorageFile_QueryInterface( write_bytes_options->file, &IID_IStorageItem, (void **)&item );
-    IStorageItem_get_Path( item, &filePath );
-    
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_Streams_DataWriter, dataWriterFactory, IID_IDataWriterFactory );
+
     TRACE( "iface %p, value %p\n", invoker, result );
 
-    contents = write_bytes_options->buffer;
+    status = IStorageFile_OpenAsync( write_bytes_options->file, FileAccessMode_ReadWrite, &writeStreamOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
 
-    fileHandle = CreateFileW( WindowsGetStringRawBuffer( filePath, NULL ), GENERIC_WRITE, 0 , NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );    
-    //Clear the file
-    if ( SetFilePointer( fileHandle, 0, NULL, FILE_BEGIN ) == INVALID_SET_FILE_POINTER )
+    asyncRes = await_IAsyncOperation_IRandomAccessStream( writeStreamOperation, INFINITE );
+    if ( asyncRes )
     {
         status = E_UNEXPECTED;
         goto _CLEANUP;
     }
 
-    if ( !SetEndOfFile( fileHandle ) ) 
+    status = IAsyncOperation_IRandomAccessStream_GetResults( writeStreamOperation, &writeStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    IRandomAccessStream_get_CanWrite( writeStream, &canWrite );
+    if ( !canWrite )
     {
-        status = HRESULT_FROM_WIN32( GetLastError() );
+        status = E_ACCESSDENIED;
         goto _CLEANUP;
     }
 
-    if ( !WriteFile( fileHandle, (LPCVOID)contents, write_bytes_options->bufferSize, &bytesWritten, NULL ) )
+    // Clear out the file
+    status = IRandomAccessStream_put_Size( writeStream, 0 );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IRandomAccessStream_GetOutputStreamAt( writeStream, 0, &outputStream );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriterFactory_CreateDataWriter( dataWriterFactory, outputStream, &dataWriter );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_WriteBytes( dataWriter, write_bytes_options->bufferSize, write_bytes_options->buffer );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    status = IDataWriter_StoreAsync( dataWriter, &storeOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_UINT32( storeOperation, INFINITE );
+    if ( asyncRes )
     {
-        status = HRESULT_FROM_WIN32( GetLastError() );
+        status = E_UNEXPECTED;
         goto _CLEANUP;
     }
+
+    status = IAsyncOperation_UINT32_GetResults( storeOperation, &bytesWritten );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    if ( bytesWritten != write_bytes_options->bufferSize )
+    {
+        status = E_FAIL;
+        goto _CLEANUP;
+    }
+
+    status = IDataWriter_FlushAsync( dataWriter, &flushOperation );
+    if ( FAILED( status ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_boolean( flushOperation, INFINITE );
+    if ( asyncRes ) status = E_UNEXPECTED;
 
 _CLEANUP:
-    if ( fileHandle != INVALID_HANDLE_VALUE )
-        CloseHandle( fileHandle );
-    if ( item )
-        IStorageItem_Release( item );
+    if ( writeStream )
+        IRandomAccessStream_Release( writeStream );
+    if ( writeStreamOperation )
+        IAsyncOperation_IRandomAccessStream_Release( writeStreamOperation );
+    if ( storeOperation )
+        IAsyncOperation_UINT32_Release( storeOperation );
+    if ( flushOperation )
+        IAsyncOperation_boolean_Release( flushOperation );
+    if ( outputStream )
+        IOutputStream_Release( outputStream );
+    if ( dataWriter )
+        IDataWriter_Release( dataWriter );
+    if ( dataWriterFactory )
+        IDataWriterFactory_Release( dataWriterFactory );
+    free( write_bytes_options );
 
     return status;
 }
