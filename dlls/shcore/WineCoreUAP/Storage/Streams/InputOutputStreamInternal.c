@@ -70,13 +70,13 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
 
     IBufferByteAccess_Buffer( bufferByteAccess, &buffer );
 
-    while ( totalBytesRead < streamSize )
+    while ( totalBytesRead < options->count )
     {
         //IStream_Read is supposed to break after "tmpBuffer" reaches null,
         //but apparently this isn't implemented in wine.
-        if ( (streamSize - totalBytesRead) < BUFFER_SIZE )
+        if ( (options->count - totalBytesRead) < BUFFER_SIZE )
         {
-            status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, streamSize - totalBytesRead, &bytesRead );
+            status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, options->count - totalBytesRead, &bytesRead );
             if ( FAILED( status ) ) return status;
         } else {
             status = IStream_Read( stream->stream, (LPVOID)tmpBuffer, BUFFER_SIZE, &bytesRead );
@@ -84,9 +84,8 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
         }
 
         if ( bytesRead == 0 ) break;
-
+        
         memcpy( buffer + totalBytesRead, tmpBuffer, bytesRead );
-
         totalBytesRead += bytesRead;
 
         //Progress handlers are optional.
@@ -109,6 +108,10 @@ HRESULT WINAPI input_stream_Read( IUnknown *invoker, IUnknown *param, PROPVARIAN
         result->vt = VT_UNKNOWN;
         result->punkVal = (IUnknown *)options->buffer;
     }
+
+    free( options );
+
+    IBufferByteAccess_Release( bufferByteAccess );
 
     return status;
 }
