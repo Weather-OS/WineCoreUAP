@@ -104,7 +104,7 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    ERROR( "iface %p, instance %p this class cannot be activated.\n", iface, instance );
+    ERR( "iface %p, instance %p this class cannot be activated.\n", iface, instance );
     return E_NOTIMPL;
 }
 
