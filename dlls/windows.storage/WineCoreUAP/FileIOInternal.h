@@ -66,6 +66,7 @@ struct file_io_write_bytes_options
     UINT32 bufferSize;
 };
 
+HRESULT WINAPI Unpack_IIterable_HSTRING( IN IIterable_HSTRING *iter, OUT HSTRING *out );
 
 HRESULT WINAPI file_io_statics_ReadText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );
 HRESULT WINAPI file_io_statics_WriteText( IUnknown *invoker, IUnknown *param, PROPVARIANT *result );

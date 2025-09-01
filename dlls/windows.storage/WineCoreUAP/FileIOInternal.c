@@ -28,6 +28,85 @@ DEFINE_ASYNC_COMPLETED_HANDLER( async_uint32_handler, IAsyncOperationCompletedHa
 DEFINE_ASYNC_COMPLETED_HANDLER( async_boolean_handler, IAsyncOperationCompletedHandler_boolean, IAsyncOperation_boolean )
 DEFINE_ASYNC_COMPLETED_HANDLER( async_hstring_handler, IAsyncOperationCompletedHandler_HSTRING, IAsyncOperation_HSTRING )
 
+HRESULT WINAPI
+Unpack_IIterable_HSTRING(
+    IN IIterable_HSTRING *iter,
+    OUT HSTRING *out
+) {
+    HRESULT hr;
+    HSTRING *strings = NULL;
+    BOOLEAN strExists;
+    LPWSTR combinedString = NULL;
+    UINT32 vectorSize = 0;
+    UINT32 totalSize = 0;
+    UINT32 i;
+
+    IIterator_HSTRING *hstringIterator;
+
+    TRACE( "iter %p, out %p\n", iter, out );
+
+    if ( !iter || !out ) return E_INVALIDARG;
+
+    hr = IIterable_HSTRING_First( iter, &hstringIterator );
+    if ( FAILED( hr ) )
+        return hr;
+
+    IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
+    while ( strExists )
+    {
+        vectorSize++;
+        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
+    }
+
+    IIterator_HSTRING_Release( hstringIterator );
+
+    if ( vectorSize == 0 )
+        return E_INVALIDARG;
+
+    strings = (HSTRING *)CoTaskMemAlloc( vectorSize * sizeof( HSTRING ) );
+    if ( !strings ) return E_OUTOFMEMORY;
+
+    hr = IIterable_HSTRING_First( iter, &hstringIterator );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
+        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
+
+        totalSize += WindowsGetStringLen( strings[i] ) + 1; /* +1 for newline */
+    }
+
+    combinedString = (LPWSTR)CoTaskMemAlloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
+    if ( !combinedString )
+    {
+        hr = E_OUTOFMEMORY;
+        goto _CLEANUP;
+    }
+    combinedString[0] = L'\0';
+
+    for ( i = 0; i < vectorSize; i++ )
+    {
+        wcscat( combinedString, WindowsGetStringRawBuffer( strings[i], NULL ) );
+        wcscat( combinedString, L"\n" );
+    }
+
+    if ( wcslen( combinedString ) > 0 )
+        combinedString[ wcslen( combinedString ) - 1 ] = L'\0';
+
+    if ( combinedString )
+        hr = WindowsCreateString( combinedString, wcslen( combinedString ), out );
+
+_CLEANUP:
+    if ( hstringIterator )
+        IIterator_HSTRING_Release( hstringIterator );
+    CoTaskMemFree( combinedString );
+    for ( i = 0; i < vectorSize; i++ )
+        WindowsDeleteString( strings[i] );
+    CoTaskMemFree( strings );
+    return hr;
+}
+
 static HRESULT WINAPI
 AutoDetectEncoding(
     IN IStorageFile *file,

@@ -23,668 +23,635 @@
 
 _ENABLE_DEBUGGING_
 
+DEFINE_ASYNC_COMPLETED_HANDLER( async_storage_file_handler, IAsyncOperationCompletedHandler_StorageFile, IAsyncOperation_StorageFile )
+
 // Path Input Output Operations
 
-static struct path_io_statics *impl_from_IActivationFactory( IActivationFactory *iface )
-{
-    return CONTAINING_RECORD( iface, struct path_io_statics, IActivationFactory_iface );
-}
-
-static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
-{
-
-    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
-
-    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
-
-    if (IsEqualGUID( iid, &IID_IUnknown ) ||
-        IsEqualGUID( iid, &IID_IInspectable ) ||
-        IsEqualGUID( iid, &IID_IAgileObject ) ||
-        IsEqualGUID( iid, &IID_IActivationFactory ))
-    {
-        *out = &impl->IActivationFactory_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    if (IsEqualGUID( iid, &IID_IPathIOStatics ))
-    {
-        *out = &impl->IPathIOStatics_iface;
-        IInspectable_AddRef( *out );
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( iid ) );
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
-{
-    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
-    ULONG ref = InterlockedIncrement( &impl->ref );
-    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static ULONG WINAPI factory_Release( IActivationFactory *iface )
-{
-    struct path_io_statics *impl = impl_from_IActivationFactory( iface );
-    ULONG ref = InterlockedDecrement( &impl->ref );
-    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
-    return ref;
-}
-
-static HRESULT WINAPI factory_GetIids( IActivationFactory *iface, ULONG *iid_count, IID **iids )
-{
-    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_GetRuntimeClassName( IActivationFactory *iface, HSTRING *class_name )
-{
-    FIXME( "iface %p, class_name %p stub!\n", iface, class_name );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLevel *trust_level )
-{
-    FIXME( "iface %p, trust_level %p stub!\n", iface, trust_level );
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
-{
-    FIXME( "iface %p, instance %p stub!\n", iface, instance );
-    return E_NOTIMPL;
-}
-
-static const struct IActivationFactoryVtbl factory_vtbl =
-{
-    factory_QueryInterface,
-    factory_AddRef,
-    factory_Release,
-    /* IInspectable methods */
-    factory_GetIids,
-    factory_GetRuntimeClassName,
-    factory_GetTrustLevel,
-    /* IActivationFactory methods */
-    factory_ActivateInstance,
-};
+DEFINE_IACTIVATIONFACTORY( struct path_io_statics, IPathIOStatics_iface, IID_IPathIOStatics )
 
 DEFINE_IINSPECTABLE( path_io_statics, IPathIOStatics, struct path_io_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI path_io_statics_ReadTextAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_HSTRING **textOperation )
-{
+static HRESULT WINAPI 
+ObtainStorageFileFromPath( 
+    IN HSTRING absolutePath, 
+    OUT IStorageFile **targetFile 
+) {
     HRESULT hr;
-    struct path_io_read_text_options *read_text_options;
+    DWORD asyncRes;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IAsyncOperation_StorageFile *storageFileOperation = NULL;
+    IStorageFileStatics *storageFileStatics = NULL; 
+
+    TRACE( "absolutePath %s, targetFile %p\n", debugstr_hstring( absolutePath ), targetFile );
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_StorageFile, storageFileStatics, IID_IStorageFileStatics );
+
+    hr = IStorageFileStatics_GetFileFromPathAsync( storageFileStatics, absolutePath, &storageFileOperation );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    asyncRes = await_IAsyncOperation_StorageFile( storageFileOperation, INFINITE );
+    if ( asyncRes )
+    {
+        hr = E_UNEXPECTED;
+        goto _CLEANUP;
+    }
+
+    hr = IAsyncOperation_StorageFile_GetResults( storageFileOperation, targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+_CLEANUP:
+    if ( storageFileStatics )
+        IStorageFileStatics_Release( storageFileStatics );
+    if ( storageFileOperation )
+        IAsyncOperation_StorageFile_Release( storageFileOperation );
+
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncOperation<HSTRING> IPathIOStatics::ReadTextAsync
+ *      Description: Reads text from an IStorageFile*, obtained from the given path then returns 
+ *      all the contents of the file within a packed HSTRING.
+ */
+static HRESULT WINAPI 
+path_io_statics_ReadTextAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IAsyncOperation_HSTRING **textOperation 
+) {
+    HRESULT hr;
+
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, operation %p\n", iface, debugstr_hstring( absolutePath ), textOperation );
 
     //Arguments
     if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    read_text_options->encoding = UnicodeEncoding_Utf8;
-    read_text_options->absolutePath = absolutePath;
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
-    
-    free( read_text_options );
+    hr = IFileIOStatics_ReadTextAsync( fileIOStatics, targetFile, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_ReadTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, UnicodeEncoding encoding, IAsyncOperation_HSTRING **textOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<HSTRING> IPathIOStatics::ReadTextWithEncodingAsync
+ *      Description: Reads text from an IStorageFile*, obtained from the given path then returns 
+ *      all the contents of the file within a packed HSTRING with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_ReadTextWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    UnicodeEncoding encoding, 
+    IAsyncOperation_HSTRING **textOperation 
+) {
     HRESULT hr;
-    struct path_io_read_text_options *read_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, encoding %d, operation %p\n", iface, debugstr_hstring( absolutePath ), encoding, textOperation );
 
     //Arguments
     if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    read_text_options->encoding = encoding;
-    read_text_options->absolutePath = absolutePath;
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    hr = async_operation_hstring_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadText, textOperation );
-    
-    free( read_text_options );
+    hr = IFileIOStatics_ReadTextWithEncodingAsync( fileIOStatics, targetFile, encoding, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_WriteTextAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteTextAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path
+ *      with the given packed HSTRING.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteTextAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    HSTRING contents, 
+    IAsyncAction **textOperation 
+) {
     HRESULT hr;
-    struct path_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, contents %p, operation %p\n", iface, debugstr_hstring( absolutePath ), &contents, textOperation );
 
     //Arguments
-    if ( !absolutePath || !contents ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->absolutePath = absolutePath;
-    write_text_options->contents = contents;
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
-    
-    free( write_text_options );
+    hr = IFileIOStatics_WriteTextAsync( fileIOStatics, targetFile, contents, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_WriteTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteTextWithEncodingAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path
+ *      with the given packed HSTRING with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteTextWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    HSTRING contents, 
+    UnicodeEncoding encoding, 
+    IAsyncAction **textOperation 
+) {
     HRESULT hr;
-    struct path_io_write_text_options *write_text_options;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, contents %p, encoding %d, operation %p\n", iface, debugstr_hstring( absolutePath ), &contents, encoding, textOperation );
 
     //Arguments
-    if ( !absolutePath || !contents ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    write_text_options->encoding = encoding;
-    write_text_options->absolutePath = absolutePath;
-    write_text_options->contents = contents;
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, textOperation );
-    
-    free( write_text_options );
+    hr = IFileIOStatics_WriteTextWithEncodingAsync( fileIOStatics, targetFile, contents, encoding, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_AppendTextAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::AppendTextAsync
+ *      Description: Appends a packed HSTRING to the contents of an IStorageFile*, obtained
+ *      from the given path.
+ */
+static HRESULT WINAPI 
+path_io_statics_AppendTextAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    HSTRING contents, 
+    IAsyncAction **textOperation 
+) {
     HRESULT hr;
-    struct path_io_write_text_options *write_text_options;
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, contents %p, operation %p\n", iface, debugstr_hstring( absolutePath ), &contents, textOperation );
 
     //Arguments
-    if ( !absolutePath || !contents ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->absolutePath = absolutePath;
-    write_text_options->contents = contents;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
-    
-    free( write_text_options );
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_AppendTextAsync( fileIOStatics, targetFile, contents, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_AppendTextWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, HSTRING contents, UnicodeEncoding encoding, IAsyncAction **textOperation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::AppendTextAsync
+ *      Description: Appends a packed HSTRING to the contents of an IStorageFile*, obtained
+ *      from the given path, with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_AppendTextWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    HSTRING contents, 
+    UnicodeEncoding encoding, 
+    IAsyncAction **textOperation 
+) {
     HRESULT hr;
-    struct path_io_write_text_options *write_text_options;
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
 
-    TRACE( "iface %p, operation %p\n", iface, textOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, contents %p, encoding %d, operation %p\n", iface, debugstr_hstring( absolutePath ), &contents, encoding, textOperation );
 
     //Arguments
-    if ( !absolutePath || !contents ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !textOperation ) return E_POINTER;
 
-    write_text_options->encoding = encoding;
-    write_text_options->absolutePath = absolutePath;
-    write_text_options->contents = contents;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, textOperation );
-    
-    free( write_text_options );
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_AppendTextWithEncodingAsync( fileIOStatics, targetFile, contents, encoding, textOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_ReadLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IVector_HSTRING **linesOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<IVector <HSTRING>*> IPathIOStatics::ReadLinesAsync
+ *      Description: Reads the contents of an IStorageFile*, obtained from the given path, 
+ *      line by line and appends it to an HSTRING Vector.
+ */
+static HRESULT WINAPI 
+path_io_statics_ReadLinesAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IAsyncOperation_IVector_HSTRING **linesOperation 
+) {
     HRESULT hr;
-    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
-    struct path_io_read_text_options *read_text_options;
-    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
-    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, operation %p\n", iface, debugstr_hstring( absolutePath ), linesOperation );
 
     //Arguments
     if ( !absolutePath ) return E_INVALIDARG;
     if ( !linesOperation ) return E_POINTER;
 
-    read_text_options->encoding = UnicodeEncoding_Utf8;
-    read_text_options->absolutePath = absolutePath;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
-    
-    free( read_text_options );
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_ReadLinesAsync( fileIOStatics, targetFile, linesOperation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_ReadLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, UnicodeEncoding encoding, IAsyncOperation_IVector_HSTRING **linesOperation )
-{
+/***********************************************************************
+ *      IAsyncOperation<IVector <HSTRING>*> IPathIOStatics::ReadLinesAsync
+ *      Description: Reads the contents of an IStorageFile*, obtained from the given path,
+ *      line by line and appends it to an HSTRING Vector with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_ReadLinesWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    UnicodeEncoding encoding, 
+    IAsyncOperation_IVector_HSTRING **linesOperation 
+) {
     HRESULT hr;
-    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IVector_HSTRING };
-    struct path_io_read_text_options *read_text_options;
-    if (!(read_text_options = calloc( 1, sizeof(*read_text_options) ))) return E_OUTOFMEMORY;
 
-    TRACE( "iface %p, operation %p\n", iface, linesOperation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, encoding %d, operation %p\n", iface, debugstr_hstring( absolutePath ), encoding, linesOperation );
 
     //Arguments
     if ( !absolutePath ) return E_INVALIDARG;
     if ( !linesOperation ) return E_POINTER;
 
-    read_text_options->encoding = encoding;
-    read_text_options->absolutePath = absolutePath;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)read_text_options, path_io_statics_ReadLines, iids, (IAsyncOperation_IInspectable **)linesOperation );
-    
-    free( read_text_options );
-    return hr;
-}
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-static HRESULT WINAPI path_io_statics_WriteLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
-    HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-    
-    IIterator_HSTRING *hstringIterator;
+    hr = IFileIOStatics_ReadLinesWithEncodingAsync( fileIOStatics, targetFile, encoding, linesOperation );
 
-    struct path_io_write_text_options *write_text_options;
-
-    TRACE( "iface %p, operation %p\n", iface, operation );
-
-    //Arguments
-    if ( !absolutePath || !lines ) return E_INVALIDARG;
-    if ( !operation ) return E_POINTER;
-
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
-
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
-    {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
-        free( write_text_options );
-        return hr;
-    }
-
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
-    write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->absolutePath = absolutePath;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
-
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        if ( strings[i] != NULL )
-        {
-            WindowsDeleteString( strings[i] );
-        }
-    }
-    free( strings );
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
 
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_WriteLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
-    HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-    IIterator_HSTRING *hstringIterator;
-
-    struct path_io_write_text_options *write_text_options;
-
-    TRACE( "iface %p, operation %p\n", iface, operation );
-
-    //Arguments
-    if ( !absolutePath || !lines ) return E_INVALIDARG;
-    if ( !operation ) return E_POINTER;
-
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
-
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
-    {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
-        free( write_text_options );
-        return hr;
-    }
-
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
-    write_text_options->encoding = encoding;
-    write_text_options->absolutePath = absolutePath;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
-
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_WriteText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        if ( strings[i] != NULL )
-        {
-            WindowsDeleteString( strings[i] );
-        }
-    }
-    free( strings );
-    
-    return hr;
-}
-
-static HRESULT WINAPI path_io_statics_AppendLinesAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
-    HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-    IIterator_HSTRING *hstringIterator;
-
-    struct path_io_write_text_options *write_text_options;
-
-    TRACE( "iface %p, operation %p\n", iface, operation );
-
-    //Arguments
-    if ( !absolutePath || !lines ) return E_INVALIDARG;
-    if ( !operation ) return E_POINTER;
-
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
-
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
-    {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
-        free( write_text_options );
-        return hr;
-    }
-
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
-    write_text_options->encoding = UnicodeEncoding_Utf8;
-    write_text_options->absolutePath = absolutePath;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
-
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        if ( strings[i] != NULL )
-        {
-            WindowsDeleteString( strings[i] );
-        }
-    }
-    free( strings );
-
-    return hr;
-}
-
-static HRESULT WINAPI path_io_statics_AppendLinesWithEncodingAsync( IPathIOStatics *iface, HSTRING absolutePath, IIterable_HSTRING *lines, UnicodeEncoding encoding, IAsyncAction **operation )
-{
-    //Convert IIterable_HSTRING to HSTRING
-    HRESULT hr;
-    HSTRING *strings;
-    LPWSTR combinedString = NULL;
-    LPWSTR tmpStr;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-    boolean strExists;
-    IIterator_HSTRING *hstringIterator;
-
-    struct path_io_write_text_options *write_text_options;
-
-    TRACE( "iface %p, operation %p\n", iface, operation );
-
-    //Arguments
-    if ( !absolutePath || !lines ) return E_INVALIDARG;
-    if ( !operation ) return E_POINTER;
-
-    if (!(write_text_options = calloc( 1, sizeof(*write_text_options) ))) return E_OUTOFMEMORY;
-
-    hr = IIterable_HSTRING_First( lines, &hstringIterator );
-    if ( SUCCEEDED( hr ) )
-    {
-        IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-        while ( strExists )
-        {
-            vectorSize++;
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-        }
-
-        strings = (HSTRING *)malloc( vectorSize * sizeof( HSTRING ) );
-        IIterable_HSTRING_First( lines, &hstringIterator );
-        
-        for ( i = 0; i < vectorSize; i++ )
-        {
-            IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-            IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-            totalSize += WindowsGetStringLen( strings[i] ) + 1; 
-            combinedString = (LPWSTR)malloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-            combinedString[0] = L'\0';
-            tmpStr = (LPWSTR)malloc( ( WindowsGetStringLen( strings[i] ) + 1 ) * sizeof( WCHAR ) );
-
-            wcscpy( tmpStr, WindowsGetStringRawBuffer( strings[i], NULL ) );
-            wcscat( tmpStr, L"\n" );
-            wcscat( combinedString, tmpStr );
-            
-            free( tmpStr );
-        }
-    } else {
-        free( write_text_options );
-        return hr;
-    }
-
-    //Remove trailing nextspace
-    combinedString[ wcslen(combinedString) - 1 ] = L'\0'; 
-
-    write_text_options->encoding = encoding;
-    write_text_options->absolutePath = absolutePath;
-    if ( combinedString )
-        WindowsCreateString( combinedString, wcslen( combinedString ), &write_text_options->contents );
-
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_text_options, path_io_statics_AppendText, operation );
-
-    free( write_text_options );
-    if ( combinedString ) 
-        free( combinedString );
-    IIterator_HSTRING_Release( hstringIterator );
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        if ( strings[i] != NULL )
-        {
-            WindowsDeleteString( strings[i] );
-        }
-    }
-    free( strings );
-
-    return hr;
-}
-
-static HRESULT WINAPI path_io_statics_ReadBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IAsyncOperation_IBuffer **operation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteLinesAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path
+ *      with the given HSTRING vector.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteLinesAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IIterable_HSTRING *lines, 
+    IAsyncAction **operation 
+) {
     HRESULT hr;
 
-    struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_IBuffer };
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    TRACE( "iface %p, absolutePath %s, lines %p, operation %p\n", iface, debugstr_hstring( absolutePath ), lines, operation );
 
     //Arguments
     if ( !absolutePath ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
-    hr = async_operation_create( (IUnknown *)iface, (IUnknown *)absolutePath, path_io_statics_ReadBuffer, iids, (IAsyncOperation_IInspectable **)operation );
-    TRACE( "created IAsyncOperation_IBuffer %p.\n", *operation );
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
+
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_WriteLinesAsync( fileIOStatics, targetFile, lines, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
 
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_WriteBufferAsync( IPathIOStatics *iface, HSTRING absolutePath, IBuffer* buffer, IAsyncAction **operation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteLinesWithEncodingAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path
+ *      with the given HSTRING vector with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteLinesWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IIterable_HSTRING *lines, 
+    UnicodeEncoding encoding, 
+    IAsyncAction **operation 
+) {
     HRESULT hr;
-    struct path_io_write_buffer_options *write_buffer_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, lines %p, operation %p\n", iface, debugstr_hstring( absolutePath ), lines, operation );
 
     //Arguments
-    if ( !absolutePath || !buffer ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
-    if (!(write_buffer_options = calloc( 1, sizeof(*write_buffer_options) ))) return E_OUTOFMEMORY;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    write_buffer_options->buffer = buffer;
-    write_buffer_options->absolutePath = absolutePath;
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_buffer_options, path_io_statics_WriteBuffer, operation );
+    hr = IFileIOStatics_WriteLinesWithEncodingAsync( fileIOStatics, targetFile, lines, encoding, operation );
 
-    free( write_buffer_options );
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 
-static HRESULT WINAPI path_io_statics_WriteBytesAsync( IPathIOStatics *iface, HSTRING absolutePath, UINT32 __bufferSize, BYTE *buffer, IAsyncAction **operation )
-{
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::AppendLinesAsync
+ *      Description: Appends an HSTRING vector to the contents of an IStorageFile*,
+ *      obtained from the given path.
+ */
+static HRESULT WINAPI 
+path_io_statics_AppendLinesAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IIterable_HSTRING *lines, 
+    IAsyncAction **operation 
+) {
     HRESULT hr;
-    struct path_io_write_bytes_options *write_bytes_options;
 
-    TRACE( "iface %p, operation %p\n", iface, operation );
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
 
-    if (!(write_bytes_options = calloc( 1, sizeof(*write_bytes_options) ))) return E_OUTOFMEMORY;
+    TRACE( "iface %p, absolutePath %s, lines %p, operation %p\n", iface, debugstr_hstring( absolutePath ), lines, operation );
 
     //Arguments
-    if ( !absolutePath || !buffer ) return E_INVALIDARG;
+    if ( !absolutePath ) return E_INVALIDARG;
     if ( !operation ) return E_POINTER;
 
-    write_bytes_options->buffer = buffer;
-    write_bytes_options->absolutePath = absolutePath;
-    write_bytes_options->bufferSize = __bufferSize;
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
 
-    hr = async_action_create( (IUnknown *)iface, (IUnknown *)write_bytes_options, path_io_statics_WriteBytes, operation );
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
-    free( write_bytes_options );
+    hr = IFileIOStatics_AppendLinesAsync( fileIOStatics, targetFile, lines, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::AppendLinesWithEncodingAsync
+ *      Description: Appends an HSTRING vector to the contents of an IStorageFile*,
+ *      obtained from the given path, with the specified encoding.
+ */
+static HRESULT WINAPI 
+path_io_statics_AppendLinesWithEncodingAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IIterable_HSTRING *lines, 
+    UnicodeEncoding encoding, 
+    IAsyncAction **operation 
+) {
+    HRESULT hr;
+
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, lines %p, encoding %d, operation %p\n", iface, debugstr_hstring( absolutePath ), lines, encoding, operation );
+
+    //Arguments
+    if ( !absolutePath ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
+
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_AppendLinesWithEncodingAsync( fileIOStatics, targetFile, lines, encoding, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncOperation<IBuffer *> IPathIOStatics::ReadBufferAsync
+ *      Description: Reads the contents of an IStorageFile*, obtained from the given path, 
+ *      and appends it to an IBuffer.
+ */
+static HRESULT WINAPI 
+path_io_statics_ReadBufferAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IAsyncOperation_IBuffer **operation 
+) {
+    HRESULT hr;
+
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, operation %p\n", iface, debugstr_hstring( absolutePath ), operation );
+
+    //Arguments
+    if ( !absolutePath ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
+
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_ReadBufferAsync( fileIOStatics, targetFile, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteBufferAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path,
+ *      with the given IBuffer.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteBufferAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    IBuffer* buffer, 
+    IAsyncAction **operation 
+) {
+    HRESULT hr;
+
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, buffer %p, operation %p\n", iface, debugstr_hstring( absolutePath ), buffer, operation );
+
+    //Arguments
+    if ( !absolutePath ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
+
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_WriteBufferAsync( fileIOStatics, targetFile, buffer, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
+    return hr;
+}
+
+/***********************************************************************
+ *      IAsyncAction IPathIOStatics::WriteBytesAsync
+ *      Description: Overwrites the contents of an IStorageFile*, obtained from the given path,
+ *      with the given byte buffer.
+ */
+static HRESULT WINAPI 
+path_io_statics_WriteBytesAsync( 
+    IPathIOStatics *iface, 
+    HSTRING absolutePath, 
+    UINT32 __bufferSize, 
+    BYTE *buffer, 
+    IAsyncAction **operation 
+) {
+    HRESULT hr;
+
+    IFileIOStatics *fileIOStatics = NULL;
+    IStorageFile *targetFile = NULL;
+
+    TRACE( "iface %p, absolutePath %s, __bufferSize %d, buffer %p, operation %p\n", iface, debugstr_hstring( absolutePath ), __bufferSize, &buffer, operation );
+
+    //Arguments
+    if ( !absolutePath ) return E_INVALIDARG;
+    if ( !operation ) return E_POINTER;
+
+    ACTIVATE_INSTANCE( RuntimeClass_Windows_Storage_FileIO, fileIOStatics, IID_IFileIOStatics );
+
+    hr = ObtainStorageFileFromPath( absolutePath, &targetFile );
+    if ( FAILED( hr ) ) goto _CLEANUP;
+
+    hr = IFileIOStatics_WriteBytesAsync( fileIOStatics, targetFile, __bufferSize, buffer, operation );
+
+_CLEANUP:
+    if ( fileIOStatics )
+        IFileIOStatics_Release( fileIOStatics );
+    if ( targetFile )
+        IStorageFile_Release( targetFile );
+
     return hr;
 }
 

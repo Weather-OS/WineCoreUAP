@@ -29,85 +29,6 @@ DEFINE_IACTIVATIONFACTORY( struct file_io_statics, IFileIOStatics_iface, IID_IFi
 
 DEFINE_IINSPECTABLE( file_io_statics, IFileIOStatics, struct file_io_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI
-Unpack_IIterable_HSTRING(
-    IIterable_HSTRING *iter,
-    HSTRING *out
-) {
-    HRESULT hr;
-    HSTRING *strings = NULL;
-    BOOLEAN strExists;
-    LPWSTR combinedString = NULL;
-    UINT32 vectorSize = 0;
-    UINT32 totalSize = 0;
-    UINT32 i;
-
-    IIterator_HSTRING *hstringIterator;
-
-    TRACE( "iter %p, out %p\n", iter, out );
-
-    if ( !iter || !out ) return E_INVALIDARG;
-
-    hr = IIterable_HSTRING_First( iter, &hstringIterator );
-    if ( FAILED( hr ) )
-        return hr;
-
-    IIterator_HSTRING_get_HasCurrent( hstringIterator, &strExists );
-    while ( strExists )
-    {
-        vectorSize++;
-        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-    }
-
-    IIterator_HSTRING_Release( hstringIterator );
-
-    if ( vectorSize == 0 )
-        return E_INVALIDARG;
-
-    strings = (HSTRING *)CoTaskMemAlloc( vectorSize * sizeof( HSTRING ) );
-    if ( !strings ) return E_OUTOFMEMORY;
-
-    hr = IIterable_HSTRING_First( iter, &hstringIterator );
-    if ( FAILED( hr ) ) goto _CLEANUP;
-
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        IIterator_HSTRING_get_Current( hstringIterator, &strings[i] );
-        IIterator_HSTRING_MoveNext( hstringIterator, &strExists );
-
-        totalSize += WindowsGetStringLen( strings[i] ) + 1; /* +1 for newline */
-    }
-
-    combinedString = (LPWSTR)CoTaskMemAlloc( ( totalSize + 1 ) * sizeof( WCHAR ) );
-    if ( !combinedString )
-    {
-        hr = E_OUTOFMEMORY;
-        goto _CLEANUP;
-    }
-    combinedString[0] = L'\0';
-
-    for ( i = 0; i < vectorSize; i++ )
-    {
-        wcscat( combinedString, WindowsGetStringRawBuffer( strings[i], NULL ) );
-        wcscat( combinedString, L"\n" );
-    }
-
-    if ( wcslen( combinedString ) > 0 )
-        combinedString[ wcslen( combinedString ) - 1 ] = L'\0';
-
-    if ( combinedString )
-        hr = WindowsCreateString( combinedString, wcslen( combinedString ), out );
-
-_CLEANUP:
-    if ( hstringIterator )
-        IIterator_HSTRING_Release( hstringIterator );
-    CoTaskMemFree( combinedString );
-    for ( i = 0; i < vectorSize; i++ )
-        WindowsDeleteString( strings[i] );
-    CoTaskMemFree( strings );
-    return hr;
-}
-
 /***********************************************************************
  *      IAsyncOperation<HSTRING> IFileIOStatics::ReadTextAsync
  *      Description: Reads text from an IStorageFile* then returns all the contents of the file
@@ -565,7 +486,7 @@ file_io_statics_AppendLinesWithEncodingAsync(
 
 /***********************************************************************
  *      IAsyncOperation<IBuffer *> IFileIOStatics::ReadBufferAsync
- *      Description: Reads the contents of an IStoragFile* and
+ *      Description: Reads the contents of an IStorageFile* and
  *      appends it to an IBuffer.
  */
 static HRESULT WINAPI
