@@ -104,7 +104,7 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, instance );
+    ERROR( "iface %p, instance %p this class cannot be activated.\n", iface, instance );
     return E_NOTIMPL;
 }
 
@@ -216,9 +216,6 @@ static HRESULT WINAPI data_reader_put_UnicodeEncoding( IDataReader *iface, Unico
 
     TRACE( "iface %p, value %d\n", iface, value );
 
-    // Arguments
-    if ( !value ) return E_POINTER;
-
     impl->Encoding = value;
     return S_OK;
 }
@@ -242,9 +239,6 @@ static HRESULT WINAPI data_reader_put_ByteOrder( IDataReader *iface, ByteOrder v
 
     TRACE( "iface %p, value %d\n", iface, value );
 
-    // Arguments
-    if ( !value ) return E_POINTER;
-
     impl->Order = value;
     return S_OK;
 }
@@ -267,9 +261,6 @@ static HRESULT WINAPI data_reader_put_InputStreamOptions( IDataReader *iface, In
     struct data_reader *impl = impl_from_IDataReader( iface );
 
     TRACE( "iface %p, value %d\n", iface, value );
-
-    // Arguments
-    if ( !value ) return E_POINTER;
 
     impl->StreamOptions = value;
     return S_OK;
@@ -883,7 +874,7 @@ static HRESULT WINAPI data_reader_Load( IUnknown *invoker, IUnknown *param, PROP
 
     IAsyncOperationWithProgress_IBuffer_UINT32_Release( operation );
 
-    CHECK_LAST_RESTRICTED_ERROR();
+    CHECK_LAST_RESTRICTED_ERROR()
 
     impl->buffer = returnedBuffer;
     hr = IBuffer_get_Length( returnedBuffer, &impl->UnconsumedBufferLength );

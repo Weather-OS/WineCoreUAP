@@ -94,11 +94,16 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
     struct property_set *impl;
+
+    TRACE( "iface %p, instance %p\n", iface, instance );
+
     if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
     impl->IPropertySet_iface.lpVtbl = &property_set_vtbl;
     impl->map = NULL;
     impl->ref = 1;
 
+    // Object inheritence works both ways in COM. doing this is valid since
+    //  the virtual table array includes the methods in the same spots.
     *instance = (IInspectable *)&impl->IPropertySet_iface;
 
     return S_OK;

@@ -97,8 +97,30 @@ static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLev
 
 static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **instance )
 {
-    FIXME( "iface %p, instance %p stub!\n", iface, instance );
-    return E_NOTIMPL;
+    struct data_writer *impl;
+
+    TRACE( "iface %p, instance %p\n", iface, instance );
+
+    // "Activating" the DataWriter class results in a headless DataWriter instance.
+    // The client can use this as an alternate way of creating IBuffers.
+
+    // Arguments
+    if ( !instance ) return E_POINTER;
+
+    if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
+
+    impl->IDataWriter_iface.lpVtbl = &data_writer_vtbl;
+    impl->Encoding = UnicodeEncoding_Utf8;
+    impl->Order = ByteOrder_LittleEndian;
+    impl->outputStream = NULL;
+    impl->ref = 1;
+
+    // Object inheritence works both ways in COM. doing this is valid since
+    //  the virtual table array includes the methods in the same spots.
+    *instance = (IInspectable *)&writer->IDataWriter_iface;
+
+    //This buffer is dynamically reallocated 
+    return buffer_Create( 0, &writer->buffer );
 }
 
 static const struct IActivationFactoryVtbl factory_vtbl =
@@ -839,12 +861,19 @@ static HRESULT WINAPI data_writer_StoreAsync( IDataWriter *iface, IAsyncOperatio
 {
     HRESULT hr;
 
+    struct data_writer *impl = impl_from_IDataWriter( (IDataWriter *)iface );
     struct async_operation_iids iids = { .operation = &IID_IAsyncOperation_UINT32 };
 
     TRACE( "iface %p, value %p\n", iface, operation );
 
     // Arguments
     if ( !operation ) return E_POINTER;
+
+    if ( !impl->outputStream )
+    {
+        ERROR( "this DataWriter instance %p is a headless/in-memory instance and does not support store operations.\n", iface );
+        return HRESULT_FROM_WIN32( ERROR_INVALID_OPERATION );
+    }
 
     hr = async_operation_uint32_create( (IUnknown *)iface, NULL, data_writer_Store, iids, operation );
 
@@ -861,6 +890,15 @@ static HRESULT WINAPI data_writer_FlushAsync( IDataWriter *iface, IAsyncOperatio
 
     // Arguments
     if ( !operation ) return E_POINTER;
+
+    if ( !impl->outputStream )
+    {
+        ERROR( "this DataWriter instance %p is a headless/in-memory instance and cannot be flushed.\n", iface );
+        return HRESULT_FROM_WIN32( ERROR_INVALID_OPERATION );
+    }
+
+    IBuffer_Release( impl->buffer );
+    buffer_Create( 0, &impl->buffer );
     
     hr = IOutputStream_FlushAsync( impl->outputStream, operation );
 
@@ -894,7 +932,11 @@ static HRESULT WINAPI data_writer_DetachStream( IDataWriter *iface, IOutputStrea
     // Arguments
     if ( !stream ) return E_POINTER;
 
-    if ( !impl->outputStream ) return E_FAIL;
+    if ( !impl->outputStream )
+    {
+        ERROR( "this DataWriter instance %p is a headless/in-memory instance and does not contain an output stream.\n", iface );
+        return HRESULT_FROM_WIN32( ERROR_INVALID_OPERATION );
+    }
 
     *stream = impl->outputStream;
     IOutputStream_AddRef( *stream );
