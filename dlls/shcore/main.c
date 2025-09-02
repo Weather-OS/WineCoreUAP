@@ -2559,7 +2559,7 @@ HRESULT WINAPI CreateRandomAccessStreamOverStream(IStream *stream, BSOS_OPTIONS 
  */
 HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD access_mode, REFIID riid, void **ppv)
 {
-    HRESULT hr;
+    HRESULT hr = S_OK;
     HSTRING pathString;
     DWORD asyncRes;
 
@@ -2569,14 +2569,13 @@ HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD access_mode
     IRandomAccessStreamReference *fileStreamReference = NULL;
     IAsyncOperation_IRandomAccessStream *random_access_stream_operation = NULL;
 
-    WindowsCreateString( filePath, wcslen( filePath ), &pathString );
+    TRACE( "filePath %s, access_mode %ld, riid %p, ppv %p.\n", debugstr_w( filePath ), access_mode, &riid, ppv );
+
+    hr = WindowsCreateString( filePath, wcslen( filePath ), &pathString );
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
     hr = random_access_stream_reference_CreateStreamReference( pathString, access_mode, &fileStreamReference );
-    if ( FAILED( hr ) )
-    {
-        WindowsDeleteString( pathString );
-        return hr;
-    }
+    if ( FAILED( hr ) ) goto _CLEANUP;
 
     if ( IsEqualGUID( riid, &IID_IRandomAccessStreamReference ) )
     {
@@ -2586,37 +2585,30 @@ HRESULT WINAPI CreateRandomAccessStreamOnFile(PCWSTR filePath, DWORD access_mode
     else
     {
         hr = async_operation_create( (IUnknown *)fileStreamReference, NULL, random_access_stream_reference_CreateStream, iids, (IAsyncOperation_IInspectable **)&random_access_stream_operation );
-        if ( FAILED( hr ) )
-        {
-            IRandomAccessStreamReference_Release( fileStreamReference );
-            WindowsDeleteString( pathString );
-            return hr;
-        }
+        if ( FAILED( hr ) ) goto _CLEANUP;
     
         asyncRes = await_IAsyncOperation_IRandomAccessStream( random_access_stream_operation, INFINITE );
         if ( asyncRes )
         {
-            IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
-            IRandomAccessStreamReference_Release( fileStreamReference );
-            WindowsDeleteString( pathString );
-            return E_ABORT;
+            hr = E_ABORT;
+            goto _CLEANUP;
         }
     
         hr = IAsyncOperation_IRandomAccessStream_GetResults( random_access_stream_operation, &fileStream );
-        if ( FAILED( hr ) )
-        {
-            IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
-            IRandomAccessStreamReference_Release( fileStreamReference );
-            WindowsDeleteString( pathString );
-            return hr;
-        }
-    
-        IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+        if ( FAILED( hr ) ) goto _CLEANUP;
 
-        WindowsDeleteString( pathString );
-
-        return IRandomAccessStream_QueryInterface( fileStream, riid, ppv );
+        hr = IRandomAccessStream_QueryInterface( fileStream, riid, ppv );
     }
+
+_CLEANUP:
+    if ( FAILED( hr ) ) 
+        if ( fileStreamReference )
+            IRandomAccessStreamReference_Release( fileStreamReference );
+    if ( random_access_stream_operation )
+        IAsyncOperation_IRandomAccessStream_Release( random_access_stream_operation );
+    if ( fileStream )
+        IRandomAccessStream_Release( fileStream );
+    WindowsDeleteString( pathString );
 
     return hr;
 }

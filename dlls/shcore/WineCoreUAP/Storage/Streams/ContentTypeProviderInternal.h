@@ -20,7 +20,7 @@
  */
 
 #ifndef CONTENT_TYPE_PROVIDER_INTERNAL_H
-#define CONTENT_TYPE_PROVIDER_H
+#define CONTENT_TYPE_PROVIDER_INTERNAL_H
 
 #include "../../../private.h"
 #include "wine/debug.h"
