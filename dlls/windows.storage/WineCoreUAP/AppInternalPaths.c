@@ -21,25 +21,30 @@
 
 #include "AppInternalPaths.h"
 
+#include <knownfolders.h>
+
 #include <shlobj.h>
 #include <shlwapi.h>
 
 _ENABLE_DEBUGGING_
 
-HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * FOLDERID, HSTRING *value) 
-{    
-    HRESULT status = S_OK;
+HRESULT WINAPI
+app_data_paths_GetKnownFolder(
+    IAppDataPaths *iface,
+    LPCSTR FOLDERID,
+    HSTRING *value
+) {
     appxstatus regStatus;
-
-    WCHAR path[MAX_PATH] = L"C:\\users\\";
-    WCHAR username[256];
-    WCHAR manifestPath[MAX_PATH];
+    HRESULT status = S_OK;
     LPCWSTR AppName;
-    DWORD username_len = sizeof(username);
+    PWSTR path;
+    WCHAR manifestPath[MAX_PATH];
 
     struct appx_package package;
 
-    TRACE( "iface %p, folderid %s, value %p\n", iface, FOLDERID, value );
+    TRACE( "iface %p, folderid %s, value %p\n", iface, debugstr_a(FOLDERID), value );
+
+    path = (PWSTR)CoTaskMemAlloc( MAX_PATH * sizeof( WCHAR ) );
 
     GetModuleFileNameW( NULL, manifestPath, MAX_PATH );
     PathRemoveFileSpecW( manifestPath );
@@ -60,37 +65,43 @@ HRESULT WINAPI app_data_paths_GetKnownFolder(IAppDataPaths *iface, const char * 
 
     AppName = package.Package.Identity.Name;
 
-    if ( !GetUserNameW( username, &username_len ) ) {
-        status = HRESULT_FROM_WIN32( GetLastError() );
-        goto _CLEANUP;
-    }
+    SHGetKnownFolderPath( &FOLDERID_LocalAppData, 0, NULL, &path );
 
-    PathAppendW( path, username );
-    PathAppendW( path, L"AppData\\Local\\Packages" );
-    PathAppendW( path, AppName ); // Assuming AppName now holds the correct package name
+    PathAppendW( path, L"Packages" );
+    PathAppendW( path, AppName );
 
-    if ( !strcmp( FOLDERID, "cookies" ) ) {
+    if ( !strcmp( FOLDERID, "cookies" ) ) 
+    {
         PathAppendW( path, L"AC\\INetCookies" );
-    } else if ( !strcmp( FOLDERID, "desktop" ) ) {
+    } else if ( !strcmp( FOLDERID, "desktop" ) ) 
+    {
         PathAppendW( path, L"LocalState\\Desktop" );
-    } else if ( !strcmp( FOLDERID, "documents" ) ) {
+    } else if ( !strcmp( FOLDERID, "documents" ) ) 
+    {
         PathAppendW( path, L"LocalState\\Documents" );
-    } else if ( !strcmp( FOLDERID, "favorites" ) ) {
-        PathAppendW( path, L"LocalState\\favorites" );
-    } else if ( !strcmp( FOLDERID, "history" ) ) {
+    } else if ( !strcmp( FOLDERID, "favorites" ) ) 
+    {
+        PathAppendW( path, L"LocalState\\Favorites" );
+    } else if ( !strcmp( FOLDERID, "history" ) ) 
+    {
         PathAppendW( path, L"AC\\INetHistory" );
-    } else if ( !strcmp( FOLDERID, "internet_cache" ) ) {
+    } else if ( !strcmp( FOLDERID, "internet_cache" ) ) 
+    {
         PathAppendW( path, L"AC\\INetCache" );
-    } else if ( !strcmp( FOLDERID, "localappdata" ) ) {
+    } else if ( !strcmp( FOLDERID, "localappdata" ) ) 
+    {
         PathAppendW( path, L"LocalState" );
-    } else if ( !strcmp( FOLDERID, "programdata" ) ) {
+    } else if ( !strcmp( FOLDERID, "programdata" ) ) 
+    {
         PathAppendW( path, L"LocalState\\ProgramData" );
-    } else if ( !strcmp( FOLDERID, "roamingappdata") ) {
+    } else if ( !strcmp( FOLDERID, "roamingappdata") ) 
+    {
         PathAppendW( path, L"RoamingState" );
     }
 
     status = WindowsCreateString( path, wcslen( path ), value );
 
 _CLEANUP:
+    CoTaskMemFree( path );
     return status;
 }

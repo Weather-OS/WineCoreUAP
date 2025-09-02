@@ -27,6 +27,19 @@
 #include "../private.h"
 #include "wine/debug.h"
 
-HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, const char * FOLDERID, HSTRING *value );
+struct app_data_paths_statics
+{
+    IActivationFactory IActivationFactory_iface;
+    IAppDataPathsStatics IAppDataPathsStatics_iface;
+    LONG ref;
+};
+
+struct app_data_paths
+{
+    IAppDataPaths IAppDataPaths_iface;
+    LONG ref;
+};
+
+HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, LPCSTR FOLDERID, HSTRING *value );
 
 #endif
