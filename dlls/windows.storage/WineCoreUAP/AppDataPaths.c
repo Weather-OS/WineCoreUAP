@@ -123,7 +123,7 @@ app_data_paths_get_Cookies(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "cookies", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_Cookies, value );
 }
 
 /***********************************************************************
@@ -139,7 +139,7 @@ app_data_paths_get_Desktop(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "desktop", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_Desktop, value );
 }
 
 /***********************************************************************
@@ -155,7 +155,7 @@ app_data_paths_get_Documents(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "documents", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_Documents, value );
 }
 
 /***********************************************************************
@@ -171,7 +171,7 @@ app_data_paths_get_Favorites(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "favorites", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_Favorites, value );
 }
 
 /***********************************************************************
@@ -187,7 +187,7 @@ app_data_paths_get_History(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "history", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_History, value );
 }
 
 /***********************************************************************
@@ -203,7 +203,7 @@ app_data_paths_get_InternetCache(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "internet_cache", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_InternetCache, value );
 }
 
 /***********************************************************************
@@ -219,7 +219,7 @@ app_data_paths_get_LocalAppData(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "localappdata", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_LocalAppData, value );
 }
 
 /***********************************************************************
@@ -235,7 +235,7 @@ app_data_paths_get_ProgramData(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "programdata", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_ProgramData, value );
 }
 
 /***********************************************************************
@@ -251,7 +251,7 @@ app_data_paths_get_RoamingAppData(
     TRACE( "iface %p, value %p\n", iface, value );
     // Arguments
     if ( !value ) return E_POINTER;
-    return app_data_paths_GetKnownFolder( iface, "roamingappdata", value );
+    return app_data_paths_GetKnownFolder( iface, FOLDERID_RoamingAppData, value );
 }
 
 static const struct IAppDataPathsVtbl app_data_paths_vtbl =

@@ -21,17 +21,12 @@
 
 #include "AppInternalPaths.h"
 
-#include <knownfolders.h>
-
-#include <shlobj.h>
-#include <shlwapi.h>
-
 _ENABLE_DEBUGGING_
 
 HRESULT WINAPI
 app_data_paths_GetKnownFolder(
     IAppDataPaths *iface,
-    LPCSTR FOLDERID,
+    GUID FOLDERID,
     HSTRING *value
 ) {
     appxstatus regStatus;
@@ -42,7 +37,7 @@ app_data_paths_GetKnownFolder(
 
     struct appx_package package;
 
-    TRACE( "iface %p, folderid %s, value %p\n", iface, debugstr_a(FOLDERID), value );
+    TRACE( "iface %p, folderid %s, value %p\n", iface, debugstr_guid( &FOLDERID ), value );
 
     path = (PWSTR)CoTaskMemAlloc( MAX_PATH * sizeof( WCHAR ) );
 
@@ -70,31 +65,31 @@ app_data_paths_GetKnownFolder(
     PathAppendW( path, L"Packages" );
     PathAppendW( path, AppName );
 
-    if ( !strcmp( FOLDERID, "cookies" ) ) 
+    if ( IsEqualGUID( &FOLDERID, &FOLDERID_Cookies ) ) 
     {
         PathAppendW( path, L"AC\\INetCookies" );
-    } else if ( !strcmp( FOLDERID, "desktop" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_Desktop ) ) 
     {
         PathAppendW( path, L"LocalState\\Desktop" );
-    } else if ( !strcmp( FOLDERID, "documents" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_Documents ) ) 
     {
         PathAppendW( path, L"LocalState\\Documents" );
-    } else if ( !strcmp( FOLDERID, "favorites" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_Favorites ) ) 
     {
         PathAppendW( path, L"LocalState\\Favorites" );
-    } else if ( !strcmp( FOLDERID, "history" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_History ) ) 
     {
         PathAppendW( path, L"AC\\INetHistory" );
-    } else if ( !strcmp( FOLDERID, "internet_cache" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_InternetCache ) ) 
     {
         PathAppendW( path, L"AC\\INetCache" );
-    } else if ( !strcmp( FOLDERID, "localappdata" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_LocalAppData ) ) 
     {
         PathAppendW( path, L"LocalState" );
-    } else if ( !strcmp( FOLDERID, "programdata" ) ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_ProgramData ) ) 
     {
         PathAppendW( path, L"LocalState\\ProgramData" );
-    } else if ( !strcmp( FOLDERID, "roamingappdata") ) 
+    } else if ( IsEqualGUID( &FOLDERID, &FOLDERID_RoamingAppData ) ) 
     {
         PathAppendW( path, L"RoamingState" );
     }

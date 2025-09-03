@@ -27,6 +27,11 @@
 #include "../private.h"
 #include "wine/debug.h"
 
+#include <knownfolders.h>
+
+#include <shlobj.h>
+#include <shlwapi.h>
+
 struct app_data_paths_statics
 {
     IActivationFactory IActivationFactory_iface;
@@ -40,6 +45,6 @@ struct app_data_paths
     LONG ref;
 };
 
-HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, LPCSTR FOLDERID, HSTRING *value );
+HRESULT WINAPI app_data_paths_GetKnownFolder( IAppDataPaths *iface, GUID FOLDERID, HSTRING *value );
 
 #endif
