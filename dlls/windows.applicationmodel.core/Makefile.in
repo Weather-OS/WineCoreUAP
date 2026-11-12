@@ -1,6 +1,9 @@
 MODULE  = windows.applicationmodel.core.dll
-IMPORTS = combase kernelbase
+IMPORTS = combase kernelbase $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
 
 SOURCES = \
 	classes.idl \
-	main.c
+	provider.idl \
+	main.c \
+	\
+	WineCoreUAP/CoreApplication/CoreApplication.cpp 

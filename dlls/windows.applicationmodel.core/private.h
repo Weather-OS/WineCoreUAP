@@ -1,6 +1,6 @@
-/* WinRT Windows.ApplicationModel Implementation
+/* WinRT Windows.Storage Implementation
  *
- * Copyright (C) 2023 Mohamad Al-Jaf
+ * Copyright (C) 2025 Mohamad Al-Jaf
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef __WINE_WINDOWS_APPLICATIONMODEL_PRIVATE_H
-#define __WINE_WINDOWS_APPLICATIONMODEL_PRIVATE_H
+#ifndef __WINE_WINDOWS_APPLICATIONMODEL_CORE_PRIVATE_H
+#define __WINE_WINDOWS_APPLICATIONMODEL_CORE_PRIVATE_H
 
 #include <stdarg.h>
 
@@ -29,13 +29,42 @@
 
 #include "activation.h"
 
+#ifdef __cplusplus
+// Bug: WinRT in C++ within Wine lacks proper C++ type handling
+// Redefine boolean as bool, and DOUBLE as double to prevent compile issues.
+// Casting is purely handled by libstdc++, so it's not an issue here.
+#undef boolean
+#define boolean bool
+#undef DOUBLE
+#define DOUBLE double
+
+// Bug: __WINESRC__ is not defined in C++ contexts.
+#define __WINESRC__ 1
+#endif
+
+#include "wine/debug.h"
+
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
 #define WIDL_using_Windows_ApplicationModel
-#define WIDL_using_Windows_Storage
-#include "windows.applicationmodel.h"
+#define WIDL_using_Windows_ApplicationModel_Core
+#include "windows.applicationmodel.core.h"
 
+#define WINDOWS_TICK 10000000
+#define SEC_TO_UNIX_EPOCH 11644473600LL
+
+struct async_operation_iids
+{
+    const GUID *operation;
+};
+
+extern IActivationFactory *core_application_factory;
+
+typedef HRESULT (WINAPI *async_operation_callback)( IUnknown *invoker, PVOID param, PROPVARIANT *result );
+
+// DEFINE_IINSPECTABLE Should NOT be used in C++ contexts. Use classes instead.
+#ifndef __cplusplus
 #define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
     static inline impl_type *impl_from( iface_type *iface )                                        \
     {                                                                                              \
@@ -73,5 +102,6 @@
     }
 #define DEFINE_IINSPECTABLE( pfx, iface_type, impl_type, base_iface )                              \
     DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
+#endif
 
 #endif

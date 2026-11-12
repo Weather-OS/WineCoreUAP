@@ -46,9 +46,6 @@ namespace Windows.System.UserProfile {
 namespace Windows.UI.ViewManagement {
     runtimeclass ApplicationView;
 }
-namespace Windows.ApplicationModel.Core {
-    runtimeclass CoreApplication;
-}
 namespace Windows.ApplicationModel.DataTransfer {
     runtimeclass DataTransferManager;
 }
