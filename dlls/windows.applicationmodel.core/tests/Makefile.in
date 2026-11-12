@@ -1,0 +1,4 @@
+TESTDLL = windows.applicationmodel.core.dll
+IMPORTS = combase advapi32 shlwapi
+
+application_EXTRADLLFLAGS = -mconsole

@@ -1584,6 +1584,7 @@ enable_winbio
 enable_winbrand
 enable_windebug
 enable_windows_applicationmodel
+enable_windows_applicationmodel_core
 enable_windows_devices_bluetooth
 enable_windows_devices_enumeration
 enable_windows_devices_radios
@@ -22826,6 +22827,8 @@ wine_fn_config_makefile dlls/winbrand enable_winbrand
 wine_fn_config_makefile dlls/windebug.dll16 enable_windebug
 wine_fn_config_makefile dlls/windows.applicationmodel enable_windows_applicationmodel
 wine_fn_config_makefile dlls/windows.applicationmodel/tests enable_tests
+wine_fn_config_makefile dlls/windows.applicationmodel.core enable_windows_applicationmodel_core
+wine_fn_config_makefile dlls/windows.applicationmodel.core/tests enable_tests
 wine_fn_config_makefile dlls/windows.devices.bluetooth enable_windows_devices_bluetooth
 wine_fn_config_makefile dlls/windows.devices.bluetooth/tests enable_tests
 wine_fn_config_makefile dlls/windows.devices.enumeration enable_windows_devices_enumeration
