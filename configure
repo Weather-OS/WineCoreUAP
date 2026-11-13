@@ -21982,6 +21982,7 @@ wine_fn_config_makefile dlls/apphelp/tests enable_tests
 wine_fn_config_makefile dlls/appwiz.cpl enable_appwiz_cpl
 wine_fn_config_makefile dlls/appxdeploymentclient enable_appxdeploymentclient
 wine_fn_config_makefile dlls/appxdeploymentserver enable_appxdeploymentserver
+wine_fn_config_makefile dlls/appxdeploymentserver/tests enable_tests
 wine_fn_config_makefile dlls/atl enable_atl
 wine_fn_config_makefile dlls/atl/tests enable_tests
 wine_fn_config_makefile dlls/atl100 enable_atl100
