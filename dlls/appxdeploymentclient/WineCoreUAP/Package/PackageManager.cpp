@@ -395,12 +395,22 @@ public:
     HRESULT WINAPI
     ActivateInstance( IInspectable **instance ) noexcept override
     {
-        ERR( "iface %p, This factory is not activatable!\n", this );
-        return E_NOTIMPL;
+        PackageManagerImpl *packageManager;
+        TRACE( "iface %p, instance %p\n", this, instance );
+
+        if ( !instance )
+            return E_POINTER;
+
+        packageManager = new PackageManagerImpl();
+
+        HRESULT hr = packageManager->QueryInterface( IID_PPV_ARGS( instance ) );
+        packageManager->Release();
+
+        return hr;
     }
 
 private:
-    std::atomic<LONG> ref{ 1 };    
+    std::atomic<LONG> ref{ 1 };
 };
 
 static PackageManager g_package_manager;
