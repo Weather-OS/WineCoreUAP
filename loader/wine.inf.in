@@ -914,7 +914,7 @@ win.ini, fonts,,"dummy=0"
 AddReg=AppXDeploymentServerServiceKeys
 Description="AppX Package Deployment & Management Service"
 DisplayName="AppX Package Deployment & Management Service"
-ServiceBinary="%11%\svchost.exe -k AppXSvc"
+ServiceBinary="%11%\svchost.exe -k wsappx"
 ServiceType=16
 StartType=2
 ErrorControl=1
@@ -1070,7 +1070,7 @@ HKLM,%CurrentVersionNT%\SvcHost,"netsvcs",0x00010008,"BITS"
 
 [AppXDeploymentServerServiceKeys]
 HKR,Parameters,"ServiceDll",,"%11%\appxdeploymentserver.dll"
-HKLM,%CurrentVersionNT%\SvcHost,"AppXSvc",0x00010008,"AppXDeploymentServer"
+HKLM,%CurrentVersionNT%\SvcHost,"wsappx",0x00010008,"AppXDeploymentServer"
 
 [EventLogServiceKeys]
 HKR,Parameters,"ServiceDll",,"%11%\wevtsvc.dll"
