@@ -24,6 +24,7 @@ SOURCES = \
 	appmodel.h \
 	appnotify.h \
 	appx.idl \
+	appxpackaging.idl \
 	asferr.h \
 	asptlb.idl \
 	asyncinfo.idl \

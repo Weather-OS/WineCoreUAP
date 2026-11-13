@@ -1,0 +1,51 @@
+/*
+ * COM Classes for AppxPackaging
+ *
+ * Written by Weather
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+#pragma makedep register
+
+[
+    threading(both),
+    uuid(5842a140-ff9f-4166-8f5c-62f5b7b0c781)
+]
+coclass AppxFactory {};
+
+[
+    threading(both),
+    uuid(378E0446-5384-43B7-8877-E7DBDD883446)
+]
+coclass AppxBundleFactory {};
+
+[
+    threading(both),
+    uuid(50CA0A46-1588-4161-8ED2-EF9E469CED5D)
+]
+coclass AppxPackagingDiagnosticEventSinkManager {};
+
+[
+    threading(both),
+    uuid(DC664FDD-D868-46EE-8780-8D196CB739F7)
+]
+coclass AppxEncryptionFactory {};
+
+[
+    threading(both),
+    uuid(F004F2CA-AEBC-4B0D-BF58-E516D5BCC0AB)
+]
+coclass AppxPackageEditor {};

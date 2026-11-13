@@ -78,6 +78,34 @@ public:
         return curr;
     }
 
+    /* IAppXPackageManager Methods */
+    HRESULT WINAPI 
+    AddAppXPackage( LPCWSTR packagePath ) noexcept override
+    {
+        TRACE( "iface %p, packagePath %s stub!\n", this, debugstr_w(packagePath) );
+        return E_NOTIMPL;
+    }
+
+    HRESULT WINAPI
+    StageAppXPackage( LPCWSTR packagePath ) noexcept override
+    {
+        TRACE( "iface %p, packagePath %s stub!\n", this, debugstr_w(packagePath) );
+        return E_NOTIMPL;
+    }
+
+    HRESULT WINAPI
+    RegisterAppXPackage( LPCWSTR packagePath ) noexcept override
+    {
+        TRACE( "iface %p, packagePath %s stub!\n", this, debugstr_w(packagePath) );
+        return E_NOTIMPL;
+    }
+
+    HRESULT WINAPI
+    RemoveAppXPackage( LPCWSTR packageFullName ) noexcept override
+    {
+        TRACE( "iface %p, packagePath %s stub!\n", this, debugstr_w(packageFullName) );
+        return E_NOTIMPL;
+    }
 private:
     std::atomic<LONG> ref{ 1 };
 };

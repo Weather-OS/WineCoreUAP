@@ -34,6 +34,10 @@ import "unknwn.idl";
 ]
 interface IAppXPackageManager : IUnknown
 {
+    HRESULT AddAppXPackage( [in] LPCWSTR packagePath );
+    HRESULT StageAppXPackage( [in] LPCWSTR packagePath );
+    HRESULT RegisterAppXPackage( [in] LPCWSTR packagePath );
+    HRESULT RemoveAppXPackage( [in] LPCWSTR packageFullName );
 }
 
 [

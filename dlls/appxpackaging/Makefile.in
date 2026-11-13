@@ -1,0 +1,8 @@
+MODULE    = appxpackaging.dll
+IMPORTS   = advapi32 combase $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
+
+EXTRADLLFLAGS = -Wb,--prefer-native
+
+SOURCES = \
+	main.c \
+    appxpackaging.idl

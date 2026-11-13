@@ -134,7 +134,7 @@ public:
         FIXME( "iface %p, uri %p, dependencies %p, options %d, operation %p stub!\n", this, uri, dependencies, options, operation );
         return E_NOTIMPL;
     }
-
+    
     HRESULT WINAPI UpdatePackageAsync( IUriRuntimeClass *uri, IIterable<Uri *> *dependencies,
         DeploymentOptions options, IAsyncOperationWithProgress<DeploymentResult *, DeploymentProgress> **operation ) noexcept override
     {
