@@ -1,0 +1,15 @@
+HKCR
+{
+    NoRemove AppID
+    {
+        '{D30C6725-2471-4430-B558-00849E7E0C81}' { val LocalService = s 'AppXDeploymentServer' }
+        AppXDeploymentServer { val AppID = s '{D30C6725-2471-4430-B558-00849E7E0C81}' }
+    }
+    NoRemove CLSID
+    {
+        '{6C10A3A4-2BB8-4A49-B43F-1DA63103F3C0}'
+        {
+            val AppID = s '{D30C6725-2471-4430-B558-00849E7E0C81}'
+        }
+    }
+}

@@ -23,6 +23,7 @@ SOURCES = \
 	appmgmt.h \
 	appmodel.h \
 	appnotify.h \
+	appx.idl \
 	asferr.h \
 	asptlb.idl \
 	asyncinfo.idl \
