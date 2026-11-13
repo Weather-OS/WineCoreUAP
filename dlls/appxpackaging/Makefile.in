@@ -5,4 +5,6 @@ EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	main.c \
-    appxpackaging.idl
+    appx_packaging.idl \
+    \
+    WineCoreUAP/AppXPackaging/AppxFactory.cpp
