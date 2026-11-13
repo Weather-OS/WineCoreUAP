@@ -30,35 +30,6 @@ static SERVICE_STATUS_HANDLE service_handle;
 static SERVICE_STATUS status;
 static HANDLE stop_event;
 
-static DWORD WINAPI service_handler( DWORD ctrl, DWORD event_type, void *event_data, void *context )
-{
-    SERVICE_STATUS status;
-
-    status.dwServiceType             = SERVICE_WIN32;
-    status.dwControlsAccepted        = SERVICE_ACCEPT_STOP;
-    status.dwWin32ExitCode           = 0;
-    status.dwServiceSpecificExitCode = 0;
-    status.dwCheckPoint              = 0;
-    status.dwWaitHint                = 0;
-
-    switch(ctrl)
-    {
-    case SERVICE_CONTROL_STOP:
-    case SERVICE_CONTROL_SHUTDOWN:
-        TRACE( "shutting down\n" );
-        status.dwCurrentState     = SERVICE_STOP_PENDING;
-        status.dwControlsAccepted = 0;
-        SetServiceStatus( service_handle, &status );
-        SetEvent( stop_event );
-        return NO_ERROR;
-    default:
-        FIXME( "got service ctrl %lx\n", ctrl );
-        status.dwCurrentState = SERVICE_RUNNING;
-        SetServiceStatus( service_handle, &status );
-        return NO_ERROR;
-    }
-}
-
 static VOID
 UpdateStatus( DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint )
 {
@@ -82,6 +53,26 @@ UpdateStatus( DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint )
     }
 }
 
+static DWORD WINAPI
+ServiceHandler( DWORD ctrl, DWORD event_type, LPVOID event_data, LPVOID context )
+{
+    switch ( ctrl ) 
+    {
+    case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
+        TRACE( "shutting down service\n" );
+        UpdateStatus( SERVICE_STOP_PENDING, NO_ERROR, 0 );
+        SetEvent( stop_event );
+        break;
+    default:
+        FIXME( "ignoring handle service ctrl %lx\n", ctrl );
+        UpdateStatus( status.dwCurrentState, NO_ERROR, 0 );
+        break;
+    }
+
+    return NO_ERROR;
+}
+
 static HRESULT
 RegisterCOMEntries( void )
 {
@@ -98,9 +89,9 @@ RegisterCOMEntries( void )
                                NULL );
     if ( FAILED( hr ) ) return hr;
 
-    hr = CoRegisterClassObject(&CLSID_AppXPackageManager,
-                               (IUnknown *) &appx_package_manager_factory,
-                               CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &dwReg);
+    hr = CoRegisterClassObject( &CLSID_AppXPackageManager,
+                                (IUnknown *)appx_package_manager_factory,
+                                CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &dwReg );
     if ( FAILED( hr ) ) return hr;
 
     return TRUE;
@@ -109,7 +100,7 @@ RegisterCOMEntries( void )
 /***********************************************************************
  *		ServiceMain (appxdeploymentserver.@)
  */
-VOID WINAPI ServiceMain(DWORD argc, LPWSTR *argv)
+VOID WINAPI ServiceMain( DWORD argc, LPWSTR *argv )
 {
     HRESULT hr;
 
@@ -117,7 +108,7 @@ VOID WINAPI ServiceMain(DWORD argc, LPWSTR *argv)
 
     stop_event = CreateEventW( NULL, TRUE, FALSE, NULL );
 
-    service_handle = RegisterServiceCtrlHandlerExW( L"AppXDeploymentServer", service_handler, NULL );
+    service_handle = RegisterServiceCtrlHandlerExW( L"AppXDeploymentServer", ServiceHandler, NULL );
     if (!service_handle)
         return;
 
