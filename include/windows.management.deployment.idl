@@ -35,6 +35,7 @@ namespace Windows.Management.Deployment {
     typedef struct DeploymentProgress DeploymentProgress;
 
     interface IDeploymentResult;
+    interface IDeploymentResult2;
     interface IPackageManager;
     interface IPackageManager2;
     interface IPackageUserInformation;
@@ -151,6 +152,16 @@ namespace Windows.Management.Deployment {
     }
 
     [
+        contract(Windows.Foundation.UniversalApiContract, 4.0),
+        exclusiveto(Windows.Management.Deployment.DeploymentResult),
+        uuid(FC0E715C-5A01-4BD7-BCF1-381C8C82E04A)
+    ]
+    interface IDeploymentResult2 : IInspectable
+    {
+        [propget] HRESULT IsRegistered([out] [retval] boolean* value);
+    }
+
+    [
         contract(Windows.Foundation.UniversalApiContract, 1.0),
         exclusiveto(Windows.Management.Deployment.PackageManager),
         uuid(9a7d4b65-5e8f-4fc7-a2e5-7f6925cb8b53)
@@ -245,7 +256,7 @@ namespace Windows.Management.Deployment {
     runtimeclass DeploymentResult
     {
         [default] interface Windows.Management.Deployment.IDeploymentResult;
-        /* [contract(Windows.Foundation.UniversalApiContract, 4.0)] interface Windows.Management.Deployment.IDeploymentResult2; */
+        [contract(Windows.Foundation.UniversalApiContract, 4.0)] interface Windows.Management.Deployment.IDeploymentResult2;
     }
 
     [
