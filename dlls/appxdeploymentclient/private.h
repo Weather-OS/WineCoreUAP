@@ -29,6 +29,21 @@
 
 #include "activation.h"
 
+#ifdef __cplusplus
+// Bug: WinRT in C++ within Wine lacks proper C++ type handling
+// Redefine boolean as bool, and DOUBLE as double to prevent compile issues.
+// Casting is purely handled by libstdc++, so it's not an issue here.
+#undef boolean
+#define boolean bool
+#undef DOUBLE
+#define DOUBLE double
+
+// Bug: __WINESRC__ is not defined in C++ contexts.
+#define __WINESRC__ 1
+#endif
+
+#include "wine/debug.h"
+
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
