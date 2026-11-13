@@ -1,8 +1,10 @@
 MODULE    = appxdeploymentserver.dll
-IMPORTS   = advapi32
+IMPORTS   = advapi32 combase $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 SOURCES = \
 	main.c \
-    rsrc.rc 
+    rsrc.rc \
+    \
+    WineCoreUAP/AppX/AppXPackageManager.cpp

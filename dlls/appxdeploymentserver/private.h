@@ -30,6 +30,7 @@
 #include "winsvc.h"
 
 #include "activation.h"
+#include "appx.h"
 
 #ifdef __cplusplus
 // Bug: WinRT in C++ within Wine lacks proper C++ type handling
@@ -45,5 +46,7 @@
 #endif
 
 #include "wine/debug.h"
+
+extern IClassFactory* appx_package_manager_factory;
 
 #endif

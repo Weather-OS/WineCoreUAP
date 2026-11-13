@@ -19,6 +19,7 @@
  */
 
 #define WIN32_LEAN_AND_MEAN
+#include <initguid.h>
 #include "private.h"
 
 #include "wine/debug.h"
@@ -26,6 +27,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(appxds);
 
 static SERVICE_STATUS_HANDLE service_handle;
+static SERVICE_STATUS status;
 static HANDLE stop_event;
 
 static DWORD WINAPI service_handler( DWORD ctrl, DWORD event_type, void *event_data, void *context )
@@ -57,12 +59,59 @@ static DWORD WINAPI service_handler( DWORD ctrl, DWORD event_type, void *event_d
     }
 }
 
+static VOID
+UpdateStatus( DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint )
+{
+    status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    status.dwCurrentState = dwCurrentState;
+    if ( dwCurrentState == SERVICE_START_PENDING )
+        status.dwControlsAccepted = 0;
+    else
+        status.dwControlsAccepted
+            = (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PAUSE_CONTINUE
+               | SERVICE_ACCEPT_SHUTDOWN);
+    status.dwWin32ExitCode = 0;
+    status.dwServiceSpecificExitCode = 0;
+    status.dwCheckPoint = 0;
+    status.dwWaitHint = dwWaitHint;
+
+    if ( !SetServiceStatus( service_handle, &status ) ) 
+    {
+        ERR( "failed to set service status\n" );
+        SetEvent( stop_event );
+    }
+}
+
+static HRESULT
+RegisterCOMEntries( void )
+{
+    HRESULT hr;
+    DWORD dwReg;
+
+    TRACE("\n");
+    
+    hr = CoInitializeEx( NULL, COINIT_MULTITHREADED );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = CoInitializeSecurity( NULL, -1, NULL, NULL, RPC_C_AUTHN_LEVEL_NONE,
+                               RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE,
+                               NULL );
+    if ( FAILED( hr ) ) return hr;
+
+    hr = CoRegisterClassObject(&CLSID_AppXPackageManager,
+                               (IUnknown *) &appx_package_manager_factory,
+                               CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &dwReg);
+    if ( FAILED( hr ) ) return hr;
+
+    return TRUE;
+}
+
 /***********************************************************************
- *		ServiceMain (fntcache.@)
+ *		ServiceMain (appxdeploymentserver.@)
  */
 VOID WINAPI ServiceMain(DWORD argc, LPWSTR *argv)
 {
-    SERVICE_STATUS status;
+    HRESULT hr;
 
     TRACE( "starting service\n" );
 
@@ -72,19 +121,22 @@ VOID WINAPI ServiceMain(DWORD argc, LPWSTR *argv)
     if (!service_handle)
         return;
 
-    status.dwServiceType             = SERVICE_WIN32;
-    status.dwCurrentState            = SERVICE_RUNNING;
-    status.dwControlsAccepted        = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
-    status.dwWin32ExitCode           = 0;
-    status.dwServiceSpecificExitCode = 0;
-    status.dwCheckPoint              = 0;
-    status.dwWaitHint                = 10000;
-    SetServiceStatus( service_handle, &status );
+    UpdateStatus( SERVICE_START_PENDING, NO_ERROR, 3000 );
+    hr = RegisterCOMEntries();
+    if ( FAILED( hr ) )
+    {
+        ERR( "Failed registring COM entries! Status %#lx\n", hr );
+        UpdateStatus( SERVICE_STOPPED, HRESULT_CODE( hr ), 0 );
+        return;
+    }
+
+    UpdateStatus( SERVICE_RUNNING, ERROR_SUCCESS, 0 );
 
     WaitForSingleObject( stop_event, INFINITE );
 
-    status.dwCurrentState     = SERVICE_STOPPED;
-    status.dwControlsAccepted = 0;
-    SetServiceStatus( service_handle, &status );
+    UpdateStatus( SERVICE_STOPPED, NO_ERROR, 0 );
+
     TRACE( "service stopped\n" );
+
+    CoUninitialize();
 }
