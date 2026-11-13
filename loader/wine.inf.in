@@ -134,6 +134,7 @@ AddReg=\
     CurrentVersionWow64.ntarm
 
 [DefaultInstall.Services]
+AddService=AppXDeploymentServer,0,AppXDeploymentServerService
 AddService=BITS,0,BITSService
 AddService=EventLog,0x800,EventLogService
 AddService=HTTP,0,HTTPService
@@ -155,6 +156,7 @@ AddService=NDIS,0x800,NDISService
 AddService=nsiproxy,0x800,NsiProxyService
 
 [DefaultInstall.ntx86.Services]
+AddService=AppXDeploymentServer,0,AppXDeploymentServerService
 AddService=BITS,0,BITSService
 AddService=EventLog,0x800,EventLogService
 AddService=HTTP,0,HTTPService
@@ -176,6 +178,7 @@ AddService=NDIS,0x800,NDISService
 AddService=nsiproxy,0x800,NsiProxyService
 
 [DefaultInstall.ntamd64.Services]
+AddService=AppXDeploymentServer,0,AppXDeploymentServerService
 AddService=BITS,0,BITSService
 AddService=EventLog,0x800,EventLogService
 AddService=HTTP,0,HTTPService
@@ -197,6 +200,7 @@ AddService=NDIS,0x800,NDISService
 AddService=nsiproxy,0x800,NsiProxyService
 
 [DefaultInstall.ntarm64.Services]
+AddService=AppXDeploymentServer,0,AppXDeploymentServerService
 AddService=BITS,0,BITSService
 AddService=EventLog,0x800,EventLogService
 AddService=HTTP,0,HTTPService
@@ -906,6 +910,15 @@ system.ini, drivers32,,"; vidc.IV32=ir32_32.dll"
 win.ini, mail,,"mapi=1"
 win.ini, fonts,,"dummy=0"
 
+[AppXDeploymentServerService]
+AddReg=AppXDeploymentServerServiceKeys
+Description="AppX Package Deployment & Management Service"
+DisplayName="AppX Package Deployment & Management Service"
+ServiceBinary="%11%\svchost.exe -k AppXSvc"
+ServiceType=16
+StartType=2
+ErrorControl=1
+
 [BITSService]
 AddReg=BITSServiceKeys
 Description="BITS Service"
@@ -1054,6 +1067,10 @@ ErrorControl=1
 [BITSServiceKeys]
 HKR,Parameters,"ServiceDll",,"%11%\qmgr.dll"
 HKLM,%CurrentVersionNT%\SvcHost,"netsvcs",0x00010008,"BITS"
+
+[AppXDeploymentServerServiceKeys]
+HKR,Parameters,"ServiceDll",,"%11%\appxdeploymentserver.dll"
+HKLM,%CurrentVersionNT%\SvcHost,"AppXSvc",0x00010008,"AppXDeploymentServer"
 
 [EventLogServiceKeys]
 HKR,Parameters,"ServiceDll",,"%11%\wevtsvc.dll"
