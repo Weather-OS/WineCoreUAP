@@ -19,11 +19,68 @@
  */
 
 #include <atomic>
+#include <new>
 
 #include "../../private.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxds);
+
+class AppXPackageManagerImpl
+    : public IAppXPackageManager
+{
+public:
+    AppXPackageManagerImpl() = default;
+    AppXPackageManagerImpl(const AppXPackageManagerImpl&) = delete;
+    AppXPackageManagerImpl& operator=(const AppXPackageManagerImpl&) = delete;
+
+    virtual ~AppXPackageManagerImpl() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override
+    {
+        TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+        if (!out) return E_POINTER;
+        *out = nullptr;
+
+        if ( iid == __uuidof( IUnknown ) ||
+             iid == __uuidof( IAppXPackageManager ) )
+        {
+            AddRef();
+            *out = static_cast<IAppXPackageManager *>(this);
+            return S_OK;
+        }
+
+        FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+        *out = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    ULONG WINAPI 
+    AddRef() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(++ref);
+        TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+        return curr;
+    }
+
+    ULONG WINAPI 
+    Release() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(--ref);
+        TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+        if ( !curr )
+           delete this;
+        
+        return curr;
+    }
+
+private:
+    std::atomic<LONG> ref{ 1 };
+};
 
 class AppXPackageManager
     : public IClassFactory
@@ -76,11 +133,29 @@ public:
         return curr;
     }
 
+    /* IClassFactory Methods */
     HRESULT WINAPI
     CreateInstance( IUnknown *pUnkOuter, REFIID riid, void **ppvObj) noexcept override
     {
-        FIXME( "iface %p, pUnkOuter %p, riid %s, ppvObj %p.\n", this, pUnkOuter, debugstr_guid( &riid ), ppvObj );
-        return E_NOTIMPL;
+        HRESULT hr;
+        AppXPackageManagerImpl *manager = nullptr;
+
+        TRACE( "iface %p, pUnkOuter %p, riid %s, ppvObj %p.\n", this, pUnkOuter, debugstr_guid( &riid ), ppvObj );
+
+        if ( pUnkOuter )
+            return CLASS_E_NOAGGREGATION;
+
+        if ( !ppvObj )
+            return E_POINTER;
+
+        manager = new(std::nothrow) AppXPackageManagerImpl();
+        if ( !manager ) 
+            return E_OUTOFMEMORY;
+
+        hr = manager->QueryInterface( riid, ppvObj );
+        manager->Release();
+
+        return hr;
     }
 
     HRESULT WINAPI

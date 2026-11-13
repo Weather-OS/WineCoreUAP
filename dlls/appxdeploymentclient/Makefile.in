@@ -1,8 +1,9 @@
 MODULE  = appxdeploymentclient.dll
-IMPORTS = combase $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
+IMPORTS = rpcrt4 combase $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
 
 SOURCES = \
 	classes.idl \
 	main.c \
+	prxy.idl \
 	\
 	WineCoreUAP/Package/PackageManager.cpp

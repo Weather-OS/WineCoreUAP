@@ -29,6 +29,26 @@
 
 #include <wine/test.h>
 
+static void test_AppXPackageManager(void)
+{
+    IClassFactory *factory = NULL;
+    IAppXPackageManager *manager = NULL;
+    HRESULT hr;
+
+    hr = CoInitializeEx( NULL, COINIT_MULTITHREADED );
+    ok( SUCCEEDED( hr ), "CoInitializeEx failed: %#lx\n", hr );
+
+    hr = CoGetClassObject( &CLSID_AppXPackageManager, CLSCTX_LOCAL_SERVER, NULL, &IID_IClassFactory, (void **)&factory );
+    ok( SUCCEEDED( hr ), "CoGetClassObject failed: %#lx\n", hr );
+
+    hr = IClassFactory_CreateInstance( factory, NULL, &IID_IAppXPackageManager, (void **)&manager );
+    ok( SUCCEEDED( hr ), "CreateInstance failed: %#lx\n", hr );
+
+    IAppXPackageManager_Release( manager );
+    IClassFactory_Release( factory );
+    CoUninitialize();
+}
+
 static void test_ServiceInstance( void )
 {
     BOOL res = FALSE;
@@ -38,18 +58,18 @@ static void test_ServiceInstance( void )
     DWORD bytesNeeded;
 
     scm = OpenSCManagerW( NULL, NULL, SC_MANAGER_CONNECT );
-    ok( scm != NULL, "OpenSCManagerW failed with %d\n", GetLastError() );
+    ok( scm != NULL, "OpenSCManagerW failed with %ld\n", GetLastError() );
 
     service = OpenServiceA( scm, "AppXDeploymentServer", SERVICE_QUERY_STATUS );
-    ok( service != NULL, "OpenServiceA failed with %d\n", GetLastError() );
+    ok( service != NULL, "OpenServiceA failed with %ld\n", GetLastError() );
 
     res = QueryServiceStatusEx( service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(status), &bytesNeeded );
-    ok( res == TRUE, "QueryServiceStatusEx failed with %d\n", GetLastError() );
+    ok( res == TRUE, "QueryServiceStatusEx failed with %ld\n", GetLastError() );
 
     // Service starts on startup.
     // There could be a race condition here regarding SERVICE_START_PENDING,
     // but it's very rare in this snapshot.
-    ok( status.dwCurrentState == SERVICE_RUNNING, "Service is not running! Current state %d\n", status.dwCurrentState );
+    ok( status.dwCurrentState == SERVICE_RUNNING, "Service is not running! Current state %ld\n", status.dwCurrentState );
 
     CloseServiceHandle( service );
     CloseServiceHandle( scm );
@@ -58,4 +78,5 @@ static void test_ServiceInstance( void )
 START_TEST(appx)
 {
     test_ServiceInstance();
+    test_AppXPackageManager();
 }

@@ -94,7 +94,7 @@ RegisterCOMEntries( void )
                                 CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE, &dwReg );
     if ( FAILED( hr ) ) return hr;
 
-    return TRUE;
+    return S_OK;
 }
 
 /***********************************************************************
