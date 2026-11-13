@@ -1112,11 +1112,9 @@ SOURCES = \
 	windows.ui.xaml.idl \
 	windows.ui.xaml.interop.idl \
 	windowscontracts.idl \
-	winecontracts.idl \
 	windowsx.h \
 	wine/afd.h \
 	wine/asm.h \
-	appx.idl \
 	wine/atsvc.idl \
 	wine/condrv.h \
 	wine/dcetypes.idl \
