@@ -123,7 +123,7 @@ public:
 
         *packageReader = reader;
 
-        return E_NOTIMPL;
+        return S_OK;
     }
     
     HRESULT WINAPI 
