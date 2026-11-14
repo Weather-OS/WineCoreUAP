@@ -1,0 +1,101 @@
+/* 
+ * AppXPackage Reader and Writer interfaces.
+ *
+ * Written by Weather.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+#ifndef __WINE_APPX_PACKAGE_IO_H
+#define __WINE_APPX_PACKAGE_IO_H
+
+#include <atomic>
+#include <new>
+
+#include "../../../private.h"
+
+class AppxPackageReader
+    : public IAppxPackageReader
+{
+public:
+    AppxPackageReader() = default;
+    AppxPackageReader(const AppxPackageReader&) = delete;
+    AppxPackageReader& operator=(const AppxPackageReader&) = delete;
+
+    virtual ~AppxPackageReader() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxPackageReader Methods */
+    HRESULT WINAPI 
+    GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept override;
+
+    HRESULT WINAPI 
+    GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE type, 
+                      IAppxFile **file ) noexcept override;
+
+    HRESULT WINAPI 
+    GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept override;
+
+    HRESULT WINAPI 
+    GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noexcept override;
+
+    HRESULT WINAPI 
+    GetManifest( IAppxManifestReader **manifestReader ) noexcept override;
+private:
+    std::atomic<LONG> ref{ 1 };
+};
+
+class AppxPackageWriter
+    : public IAppxPackageWriter
+{
+public:
+    AppxPackageWriter() = default;
+    AppxPackageWriter(const AppxPackageWriter&) = delete;
+    AppxPackageWriter& operator=(const AppxPackageWriter&) = delete;
+
+    virtual ~AppxPackageWriter() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxPackageWriter Methods */
+    HRESULT WINAPI 
+    AddPayloadFile( LPCWSTR fileName, LPCWSTR contentType, 
+                    APPX_COMPRESSION_OPTION compressionOption, 
+                    IStream *inputStream ) noexcept override;
+
+    HRESULT WINAPI 
+    Close( IStream *manifest ) noexcept override;
+private:
+    std::atomic<LONG> ref{ 1 };
+};
+
+#endif

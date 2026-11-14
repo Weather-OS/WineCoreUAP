@@ -7,4 +7,7 @@ SOURCES = \
 	main.c \
     appx_packaging.idl \
     \
-    WineCoreUAP/AppXPackaging/AppxFactory.cpp
+    WineCoreUAP/AppXPackaging/AppxFactory.cpp \
+    \
+    WineCoreUAP/AppXPackaging/IO/PackageReader.cpp \
+    WineCoreUAP/AppXPackaging/IO/PackageWriter.cpp

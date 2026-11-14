@@ -80,7 +80,8 @@ public:
 
     /* IAppXPackageManager Methods */
     HRESULT WINAPI 
-    CreatePackageWriter( IStream *outputStream, APPX_PACKAGE_SETTINGS *settings, IAppxPackageWriter **packageWriter ) noexcept override
+    CreatePackageWriter( IStream *outputStream, APPX_PACKAGE_SETTINGS *settings, 
+                         IAppxPackageWriter **packageWriter ) noexcept override
     {
         FIXME( "iface %p, outputStream %p, settings %p, packageWriter %p stub!\n", this, outputStream, settings, packageWriter );
         return E_NOTIMPL;
@@ -108,9 +109,11 @@ public:
     }
     
     HRESULT WINAPI 
-    CreateValidatedBlockMapReader( IStream *blockMapStream, LPCWSTR signatureFileName, IAppxBlockMapReader **blockMapReader ) noexcept override
+    CreateValidatedBlockMapReader( IStream *blockMapStream, LPCWSTR signatureFileName, 
+                                   IAppxBlockMapReader **blockMapReader ) noexcept override
     {
-        FIXME( "iface %p, blockMapStream %p, signatureFileName %p, manifestReader %p stub!\n", this, blockMapStream, signatureFileName, blockMapReader );
+        FIXME( "iface %p, blockMapStream %p, signatureFileName %s, manifestReader %p stub!\n", 
+            this, blockMapStream, debugstr_w(signatureFileName), blockMapReader );
         return E_NOTIMPL;
     }
 private:
@@ -170,7 +173,7 @@ public:
 
     /* IClassFactory Methods */
     HRESULT WINAPI
-    CreateInstance( IUnknown *pUnkOuter, REFIID riid, void **ppvObj) noexcept override
+    CreateInstance( IUnknown *pUnkOuter, REFIID riid, void **ppvObj ) noexcept override
     {
         HRESULT hr;
         AppxFactoryImpl *factory = nullptr;
