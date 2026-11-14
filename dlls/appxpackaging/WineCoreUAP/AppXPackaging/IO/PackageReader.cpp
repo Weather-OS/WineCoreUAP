@@ -26,6 +26,12 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
+AppxPackageReader::AppxPackageReader( IStream *fileStream )
+    : packageFileStream( fileStream )
+{
+    fileStream->AddRef();
+}
+
 /* IUnknown Methods (Shared) */
 HRESULT WINAPI
 AppxPackageReader::QueryInterface( REFIID iid, void** out ) noexcept
@@ -63,7 +69,10 @@ AppxPackageReader::Release() noexcept
     TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
 
     if ( !curr )
-       delete this;
+    {
+        if ( packageFileStream ) packageFileStream->Release();
+        delete this;
+    }
     
     return curr;
 }

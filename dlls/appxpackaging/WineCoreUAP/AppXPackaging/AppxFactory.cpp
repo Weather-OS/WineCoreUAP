@@ -21,6 +21,8 @@
 #include <atomic>
 #include <new>
 
+#include "IO/PackageIO.hpp"
+
 #include "../../private.h"
 #include "wine/debug.h"
 
@@ -83,14 +85,44 @@ public:
     CreatePackageWriter( IStream *outputStream, APPX_PACKAGE_SETTINGS *settings, 
                          IAppxPackageWriter **packageWriter ) noexcept override
     {
-        FIXME( "iface %p, outputStream %p, settings %p, packageWriter %p stub!\n", this, outputStream, settings, packageWriter );
-        return E_NOTIMPL;
+        AppxPackageWriter *writer = nullptr;
+        
+        FIXME( "iface %p, outputStream %p, settings %p, packageWriter %p semi-stub!\n", this, outputStream, settings, packageWriter );
+        
+        if ( !packageWriter )
+            return E_POINTER;
+
+        if ( !outputStream || !settings )
+            return E_INVALIDARG;
+
+        writer = new(std::nothrow) AppxPackageWriter( outputStream );
+        if ( !writer ) 
+            return E_OUTOFMEMORY;
+
+        *packageWriter = writer;
+
+        return S_OK;
     }
     
     HRESULT WINAPI 
     CreatePackageReader( IStream *inputStream, IAppxPackageReader **packageReader ) noexcept override
     {
-        FIXME( "iface %p, inputStream %p, packageReader %p stub!\n", this, inputStream, packageReader );
+        AppxPackageReader *reader = nullptr;
+
+        TRACE( "iface %p, inputStream %p, packageReader %p.\n", this, inputStream, packageReader );
+        
+        if ( !packageReader )
+            return E_POINTER;
+
+        if ( !inputStream )
+            return E_INVALIDARG;
+
+        reader = new(std::nothrow) AppxPackageReader( inputStream );
+        if ( !reader ) 
+            return E_OUTOFMEMORY;
+
+        *packageReader = reader;
+
         return E_NOTIMPL;
     }
     

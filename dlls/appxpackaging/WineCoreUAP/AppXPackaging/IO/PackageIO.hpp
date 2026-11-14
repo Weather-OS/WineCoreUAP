@@ -34,6 +34,8 @@ public:
     AppxPackageReader(const AppxPackageReader&) = delete;
     AppxPackageReader& operator=(const AppxPackageReader&) = delete;
 
+    AppxPackageReader( IStream *fileStream );
+
     virtual ~AppxPackageReader() = default;
 
     /* IUnknown Methods (Shared) */
@@ -62,8 +64,10 @@ public:
 
     HRESULT WINAPI 
     GetManifest( IAppxManifestReader **manifestReader ) noexcept override;
+
 private:
     std::atomic<LONG> ref{ 1 };
+    IStream *packageFileStream{ nullptr };
 };
 
 class AppxPackageWriter
@@ -75,6 +79,8 @@ public:
     AppxPackageWriter& operator=(const AppxPackageWriter&) = delete;
 
     virtual ~AppxPackageWriter() = default;
+
+    AppxPackageWriter( IStream *fileStream );
 
     /* IUnknown Methods (Shared) */
     HRESULT WINAPI
@@ -94,8 +100,10 @@ public:
 
     HRESULT WINAPI 
     Close( IStream *manifest ) noexcept override;
+
 private:
     std::atomic<LONG> ref{ 1 };
+    IStream *packageFileStream{ nullptr };
 };
 
 #endif
