@@ -1,0 +1,14 @@
+ The following files are proprietary Microsoft® components and are
+NOT licensed under the GNU Lesser General Public License, version 2.1:
+    - TestApplicationPackages/Dependencies/ARM64/Microsoft.VCLibs.ARM64.14.00.appx
+    - TestApplicationPackages/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx
+    - TestApplicationPackages/Dependencies/x86/Microsoft.VCLibs.x86.14.00.appx
+
+ They are distributed under their respective Microsoft license terms.
+Redistribution is subject to those terms.
+
+ The inclusion of these files is not intended to provide functionality for 
+the Wine project, which is licensed under LGPL-2.1. They are intended to provide
+a test environment for testing AppX packaging capabilities instead.
+
+All other applicable Wine project licensing terms remain unchanged.

@@ -18,5 +18,33 @@
 
 #include "windef.h"
 
-/* @makedep: HelloWorld.appx */
-HelloWorld.appx RCDATA HelloWorld.appx
+/* @directory: TestApplicationPackages */
+
+/* @makedep: TestApplicationPackages/TestApplication_1.0.0.0_ARM64.appx */
+ARM64.appx RCDATA "TestApplicationPackages\\TestApplication_1.0.0.0_ARM64.appx"
+
+/* @makedep: TestApplicationPackages/TestApplication_1.0.0.0_Win32.appx */
+Win32.appx RCDATA "TestApplicationPackages\\TestApplication_1.0.0.0_Win32.appx"
+
+/* @makedep: TestApplicationPackages/TestApplication_1.0.0.0_x64.appx */
+x64.appx RCDATA "TestApplicationPackages\\TestApplication_1.0.0.0_x64.appx"
+
+/* @makedep: TestApplicationPackages/TestApplication_1.0.0.0_x86_x64_arm64.appxbundle */
+bundle.appx RCDATA "TestApplicationPackages\\TestApplication_1.0.0.0_x86_x64_arm64.appxbundle"
+
+/* @makedep: TestApplicationPackages/TestApplication_1.0.0.0_x86_x64_arm64.cer */
+certificate.cer RCDATA "TestApplicationPackages\\TestApplication_1.0.0.0_x86_x64_arm64.cer"
+
+/* @directory: TestApplicationPackages/Dependencies */
+
+/* @directory: TestApplicationPackages/Dependencies/ARM64 */
+/* @makedep: TestApplicationPackages/Dependencies/ARM64/Microsoft.VCLibs.ARM64.14.00.appx */
+ARM64dep.appx RCDATA "TestApplicationPackages\\Dependencies\\ARM64\\Microsoft.VCLibs.ARM64.14.00.appx"
+
+/* @directory: TestApplicationPackages/Dependencies/x64 */
+/* @makedep: TestApplicationPackages/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx */
+x64dep.appx RCDATA "TestApplicationPackages\\Dependencies\\x64\\Microsoft.VCLibs.x64.14.00.appx"
+
+/* @directory: TestApplicationPackages/Dependencies/x86 */
+/* @makedep: TestApplicationPackages/Dependencies/x86/Microsoft.VCLibs.x86.14.00.appx */
+x86dep.appx RCDATA "TestApplicationPackages\\Dependencies\\x86\\Microsoft.VCLibs.x86.14.00.appx"

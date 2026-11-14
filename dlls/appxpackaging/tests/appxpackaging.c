@@ -84,7 +84,15 @@ static void test_AppxFactory( void )
     IAppxFactory *factory = NULL;
     IStream *stream = NULL;
     HRESULT hr = S_OK;
-    LPCWSTR appxPackage = L"HelloWorld.appx";
+
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
+    LPCWSTR appxPackage = L"ARM64.appx";
+#elif defined(__x86_64__) || defined(_M_X64)
+    LPCWSTR appxPackage = L"x64.appx";
+#elif defined(__i386__) || defined(_M_IX86)
+    LPCWSTR appxPackage = L"Win32.appx";
+#endif
+
     WCHAR temp[MAX_PATH], path[MAX_PATH + 7];
 
     GetTempPathW( ARRAY_SIZE(temp), temp );
