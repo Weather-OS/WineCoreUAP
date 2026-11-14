@@ -1,0 +1,6 @@
+TESTDLL   = appxpackaging.dll
+IMPORTS   = combase advapi32 shlwapi $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
+
+SOURCES = \
+	appxpackaging.c \
+	resource.rc
