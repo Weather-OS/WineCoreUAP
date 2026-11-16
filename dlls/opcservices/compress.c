@@ -451,6 +451,33 @@ static void compress_write_content(struct zip_archive *archive, IStream *content
         level = Z_DEFAULT_COMPRESSION;
     }
 
+    // ISSUE: zlib deflate for no compression? why?
+    if ( options == OPC_COMPRESSION_NONE ) // <-- temporary fix
+    {
+        while( TRUE )
+        {
+            if ( FAILED (hr = IStream_Read( content, archive->input_buffer, sizeof(archive->input_buffer), &num_read ) ) )
+            {
+                archive->status = hr;
+                return;
+            }
+
+            if ( !num_read )
+                break;
+
+            file->crc32 = RtlComputeCrc32( file->crc32, archive->input_buffer, num_read );
+
+            file->uncompressed_size += num_read;
+            file->compressed_size += num_read;
+
+            compress_write( archive, archive->input_buffer, num_read );
+
+            if ( FAILED( archive->status ) ) return;
+        }
+
+        return;
+    }
+
     memset(&z_str, 0, sizeof(z_str));
     z_str.zalloc = zalloc;
     z_str.zfree = zfree;
@@ -736,7 +763,7 @@ static HRESULT decompress_read_cd( struct zip_archive *archive, uint64_t directo
     uint64_t local_offset;
 
     struct zip32_central_directory_header header;
-     struct zip_file *file = NULL;
+    struct zip_file *file = NULL;
 
     if ( directory_size > SIZE_MAX ||
          directory_size > (uint64_t)INT64_MAX ||
@@ -1292,6 +1319,8 @@ HRESULT decompress_extract_file(struct zip_archive *archive, size_t index, IStre
     }
 
     memset( &zs, 0, sizeof(zs) );
+    zs.zalloc = zalloc;
+    zs.zfree = zfree;
 
     zret = inflateInit2( &zs, -MAX_WBITS );
 
