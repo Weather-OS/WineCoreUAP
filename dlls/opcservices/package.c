@@ -915,7 +915,7 @@ static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_se
     for (i = 0; i < part_set->count; ++i)
     {
         is_equal = FALSE;
-        if (IOpcPartUri_IsEqual(part_set->parts[i]->name, (IUri *)name, &is_equal) == S_OK && is_equal)
+        if ( (IOpcPartUri_IsEqual(part_set->parts[i]->name, (IUri *)name, &is_equal) == S_OK && is_equal) )
         {
             if ( archive )
             {
@@ -2107,6 +2107,7 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
     XmlNodeType node;
     HRESULT hr;
     BOOLEAN contains_content_type = FALSE;
+    BOOLEAN has_associated_content_type = FALSE;
     size_t file_count;
     size_t name_size;
     size_t iterator;
@@ -2115,6 +2116,7 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
     LPCWSTR value;
     LPWSTR name_w = NULL;
     LPSTR name = NULL;
+    BSTR name_but_formatted_through_uri = NULL;
     BSTR name_extension = NULL;
 
     struct zip_archive *archive = NULL;
@@ -2241,7 +2243,15 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
         if ( FAILED( hr ) )
             goto _CLEANUP;
 
-        while( SUCCEEDED( hr = IXmlReader_Read( reader, &node ) ) )
+        hr = IStream_Seek( fileStream, zero_pos, STREAM_SEEK_SET, NULL );
+        if ( FAILED( hr ) )
+            goto _CLEANUP;
+
+        hr = IXmlReader_SetInput( reader, (IUnknown *)fileStream );
+        if ( FAILED( hr ) )
+            goto _CLEANUP;
+
+        while( (hr = IXmlReader_Read( reader, &node )) == S_OK )
         {
             if ( node != XmlNodeType_Element )
                 continue;
@@ -2251,7 +2261,64 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
                 continue;
 
             if ( lstrcmpW( xml_elem_name, L"Default") != 0 )
-                continue;
+            {
+                if ( lstrcmpW( xml_elem_name, L"Override") != 0 )
+                    continue;
+
+                TRACE("got here!\n");
+                hr = IXmlReader_MoveToAttributeByName( reader, L"PartName", NULL );
+                if ( FAILED( hr ) )
+                    continue;
+
+                hr = IXmlReader_GetValue( reader, &value, NULL );
+                if ( FAILED( hr ) )
+                    continue; 
+
+                // this is a very stupid way of approaching this
+                // TODO: anything can be better than this.
+                hr = IOpcPartUri_GetRawUri( parturi, &name_but_formatted_through_uri );
+                if ( FAILED( hr ) )
+                    goto _CLEANUP;
+
+                if ( lstrcmpW( value, name_but_formatted_through_uri ) == 0 )
+                {
+                    SysFreeString( name_but_formatted_through_uri );
+                    hr = IXmlReader_MoveToElement( reader );
+                    if ( FAILED( hr ) )
+                    {
+                        ERR("malformed [Content_Type].xml!\n");
+                        goto _CLEANUP;
+                    }
+
+                    hr = IXmlReader_MoveToAttributeByName( reader, L"ContentType", NULL );
+                    if ( FAILED( hr ) )
+                    {
+                        ERR("malformed [Content_Type].xml!\n");
+                        goto _CLEANUP;
+                    }
+
+                    hr = IXmlReader_GetValue( reader, &value, NULL );
+                    if ( FAILED( hr ) )
+                    {
+                        ERR("malformed [Content_Type].xml!\n");
+                        goto _CLEANUP;
+                    }
+
+                    if ( FAILED( hr = decompress_get_file_compression( archive, iterator, &file_compression ) ) )
+                        goto _CLEANUP;
+
+                    hr = IOpcPartSet_CreatePart( partset, parturi, value, file_compression, &part );
+                    if ( FAILED( hr ) )
+                        goto _CLEANUP;
+
+                    has_associated_content_type = TRUE;
+
+                    IOpcPart_Release( part );
+                    part = NULL;
+
+                    break;
+                }
+            }
 
             hr = IXmlReader_MoveToAttributeByName( reader, L"Extension", NULL );
             if ( FAILED( hr ) )
@@ -2261,8 +2328,7 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
             if ( FAILED( hr ) )
                 continue; 
 
-            // apparently its somehow possible for file extensions to use different letter cases.
-            if ( lstrcmpiW( value, name_extension ) )
+            if ( lstrcmpiW( value, name_extension + 1 /* account for the period */ ) == 0 )
             {
                 hr = IXmlReader_MoveToElement( reader );
                 if ( FAILED( hr ) )
@@ -2292,12 +2358,31 @@ HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS f
                 if ( FAILED( hr ) )
                     goto _CLEANUP;
 
+                has_associated_content_type = TRUE;
+
                 IOpcPart_Release( part );
+                part = NULL;
+
+                break;
             }
         }
+
+        if ( !has_associated_content_type )
+        {
+            WARN("current part %d has no associated content type! adding it anyway... package may be malformed!\n", (int)iterator );
+            hr = IOpcPartSet_CreatePart( partset, parturi, L"", file_compression, &part );
+            if ( FAILED( hr ) )
+                goto _CLEANUP;
+
+            IOpcPart_Release( part );
+            part = NULL;
+        }
+        has_associated_content_type = FALSE;
     }
 
     FIXME("package part relationships aren't supported!\n");
+    if ( hr == S_FALSE )
+        hr = S_OK;
 
 _CLEANUP:
     if ( FAILED( hr ) )
