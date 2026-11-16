@@ -54,6 +54,10 @@ struct opc_package
 
     IOpcPartSet *part_set;
     IOpcRelationshipSet *relationship_set;
+    // preserve the archive for read package operations
+    // loading the whole package in memory at once is too expensive.
+    // TODO: Probably a better way to do this.
+    struct zip_archive *archive; 
     IOpcUri *source_uri;
 };
 
@@ -85,6 +89,7 @@ struct opc_part_set
     LONG refcount;
 
     struct opc_part **parts;
+    struct zip_archive *archive; //<-- refer to opc_package for the reasoning behind this.
     size_t size;
     size_t count;
     GUID id;
@@ -900,16 +905,37 @@ static HRESULT opc_part_create(struct opc_part_set *set, IOpcPartUri *name, cons
     return S_OK;
 }
 
-static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_set, IOpcPartUri *name)
+static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_set, struct zip_archive *archive, IOpcPartUri *name)
 {
+    IStream *fileStream = NULL;
     BOOL is_equal;
     size_t i;
+    HRESULT hr;
 
     for (i = 0; i < part_set->count; ++i)
     {
         is_equal = FALSE;
         if (IOpcPartUri_IsEqual(part_set->parts[i]->name, (IUri *)name, &is_equal) == S_OK && is_equal)
+        {
+            if ( archive )
+            {
+                // part has data. read it first.
+                hr = IOpcPart_GetContentStream( &part_set->parts[i]->IOpcPart_iface, &fileStream );
+                if ( FAILED( hr ) ) 
+                {
+                    ERR("GetContentStream failed with %#lx. Returning empty part...\n", hr);
+                    return part_set->parts[i];
+                }
+
+                if ( FAILED( hr = decompress_extract_file( archive, i, fileStream ) ) )
+                {
+                    IStream_Release( fileStream );
+                    ERR("decompress_extract_file failed with %#lx. Returning empty part...\n", hr);
+                    return part_set->parts[i];
+                }
+            }
             return part_set->parts[i];
+        }
     }
 
     return NULL;
@@ -976,7 +1002,7 @@ static HRESULT WINAPI opc_part_set_GetPart(IOpcPartSet *iface, IOpcPartUri *name
     if (!name)
         return E_POINTER;
 
-    if ((part = opc_part_set_get_part(part_set, name)))
+    if ((part = opc_part_set_get_part(part_set, part_set->archive, name)))
     {
         *out = &part->IOpcPart_iface;
         IOpcPart_AddRef(*out);
@@ -1001,7 +1027,7 @@ static HRESULT WINAPI opc_part_set_CreatePart(IOpcPartSet *iface, IOpcPartUri *n
     if (!name)
         return E_POINTER;
 
-    if (opc_part_set_get_part(part_set, name))
+    if (opc_part_set_get_part(part_set, NULL, name))
         return OPC_E_DUPLICATE_PART;
 
     return opc_part_create(part_set, name, content_type, compression_options, part);
@@ -1023,7 +1049,7 @@ static HRESULT WINAPI opc_part_set_PartExists(IOpcPartSet *iface, IOpcPartUri *n
     if (!name || !exists)
         return E_POINTER;
 
-    *exists = opc_part_set_get_part(part_set, name) != NULL;
+    *exists = opc_part_set_get_part(part_set, NULL, name) != NULL;
 
     return S_OK;
 }
@@ -1033,6 +1059,12 @@ static HRESULT WINAPI opc_part_set_GetEnumerator(IOpcPartSet *iface, IOpcPartEnu
     struct opc_part_set *part_set = impl_from_IOpcPartSet(iface);
 
     TRACE("iface %p, enumerator %p.\n", iface, enumerator);
+
+    if ( part_set->archive )
+    {
+        FIXME("enumerator content aggregation for packages being read should also be handled. not implemented!\n");
+        return E_NOTIMPL;
+    }
 
     if (!enumerator)
         return E_POINTER;
@@ -1455,6 +1487,8 @@ static ULONG WINAPI opc_package_Release(IOpcPackage *iface)
             IOpcRelationshipSet_Release(package->relationship_set);
         if (package->source_uri)
             IOpcUri_Release(package->source_uri);
+        if (package->archive)
+            compress_release_archive(package->archive);
         free(package);
     }
 
@@ -1474,6 +1508,9 @@ static HRESULT WINAPI opc_package_GetPartSet(IOpcPackage *iface, IOpcPartSet **p
             return E_OUTOFMEMORY;
 
         part_set->IOpcPartSet_iface.lpVtbl = &opc_part_set_vtbl;
+        part_set->archive = package->archive;
+        if ( package->archive )
+            compress_addref_archive( part_set->archive );
         part_set->refcount = 1;
 
         package->part_set = &part_set->IOpcPartSet_iface;
@@ -1513,7 +1550,7 @@ static const IOpcPackageVtbl opc_package_vtbl =
     opc_package_GetRelationshipSet,
 };
 
-HRESULT opc_package_create(IOpcFactory *factory, IOpcPackage **out)
+HRESULT opc_package_create(IOpcFactory *factory, struct zip_archive *archive, IOpcPackage **out)
 {
     struct opc_package *package;
     HRESULT hr;
@@ -1522,6 +1559,9 @@ HRESULT opc_package_create(IOpcFactory *factory, IOpcPackage **out)
         return E_OUTOFMEMORY;
 
     package->IOpcPackage_iface.lpVtbl = &opc_package_vtbl;
+    package->archive = archive;
+    if ( archive )
+        compress_addref_archive( archive );
     package->refcount = 1;
 
     if (FAILED(hr = IOpcFactory_CreatePackageRootUri(factory, &package->source_uri)))
@@ -2052,5 +2092,223 @@ HRESULT opc_package_write(IOpcPackage *package, OPC_WRITE_FLAGS flags, IStream *
     compress_release_archive(archive);
     IXmlWriter_Release(writer);
 
+    return hr;
+}
+
+HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS flags, IOpcPackage **package)
+{
+    IOpcPartSet *partset = NULL;
+    IOpcPartUri *parturi = NULL;
+    IXmlReader *reader = NULL;
+    IOpcPart *part = NULL;
+    IStream *fileStream = NULL;
+    OPC_COMPRESSION_OPTIONS file_compression;
+    LARGE_INTEGER zero_pos = { .QuadPart = 0ll };
+    XmlNodeType node;
+    HRESULT hr;
+    BOOLEAN contains_content_type = FALSE;
+    size_t file_count;
+    size_t name_size;
+    size_t iterator;
+    size_t name_size_w;
+    LPCWSTR xml_elem_name;
+    LPCWSTR value;
+    LPWSTR name_w = NULL;
+    LPSTR name = NULL;
+    BSTR name_extension = NULL;
+
+    struct zip_archive *archive = NULL;
+
+    *package = NULL;
+
+    if ( FAILED( hr = CreateXmlReader( &IID_IXmlReader, (void **)&reader, NULL ) ) )
+        goto _CLEANUP;
+
+    if ( FAILED( hr = decompress_open_archive( stream, &archive ) ) ) 
+        goto _CLEANUP;
+
+    if ( FAILED( hr = decompress_get_file_count( archive, &file_count ) ) )
+        goto _CLEANUP;
+
+    if ( FAILED( hr = opc_package_create( factory, archive, package ) ) )
+        goto _CLEANUP;
+
+    // no need to complicate things through internal functions. just use opc itself
+    hr = IOpcPackage_GetPartSet( *package, &partset );
+    if ( FAILED( hr ) )
+        goto _CLEANUP;
+
+    // unfortunately not all opc packages have their [Content_Types].xml in the last index.
+    // try and find it.
+    for ( iterator = 0; iterator < file_count; iterator++ )
+    {
+        if ( FAILED( hr = decompress_get_file_name( archive, iterator, NULL, &name_size ) ) )
+            goto _CLEANUP;
+
+        name = (LPSTR)malloc( name_size * sizeof( CHAR ) );
+        if ( !name )
+        {
+            hr = E_OUTOFMEMORY;
+            goto _CLEANUP;
+        }
+
+        if ( FAILED( hr = decompress_get_file_name( archive, iterator, name, NULL ) ) )
+            goto _CLEANUP;
+
+        if ( lstrcmpA( name, "[Content_Types].xml" ) == 0 )
+        {
+            if ( flags & OPC_CACHE_ON_ACCESS )
+            {
+                FIXME("cache on access not implemented!\n");
+                hr = E_NOTIMPL;
+                goto _CLEANUP;
+            } else
+            {
+                if ( FAILED( hr = CreateStreamOnHGlobal( NULL, TRUE, &fileStream ) ) )
+                    goto _CLEANUP;
+            }
+
+            if ( FAILED( hr = decompress_extract_file( archive, iterator, fileStream ) ) )
+                goto _CLEANUP;
+
+            hr = IStream_Seek( fileStream, zero_pos, STREAM_SEEK_SET, NULL );
+            if ( FAILED( hr ) )
+                goto _CLEANUP;
+
+            hr = IXmlReader_SetInput( reader, (IUnknown *)fileStream );
+            if ( FAILED( hr ) )
+                goto _CLEANUP;
+
+            contains_content_type = TRUE;
+            break;
+        }
+
+        free( name );
+        name = NULL;
+    }
+
+    if ( !contains_content_type )
+    {
+        // malformed or invalid archive.
+        hr = OPC_E_ZIP_COMPRESSION_FAILED;
+        goto _CLEANUP;
+    }
+
+    for ( iterator = 0; iterator < file_count; iterator++ )
+    {
+        if ( parturi )
+        {
+            IOpcPartUri_Release( parturi );
+            parturi = NULL;
+        }
+        if ( name_extension )
+        {
+            SysFreeString( name_extension );
+            name_extension = NULL;
+        }
+        if ( FAILED( hr = decompress_get_file_name( archive, iterator, NULL, &name_size ) ) )
+            goto _CLEANUP;
+
+        name = (LPSTR)malloc( name_size * sizeof( CHAR ) );
+        if ( !name )
+        {
+            hr = E_OUTOFMEMORY;
+            goto _CLEANUP;
+        }
+
+        if ( FAILED( hr = decompress_get_file_name( archive, iterator, name, NULL ) ) )
+            goto _CLEANUP;
+
+        name_size_w = MultiByteToWideChar( CP_UTF8, 0, name, -1, NULL, 0 );
+        name_w = (LPWSTR)malloc( name_size_w * sizeof( WCHAR ) );
+        if ( !name_w )
+        {
+            hr = E_OUTOFMEMORY;
+            goto _CLEANUP;
+        }
+        MultiByteToWideChar( CP_UTF8, 0, name, -1, name_w, name_size_w );
+        free( name );
+        name = NULL;
+
+        hr = IOpcFactory_CreatePartUri( factory, name_w, &parturi );
+        free( name_w );
+        name_w = NULL;
+
+        if ( FAILED( hr ) )
+            goto _CLEANUP;
+
+        hr = IOpcPartUri_GetExtension( parturi, &name_extension );
+        if ( FAILED( hr ) )
+            goto _CLEANUP;
+
+        while( SUCCEEDED( hr = IXmlReader_Read( reader, &node ) ) )
+        {
+            if ( node != XmlNodeType_Element )
+                continue;
+
+            hr = IXmlReader_GetLocalName( reader, &xml_elem_name, NULL );
+            if ( FAILED( hr ) )
+                continue;
+
+            if ( lstrcmpW( xml_elem_name, L"Default") != 0 )
+                continue;
+
+            hr = IXmlReader_MoveToAttributeByName( reader, L"Extension", NULL );
+            if ( FAILED( hr ) )
+                continue;
+
+            hr = IXmlReader_GetValue( reader, &value, NULL );
+            if ( FAILED( hr ) )
+                continue; 
+
+            // apparently its somehow possible for file extensions to use different letter cases.
+            if ( lstrcmpiW( value, name_extension ) )
+            {
+                hr = IXmlReader_MoveToElement( reader );
+                if ( FAILED( hr ) )
+                {
+                    ERR("malformed [Content_Type].xml!\n");
+                    goto _CLEANUP;
+                }
+
+                hr = IXmlReader_MoveToAttributeByName( reader, L"ContentType", NULL );
+                if ( FAILED( hr ) )
+                {
+                    ERR("malformed [Content_Type].xml!\n");
+                    goto _CLEANUP;
+                }
+
+                hr = IXmlReader_GetValue( reader, &value, NULL );
+                if ( FAILED( hr ) )
+                {
+                    ERR("malformed [Content_Type].xml!\n");
+                    goto _CLEANUP;
+                }
+
+                if ( FAILED( hr = decompress_get_file_compression( archive, iterator, &file_compression ) ) )
+                    goto _CLEANUP;
+
+                hr = IOpcPartSet_CreatePart( partset, parturi, value, file_compression, &part );
+                if ( FAILED( hr ) )
+                    goto _CLEANUP;
+
+                IOpcPart_Release( part );
+            }
+        }
+    }
+
+    FIXME("package part relationships aren't supported!\n");
+
+_CLEANUP:
+    if ( FAILED( hr ) )
+        if( *package ) IOpcPackage_Release( *package );
+    if ( partset ) IOpcPartSet_Release( partset );
+    if ( part ) IOpcPart_Release( part );
+    if ( parturi ) IOpcPartUri_Release( parturi );
+    if ( name ) free( name );
+    if ( name_w ) free( name_w );
+    if ( name_extension ) SysFreeString( name_extension );
+    if ( fileStream ) IStream_Release( fileStream );
+    if ( reader ) IXmlReader_Release( reader );
     return hr;
 }

@@ -57,15 +57,25 @@ struct opc_uri
     struct opc_uri *source_uri;
 };
 
-extern HRESULT opc_package_create(IOpcFactory *factory, IOpcPackage **package);
 extern HRESULT opc_part_uri_create(IUri *uri, struct opc_uri *source_uri, IOpcPartUri **part_uri);
 extern HRESULT opc_root_uri_create(IOpcUri **opc_uri);
 
 extern HRESULT opc_package_write(IOpcPackage *package, OPC_WRITE_FLAGS flags, IStream *stream);
+extern HRESULT opc_package_read(IOpcFactory *factory, IStream *stream, OPC_READ_FLAGS flags, IOpcPackage **package);
 
 struct zip_archive;
-extern HRESULT compress_create_archive(IStream *output, bool zip64, struct zip_archive **archive);
+extern HRESULT opc_package_create(IOpcFactory *factory, struct zip_archive *archive, IOpcPackage **package);
+extern HRESULT compress_create_archive(IStream *stream, bool zip64, struct zip_archive **archive);
 extern HRESULT compress_add_file(struct zip_archive *archive, const WCHAR *path, IStream *content,
         OPC_COMPRESSION_OPTIONS options);
 extern HRESULT compress_finalize_archive(struct zip_archive *archive);
 extern void compress_release_archive(struct zip_archive *archive);
+extern void compress_addref_archive(struct zip_archive *archive);
+extern HRESULT decompress_open_archive(IStream *stream, struct zip_archive **out);
+extern HRESULT decompress_get_file_count(struct zip_archive *archive, size_t *count);
+extern HRESULT decompress_get_file_name(struct zip_archive *archive, size_t index,
+        LPSTR name, size_t *size);
+extern HRESULT decompress_get_uncompressed_file_size(struct zip_archive *archive, size_t index, UINT64 *size);
+extern HRESULT decompress_get_file_compression(struct zip_archive *archive, size_t index, OPC_COMPRESSION_OPTIONS *compression);
+extern HRESULT decompress_extract_file(struct zip_archive *archive, size_t index,
+        IStream *output);
