@@ -108,6 +108,9 @@ public:
     CreatePackageReader( IStream *inputStream, IAppxPackageReader **packageReader ) noexcept override
     {
         AppxPackageReader *reader = nullptr;
+        IOpcPackage *package = nullptr;
+        IOpcFactory *opc_factory = nullptr;
+        HRESULT hr = S_OK;
 
         TRACE( "iface %p, inputStream %p, packageReader %p.\n", this, inputStream, packageReader );
         
@@ -117,9 +120,21 @@ public:
         if ( !inputStream )
             return E_INVALIDARG;
 
-        reader = new(std::nothrow) AppxPackageReader( inputStream );
+        hr = CoCreateInstance( CLSID_OpcFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opc_factory ) );
+        if ( FAILED( hr ) ) 
+            return hr;
+
+        hr = opc_factory->ReadPackageFromStream( inputStream, OPC_READ_FLAGS::OPC_READ_DEFAULT, &package );
+        opc_factory->Release();
+        if ( FAILED( hr ) ) 
+            return hr;
+        
+        reader = new(std::nothrow) AppxPackageReader( inputStream, package );
         if ( !reader ) 
+        {
+            package->Release();
             return E_OUTOFMEMORY;
+        }
 
         *packageReader = reader;
 

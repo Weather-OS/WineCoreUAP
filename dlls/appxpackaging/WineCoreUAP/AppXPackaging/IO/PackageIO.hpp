@@ -25,6 +25,7 @@
 #include <new>
 
 #include "../../../private.h"
+#include "msopc.h"
 
 class AppxPackageReader
     : public IAppxPackageReader
@@ -34,7 +35,7 @@ public:
     AppxPackageReader(const AppxPackageReader&) = delete;
     AppxPackageReader& operator=(const AppxPackageReader&) = delete;
 
-    AppxPackageReader( IStream *fileStream );
+    AppxPackageReader( IStream *fileStream, IOpcPackage *opcPackage );
 
     virtual ~AppxPackageReader() = default;
 
@@ -68,6 +69,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IStream *packageFileStream{ nullptr };
+    IOpcPackage *package{ nullptr };
 };
 
 class AppxPackageWriter

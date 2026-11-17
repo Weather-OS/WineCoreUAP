@@ -26,10 +26,11 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
-AppxPackageReader::AppxPackageReader( IStream *fileStream )
-    : packageFileStream( fileStream )
+AppxPackageReader::AppxPackageReader( IStream *fileStream, IOpcPackage *opcPackage )
+    : packageFileStream( fileStream ), package( opcPackage )
 {
     fileStream->AddRef();
+    opcPackage->AddRef();
 }
 
 /* IUnknown Methods (Shared) */

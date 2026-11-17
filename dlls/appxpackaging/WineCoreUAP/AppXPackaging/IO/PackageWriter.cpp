@@ -77,6 +77,9 @@ AppxPackageWriter::Release() noexcept
     return curr;
 }
 
+// P.S: Don't waste your time implementing package writers.
+// No one is packaging appx on non-Windows platforms.
+
 /* IAppxPackageWriter Methods */
 HRESULT WINAPI 
 AppxPackageWriter::AddPayloadFile( LPCWSTR fileName, LPCWSTR contentType, APPX_COMPRESSION_OPTION compressionOption, 
