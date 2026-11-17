@@ -83,36 +83,91 @@ AppxFile::Release() noexcept
 HRESULT WINAPI
 AppxFile::GetCompressionOption( APPX_COMPRESSION_OPTION *compressionOption ) noexcept
 {
-    FIXME( "iface %p, compressionOption %p.\n", this, compressionOption );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    OPC_COMPRESSION_OPTIONS option;
+
+    TRACE( "iface %p, compressionOption %p.\n", this, compressionOption );
+
+    if ( FAILED( hr = filePart->GetCompressionOptions( &option ) ) )
+        return hr;
+
+    // OPC_COMPRESSION_OPTIONS maps almost perfectly to APPX_COMPRESSION_OPTION.
+    // we just need to move it 1 step to the right.
+    
+    *compressionOption = (APPX_COMPRESSION_OPTION)(option + 1);
+
+    return S_OK;
 }
 
 HRESULT WINAPI
 AppxFile::GetContentType( LPWSTR *contentType ) noexcept
 {
-    FIXME( "iface %p, contentType %p.\n", this, contentType );
-    return E_NOTIMPL;
+    TRACE( "iface %p, contentType %p.\n", this, contentType );
+
+    return filePart->GetContentType( contentType );
 }
 
 HRESULT WINAPI
 AppxFile::GetName( LPWSTR *fileName ) noexcept
 {
-    FIXME( "iface %p, fileName %p.\n", this, fileName );
-    return E_NOTIMPL;
+    BSTR path;
+    HRESULT hr = S_OK;
+    IOpcPartUri *part_uri = nullptr;
+
+    TRACE( "iface %p, fileName %p.\n", this, fileName );
+
+    if ( !fileName )
+        return E_POINTER;
+
+    if ( FAILED( hr = filePart->GetName( &part_uri ) ) )
+        return hr;
+
+    hr = part_uri->GetPath( &path );
+    part_uri->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    *fileName = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( path ) + sizeof(WCHAR) );
+    if ( !*fileName )
+    {
+        SysFreeString( path );
+        return E_OUTOFMEMORY;
+    }
+    lstrcpynW( *fileName, path, SysStringLen( path ) + 1 );
+    SysFreeString( path );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxFile::GetSize( UINT64 *size ) noexcept
 {
-    FIXME( "iface %p, size %p.\n", this, size );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    IStream *stream = nullptr;
+    LARGE_INTEGER move = {};
+    ULARGE_INTEGER newPosition = {};
+
+    TRACE( "iface %p, size %p.\n", this, size );
+
+    hr = filePart->GetContentStream( &stream );
+    if ( FAILED( hr ) )
+        return hr;
+
+    // IOpcPart stream does not support stat in wine.
+    hr = stream->Seek( move, STREAM_SEEK_END, &newPosition );
+    stream->Release();
+
+    *size = newPosition.QuadPart;
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxFile::GetStream( IStream **stream ) noexcept
 {
-    FIXME( "iface %p, stream %p.\n", this, stream );
-    return E_NOTIMPL;
+    TRACE( "iface %p, stream %p.\n", this, stream );
+
+    return filePart->GetContentStream( stream );
 }
 
 // ------------- IAppxBlockMapReader ------------- //
