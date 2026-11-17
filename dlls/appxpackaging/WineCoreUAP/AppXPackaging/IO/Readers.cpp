@@ -229,22 +229,46 @@ AppxFilesEnumerator::Release() noexcept
 HRESULT WINAPI 
 AppxFilesEnumerator::GetCurrent( IAppxFile **file )
 {
-    FIXME( "iface %p, file %p stub!\n", this, file );
-    return E_NOTIMPL;
+    TRACE( "iface %p, file %p.\n", this, file );
+
+    if ( index >= filesCount )
+        return E_BOUNDS;
+
+    *file = files[index];
+    files[index]->AddRef();
+
+    return S_OK;
 }
 
 HRESULT WINAPI 
 AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent )
 {
-    FIXME( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
-    return E_NOTIMPL;
+    TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
+
+    *hasCurrent = FALSE;
+
+    if ( index < filesCount )
+        *hasCurrent = TRUE;
+
+    return S_OK;
 }
 
 HRESULT WINAPI 
 AppxFilesEnumerator::MoveNext( BOOL *hasNext )
 {
-    FIXME( "iface %p, hasNext %p stub!\n", this, hasNext );
-    return E_NOTIMPL;
+    TRACE( "iface %p, hasNext %p.\n", this, hasNext );
+
+    *hasNext = FALSE;
+
+    if ( index >= filesCount )
+        return E_BOUNDS;
+
+    index++;
+
+    if ( index + 1 < filesCount )
+        *hasNext = TRUE;
+
+    return S_OK;
 }
 
 // ------------- IAppxBlockMapReader ------------- //

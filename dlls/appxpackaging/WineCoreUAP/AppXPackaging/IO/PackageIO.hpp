@@ -106,6 +106,7 @@ public:
 
 private:
     std::atomic<LONG> ref{ 1 };
+    SIZE_T index{ 0 };
     SIZE_T filesCount;
     IAppxFile **files;
 };
