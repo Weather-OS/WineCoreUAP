@@ -130,9 +130,9 @@ public:
             return hr;
         
         reader = new(std::nothrow) AppxPackageReader( inputStream, package );
+        package->Release();
         if ( !reader ) 
         {
-            package->Release();
             return E_OUTOFMEMORY;
         }
 
