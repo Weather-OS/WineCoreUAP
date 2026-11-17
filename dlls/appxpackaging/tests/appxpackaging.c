@@ -75,7 +75,11 @@ static void load_resource( const WCHAR *name, const WCHAR *type, const WCHAR *fi
 
 static void test_IAppxPackageReader( IAppxPackageReader *reader )
 {
+    HRESULT hr = S_OK;
+    IAppxBlockMapReader *blockMap = NULL;
 
+    hr = IAppxPackageReader_GetBlockMap( reader, &blockMap );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetBlockMap failed with %#lx\n", hr );
 }
 
 static void test_AppxFactory( void )
@@ -111,6 +115,8 @@ static void test_AppxFactory( void )
 
     hr = IAppxFactory_CreatePackageReader( factory, stream, &reader );
     ok( SUCCEEDED( hr ), "IAppxFactory::CreatePackageReader failed with %#lx\n", hr );
+
+    test_IAppxPackageReader( reader );
 }
 
 START_TEST(appxpackaging)
