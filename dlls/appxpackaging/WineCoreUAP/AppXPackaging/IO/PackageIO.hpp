@@ -26,6 +26,50 @@
 
 #include "../../../private.h"
 
+/* IOpcPart backed AppxFile */
+class AppxFile
+    : public IAppxFile
+{
+public:
+    AppxFile() = default;
+    AppxFile(const AppxFile&) = delete;
+    AppxFile& operator=(const AppxFile&) = delete;
+
+    AppxFile( IOpcPart *part );
+
+    virtual ~AppxFile() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxFile Methods */
+    HRESULT WINAPI 
+    GetCompressionOption( APPX_COMPRESSION_OPTION *compressionOption ) noexcept override;
+
+    HRESULT WINAPI 
+    GetContentType( LPWSTR *contentType ) noexcept override;
+
+    HRESULT WINAPI 
+    GetName( LPWSTR *fileName ) noexcept override;
+
+    HRESULT WINAPI 
+    GetSize( UINT64 *size ) noexcept override;
+
+    HRESULT WINAPI 
+    GetStream( IStream **stream ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IOpcPart *filePart{ nullptr };
+};
+
 class AppxBlockMapReader
     : public IAppxBlockMapReader
 {
