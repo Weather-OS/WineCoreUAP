@@ -70,6 +70,7 @@ private:
     IOpcPart *filePart{ nullptr };
 };
 
+/* IAppxFile backed AppxBlockMapReader */
 class AppxBlockMapReader
     : public IAppxBlockMapReader
 {
@@ -78,7 +79,7 @@ public:
     AppxBlockMapReader(const AppxBlockMapReader&) = delete;
     AppxBlockMapReader& operator=(const AppxBlockMapReader&) = delete;
 
-    AppxBlockMapReader( IStream *fileStream );
+    AppxBlockMapReader( IAppxFile *file );
 
     virtual ~AppxBlockMapReader() = default;
 
@@ -107,7 +108,7 @@ public:
 
 private:
     std::atomic<LONG> ref{ 1 };
-    IStream *blockMapFileStream{ nullptr };
+    IAppxFile *appxFile{ nullptr };
 };
 
 class AppxPackageReader

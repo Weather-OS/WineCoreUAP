@@ -116,10 +116,10 @@ AppxFile::GetStream( IStream **stream ) noexcept
 }
 
 // ------------- IAppxBlockMapReader ------------- //
-AppxBlockMapReader::AppxBlockMapReader( IStream *fileStream )
-    : blockMapFileStream( fileStream )
+AppxBlockMapReader::AppxBlockMapReader( IAppxFile *file )
+    : appxFile( file )
 {
-    fileStream->AddRef();
+    file->AddRef();
 }
 
 /* IUnknown Methods (Shared) */
@@ -160,7 +160,7 @@ AppxBlockMapReader::Release() noexcept
 
     if ( !curr )
     {
-        if ( blockMapFileStream ) blockMapFileStream->Release();
+        if ( appxFile ) appxFile->Release();
         delete this;
     }
     
