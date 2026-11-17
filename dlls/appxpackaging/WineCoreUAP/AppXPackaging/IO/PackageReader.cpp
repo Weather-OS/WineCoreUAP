@@ -94,6 +94,9 @@ AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
 
     TRACE( "iface %p, blockMapReader %p stub!\n", this, blockMapReader );
 
+    if ( !blockMapReader )
+        return E_POINTER;
+
     hr = CoCreateInstance( CLSID_OpcFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opc_factory ) );
     if ( FAILED( hr ) ) 
         return hr;
@@ -126,9 +129,9 @@ AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
         return hr;
 
     reader = new(std::nothrow) AppxBlockMapReader( part_stream );
+    part_stream->Release();
     if ( !reader ) 
     {
-        part_stream->Release();
         return E_OUTOFMEMORY;
     }
 
@@ -154,8 +157,52 @@ AppxPackageReader::GetManifest( IAppxManifestReader **manifestReader ) noexcept
 HRESULT WINAPI
 AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
 {
-    FIXME( "iface %p, fileName %s, file %p stub!\n", this, debugstr_w(fileName), file );
-    return E_NOTIMPL;
+    HRESULT hr;
+    IOpcPart *part = nullptr;
+    IOpcPartSet *part_set = nullptr;
+    IOpcPartUri *part_uri = nullptr;
+    IOpcFactory *opc_factory = nullptr;
+    IAppxFile *appx_file;
+
+    TRACE( "iface %p, fileName %s, file %p stub!\n", this, debugstr_w( fileName ), file );
+
+    if ( !fileName )
+        return E_INVALIDARG;
+
+    if ( !file )
+        return E_POINTER;
+
+    hr = CoCreateInstance( CLSID_OpcFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opc_factory ) );
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    hr = opc_factory->CreatePartUri( fileName, &part_uri );
+    opc_factory->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    if ( FAILED( hr = package->GetPartSet( &part_set ) ) )
+    {
+        part_uri->Release();
+        return hr;
+    }
+
+    hr = part_set->GetPart( part_uri, &part );
+    part_uri->Release();
+    part_set->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    appx_file = new(std::nothrow) AppxFile( part );
+    part->Release();
+    if ( !appx_file ) 
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    *file = appx_file;
+
+    return S_OK;
 }
 
 HRESULT WINAPI
