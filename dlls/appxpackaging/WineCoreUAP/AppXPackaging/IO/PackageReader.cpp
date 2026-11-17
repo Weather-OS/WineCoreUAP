@@ -84,8 +84,57 @@ AppxPackageReader::Release() noexcept
 HRESULT WINAPI
 AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
 {
-    FIXME( "iface %p, blockMapReader %p stub!\n", this, blockMapReader );
-    return E_NOTIMPL;
+    HRESULT hr;
+    IStream *part_stream = nullptr;
+    IOpcPart *part = nullptr;
+    IOpcPartSet *part_set = nullptr;
+    IOpcPartUri *part_uri = nullptr;
+    IOpcFactory *opc_factory = nullptr;
+    AppxBlockMapReader *reader;
+
+    TRACE( "iface %p, blockMapReader %p stub!\n", this, blockMapReader );
+
+    hr = CoCreateInstance( CLSID_OpcFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opc_factory ) );
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    hr = opc_factory->CreatePartUri( (LPWSTR)L"/AppxBlockMap.xml", &part_uri );
+    opc_factory->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    if ( FAILED( hr = package->GetPartSet( &part_set ) ) )
+    {
+        part_uri->Release();
+        return hr;
+    }
+
+    hr = part_set->GetPart( part_uri, &part );
+    part_uri->Release();
+    part_set->Release();
+    if ( FAILED( hr ) )
+    {
+        if ( hr == OPC_E_NO_SUCH_PART )
+            ERR("Could not find AppxBlockMap.xml. AppX Package is malformed!\n");
+
+        return hr;
+    }
+
+    hr = part->GetContentStream( &part_stream );
+    part->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    reader = new(std::nothrow) AppxBlockMapReader( part_stream );
+    if ( !reader ) 
+    {
+        part_stream->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    *blockMapReader = reader;
+
+    return S_OK;
 }
 
 HRESULT WINAPI

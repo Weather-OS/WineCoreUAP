@@ -27,7 +27,7 @@
 #include "../../../private.h"
 
 class AppxBlockMapReader
-    : IAppxBlockMapReader
+    : public IAppxBlockMapReader
 {
 public:
     AppxBlockMapReader() = default;
