@@ -88,12 +88,12 @@ AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
     IAppxFile *file = nullptr;
     IAppxBlockMapReader *reader = nullptr;
    
-    TRACE( "iface %p, blockMapReader %p stub!\n", this, blockMapReader );
+    TRACE( "iface %p, blockMapReader %p.\n", this, blockMapReader );
 
     if ( !blockMapReader )
         return E_POINTER;
 
-    if ( FAILED( hr = GetPayloadFile( (LPCWSTR)L"/AppxBlockMap.xml", &file ) ) )
+    if ( FAILED( hr = GetFile( (LPCWSTR)L"/AppxBlockMap.xml", &file ) ) )
         return hr;
 
     reader = new(std::nothrow) AppxBlockMapReader( file );
@@ -125,6 +125,25 @@ AppxPackageReader::GetManifest( IAppxManifestReader **manifestReader ) noexcept
 HRESULT WINAPI
 AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
 {
+    FIXME( "iface %p, fileName %s, file %p stub!\n", this, debugstr_w( fileName ), file );
+
+    return S_OK;
+}
+
+HRESULT WINAPI
+AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noexcept
+{
+    FIXME( "iface %p, filesEnumerator %p stub!\n", this, filesEnumerator );
+    return E_NOTIMPL;
+}
+
+/* Internal Methods */
+
+// AppxPackageReader::GetPayloadFiles is only supposed to fetch files 
+// outside of Footprint files.
+HRESULT WINAPI
+AppxPackageReader::GetFile( LPCWSTR fileName, IAppxFile **file ) noexcept
+{
     HRESULT hr;
     IOpcPart *part = nullptr;
     IOpcPartSet *part_set = nullptr;
@@ -132,7 +151,7 @@ AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
     IOpcFactory *opc_factory = nullptr;
     IAppxFile *appx_file;
 
-    TRACE( "iface %p, fileName %s, file %p stub!\n", this, debugstr_w( fileName ), file );
+    TRACE( "iface %p, fileName %s, file %p.\n", this, debugstr_w( fileName ), file );
 
     if ( !fileName )
         return E_INVALIDARG;
@@ -171,11 +190,4 @@ AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
     *file = appx_file;
 
     return S_OK;
-}
-
-HRESULT WINAPI
-AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noexcept
-{
-    FIXME( "iface %p, filesEnumerator %p stub!\n", this, filesEnumerator );
-    return E_NOTIMPL;
 }

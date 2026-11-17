@@ -151,6 +151,10 @@ public:
     GetManifest( IAppxManifestReader **manifestReader ) noexcept override;
 
 private:
+    /* Internal Methods */
+    HRESULT WINAPI
+    GetFile( LPCWSTR fileName, IAppxFile **file ) noexcept;
+
     std::atomic<LONG> ref{ 1 };
     IStream *packageFileStream{ nullptr };
     IOpcPackage *package{ nullptr };
