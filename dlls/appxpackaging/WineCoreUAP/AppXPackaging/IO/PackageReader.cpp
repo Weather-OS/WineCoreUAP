@@ -72,6 +72,8 @@ AppxPackageReader::Release() noexcept
     if ( !curr )
     {
         if ( packageFileStream ) packageFileStream->Release();
+        if ( package ) package->Release();
+
         delete this;
     }
     

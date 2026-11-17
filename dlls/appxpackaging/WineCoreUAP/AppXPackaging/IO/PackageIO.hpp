@@ -27,6 +27,46 @@
 #include "../../../private.h"
 #include "msopc.h"
 
+class AppxBlockMapReader
+    : IAppxBlockMapReader
+{
+public:
+    AppxBlockMapReader() = default;
+    AppxBlockMapReader(const AppxBlockMapReader&) = delete;
+    AppxBlockMapReader& operator=(const AppxBlockMapReader&) = delete;
+
+    AppxBlockMapReader( IStream *fileStream );
+
+    virtual ~AppxBlockMapReader() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxBlockMapReader Methods */
+    HRESULT WINAPI 
+    GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexcept override;
+
+    HRESULT WINAPI 
+    GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexcept override;
+
+    HRESULT WINAPI 
+    GetHashMethod( IUri **hashMethod ) noexcept override;
+
+    HRESULT WINAPI 
+    GetStream( IStream **blockMapStream ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IStream *blockMapFileStream{ nullptr };
+};
+
 class AppxPackageReader
     : public IAppxPackageReader
 {
