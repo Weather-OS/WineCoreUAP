@@ -182,6 +182,8 @@ static void opc_content_release(struct opc_content *content)
 
 static HRESULT opc_part_enum_create(struct opc_part_set *part_set, IOpcPartEnumerator **out);
 
+static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_set, struct zip_archive *archive, IOpcPartUri *name);
+
 static HRESULT WINAPI opc_part_enum_QueryInterface(IOpcPartEnumerator *iface, REFIID iid, void **out)
 {
     TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
@@ -276,6 +278,7 @@ static HRESULT WINAPI opc_part_enum_MovePrevious(IOpcPartEnumerator *iface, BOOL
 static HRESULT WINAPI opc_part_enum_GetCurrent(IOpcPartEnumerator *iface, IOpcPart **part)
 {
     struct opc_part_enum *part_enum = impl_from_IOpcPartEnumerator(iface);
+    struct opc_part *opcpart = NULL;
 
     TRACE("iface %p, part %p.\n", iface, part);
 
@@ -289,7 +292,13 @@ static HRESULT WINAPI opc_part_enum_GetCurrent(IOpcPartEnumerator *iface, IOpcPa
 
     if (part_enum->pos < part_enum->part_set->count)
     {
-        *part = &part_enum->part_set->parts[part_enum->pos]->IOpcPart_iface;
+        // ref is from part_set, so it's safe.
+        if ( part_enum->part_set->archive )
+        {
+            opcpart = opc_part_set_get_part( part_enum->part_set, part_enum->part_set->archive, part_enum->part_set->parts[part_enum->pos]->name );
+            *part = &opcpart->IOpcPart_iface;
+        } else 
+            *part = &part_enum->part_set->parts[part_enum->pos]->IOpcPart_iface;
         IOpcPart_AddRef(*part);
     }
 
@@ -1059,12 +1068,6 @@ static HRESULT WINAPI opc_part_set_GetEnumerator(IOpcPartSet *iface, IOpcPartEnu
     struct opc_part_set *part_set = impl_from_IOpcPartSet(iface);
 
     TRACE("iface %p, enumerator %p.\n", iface, enumerator);
-
-    if ( part_set->archive )
-    {
-        FIXME("enumerator content aggregation for packages being read should also be handled. not implemented!\n");
-        return E_NOTIMPL;
-    }
 
     if (!enumerator)
         return E_POINTER;
