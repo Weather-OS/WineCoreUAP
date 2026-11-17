@@ -22,7 +22,6 @@
 #define __WINE_APPX_PACKAGE_IO_H
 
 #include <atomic>
-#include <new>
 
 #include "../../../private.h"
 
@@ -68,6 +67,47 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IOpcPart *filePart{ nullptr };
+};
+
+/*
+ * AppxFilesEnumerator should not be IOpcPartEnumerator backed, as it
+ * doesn't represent footprint files.
+ */
+class AppxFilesEnumerator
+    : public IAppxFilesEnumerator
+{
+public:
+    AppxFilesEnumerator() = default;
+    AppxFilesEnumerator(const AppxFilesEnumerator&) = delete;
+    AppxFilesEnumerator& operator=(const AppxFilesEnumerator&) = delete;
+
+    AppxFilesEnumerator( IAppxFile **files, SIZE_T size );
+
+    virtual ~AppxFilesEnumerator() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    HRESULT WINAPI 
+    GetCurrent( IAppxFile **file ) noexcept override;
+
+    HRESULT WINAPI 
+    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
+
+    HRESULT WINAPI 
+    MoveNext( BOOL *hasNext ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    SIZE_T filesCount;
+    IAppxFile **files;
 };
 
 /* IAppxFile backed AppxBlockMapReader */

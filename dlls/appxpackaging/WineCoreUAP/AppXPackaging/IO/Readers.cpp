@@ -170,6 +170,83 @@ AppxFile::GetStream( IStream **stream ) noexcept
     return filePart->GetContentStream( stream );
 }
 
+// ------------- IAppxFilesEnumerator ------------- //
+AppxFilesEnumerator::AppxFilesEnumerator( IAppxFile **files, SIZE_T size )
+    : files( files ), filesCount( size )
+{
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxFilesEnumerator::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxFilesEnumerator ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxFilesEnumerator *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxFilesEnumerator::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxFilesEnumerator::Release() noexcept
+{
+    SIZE_T iterator;
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        for ( iterator = 0; iterator < filesCount; iterator++ )
+        {
+            files[iterator]->Release();
+        }
+
+        delete this;
+    }
+    
+    return curr;
+}
+
+HRESULT WINAPI 
+AppxFilesEnumerator::GetCurrent( IAppxFile **file )
+{
+    FIXME( "iface %p, file %p stub!\n", this, file );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent )
+{
+    FIXME( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxFilesEnumerator::MoveNext( BOOL *hasNext )
+{
+    FIXME( "iface %p, hasNext %p stub!\n", this, hasNext );
+    return E_NOTIMPL;
+}
+
 // ------------- IAppxBlockMapReader ------------- //
 AppxBlockMapReader::AppxBlockMapReader( IAppxFile *file )
     : appxFile( file )
