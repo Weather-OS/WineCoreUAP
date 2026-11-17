@@ -31,6 +31,7 @@
 
 #include "activation.h"
 #include "appx.h"
+#include "msopc.h"
 #include "appxpackaging.h"
 
 #ifdef __cplusplus

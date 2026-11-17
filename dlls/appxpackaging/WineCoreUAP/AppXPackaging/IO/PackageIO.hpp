@@ -25,7 +25,6 @@
 #include <new>
 
 #include "../../../private.h"
-#include "msopc.h"
 
 class AppxBlockMapReader
     : IAppxBlockMapReader

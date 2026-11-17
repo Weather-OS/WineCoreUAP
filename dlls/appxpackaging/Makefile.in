@@ -10,4 +10,5 @@ SOURCES = \
     WineCoreUAP/AppXPackaging/AppxFactory.cpp \
     \
     WineCoreUAP/AppXPackaging/IO/PackageReader.cpp \
-    WineCoreUAP/AppXPackaging/IO/PackageWriter.cpp
+    WineCoreUAP/AppXPackaging/IO/PackageWriter.cpp \
+    WineCoreUAP/AppXPackaging/IO/Readers.cpp
