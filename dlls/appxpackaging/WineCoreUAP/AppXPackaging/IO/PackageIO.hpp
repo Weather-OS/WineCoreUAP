@@ -106,9 +106,9 @@ public:
 
 private:
     std::atomic<LONG> ref{ 1 };
+    IAppxFile **files{};
     SIZE_T index{ 0 };
-    SIZE_T filesCount;
-    IAppxFile **files;
+    SIZE_T filesCount{ 0 };
 };
 
 /* IAppxFile backed AppxBlockMapReader */
@@ -191,11 +191,14 @@ public:
     HRESULT WINAPI 
     GetManifest( IAppxManifestReader **manifestReader ) noexcept override;
 
-private:
     /* Internal Methods */
     HRESULT WINAPI
     GetFile( LPCWSTR fileName, IAppxFile **file ) noexcept;
 
+    HRESULT WINAPI
+    GetFiles( IAppxFilesEnumerator **enumerator ) noexcept;
+
+private:
     std::atomic<LONG> ref{ 1 };
     IStream *packageFileStream{ nullptr };
     IOpcPackage *package{ nullptr };

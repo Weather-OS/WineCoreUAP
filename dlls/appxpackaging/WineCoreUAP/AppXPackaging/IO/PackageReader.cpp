@@ -111,8 +111,35 @@ AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
 HRESULT WINAPI
 AppxPackageReader::GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE type, IAppxFile **file ) noexcept
 {
-    FIXME( "iface %p, type %d, file %p stub!\n", this, type, file );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, type %d, file %p.\n", this, type, file );
+
+    switch ( type )
+    {
+        case APPX_FOOTPRINT_FILE_TYPE_MANIFEST:
+            hr = GetFile( (LPCWSTR)L"/AppxManifest.xml", file );
+            return hr;
+
+        case APPX_FOOTPRINT_FILE_TYPE_BLOCKMAP:
+            hr = GetFile( (LPCWSTR)L"/AppxBlockMap.xml", file );
+            return hr;
+
+        case APPX_FOOTPRINT_FILE_TYPE_SIGNATURE:
+            hr = GetFile( (LPCWSTR)L"/AppxSignature.p7x", file );
+            return hr;
+
+        case APPX_FOOTPRINT_FILE_TYPE_CODEINTEGRITY:
+            hr = GetFile( (LPCWSTR)L"/AppxMetadata/CodeIntegrity.cat", file );
+            return hr;
+
+        case APPX_FOOTPRINT_FILE_TYPE_CONTENTGROUPMAP:
+            hr = GetFile( (LPCWSTR)L"/AppxContentGroupMap.xml", file );
+            return hr;
+
+        default:
+            return E_INVALIDARG;
+    }
 }
 
 HRESULT WINAPI
@@ -183,11 +210,95 @@ AppxPackageReader::GetFile( LPCWSTR fileName, IAppxFile **file ) noexcept
     appx_file = new(std::nothrow) AppxFile( part );
     part->Release();
     if ( !appx_file ) 
-    {
         return E_OUTOFMEMORY;
-    }
 
     *file = appx_file;
 
     return S_OK;
+}
+
+HRESULT WINAPI
+AppxPackageReader::GetFiles( IAppxFilesEnumerator **enumerator ) noexcept
+{
+    HRESULT hr;
+    SIZE_T count = 0;
+    SIZE_T iterator = 0;
+    BOOL exists;
+    IOpcPart *current_part = nullptr;
+    IOpcPartSet *part_set = nullptr;
+    IOpcPartEnumerator *opc_part_enumerator = nullptr;
+    IAppxFile **appx_files = nullptr;
+    IAppxFile **appx_files_tmp = nullptr;
+
+    TRACE( "iface %p, fileName %s, enumerator %p.\n", this, enumerator );
+
+    if ( !enumerator )
+        return E_POINTER;
+
+    if ( FAILED( hr = package->GetPartSet( &part_set ) ) )
+        goto _CLEANUP;
+
+    hr = part_set->GetEnumerator( &opc_part_enumerator );
+    if ( FAILED( hr ) )
+        goto _CLEANUP;
+
+    if ( FAILED( hr = opc_part_enumerator->MoveNext( &exists ) ) )
+    {
+        if ( hr == OPC_E_ENUM_INVALID_POSITION )
+            hr = APPX_E_CORRUPT_CONTENT;
+        goto _CLEANUP;
+    }
+
+    appx_files = (IAppxFile **)CoTaskMemAlloc( sizeof(IAppxFile *) );
+    if ( !appx_files )
+    {
+        hr = E_OUTOFMEMORY;
+        goto _CLEANUP;
+    }
+
+    while ( exists )
+    {
+        if ( FAILED( hr = opc_part_enumerator->GetCurrent( &current_part ) ) )
+            goto _CLEANUP;
+
+        appx_files_tmp = (IAppxFile **)CoTaskMemRealloc( appx_files, (count + 1) * sizeof(IAppxFile *) );
+        if ( !appx_files_tmp )
+        {
+            hr = E_OUTOFMEMORY;
+            current_part->Release();
+            current_part = nullptr;
+            goto _CLEANUP;
+        }
+        appx_files = appx_files_tmp;
+
+        appx_files[count] = new(std::nothrow) AppxFile( current_part );
+        current_part->Release();
+        current_part = nullptr;
+        if ( !appx_files[count] ) 
+        {
+            hr = E_OUTOFMEMORY;
+            goto _CLEANUP;
+        }
+
+        count++;
+
+        if ( FAILED( hr = opc_part_enumerator->MoveNext( &exists ) ) )
+            goto _CLEANUP;
+    }
+
+    *enumerator = new(std::nothrow) AppxFilesEnumerator( appx_files, count );
+    if ( !*enumerator ) 
+        hr = E_OUTOFMEMORY;
+
+_CLEANUP:
+    if ( FAILED( hr ) )
+    {
+        if ( current_part ) current_part->Release();
+        for ( iterator = 0; iterator < count; iterator++ )
+            appx_files[iterator]->Release();
+        CoTaskMemFree( appx_files );
+    }
+    if ( part_set ) part_set->Release();
+    if ( opc_part_enumerator ) opc_part_enumerator->Release();
+    return hr;
 }
