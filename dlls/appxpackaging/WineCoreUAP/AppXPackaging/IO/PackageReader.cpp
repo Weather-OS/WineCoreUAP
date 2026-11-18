@@ -230,7 +230,7 @@ AppxPackageReader::GetFiles( IAppxFilesEnumerator **enumerator ) noexcept
     IAppxFile **appx_files = nullptr;
     IAppxFile **appx_files_tmp = nullptr;
 
-    TRACE( "iface %p, fileName %s, enumerator %p.\n", this, enumerator );
+    TRACE( "iface %p, enumerator %p.\n", this, enumerator );
 
     if ( !enumerator )
         return E_POINTER;

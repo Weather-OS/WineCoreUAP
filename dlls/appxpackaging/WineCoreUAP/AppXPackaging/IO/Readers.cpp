@@ -226,6 +226,7 @@ AppxFilesEnumerator::Release() noexcept
     return curr;
 }
 
+/* IAppxFilesEnumerator Methods */
 HRESULT WINAPI 
 AppxFilesEnumerator::GetCurrent( IAppxFile **file ) noexcept
 {
@@ -269,85 +270,4 @@ AppxFilesEnumerator::MoveNext( BOOL *hasNext ) noexcept
         *hasNext = TRUE;
 
     return S_OK;
-}
-
-// ------------- IAppxBlockMapReader ------------- //
-AppxBlockMapReader::AppxBlockMapReader( IAppxFile *file )
-    : appxFile( file )
-{
-    file->AddRef();
-}
-
-/* IUnknown Methods (Shared) */
-HRESULT WINAPI
-AppxBlockMapReader::QueryInterface( REFIID iid, void** out ) noexcept
-{
-    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
-
-    if (!out) return E_POINTER;
-    *out = nullptr;
-
-    if ( iid == __uuidof( IUnknown ) ||
-         iid == __uuidof( IAppxBlockMapReader ) )
-    {
-        AddRef();
-        *out = static_cast<IAppxBlockMapReader *>(this);
-        return S_OK;
-    }
-
-    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
-    *out = nullptr;
-    return E_NOINTERFACE;
-}
-
-ULONG WINAPI 
-AppxBlockMapReader::AddRef() noexcept
-{
-    ULONG curr = static_cast<ULONG>(++ref);
-    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
-    return curr;
-}
-
-ULONG WINAPI 
-AppxBlockMapReader::Release() noexcept
-{
-    ULONG curr = static_cast<ULONG>(--ref);
-    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
-
-    if ( !curr )
-    {
-        if ( appxFile ) appxFile->Release();
-        delete this;
-    }
-    
-    return curr;
-}
-
-/* IAppxBlockMapReader Methods */
-HRESULT WINAPI
-AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexcept
-{
-    FIXME( "iface %p, filename %s, file %p.\n", this, debugstr_w( filename ), file );
-    return E_NOTIMPL;
-}
-
-HRESULT WINAPI
-AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexcept
-{
-    FIXME( "iface %p, enumerator %p stub!\n", this, enumerator );
-    return E_NOTIMPL;
-}
-
-HRESULT WINAPI
-AppxBlockMapReader::GetHashMethod( IUri **hashMethod ) noexcept
-{
-    FIXME( "iface %p, hashMethod %p stub!\n", this, hashMethod );
-    return E_NOTIMPL;
-}
-
-HRESULT WINAPI
-AppxBlockMapReader::GetStream( IStream **blockMapStream ) noexcept
-{
-    FIXME( "iface %p, blockMapStream %p stub!\n", this, blockMapStream );
-    return E_NOTIMPL;
 }
