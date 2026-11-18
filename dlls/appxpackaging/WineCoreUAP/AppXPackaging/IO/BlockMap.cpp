@@ -21,7 +21,7 @@
 #include <atomic>
 #include <new>
 
-#include "PackageIO.hpp"
+#include "BlockMap.hpp"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
@@ -90,22 +90,121 @@ AppxBlockMapFile::GetBlocks( IAppxBlockMapBlocksEnumerator **blocks ) noexcept
 HRESULT WINAPI 
 AppxBlockMapFile::GetLocalFileHeaderSize( UINT32 *lfhSize ) noexcept
 {
-    FIXME( "iface %p, lfhSize %p stub!\n", this, lfhSize );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, lfhSize %p.\n", this, lfhSize );
+
+    if ( !lfhSize )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"LfhSize" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_I4 );
+        if ( SUCCEEDED( hr ) )
+            *lfhSize = V_I4( &val );
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
 {
-    FIXME( "iface %p, name %p stub!\n", this, name );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, name %p.\n", this, name );
+
+    if ( !name )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Name" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( *name )
+                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapFile::GetUncompressedSize( UINT64 *size ) noexcept
 {
-    FIXME( "iface %p, size %p stub!\n", this, size );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, size %p.\n", this, size );
+
+    if ( !size )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Size" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_I4 );
+        if ( SUCCEEDED( hr ) )
+            *size = V_I4( &val );
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 

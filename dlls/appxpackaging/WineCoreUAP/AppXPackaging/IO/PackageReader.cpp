@@ -22,6 +22,7 @@
 #include <new>
 
 #include "PackageIO.hpp"
+#include "BlockMap.hpp"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
