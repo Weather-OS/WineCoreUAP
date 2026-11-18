@@ -25,6 +25,40 @@
 
 #include "../../../private.h"
 
+class AppxBlockMapBlock
+    : public IAppxBlockMapBlock
+{
+public:
+    AppxBlockMapBlock() = default;
+    AppxBlockMapBlock(const AppxBlockMapBlock&) = delete;
+    AppxBlockMapBlock& operator=(const AppxBlockMapBlock&) = delete;
+
+    AppxBlockMapBlock( IXMLDOMElement *element );
+
+    virtual ~AppxBlockMapBlock() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxBlockMapFile Methods */
+    HRESULT WINAPI 
+    GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept override;
+
+    HRESULT WINAPI 
+    GetCompressedSize( UINT32 *size ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMElement *xmlElement{ nullptr };
+};
+
 class AppxBlockMapBlocksEnumerator
     : public IAppxBlockMapBlocksEnumerator
 {

@@ -26,7 +26,75 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
-// ------------- IAppxBlockMapFilesEnumerator ------------- //
+// ------------- IAppxBlockMapBlock ------------- //
+AppxBlockMapBlock::AppxBlockMapBlock( IXMLDOMElement *element )
+    : xmlElement( element )
+{
+    element->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxBlockMapBlock::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxBlockMapBlock ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxBlockMapBlock *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxBlockMapBlock::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxBlockMapBlock::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if ( xmlElement ) xmlElement->Release();
+
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxBlockMapBlock Methods */
+HRESULT WINAPI 
+AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
+{
+    FIXME( "iface %p, bufferSize %p, buffer %p stub!\n", this, bufferSize, buffer );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxBlockMapBlock::GetCompressedSize( UINT32 *size ) noexcept
+{
+    FIXME( "iface %p, size %p stub!\n", this, size );
+    return E_NOTIMPL;
+}
+
+// ------------- IAppxBlockMapBlocksEnumerator ------------- //
 AppxBlockMapBlocksEnumerator::AppxBlockMapBlocksEnumerator( IXMLDOMNodeList *nodes )
     : blockNodes( nodes )
 {
@@ -78,7 +146,7 @@ AppxBlockMapBlocksEnumerator::Release() noexcept
     return curr;
 }
 
-/* IAppxBlockMapFilesEnumerator Methods */
+/* IAppxBlockMapBlocksEnumerator Methods */
 HRESULT WINAPI 
 AppxBlockMapBlocksEnumerator::GetCurrent( IAppxBlockMapBlock **block ) noexcept
 {
