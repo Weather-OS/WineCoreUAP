@@ -1,5 +1,5 @@
 /* 
- * AppXPackage Reader and Writer interfaces.
+ * AppX Block Map classes
  *
  * Written by Weather.
  *
@@ -24,6 +24,43 @@
 #include <atomic>
 
 #include "../../../private.h"
+
+class AppxBlockMapBlocksEnumerator
+    : public IAppxBlockMapBlocksEnumerator
+{
+public:
+    AppxBlockMapBlocksEnumerator() = default;
+    AppxBlockMapBlocksEnumerator(const AppxBlockMapBlocksEnumerator&) = delete;
+    AppxBlockMapBlocksEnumerator& operator=(const AppxBlockMapBlocksEnumerator&) = delete;
+
+    AppxBlockMapBlocksEnumerator( IXMLDOMNodeList *nodes );
+
+    virtual ~AppxBlockMapBlocksEnumerator() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxBlockMapBlocksEnumerator Methods */
+    HRESULT WINAPI 
+    GetCurrent( IAppxBlockMapBlock **block ) noexcept override;
+
+    HRESULT WINAPI 
+    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
+
+    HRESULT WINAPI 
+    MoveNext( BOOL *hasNext ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMNodeList *blockNodes{ nullptr };
+};
 
 class AppxBlockMapFile
     : public IAppxBlockMapFile
@@ -76,7 +113,7 @@ public:
     AppxBlockMapFilesEnumerator(const AppxBlockMapFilesEnumerator&) = delete;
     AppxBlockMapFilesEnumerator& operator=(const AppxBlockMapFilesEnumerator&) = delete;
 
-    AppxBlockMapFilesEnumerator( IXMLDOMDocument *xmlDocument );
+    AppxBlockMapFilesEnumerator( IXMLDOMNodeList *nodes );
 
     virtual ~AppxBlockMapFilesEnumerator() = default;
 
@@ -102,7 +139,7 @@ public:
 
 private:
     std::atomic<LONG> ref{ 1 };
-    IXMLDOMDocument *document{ nullptr };
+    IXMLDOMNodeList *fileNodes{ nullptr };
 };
 
 /* IAppxFile backed AppxBlockMapReader */

@@ -1,5 +1,5 @@
 /* 
- * AppXFactory Class Factory Implementation.
+ * AppX Block Map Implementation
  *
  * Written by Weather.
  *
@@ -25,6 +25,80 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
+
+// ------------- IAppxBlockMapFilesEnumerator ------------- //
+AppxBlockMapBlocksEnumerator::AppxBlockMapBlocksEnumerator( IXMLDOMNodeList *nodes )
+    : blockNodes( nodes )
+{
+    nodes->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxBlockMapBlocksEnumerator::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxBlockMapBlocksEnumerator ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxBlockMapBlocksEnumerator *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxBlockMapBlocksEnumerator::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxBlockMapBlocksEnumerator::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if( blockNodes ) blockNodes->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxBlockMapFilesEnumerator Methods */
+HRESULT WINAPI 
+AppxBlockMapBlocksEnumerator::GetCurrent( IAppxBlockMapBlock **block ) noexcept
+{
+    FIXME( "iface %p, block %p stub!\n", this, block );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxBlockMapBlocksEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
+{
+    FIXME( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxBlockMapBlocksEnumerator::MoveNext( BOOL *hasNext ) noexcept
+{
+    FIXME( "iface %p, hasNext %p stub!\n", this, hasNext );
+    return E_NOTIMPL;
+}
 
 // ------------- IAppxBlockMapFile ------------- //
 AppxBlockMapFile::AppxBlockMapFile( IXMLDOMElement *element )
@@ -215,10 +289,10 @@ AppxBlockMapFile::ValidateFileHash( IStream *fileStream, BOOL *isValid ) noexcep
 }
 
 // ------------- IAppxBlockMapFilesEnumerator ------------- //
-AppxBlockMapFilesEnumerator::AppxBlockMapFilesEnumerator( IXMLDOMDocument *xmlDocument )
-    : document( xmlDocument )
+AppxBlockMapFilesEnumerator::AppxBlockMapFilesEnumerator( IXMLDOMNodeList *nodes )
+    : fileNodes( nodes )
 {
-    xmlDocument->AddRef();
+    nodes->AddRef();
 }
 
 /* IUnknown Methods (Shared) */
@@ -259,7 +333,7 @@ AppxBlockMapFilesEnumerator::Release() noexcept
 
     if ( !curr )
     {
-        document->Release();
+        if( fileNodes ) fileNodes->Release();
         delete this;
     }
     

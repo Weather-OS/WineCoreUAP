@@ -1,5 +1,5 @@
 /* 
- * AppXFactory Class Factory Implementation.
+ * AppX File readers implementation.
  *
  * Written by Weather.
  *

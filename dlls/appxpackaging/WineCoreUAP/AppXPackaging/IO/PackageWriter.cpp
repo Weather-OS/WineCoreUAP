@@ -1,5 +1,5 @@
 /* 
- * AppXFactory Class Factory Implementation.
+ * AppX Package Writer Implementation
  *
  * Written by Weather.
  *
