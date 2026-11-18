@@ -227,7 +227,7 @@ AppxFilesEnumerator::Release() noexcept
 }
 
 HRESULT WINAPI 
-AppxFilesEnumerator::GetCurrent( IAppxFile **file )
+AppxFilesEnumerator::GetCurrent( IAppxFile **file ) noexcept
 {
     TRACE( "iface %p, file %p.\n", this, file );
 
@@ -241,7 +241,7 @@ AppxFilesEnumerator::GetCurrent( IAppxFile **file )
 }
 
 HRESULT WINAPI 
-AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent )
+AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
 {
     TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
 
@@ -253,8 +253,8 @@ AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent )
     return S_OK;
 }
 
-HRESULT WINAPI 
-AppxFilesEnumerator::MoveNext( BOOL *hasNext )
+HRESULT WINAPI
+AppxFilesEnumerator::MoveNext( BOOL *hasNext ) noexcept
 {
     TRACE( "iface %p, hasNext %p.\n", this, hasNext );
 
@@ -265,7 +265,7 @@ AppxFilesEnumerator::MoveNext( BOOL *hasNext )
 
     index++;
 
-    if ( index + 1 < filesCount )
+    if ( index < filesCount )
         *hasNext = TRUE;
 
     return S_OK;
