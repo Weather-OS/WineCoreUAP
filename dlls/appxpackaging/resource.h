@@ -30,5 +30,6 @@
 #define IDS_HASH_URI_SHA256         1
 #define IDS_HASH_URI_SHA384         2
 #define IDS_HASH_URI_SHA512         3
+#define IDS_XMLNS_URI               4
 
 #endif
