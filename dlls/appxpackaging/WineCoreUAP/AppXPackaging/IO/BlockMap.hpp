@@ -213,7 +213,12 @@ public:
     GetStream( IStream **blockMapStream ) noexcept override;
 
 private:
+    /* Internal Methods */
+    HRESULT WINAPI 
+    FetchDocument( IXMLDOMDocument3 **document ) noexcept;
+
     std::atomic<LONG> ref{ 1 };
+    IXMLDOMDocument *xmlDocument{ nullptr };
     // Do not use MSXML for the reader as it can't satisfy `GetStream`.
     IAppxFile *appxFile{ nullptr };
 };

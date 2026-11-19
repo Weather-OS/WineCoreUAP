@@ -22,6 +22,9 @@
 #include <new>
 
 #include "BlockMap.hpp"
+
+#include "wincrypt.h"
+
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
@@ -110,9 +113,9 @@ AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
         hr = VariantChangeType( &val, &val, 0, VT_BSTR );
         if ( SUCCEEDED( hr ) )
         {
-            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, bufferSize, NULL, NULL ) )
+            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, reinterpret_cast<DWORD *>(bufferSize), NULL, NULL ) )
             {
-                ERR( "for blockmap block %p, failed to calculate hash! return value was %d\n", this, GetLastError() );
+                ERR( "for blockmap block %p, failed to calculate hash! return value was %ld\n", this, GetLastError() );
                 hr = HRESULT_FROM_WIN32( GetLastError() );
             }
         }
@@ -324,9 +327,9 @@ AppxBlockMapFile::GetLocalFileHeaderSize( UINT32 *lfhSize ) noexcept
 
     if ( SUCCEEDED( hr ) )
     {
-        hr = VariantChangeType( &val, &val, 0, VT_I4 );
+        hr = VariantChangeType( &val, &val, 0, VT_UI4 );
         if ( SUCCEEDED( hr ) )
-            *lfhSize = V_I4( &val );
+            *lfhSize = V_UI4( &val );
     }
 
     SysFreeString( attributeName );
@@ -406,9 +409,9 @@ AppxBlockMapFile::GetUncompressedSize( UINT64 *size ) noexcept
 
     if ( SUCCEEDED( hr ) )
     {
-        hr = VariantChangeType( &val, &val, 0, VT_I4 );
+        hr = VariantChangeType( &val, &val, 0, VT_UI8 );
         if ( SUCCEEDED( hr ) )
-            *size = V_I4( &val );
+            *size = V_UI8( &val );
     }
 
     SysFreeString( attributeName );
@@ -554,27 +557,252 @@ AppxBlockMapReader::Release() noexcept
 HRESULT WINAPI
 AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexcept
 {
-    FIXME( "iface %p, filename %s, file %p.\n", this, debugstr_w( filename ), file );
-    return E_NOTIMPL;
+    BOOL exists;
+    LPWSTR current_name = nullptr;
+    HRESULT hr = S_OK;
+    IAppxBlockMapFile *current_file = nullptr;
+    IAppxBlockMapFilesEnumerator *enumerator = nullptr;
+
+    TRACE( "iface %p, filename %s, file %p.\n", this, debugstr_w( filename ), file );
+
+    if ( FAILED( hr = GetFiles( &enumerator ) ) )
+        return hr;
+
+    hr = enumerator->GetHasCurrent( &exists );
+    if ( FAILED( hr ) )
+    {
+        enumerator->Release();
+        return hr;
+    }
+    if ( !exists )
+    {
+        enumerator->Release();
+        return APPX_E_INVALID_BLOCKMAP;
+    }
+
+    do
+    {
+        if ( FAILED( hr = enumerator->GetCurrent( &current_file ) ) )
+            break;
+
+        if ( FAILED( hr = current_file->GetName( &current_name ) ) )
+            break;
+
+        if ( lstrcmpW( current_name, filename ) == 0 )
+        {
+            *file = current_file;
+            break;
+        }
+
+        current_file->Release();
+
+        if ( FAILED( hr = enumerator->MoveNext( &exists ) ) )
+            break;
+        
+    } while ( exists );
+
+    enumerator->Release();
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexcept
 {
-    FIXME( "iface %p, enumerator %p stub!\n", this, enumerator );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNodeList *nodeList = nullptr;
+    IXMLDOMElement *rootElem = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT val;
+    VARIANT nsval;
+    BSTR attributeName;
+
+    TRACE( "iface %p, enumerator %p.\n", this, enumerator );
+
+    if ( !enumerator )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"xmlns" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( attributeName );
+        return hr;
+    }
+
+    hr = document->get_documentElement( &rootElem );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( attributeName );
+        document->Release();
+        return hr;
+    }
+
+    VariantInit( &val );
+    
+    hr = rootElem->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            // uri needs validation
+            if ( lstrcmpiW( V_BSTR( &val ), GetResourceW( IDS_XMLNS_URI ) ) == 0 )
+            {
+                VariantInit( &nsval );
+                nsval.vt = VT_BSTR;
+                nsval.bstrVal = SysAllocString( lstrcatW( lstrcatW( (LPWSTR)L"xmlns:bm='", V_BSTR( &val ) ), (LPWSTR)L"'") );
+                document->setProperty( (BSTR)L"SelectionNameSpaces", nsval );
+                VariantClear( &nsval );
+
+                hr = document->selectNodes( (BSTR)L"/bm:BlockMap/bm:File", &nodeList );
+                if ( SUCCEEDED( hr ) )
+                {
+                    *enumerator = new(std::nothrow) AppxBlockMapFilesEnumerator( nodeList );
+                    nodeList->Release();
+                    if ( !enumerator ) 
+                        hr = E_OUTOFMEMORY;
+                }
+            } else 
+            {
+                ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+                hr = APPX_E_INVALID_BLOCKMAP;
+            }
+        }
+    }
+
+    document->Release();
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxBlockMapReader::GetHashMethod( IUri **hashMethod ) noexcept
 {
-    FIXME( "iface %p, hashMethod %p stub!\n", this, hashMethod );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMElement *rootElem = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT val;
+    BSTR attributeName;
+
+    TRACE( "iface %p, hashMethod %p.\n", this, hashMethod );
+
+    if ( !hashMethod )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"HashMethod" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( attributeName );
+        return hr;
+    }
+
+    hr = document->get_documentElement( &rootElem );
+    document->Release();
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( attributeName );
+        return hr;
+    }
+
+    VariantInit( &val );
+    
+    hr = rootElem->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+            hr = CreateUri( V_BSTR( &val ), Uri_CREATE_CANONICALIZE, 0, hashMethod );
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxBlockMapReader::GetStream( IStream **blockMapStream ) noexcept
 {
-    FIXME( "iface %p, blockMapStream %p stub!\n", this, blockMapStream );
-    return E_NOTIMPL;
+    TRACE( "iface %p, blockMapStream %p.\n", this, blockMapStream );
+
+    return appxFile->GetStream( blockMapStream );
+}
+
+/* Internal Methods */
+HRESULT WINAPI 
+AppxBlockMapReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
+{
+    IStream *blockMapStream = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT var;
+    VARIANT_BOOL bLoaded = VARIANT_FALSE;
+
+    TRACE( "iface %p, document %p.\n", this, document );
+
+    if ( !document )
+        return E_POINTER;
+    
+    if ( !xmlDocument )
+    {
+        hr = CoCreateInstance( __uuidof(DOMDocument60), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &xmlDocument ) );
+        if ( FAILED( hr ) ) 
+            return hr;
+
+        hr = xmlDocument->put_async( VARIANT_FALSE );
+        if ( FAILED( hr ) ) 
+        {
+            xmlDocument->Release();
+            xmlDocument = nullptr;
+            return hr;
+        }
+
+        hr = GetStream( &blockMapStream );
+        if ( FAILED( hr ) ) 
+        {
+            xmlDocument->Release();
+            xmlDocument = nullptr;
+            return hr;
+        }
+
+        VariantInit( &var );
+        var.vt = VT_UNKNOWN;
+        var.punkVal = static_cast<IUnknown *>( blockMapStream );
+        blockMapStream->AddRef();
+
+        hr = xmlDocument->load( var, &bLoaded );
+        blockMapStream->Release();
+        VariantClear( &var );
+        if ( FAILED( hr ) || bLoaded != VARIANT_TRUE ) 
+        {
+            xmlDocument->Release();
+            xmlDocument = nullptr;
+            return hr;
+        }
+    }
+       
+    hr = xmlDocument->QueryInterface( document );
+
+    return hr;
 }
