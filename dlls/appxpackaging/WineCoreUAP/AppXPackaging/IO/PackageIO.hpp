@@ -36,6 +36,11 @@ public:
 
     AppxFile( IOpcPart *part );
 
+    /**
+     * For some APIs, streamed-only AppxFile is sufficient.
+     */
+    AppxFile( IStream *stream );
+
     virtual ~AppxFile() = default;
 
     /* IUnknown Methods (Shared) */
@@ -67,6 +72,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IOpcPart *filePart{ nullptr };
+    IStream *fileStream{ nullptr };
 };
 
 /*

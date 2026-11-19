@@ -33,6 +33,12 @@ AppxFile::AppxFile( IOpcPart *part )
     part->AddRef();
 }
 
+AppxFile::AppxFile( IStream *stream )
+    : fileStream( stream )
+{
+    stream->AddRef();
+}
+
 /* IUnknown Methods (Shared) */
 HRESULT WINAPI
 AppxFile::QueryInterface( REFIID iid, void** out ) noexcept
@@ -72,7 +78,7 @@ AppxFile::Release() noexcept
     if ( !curr )
     {
         if ( filePart ) filePart->Release();
-
+        if ( fileStream ) fileStream->Release();
         delete this;
     }
     
@@ -87,6 +93,15 @@ AppxFile::GetCompressionOption( APPX_COMPRESSION_OPTION *compressionOption ) noe
     OPC_COMPRESSION_OPTIONS option;
 
     TRACE( "iface %p, compressionOption %p.\n", this, compressionOption );
+
+    if ( !compressionOption )
+        return E_POINTER;
+
+    if ( !filePart )
+    {
+        ERR( "AppxFile %p is streamed-only!\n", this );
+        return E_INVALIDARG;
+    }
 
     if ( FAILED( hr = filePart->GetCompressionOptions( &option ) ) )
         return hr;
@@ -104,6 +119,15 @@ AppxFile::GetContentType( LPWSTR *contentType ) noexcept
 {
     TRACE( "iface %p, contentType %p.\n", this, contentType );
 
+    if ( !contentType )
+        return E_POINTER;
+
+    if ( !filePart )
+    {
+        ERR( "AppxFile %p is streamed-only!\n", this );
+        return E_INVALIDARG;
+    }
+
     return filePart->GetContentType( contentType );
 }
 
@@ -118,6 +142,12 @@ AppxFile::GetName( LPWSTR *fileName ) noexcept
 
     if ( !fileName )
         return E_POINTER;
+
+    if ( !filePart )
+    {
+        ERR( "AppxFile %p is streamed-only!\n", this );
+        return E_INVALIDARG;
+    }
 
     if ( FAILED( hr = filePart->GetName( &part_uri ) ) )
         return hr;
@@ -149,13 +179,23 @@ AppxFile::GetSize( UINT64 *size ) noexcept
 
     TRACE( "iface %p, size %p.\n", this, size );
 
-    hr = filePart->GetContentStream( &stream );
-    if ( FAILED( hr ) )
-        return hr;
+    if ( !size )
+        return E_POINTER;
 
-    // IOpcPart stream does not support stat in wine.
-    hr = stream->Seek( move, STREAM_SEEK_END, &newPosition );
-    stream->Release();
+    if ( filePart )
+    {
+        hr = filePart->GetContentStream( &stream );
+        if ( FAILED( hr ) )
+            return hr;
+
+        // IOpcPart stream does not support stat in wine.
+        hr = stream->Seek( move, STREAM_SEEK_END, &newPosition );
+        stream->Release();
+    } else if ( fileStream )
+    {
+        hr = fileStream->Seek( move, STREAM_SEEK_END, &newPosition );
+        fileStream->Release();
+    }
 
     *size = newPosition.QuadPart;
 
@@ -167,7 +207,15 @@ AppxFile::GetStream( IStream **stream ) noexcept
 {
     TRACE( "iface %p, stream %p.\n", this, stream );
 
-    return filePart->GetContentStream( stream );
+    if ( !stream )
+        return E_POINTER;
+
+    if ( filePart )
+        return filePart->GetContentStream( stream );
+    else if ( fileStream )
+        fileStream->QueryInterface( stream );
+    
+    return S_OK;
 }
 
 // ------------- IAppxFilesEnumerator ------------- //
