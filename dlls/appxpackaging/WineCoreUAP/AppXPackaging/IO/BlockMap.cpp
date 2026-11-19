@@ -27,6 +27,8 @@
 
 #include "wine/debug.h"
 
+#define CHUNK_SIZE 64 * 1024
+
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
 // ------------- IAppxBlockMapBlock ------------- //
@@ -502,8 +504,191 @@ AppxBlockMapFile::GetUncompressedSize( UINT64 *size ) noexcept
 HRESULT WINAPI 
 AppxBlockMapFile::ValidateFileHash( IStream *fileStream, BOOL *isValid ) noexcept
 {
-    FIXME( "iface %p, fileStream %p, isValid %p stub!\n", this, fileStream, isValid );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    NTSTATUS status = ERROR_SUCCESS;
+    BOOL exists;
+    BOOL isValidSoFar = TRUE;
+    BYTE buffer[CHUNK_SIZE /*64 KB chunks*/];
+    BYTE calculatedHash[64];
+    PBYTE hashBuffer;
+    DWORD hashLength = 0;
+    DWORD result = 0;
+    ULONG chunkSize;
+    ULONG totalRead;
+    ULONG bytesRead;
+    UINT32 hashSize;
+    LPCWSTR algorithm = NULL;
+    ULONGLONG remaining;
+    LARGE_INTEGER offset = {};
+    ULARGE_INTEGER position = {};
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+    BCRYPT_HASH_HANDLE hHash = NULL;
+    IAppxBlockMapBlocksEnumerator *enumerator = nullptr;
+    IAppxBlockMapBlock *current_block = nullptr;
+
+    TRACE( "iface %p, fileStream %p, isValid %p.\n", this, fileStream, isValid );
+
+    if ( !isValid )
+        return E_POINTER;
+
+    if ( !fileStream )
+        return E_INVALIDARG;
+
+    *isValid = FALSE;
+
+    if ( FAILED( hr = fileStream->Seek( offset, STREAM_SEEK_END, &position ) ) ) 
+        return hr;
+
+    remaining = position.QuadPart;
+    if ( !remaining )
+        return APPX_E_CORRUPT_CONTENT;
+
+    if ( FAILED( hr = fileStream->Seek( offset, STREAM_SEEK_SET, nullptr ) ) ) 
+        return hr;
+
+    if ( FAILED( hr = GetBlocks( &enumerator ) ) )
+        return hr;
+
+    hr = enumerator->GetHasCurrent( &exists );
+    if ( FAILED( hr ) )
+    {
+        enumerator->Release();
+        return hr;
+    }
+    if ( !exists )
+    {
+        enumerator->Release();
+        return APPX_E_INVALID_BLOCKMAP;
+    }
+
+    do
+    {
+        if ( remaining == 0 )
+            break;
+
+        chunkSize = ( remaining > CHUNK_SIZE ) ? CHUNK_SIZE : (ULONG)remaining;
+        totalRead = 0;
+
+        while ( totalRead < chunkSize )
+        {
+            if ( FAILED ( hr = fileStream->Read( buffer + totalRead, chunkSize - totalRead, &bytesRead ) ) )
+                break;
+
+            totalRead += bytesRead;
+
+            if ( !bytesRead )
+            {
+                hr = APPX_E_CORRUPT_CONTENT;
+                break;
+            }
+        }
+
+        if ( FAILED( hr ) )
+            break;
+        
+        if ( FAILED( hr = enumerator->GetCurrent( &current_block ) ) )
+            break;
+
+        if ( FAILED( hr = current_block->GetHash( &hashSize, &hashBuffer ) ) )
+            break;
+
+        current_block->Release();
+        current_block = nullptr;
+
+        switch ( hashSize )
+        {
+            case 32:
+                algorithm = BCRYPT_SHA256_ALGORITHM;
+                hashLength = 32;
+                break;
+        
+            case 48:
+                algorithm = BCRYPT_SHA384_ALGORITHM;
+                hashLength = 48;
+                break;
+        
+            case 64:
+                algorithm = BCRYPT_SHA512_ALGORITHM;
+                hashLength = 64;
+                break;
+        
+            default:
+                hr = HRESULT_FROM_WIN32( APPX_E_INVALID_BLOCKMAP );
+                break;
+        }
+
+        if ( FAILED( hr ) )
+            break;
+
+        status = BCryptOpenAlgorithmProvider( &hAlg, algorithm, nullptr, 0 );
+        if ( FAILED( status ))
+        {
+            hr = HRESULT_FROM_NT( status );
+            break;
+        }
+
+        status = BCryptGetProperty( hAlg, BCRYPT_HASH_LENGTH, (PUCHAR)&hashLength, sizeof(hashLength), &result, 0 );
+        if ( FAILED( status ) )
+        {
+            hr = HRESULT_FROM_NT( status );
+            break;
+        }
+
+        status = BCryptCreateHash( hAlg, &hHash, nullptr, 0, nullptr, 0, 0 );
+        BCryptCloseAlgorithmProvider( hAlg, 0 );
+        hAlg = nullptr;
+
+        if ( FAILED( status ) )
+        {
+            hr = HRESULT_FROM_NT( status );
+            break;
+        }
+
+        status = BCryptHashData( hHash, buffer, chunkSize, 0 );
+        if ( FAILED( status ) )
+        {
+            hr = HRESULT_FROM_NT( status );
+            break;
+        }
+
+        status = BCryptFinishHash( hHash, calculatedHash, hashLength, 0 );
+        BCryptDestroyHash( hHash );
+        hHash = nullptr;
+        if ( FAILED( status ) )
+        {
+            hr = HRESULT_FROM_NT( status );
+            break;
+        }
+
+        if ( RtlCompareMemory( calculatedHash, hashBuffer, hashLength ) != hashLength )
+        {
+            isValidSoFar = FALSE;
+            break;
+        }
+
+        CoTaskMemFree( hashBuffer );
+        hashBuffer = nullptr;
+
+        remaining -= chunkSize;
+
+        if ( FAILED( hr = enumerator->MoveNext( &exists ) ) )
+            break;
+        
+    } while ( exists );
+
+    if ( current_block ) current_block->Release();
+    if ( hHash ) BCryptDestroyHash( hHash );
+    if ( hAlg ) BCryptCloseAlgorithmProvider( hAlg, 0 );
+    if ( hashBuffer ) CoTaskMemFree( hashBuffer );
+    enumerator->Release();
+
+    if ( remaining )
+        hr = APPX_E_CORRUPT_CONTENT;
+
+    if ( SUCCEEDED( hr ) )
+        *isValid = isValidSoFar;
+
+    return hr;
 }
 
 // ------------- IAppxBlockMapFilesEnumerator ------------- //
@@ -732,11 +917,15 @@ AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexce
         }
 
         current_file->Release();
+        current_file = nullptr;
 
         if ( FAILED( hr = enumerator->MoveNext( &exists ) ) )
             break;
         
     } while ( exists );
+
+    if ( FAILED( hr ) )
+        if ( current_file ) current_file->Release();
 
     enumerator->Release();
 
