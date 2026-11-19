@@ -887,6 +887,12 @@ AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexce
 
     TRACE( "iface %p, filename %s, file %p.\n", this, debugstr_w( filename ), file );
 
+    if ( !filename )
+        return E_INVALIDARG;
+
+    if ( !file )
+        return E_POINTER;
+
     if ( FAILED( hr = GetFiles( &enumerator ) ) )
         return hr;
 

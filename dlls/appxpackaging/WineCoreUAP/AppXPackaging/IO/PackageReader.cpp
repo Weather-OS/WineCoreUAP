@@ -94,7 +94,7 @@ AppxPackageReader::GetBlockMap( IAppxBlockMapReader **blockMapReader ) noexcept
     if ( !blockMapReader )
         return E_POINTER;
 
-    if ( FAILED( hr = GetFile( (LPCWSTR)L"/AppxBlockMap.xml", &file ) ) )
+    if ( FAILED( hr = GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE_BLOCKMAP, &file ) ) )
         return hr;
 
     reader = new(std::nothrow) AppxBlockMapReader( file );
@@ -153,16 +153,163 @@ AppxPackageReader::GetManifest( IAppxManifestReader **manifestReader ) noexcept
 HRESULT WINAPI
 AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
 {
-    FIXME( "iface %p, fileName %s, file %p stub!\n", this, debugstr_w( fileName ), file );
+    HRESULT hr;
+    LPWSTR current_name;
+    BOOL exists;
+    IAppxFilesEnumerator *enumerator = nullptr;
+    IAppxFile *current_file = nullptr;
 
-    return S_OK;
+    TRACE( "iface %p, fileName %s, file %p.\n", this, debugstr_w( fileName ), file );
+
+    if ( !fileName )
+        return E_INVALIDARG;
+
+    if ( !file )
+        return E_POINTER;
+
+    if ( FAILED( hr = GetPayloadFiles( &enumerator ) ) )
+        return hr;
+
+    hr = enumerator->GetHasCurrent( &exists );
+    if ( FAILED( hr ) )
+    {
+        enumerator->Release();
+        return hr;
+    }
+    if ( !exists )
+    {
+        enumerator->Release();
+        return APPX_E_INVALID_BLOCKMAP;
+    }
+
+    do
+    {
+        if ( FAILED( hr = enumerator->GetCurrent( &current_file ) ) )
+            break;
+
+        if ( FAILED( hr = current_file->GetName( &current_name ) ) )
+            break;
+
+        if ( lstrcmpW( current_name, fileName ) == 0 )
+        {
+            *file = current_file;
+            break;
+        }
+
+        CoTaskMemFree( current_name );
+        current_name = nullptr;
+        current_file->Release();
+        current_file = nullptr;
+
+        if ( FAILED( hr = enumerator->MoveNext( &exists ) ) )
+            break;
+        
+    } while ( exists );
+
+    if ( FAILED( hr ) )
+        if ( current_file ) current_file->Release();
+    if ( current_name ) CoTaskMemFree( current_name );
+
+    enumerator->Release();
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noexcept
 {
-    FIXME( "iface %p, filesEnumerator %p stub!\n", this, filesEnumerator );
-    return E_NOTIMPL;
+    BOOL exists;
+    LPWSTR current_name = nullptr;
+    SIZE_T count = 0;
+    SIZE_T iterator = 0;
+    HRESULT hr = S_OK;
+    IAppxFile **appx_files = nullptr;
+    IAppxFile **appx_files_tmp = nullptr;
+    IAppxBlockMapFile *current_file = nullptr;
+    IAppxBlockMapReader *reader = nullptr;
+    IAppxBlockMapFilesEnumerator *blockMapFiles = nullptr;
+
+    TRACE( "iface %p, filesEnumerator %p.\n", this, filesEnumerator );
+
+    if ( !filesEnumerator )
+        return E_POINTER;
+
+    if ( FAILED( hr = GetBlockMap( &reader ) ) )
+        return hr;
+
+    hr = reader->GetFiles( &blockMapFiles );
+    reader->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    appx_files = (IAppxFile **)CoTaskMemAlloc( sizeof(IAppxFile *) );
+    if ( !appx_files )
+        return E_OUTOFMEMORY;
+
+    hr = blockMapFiles->GetHasCurrent( &exists );
+    if ( FAILED( hr ) )
+    {
+        blockMapFiles->Release();
+        return hr;
+    }
+    if ( !exists )
+    {
+        blockMapFiles->Release();
+        return APPX_E_INVALID_BLOCKMAP;
+    }
+
+    do
+    {
+        if ( FAILED( hr = blockMapFiles->GetCurrent( &current_file ) ) )
+            break;
+
+        if ( FAILED( hr = current_file->GetName( &current_name ) ) )
+            break;
+
+        if ( FAILED( hr = GetFile( current_name, &appx_files[count] ) ) )
+            break;
+
+        CoTaskMemFree( current_name );
+        current_name = nullptr;
+
+        count++;
+
+        appx_files_tmp = (IAppxFile **)CoTaskMemRealloc( appx_files, (count) * sizeof(IAppxFile *) );
+        if ( !appx_files_tmp )
+        {
+            hr = E_OUTOFMEMORY;
+            break;
+        }
+        appx_files = appx_files_tmp;
+
+        current_file->Release();
+        current_file = nullptr;
+
+        if ( FAILED( hr = blockMapFiles->MoveNext( &exists ) ) )
+            break;
+        
+    } while ( exists );
+
+    if ( FAILED( hr ) )
+    {
+        for ( iterator = 0; iterator < count; iterator++ )
+            appx_files[iterator]->Release();
+        CoTaskMemFree( appx_files );
+    }
+
+    if ( current_file ) current_file->Release();
+    if ( current_name ) CoTaskMemFree( current_name );
+    blockMapFiles->Release();
+
+    if ( SUCCEEDED( hr ) )
+    {
+        // ownership of all files are handed to AppxFilesEnumerator
+        *filesEnumerator = new(std::nothrow) AppxFilesEnumerator( appx_files, count );
+        if ( !*filesEnumerator ) 
+            hr = E_OUTOFMEMORY;
+    }
+
+    return hr;
 }
 
 /* Internal Methods */
