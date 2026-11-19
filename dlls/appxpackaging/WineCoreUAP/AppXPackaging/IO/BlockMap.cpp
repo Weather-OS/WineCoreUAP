@@ -221,22 +221,80 @@ AppxBlockMapBlocksEnumerator::Release() noexcept
 HRESULT WINAPI 
 AppxBlockMapBlocksEnumerator::GetCurrent( IAppxBlockMapBlock **block ) noexcept
 {
-    FIXME( "iface %p, block %p stub!\n", this, block );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+    IXMLDOMNode *node;
+    IXMLDOMElement *elem;
+
+    TRACE( "iface %p, block %p.\n", this, block );
+
+    if ( !block )
+        return E_POINTER;
+
+    if ( FAILED( hr = blockNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        return E_BOUNDS;
+
+    if ( FAILED( hr = blockNodes->get_item( iterator, &node ) ) )
+        return hr;
+        
+    hr = node->QueryInterface( &elem );
+    node->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    *block = new(std::nothrow) AppxBlockMapBlock( elem );
+    elem->Release();
+    if ( !*block ) 
+        hr = E_OUTOFMEMORY;
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapBlocksEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
 {
-    FIXME( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+
+    if ( !hasCurrent )
+        return E_POINTER;
+
+    if ( FAILED( hr = blockNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        *hasCurrent = FALSE;
+    else
+        *hasCurrent = TRUE;
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxBlockMapBlocksEnumerator::MoveNext( BOOL *hasNext ) noexcept
 {
-    FIXME( "iface %p, hasNext %p stub!\n", this, hasNext );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasNext %p.\n", this, hasNext );
+
+    if ( !hasNext )
+        return E_POINTER;
+
+    if ( FAILED( hr = blockNodes->get_length( &len ) ) )
+        return hr;
+
+    if ( iterator < len )
+        iterator++;
+
+    *hasNext = ( iterator < len );
+
+    return S_OK;
 }
 
 // ------------- IAppxBlockMapFile ------------- //
@@ -296,8 +354,29 @@ AppxBlockMapFile::Release() noexcept
 HRESULT WINAPI 
 AppxBlockMapFile::GetBlocks( IAppxBlockMapBlocksEnumerator **blocks ) noexcept
 {
-    FIXME( "iface %p, blocks %p stub!\n", this, blocks );
-    return E_NOTIMPL;
+    HRESULT hr;
+    IXMLDOMNode *node;
+    IXMLDOMNodeList *blockList;
+
+    TRACE( "iface %p, blocks %p.\n", this, blocks );
+
+    if ( !blocks )
+        return E_POINTER;
+
+    if ( FAILED( hr = xmlElement->QueryInterface( &node ) ) )
+        return hr;
+
+    hr = node->selectNodes( (BSTR)L"bm:Block", &blockList );
+    node->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    *blocks = new(std::nothrow) AppxBlockMapBlocksEnumerator( blockList );
+    blockList->Release();
+    if ( !*blocks )
+        hr = E_OUTOFMEMORY;
+
+    return hr;
 }
 
 HRESULT WINAPI 

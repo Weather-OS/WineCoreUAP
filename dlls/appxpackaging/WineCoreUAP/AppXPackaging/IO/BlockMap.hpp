@@ -94,6 +94,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMNodeList *blockNodes{ nullptr };
+    LONG iterator{ 0 };
 };
 
 class AppxBlockMapFile
