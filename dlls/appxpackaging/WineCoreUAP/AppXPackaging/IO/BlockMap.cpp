@@ -483,22 +483,80 @@ AppxBlockMapFilesEnumerator::Release() noexcept
 HRESULT WINAPI 
 AppxBlockMapFilesEnumerator::GetCurrent( IAppxBlockMapFile **file ) noexcept
 {
-    FIXME( "iface %p, file %p stub!\n", this, file );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+    IXMLDOMNode *node;
+    IXMLDOMElement *elem;
+
+    TRACE( "iface %p, file %p.\n", this, file );
+
+    if ( !file )
+        return E_POINTER;
+
+    if ( FAILED( hr = fileNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        return E_BOUNDS;
+
+    if ( FAILED( hr = fileNodes->get_item( iterator, &node ) ) )
+        return hr;
+        
+    hr = node->QueryInterface( &elem );
+    node->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    *file = new(std::nothrow) AppxBlockMapFile( elem );
+    elem->Release();
+    if ( !*file ) 
+        hr = E_OUTOFMEMORY;
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapFilesEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
 {
-    FIXME( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+
+    if ( !hasCurrent )
+        return E_POINTER;
+
+    if ( FAILED( hr = fileNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        *hasCurrent = FALSE;
+    else
+        *hasCurrent = TRUE;
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxBlockMapFilesEnumerator::MoveNext( BOOL *hasNext ) noexcept
 {
-    FIXME( "iface %p, hasNext %p stub!\n", this, hasNext );
-    return E_NOTIMPL;
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasNext %p.\n", this, hasNext );
+
+    if ( !hasNext )
+        return E_POINTER;
+
+    if ( FAILED( hr = fileNodes->get_length( &len ) ) )
+        return hr;
+
+    if ( iterator < len )
+        iterator++;
+
+    *hasNext = ( iterator < len );
+
+    return S_OK;
 }
 
 // ------------- IAppxBlockMapReader ------------- //
@@ -669,7 +727,7 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
                 {
                     *enumerator = new(std::nothrow) AppxBlockMapFilesEnumerator( nodeList );
                     nodeList->Release();
-                    if ( !enumerator ) 
+                    if ( !*enumerator ) 
                         hr = E_OUTOFMEMORY;
                 }
             } else 

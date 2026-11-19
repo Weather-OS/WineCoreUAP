@@ -174,6 +174,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMNodeList *fileNodes{ nullptr };
+    LONG iterator{ 0 };
 };
 
 /* IAppxFile backed AppxBlockMapReader */
