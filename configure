@@ -9391,16 +9391,16 @@ if eval test \"x\$"$as_ac_var"\" = x"yes"
 then :
   as_fn_append ${wine_arch}_EXTRACFLAGS " -Wvla"
 fi }
-    { as_ac_var=`printf '%s\n' "ac_cv_${wine_arch}_cflags_-Wwrite-strings" | sed "$as_sed_sh"`
-{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wwrite-strings" >&5
-printf %s "checking whether $CC supports -Wwrite-strings... " >&6; }
+    { as_ac_var=`printf '%s\n' "ac_cv_${wine_arch}_cflags_-Wno-write-strings" | sed "$as_sed_sh"`
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wno-write-strings" >&5
+printf %s "checking whether $CC supports -Wno-write-strings... " >&6; }
 if eval test \${$as_ac_var+y}
 then :
   printf %s "(cached) " >&6
 else case e in #(
   e) ac_wine_try_cflags_saved=$CFLAGS
 ac_wine_try_cflags_saved_exeext=$ac_exeext
-CFLAGS="$CFLAGS -nostdlib -nodefaultlibs -Wwrite-strings"
+CFLAGS="$CFLAGS -nostdlib -nodefaultlibs -Wno-write-strings"
 ac_exeext=".exe"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -9429,7 +9429,7 @@ eval ac_res=\$$as_ac_var
 printf '%s\n' "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_var"\" = x"yes"
 then :
-  as_fn_append ${wine_arch}_EXTRACFLAGS " -Wwrite-strings"
+  as_fn_append ${wine_arch}_EXTRACFLAGS " -Wno-write-strings"
 fi }
     { as_ac_var=`printf '%s\n' "ac_cv_${wine_arch}_cflags_-Wpointer-arith" | sed "$as_sed_sh"`
 { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether $CC supports -Wpointer-arith" >&5
@@ -20321,23 +20321,23 @@ if test "x$ac_cv_cflags__Wvla" = xyes
 then :
   EXTRACFLAGS="$EXTRACFLAGS -Wvla"
 fi
-  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether the compiler supports -Wwrite-strings" >&5
-printf %s "checking whether the compiler supports -Wwrite-strings... " >&6; }
-if test ${ac_cv_cflags__Wwrite_strings+y}
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether the compiler supports -Wno-write-strings" >&5
+printf %s "checking whether the compiler supports -Wno-write-strings... " >&6; }
+if test ${ac_cv_cflags__Wno_write_strings+y}
 then :
   printf %s "(cached) " >&6
 else case e in #(
   e) ac_wine_try_cflags_saved=$CFLAGS
-CFLAGS="$CFLAGS -Wwrite-strings"
+CFLAGS="$CFLAGS -Wno-write-strings"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 int main(int argc, char **argv) { return 0; }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"
 then :
-  ac_cv_cflags__Wwrite_strings=yes
+  ac_cv_cflags__Wno_write_strings=yes
 else case e in #(
-  e) ac_cv_cflags__Wwrite_strings=no ;;
+  e) ac_cv_cflags__Wno_write_strings=no ;;
 esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
@@ -20345,11 +20345,11 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
 CFLAGS=$ac_wine_try_cflags_saved ;;
 esac
 fi
-{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $ac_cv_cflags__Wwrite_strings" >&5
-printf '%s\n' "$ac_cv_cflags__Wwrite_strings" >&6; }
-if test "x$ac_cv_cflags__Wwrite_strings" = xyes
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $ac_cv_cflags__Wno_write_strings" >&5
+printf '%s\n' "$ac_cv_cflags__Wno_write_strings" >&6; }
+if test "x$ac_cv_cflags__Wno_write_strings" = xyes
 then :
-  EXTRACFLAGS="$EXTRACFLAGS -Wwrite-strings"
+  EXTRACFLAGS="$EXTRACFLAGS -Wno-write-strings"
 fi
 
     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking whether the compiler supports -flarge-source-files -Wmisleading-indentation" >&5
