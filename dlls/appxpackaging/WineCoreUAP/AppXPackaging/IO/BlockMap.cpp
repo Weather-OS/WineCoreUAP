@@ -110,7 +110,7 @@ AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
         hr = VariantChangeType( &val, &val, 0, VT_BSTR );
         if ( SUCCEEDED( hr ) )
         {
-            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, hashMethod, *buffer, bufferSize, NULL, NULL ) )
+            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, bufferSize, NULL, NULL ) )
             {
                 ERR( "for blockmap block %p, failed to calculate hash! return value was %d\n", this, GetLastError() );
                 hr = HRESULT_FROM_WIN32( GetLastError() );
