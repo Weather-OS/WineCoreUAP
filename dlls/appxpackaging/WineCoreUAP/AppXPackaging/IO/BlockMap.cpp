@@ -916,6 +916,8 @@ AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexce
             break;
         }
 
+        CoTaskMemFree( current_name );
+        current_name = nullptr;
         current_file->Release();
         current_file = nullptr;
 
@@ -926,6 +928,7 @@ AppxBlockMapReader::GetFile( LPCWSTR filename, IAppxBlockMapFile **file ) noexce
 
     if ( FAILED( hr ) )
         if ( current_file ) current_file->Release();
+    if ( current_name ) CoTaskMemFree( current_name );
 
     enumerator->Release();
 
