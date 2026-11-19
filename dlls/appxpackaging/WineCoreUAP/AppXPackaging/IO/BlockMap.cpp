@@ -83,15 +83,83 @@ AppxBlockMapBlock::Release() noexcept
 HRESULT WINAPI 
 AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
 {
-    FIXME( "iface %p, bufferSize %p, buffer %p stub!\n", this, bufferSize, buffer );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, bufferSize %p, buffer %p.\n", this, bufferSize, buffer );
+
+    if ( !bufferSize || !buffer )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Hash" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap block %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, hashMethod, *buffer, bufferSize, NULL, NULL ) )
+            {
+                ERR( "for blockmap block %p, failed to calculate hash! return value was %d\n", this, GetLastError() );
+                hr = HRESULT_FROM_WIN32( GetLastError() );
+            }
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapBlock::GetCompressedSize( UINT32 *size ) noexcept
 {
-    FIXME( "iface %p, size %p stub!\n", this, size );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, lfhSize %p.\n", this, size );
+
+    if ( !size )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Size" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap block %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_I4 );
+        if ( SUCCEEDED( hr ) )
+            *size = V_I4( &val );
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 // ------------- IAppxBlockMapBlocksEnumerator ------------- //

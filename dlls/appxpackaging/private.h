@@ -51,4 +51,18 @@
 
 extern IClassFactory* appx_factory;
 
+inline LPCWSTR GetResourceW( INT resourceId )
+{
+    static WCHAR resourceBuffer[1024];
+    LoadStringW( GetModuleHandleW( (LPCWSTR)L"appxpackaging.dll" ), resourceId, resourceBuffer, sizeof(resourceBuffer) );
+    return resourceBuffer;
+}
+
+inline LPCSTR GetResourceA( INT resourceId )
+{
+    static CHAR resourceBuffer[1024];
+    LoadStringA( GetModuleHandleW( (LPCWSTR)L"appxpackaging.storage.dll" ), resourceId, resourceBuffer, sizeof(resourceBuffer) );
+    return resourceBuffer;
+}
+
 #endif

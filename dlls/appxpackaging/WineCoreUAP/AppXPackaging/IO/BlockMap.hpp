@@ -57,6 +57,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMElement *xmlElement{ nullptr };
+    DWORD hashMethod; // <-- Hash method needs to be passed to AppxBlockMapBlock
 };
 
 class AppxBlockMapBlocksEnumerator
@@ -94,6 +95,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMNodeList *blockNodes{ nullptr };
+    DWORD hashMethod; // <-- Hash method needs to be passed to AppxBlockMapBlock
 };
 
 class AppxBlockMapFile
@@ -137,6 +139,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMElement *xmlElement{ nullptr };
+    DWORD hashMethod; // <-- Hash method needs to be passed to AppxBlockMapBlock
 };
 
 class AppxBlockMapFilesEnumerator
@@ -174,6 +177,7 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMNodeList *fileNodes{ nullptr };
+    DWORD hashMethod; // <-- Hash method needs to be passed to AppxBlockMapBlock
 };
 
 /* IAppxFile backed AppxBlockMapReader */
