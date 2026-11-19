@@ -280,6 +280,9 @@ AppxFilesEnumerator::GetCurrent( IAppxFile **file ) noexcept
 {
     TRACE( "iface %p, file %p.\n", this, file );
 
+    if ( !file )
+        return E_POINTER;
+
     if ( index >= filesCount )
         return E_BOUNDS;
 
@@ -294,6 +297,9 @@ AppxFilesEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
 {
     TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
 
+    if ( !hasCurrent )
+        return E_POINTER;
+
     *hasCurrent = FALSE;
 
     if ( index < filesCount )
@@ -306,6 +312,9 @@ HRESULT WINAPI
 AppxFilesEnumerator::MoveNext( BOOL *hasNext ) noexcept
 {
     TRACE( "iface %p, hasNext %p.\n", this, hasNext );
+
+    if ( !hasNext )
+        return E_POINTER;
 
     *hasNext = FALSE;
 

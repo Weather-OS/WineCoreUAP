@@ -266,6 +266,18 @@ AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noe
         if ( FAILED( hr = current_file->GetName( &current_name ) ) )
             break;
 
+        // Behavior calls for excluding AppxManifest.xml
+        if ( lstrcmpW( current_name, (LPWSTR)L"AppxManifest.xml" ) == 0 )
+        {        
+            CoTaskMemFree( current_name );
+            current_name = nullptr;
+            current_file->Release();
+            current_file = nullptr;
+            if ( FAILED( hr = blockMapFiles->MoveNext( &exists ) ) )
+                break;
+            continue;
+        }
+
         if ( FAILED( hr = GetFile( current_name, &appx_files[count] ) ) )
             break;
 
@@ -274,7 +286,7 @@ AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noe
 
         count++;
 
-        appx_files_tmp = (IAppxFile **)CoTaskMemRealloc( appx_files, (count) * sizeof(IAppxFile *) );
+        appx_files_tmp = (IAppxFile **)CoTaskMemRealloc( appx_files, (count + 1) * sizeof(IAppxFile *) );
         if ( !appx_files_tmp )
         {
             hr = E_OUTOFMEMORY;

@@ -75,11 +75,41 @@ static void load_resource( const WCHAR *name, const WCHAR *type, const WCHAR *fi
 
 static void test_IAppxPackageReader( IAppxPackageReader *reader )
 {
-    HRESULT hr = S_OK;
+    HRESULT hr;
+    BOOL has_current;
+    LPWSTR name;
+    IAppxFile *file;
     IAppxBlockMapReader *blockMap = NULL;
+    IAppxFilesEnumerator *files = NULL;
 
     hr = IAppxPackageReader_GetBlockMap( reader, &blockMap );
     ok( SUCCEEDED( hr ), "IAppxPackageReader::GetBlockMap failed with %#lx\n", hr );
+
+    hr = IAppxPackageReader_GetPayloadFiles( reader, &files );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetPayloadFiles failed with %#lx\n", hr );
+
+    hr = IAppxFilesEnumerator_GetHasCurrent( files, &has_current );
+    ok( SUCCEEDED( hr ), "IAppxFilesEnumerator::GetHasCurrent failed with %#lx\n", hr );
+
+    while ( has_current )
+    {
+        hr = IAppxFilesEnumerator_GetCurrent( files, &file );
+        ok( SUCCEEDED( hr ), "IAppxFilesEnumerator::GetCurrent failed with %#lx\n", hr );
+
+        hr = IAppxFile_GetName( file, &name );
+        ok( SUCCEEDED( hr ), "IAppxFile::GetName failed with %#lx\n", hr );
+
+        trace( "Payload file: %s\n", wine_dbgstr_w( name ) );
+
+        CoTaskMemFree( name );
+        IAppxFile_Release( file );
+
+        hr = IAppxFilesEnumerator_MoveNext( files, &has_current );
+        ok( SUCCEEDED( hr ), "IAppxFilesEnumerator::MoveNext failed with %#lx\n", hr );
+    }
+
+    IAppxFilesEnumerator_Release( files );
+    IAppxBlockMapReader_Release( blockMap );
 }
 
 static void test_AppxFactory( void )

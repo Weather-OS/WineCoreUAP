@@ -1013,7 +1013,7 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
 
                 if ( SUCCEEDED( hr ) )
                 {
-                    document->setProperty( (BSTR)L"SelectionNameSpaces", nsval );
+                    document->setProperty( (BSTR)L"SelectionNamespaces", nsval );
                     VariantClear( &nsval );
 
                     hr = document->selectNodes( (BSTR)L"/bm:BlockMap/bm:File", &nodeList );
