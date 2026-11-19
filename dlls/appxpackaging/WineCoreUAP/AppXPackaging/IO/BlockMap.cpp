@@ -692,11 +692,15 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
     }
 
     hr = document->get_documentElement( &rootElem );
-    if ( FAILED( hr ) )
+    if ( FAILED( hr ) || !rootElem )
     {
-        SysFreeString( attributeName );
+        if ( rootElem )
+            rootElem->Release();
+
         document->Release();
-        return hr;
+        SysFreeString( attributeName );
+
+        return FAILED( hr ) ? hr : APPX_E_INVALID_BLOCKMAP;
     }
 
     VariantInit( &val );
@@ -718,17 +722,34 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
             {
                 VariantInit( &nsval );
                 nsval.vt = VT_BSTR;
-                nsval.bstrVal = SysAllocString( lstrcatW( lstrcatW( (LPWSTR)L"xmlns:bm='", V_BSTR( &val ) ), (LPWSTR)L"'") );
-                document->setProperty( (BSTR)L"SelectionNameSpaces", nsval );
-                VariantClear( &nsval );
+                nsval.bstrVal = SysAllocStringLen( nullptr, lstrlenW( (LPWSTR)L"xmlns:bm='" ) + SysStringLen( V_BSTR( &val ) ) + lstrlenW( (LPWSTR)L"'" ) );
+                if ( !nsval.bstrVal )
+                {
+                    hr = E_OUTOFMEMORY;
+                }
+                else
+                {
+                    lstrcpyW( nsval.bstrVal, (LPWSTR)L"xmlns:bm='" );
+                    lstrcatW( nsval.bstrVal, V_BSTR( &val ) );
+                    lstrcatW( nsval.bstrVal, (LPWSTR)L"'" );
+                }
 
-                hr = document->selectNodes( (BSTR)L"/bm:BlockMap/bm:File", &nodeList );
                 if ( SUCCEEDED( hr ) )
                 {
-                    *enumerator = new(std::nothrow) AppxBlockMapFilesEnumerator( nodeList );
-                    nodeList->Release();
-                    if ( !*enumerator ) 
-                        hr = E_OUTOFMEMORY;
+                    document->setProperty( (BSTR)L"SelectionNameSpaces", nsval );
+                    VariantClear( &nsval );
+
+                    hr = document->selectNodes( (BSTR)L"/bm:BlockMap/bm:File", &nodeList );
+                    if ( SUCCEEDED( hr ) && nodeList )
+                    {
+                        *enumerator = new(std::nothrow) AppxBlockMapFilesEnumerator( nodeList );
+                        nodeList->Release();
+                        if ( !*enumerator ) 
+                            hr = E_OUTOFMEMORY;
+                    } else if ( !nodeList  )
+                    {
+                        hr = APPX_E_INVALID_BLOCKMAP;
+                    }
                 }
             } else 
             {
