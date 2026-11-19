@@ -22,6 +22,7 @@
 #include <new>
 
 #include "IO/PackageIO.hpp"
+#include "IO/BlockMap.hpp"
 
 #include "../../private.h"
 #include "wine/debug.h"
@@ -132,9 +133,7 @@ public:
         reader = new(std::nothrow) AppxPackageReader( inputStream, package );
         package->Release();
         if ( !reader ) 
-        {
             return E_OUTOFMEMORY;
-        }
 
         *packageReader = reader;
 
@@ -151,8 +150,27 @@ public:
     HRESULT WINAPI 
     CreateBlockMapReader( IStream *inputStream, IAppxBlockMapReader **blockMapReader ) noexcept override
     {
-        FIXME( "iface %p, inputStream %p, manifestReader %p stub!\n", this, inputStream, blockMapReader );
-        return E_NOTIMPL;
+        HRESULT hr = S_OK;
+        IAppxFile *blockMapFile = nullptr;
+
+        TRACE( "iface %p, inputStream %p, manifestReader %p.\n", this, inputStream, blockMapReader );
+
+        if ( !inputStream )
+            return E_INVALIDARG;
+
+        if ( !blockMapReader )
+            return E_POINTER;
+
+        blockMapFile = new(std::nothrow) AppxFile( inputStream );
+        if ( !blockMapFile )
+            return E_OUTOFMEMORY;
+
+        *blockMapReader = new(std::nothrow) AppxBlockMapReader( blockMapFile );
+        blockMapFile->Release();
+        if ( !*blockMapReader )
+            return E_OUTOFMEMORY;
+
+        return hr;
     }
     
     HRESULT WINAPI 
