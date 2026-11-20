@@ -271,8 +271,8 @@ AppxPackageReader::GetPayloadFiles( IAppxFilesEnumerator **filesEnumerator ) noe
         if ( FAILED( hr = current_file->GetName( &current_name ) ) )
             break;
 
-        // Behavior calls for excluding AppxManifest.xml
-        if ( lstrcmpW( current_name, (LPWSTR)L"AppxManifest.xml" ) == 0 )
+        // Behavior calls for excluding /AppxManifest.xml
+        if ( lstrcmpW( current_name, (LPWSTR)L"/AppxManifest.xml" ) == 0 )
         {        
             CoTaskMemFree( current_name );
             current_name = nullptr;

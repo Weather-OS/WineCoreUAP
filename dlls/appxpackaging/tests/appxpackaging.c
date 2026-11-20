@@ -90,10 +90,6 @@ static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackag
     hr = IAppxBlockMapFilesEnumerator_GetHasCurrent( files, &has_current );
     ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::GetHasCurrent failed with %#lx\n", hr );
 
-    // skip the first file (It's always AppxManifest.xml on Windows, which isn't a payload file)
-    hr = IAppxBlockMapFilesEnumerator_MoveNext( files, &has_current );
-    ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::MoveNext failed with %#lx\n", hr );
-
     while ( has_current )
     {
         hr = IAppxBlockMapFilesEnumerator_GetCurrent( files, &file );
@@ -101,6 +97,16 @@ static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackag
 
         hr = IAppxBlockMapFile_GetName( file, &name );
         ok( SUCCEEDED( hr ), "IAppxBlockMapFile::GetName failed with %#lx\n", hr );
+
+        if ( StrStrW( name, L"AppxManifest.xml" ) )
+        {
+            CoTaskMemFree( name );
+            IAppxBlockMapFile_Release( file );
+
+            hr = IAppxBlockMapFilesEnumerator_MoveNext( files, &has_current );
+            ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::MoveNext failed with %#lx\n", hr );
+            continue;
+        }
 
         hr = IAppxPackageReader_GetPayloadFile( reader, name, &appxFile );
         ok( SUCCEEDED( hr ), "IAppxPackageReader::GetPayloadFile failed with %#lx\n", hr );
