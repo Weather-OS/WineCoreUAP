@@ -23,6 +23,7 @@
 
 #include "PackageIO.hpp"
 #include "BlockMap.hpp"
+#include "Manifest.hpp"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
@@ -146,8 +147,28 @@ AppxPackageReader::GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE type, IAppxFile **
 HRESULT WINAPI
 AppxPackageReader::GetManifest( IAppxManifestReader **manifestReader ) noexcept
 {
-    FIXME( "iface %p, manifestReader %p stub!\n", this, manifestReader );
-    return E_NOTIMPL;
+    HRESULT hr;
+    IAppxFile *file = nullptr;
+    IAppxManifestReader *reader = nullptr;
+   
+    TRACE( "iface %p, manifestReader %p.\n", this, manifestReader );
+
+    if ( !manifestReader )
+        return E_POINTER;
+
+    if ( FAILED( hr = GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE_MANIFEST, &file ) ) )
+        return hr;
+
+    reader = new(std::nothrow) AppxManifestReader( file );
+    file->Release();
+    if ( !reader ) 
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    *manifestReader = reader;
+
+    return S_OK;
 }
 
 HRESULT WINAPI

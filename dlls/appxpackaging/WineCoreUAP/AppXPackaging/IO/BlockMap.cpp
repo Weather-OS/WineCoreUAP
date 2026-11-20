@@ -1066,7 +1066,7 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
                 }
             } else 
             {
-                ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+                ERR( "for blockmap reader %p, got wrong xmlns %s!\n", this, debugstr_w( V_BSTR( &val ) ) );
                 hr = APPX_E_INVALID_BLOCKMAP;
             }
         }

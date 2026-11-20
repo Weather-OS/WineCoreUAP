@@ -26,7 +26,7 @@
 #include "../../../private.h"
 
 class AppxManifestPackageId
-    : public IAppxManifestPackageId
+    : public IAppxManifestPackageId2
 {
 public:
     AppxManifestPackageId() = default;
@@ -47,7 +47,7 @@ public:
     ULONG WINAPI 
     Release() noexcept override;
 
-    /* IAppxBlockMapFile Methods */
+    /* IAppxManifestPackageId Methods */
     HRESULT WINAPI
     GetName( LPWSTR *name ) noexcept override;
 
@@ -71,6 +71,10 @@ public:
 
     HRESULT WINAPI
     GetPackageFamilyName( LPWSTR *packageFamilyName ) noexcept override;
+
+    /* IAppxManifestPackageId2 Methods */
+    HRESULT WINAPI
+    GetArchitecture2( APPX_PACKAGE_ARCHITECTURE2 *architecture ) noexcept override;
 
 private:
     std::atomic<LONG> ref{ 1 };
