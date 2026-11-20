@@ -89,6 +89,7 @@ HRESULT WINAPI
 AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
 {
     BSTR attributeName;
+    DWORD hashSize = 0;
     HRESULT hr = S_OK;
     VARIANT val;
 
@@ -115,10 +116,25 @@ AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
         hr = VariantChangeType( &val, &val, 0, VT_BSTR );
         if ( SUCCEEDED( hr ) )
         {
-            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, reinterpret_cast<DWORD *>(bufferSize), NULL, NULL ) )
+            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, NULL, &hashSize, NULL, NULL ) )
             {
-                ERR( "for blockmap block %p, failed to calculate hash! return value was %ld\n", this, GetLastError() );
+                ERR( "for blockmap block %p, failed to calculate hash size! return value was %ld\n", this, GetLastError() );
                 hr = HRESULT_FROM_WIN32( GetLastError() );
+            }
+
+            if ( SUCCEEDED( hr ) )
+            {
+                *buffer = static_cast<BYTE *>( CoTaskMemAlloc( hashSize ) );
+                if ( !*buffer )
+                {
+                    hr = E_OUTOFMEMORY;
+                } else if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, &hashSize, NULL, NULL ) )
+                {
+                    ERR( "for blockmap block %p, failed to calculate hash! return value was %ld\n", this, GetLastError() );
+                    CoTaskMemFree( *buffer );
+                    hr = HRESULT_FROM_WIN32( GetLastError() );
+                }
+                *bufferSize = hashSize;
             }
         }
     }
@@ -261,7 +277,7 @@ AppxBlockMapBlocksEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
     LONG len;
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+    TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
 
     if ( !hasCurrent )
         return E_POINTER;
@@ -419,12 +435,15 @@ AppxBlockMapFile::GetLocalFileHeaderSize( UINT32 *lfhSize ) noexcept
     return hr;
 }
 
-HRESULT WINAPI 
+HRESULT WINAPI
 AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
 {
     BSTR attributeName;
+    BSTR normalizedName = NULL;
     HRESULT hr = S_OK;
     VARIANT val;
+    IOpcFactory *opcFactory = NULL;
+    IOpcPartUri *partUri = NULL;
 
     TRACE( "iface %p, name %p.\n", this, name );
 
@@ -434,9 +453,9 @@ AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
     attributeName = SysAllocString( (OLECHAR *)L"Name" );
     if ( !attributeName )
         return E_OUTOFMEMORY;
-    
+
     VariantInit( &val );
-    
+
     hr = xmlElement->getAttribute( attributeName, &val );
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
@@ -449,13 +468,30 @@ AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
         hr = VariantChangeType( &val, &val, 0, VT_BSTR );
         if ( SUCCEEDED( hr ) )
         {
-            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( *name )
-                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
+            hr = CoCreateInstance( CLSID_OpcFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opcFactory ) );
+            if ( SUCCEEDED( hr ) )
+                hr = opcFactory->CreatePartUri( V_BSTR( &val ), &partUri );
+
+            if ( SUCCEEDED( hr ) )
+                hr = partUri->GetPath( &normalizedName );
+
+            if ( SUCCEEDED( hr ) )
+            {
+                *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( normalizedName ) + sizeof(WCHAR) );
+                if ( *name )
+                    lstrcpynW( *name, normalizedName, SysStringLen( normalizedName ) + 1 );
+                else
+                    hr = E_OUTOFMEMORY;
+            }
         }
     }
+
+    if ( normalizedName )
+        SysFreeString( normalizedName );
+    if ( partUri )
+        partUri->Release();
+    if ( opcFactory )
+        opcFactory->Release();
 
     SysFreeString( attributeName );
     VariantClear( &val );
@@ -613,7 +649,7 @@ AppxBlockMapFile::ValidateFileHash( IStream *fileStream, BOOL *isValid ) noexcep
                 break;
         
             default:
-                hr = HRESULT_FROM_WIN32( APPX_E_INVALID_BLOCKMAP );
+                hr = APPX_E_INVALID_BLOCKMAP;
                 break;
         }
 
@@ -682,7 +718,7 @@ AppxBlockMapFile::ValidateFileHash( IStream *fileStream, BOOL *isValid ) noexcep
     if ( hashBuffer ) CoTaskMemFree( hashBuffer );
     enumerator->Release();
 
-    if ( remaining )
+    if ( remaining && SUCCEEDED( hr ) )
         hr = APPX_E_CORRUPT_CONTENT;
 
     if ( SUCCEEDED( hr ) )
@@ -785,7 +821,7 @@ AppxBlockMapFilesEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
     LONG len;
     HRESULT hr = S_OK;
 
-    TRACE( "iface %p, hasCurrent %p stub!\n", this, hasCurrent );
+    TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
 
     if ( !hasCurrent )
         return E_POINTER;

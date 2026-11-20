@@ -73,6 +73,58 @@ static void load_resource( const WCHAR *name, const WCHAR *type, const WCHAR *fi
     CloseHandle( file );
 }
 
+static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackageReader *reader )
+{
+    HRESULT hr;
+    BOOL has_current;
+    BOOL isValid;
+    LPWSTR name;
+    IStream *appxFileStream = NULL;
+    IAppxFile *appxFile = NULL;
+    IAppxBlockMapFile *file = NULL;
+    IAppxBlockMapFilesEnumerator *files = NULL;
+
+    hr = IAppxBlockMapReader_GetFiles( blockMap, &files );
+    ok( SUCCEEDED( hr ), "IAppxBlockMapReader::GetFiles failed with %#lx\n", hr );
+
+    hr = IAppxBlockMapFilesEnumerator_GetHasCurrent( files, &has_current );
+    ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::GetHasCurrent failed with %#lx\n", hr );
+
+    // skip the first file (It's always AppxManifest.xml on Windows, which isn't a payload file)
+    hr = IAppxBlockMapFilesEnumerator_MoveNext( files, &has_current );
+    ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::MoveNext failed with %#lx\n", hr );
+
+    while ( has_current )
+    {
+        hr = IAppxBlockMapFilesEnumerator_GetCurrent( files, &file );
+        ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::GetCurrent failed with %#lx\n", hr );
+
+        hr = IAppxBlockMapFile_GetName( file, &name );
+        ok( SUCCEEDED( hr ), "IAppxBlockMapFile::GetName failed with %#lx\n", hr );
+
+        hr = IAppxPackageReader_GetPayloadFile( reader, name, &appxFile );
+        ok( SUCCEEDED( hr ), "IAppxPackageReader::GetPayloadFile failed with %#lx\n", hr );
+
+        trace( "Blockmap file: %s\n", wine_dbgstr_w( name ) );
+
+        hr = IAppxFile_GetStream( appxFile, &appxFileStream );
+        ok( SUCCEEDED( hr ), "IAppxFile::GetStream failed with %#lx\n", hr );
+
+        hr = IAppxBlockMapFile_ValidateFileHash( file, appxFileStream, &isValid );
+        ok( SUCCEEDED( hr ), "IAppxBlockMapFile::ValidateFileHash failed with %#lx\n", hr );
+        ok( isValid, "checksum for block map file %s failed!\n", wine_dbgstr_w( name ) );
+
+        CoTaskMemFree( name );
+        IAppxBlockMapFile_Release( file );
+
+        hr = IAppxBlockMapFilesEnumerator_MoveNext( files, &has_current );
+        ok( SUCCEEDED( hr ), "IAppxBlockMapFilesEnumerator::MoveNext failed with %#lx\n", hr );
+    }
+
+    IAppxBlockMapFilesEnumerator_Release( files );
+    IAppxBlockMapReader_Release( blockMap );
+}
+
 static void test_IAppxPackageReader( IAppxPackageReader *reader )
 {
     HRESULT hr;
@@ -81,9 +133,6 @@ static void test_IAppxPackageReader( IAppxPackageReader *reader )
     IAppxFile *file;
     IAppxBlockMapReader *blockMap = NULL;
     IAppxFilesEnumerator *files = NULL;
-
-    hr = IAppxPackageReader_GetBlockMap( reader, &blockMap );
-    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetBlockMap failed with %#lx\n", hr );
 
     hr = IAppxPackageReader_GetPayloadFiles( reader, &files );
     ok( SUCCEEDED( hr ), "IAppxPackageReader::GetPayloadFiles failed with %#lx\n", hr );
@@ -108,8 +157,14 @@ static void test_IAppxPackageReader( IAppxPackageReader *reader )
         ok( SUCCEEDED( hr ), "IAppxFilesEnumerator::MoveNext failed with %#lx\n", hr );
     }
 
+    hr = IAppxPackageReader_GetBlockMap( reader, &blockMap );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetBlockMap failed with %#lx\n", hr );
+
     IAppxFilesEnumerator_Release( files );
-    IAppxBlockMapReader_Release( blockMap );
+
+    test_IAppxBlockMapReader( blockMap, reader );
+
+    IAppxPackageReader_Release( reader );
 }
 
 static void test_AppxFactory( void )
