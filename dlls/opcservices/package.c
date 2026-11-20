@@ -74,6 +74,7 @@ struct opc_part_enum
 struct opc_part
 {
     IOpcPart IOpcPart_iface;
+    BOOL content_extracted;
     LONG refcount;
 
     IOpcPartUri *name;
@@ -889,6 +890,7 @@ static HRESULT opc_part_create(struct opc_part_set *set, IOpcPartUri *name, cons
     part->IOpcPart_iface.lpVtbl = &opc_part_vtbl;
     part->refcount = 1;
     part->name = name;
+    part->content_extracted = FALSE;
     IOpcPartUri_AddRef(name);
     part->compression_options = compression_options;
     if (!(part->content_type = opc_strdupW(content_type)))
@@ -926,7 +928,7 @@ static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_se
         is_equal = FALSE;
         if ( (IOpcPartUri_IsEqual(part_set->parts[i]->name, (IUri *)name, &is_equal) == S_OK && is_equal) )
         {
-            if ( archive )
+            if ( archive && !part_set->parts[i]->content_extracted )
             {
                 // part has data. read it first.
                 hr = IOpcPart_GetContentStream( &part_set->parts[i]->IOpcPart_iface, &fileStream );
@@ -942,6 +944,8 @@ static struct opc_part *opc_part_set_get_part(const struct opc_part_set *part_se
                     ERR("decompress_extract_file failed with %#lx. Returning empty part...\n", hr);
                     return part_set->parts[i];
                 }
+
+                part_set->parts[i]->content_extracted = TRUE;
             }
             return part_set->parts[i];
         }
