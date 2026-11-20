@@ -73,6 +73,48 @@ static void load_resource( const WCHAR *name, const WCHAR *type, const WCHAR *fi
     CloseHandle( file );
 }
 
+static void test_IAppxManifestReader( IAppxManifestReader *manifest )
+{
+    HRESULT hr;
+    APPX_PACKAGE_ARCHITECTURE2 architecture;
+    IAppxManifestPackageId *packageId = NULL;
+    IAppxManifestPackageId2 *packageId2 = NULL;
+    LPWSTR publisher;
+    LPWSTR packageFullName;
+    LPWSTR packageFamilyName;
+
+    hr = IAppxManifestReader_GetPackageId( manifest, &packageId );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageId failed with %#lx\n", hr );
+
+    hr = IAppxManifestPackageId_QueryInterface( packageId, &IID_IAppxManifestPackageId2, (void **)&packageId2 );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
+
+    hr = IAppxManifestPackageId2_GetArchitecture2( packageId2, &architecture );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
+    ok( architecture == APPX_PACKAGE_ARCHITECTURE2_ARM64, "got wrong architecture %d for current package!\n", architecture );
+#elif defined(__x86_64__) || defined(_M_X64)
+    ok( architecture == APPX_PACKAGE_ARCHITECTURE2_X64, "got wrong architecture %d for current package!\n", architecture );
+#elif defined(__i386__) || defined(_M_IX86)
+    ok( architecture == APPX_PACKAGE_ARCHITECTURE2_X86, "got wrong architecture %d for current package!\n", architecture );
+#endif
+
+    hr = IAppxManifestPackageId2_GetPublisher( packageId2, &publisher );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId2::GetPublisher failed with %#lx\n", hr );
+
+    trace("publisher is %s\n", wine_dbgstr_w( publisher ));
+
+    hr = IAppxManifestPackageId2_GetPackageFullName( packageId2, &packageFullName );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId2::GetPackageFullName failed with %#lx\n", hr );
+
+    trace("packageFullName is %s\n", wine_dbgstr_w( packageFullName ));
+
+    hr = IAppxManifestPackageId2_GetPackageFamilyName( packageId2, &packageFamilyName );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId2::GetPackageFamilyName failed with %#lx\n", hr );
+
+    trace("packageFamilyName is %s\n", wine_dbgstr_w( packageFamilyName ));
+}
+
 static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackageReader *reader )
 {
     HRESULT hr;
@@ -138,6 +180,7 @@ static void test_IAppxPackageReader( IAppxPackageReader *reader )
     LPWSTR name;
     IAppxFile *file;
     IAppxBlockMapReader *blockMap = NULL;
+    IAppxManifestReader *manifest = NULL;
     IAppxFilesEnumerator *files = NULL;
 
     hr = IAppxPackageReader_GetPayloadFiles( reader, &files );
@@ -166,9 +209,13 @@ static void test_IAppxPackageReader( IAppxPackageReader *reader )
     hr = IAppxPackageReader_GetBlockMap( reader, &blockMap );
     ok( SUCCEEDED( hr ), "IAppxPackageReader::GetBlockMap failed with %#lx\n", hr );
 
+    hr = IAppxPackageReader_GetManifest( reader, &manifest );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetManifest failed with %#lx\n", hr );
+
     IAppxFilesEnumerator_Release( files );
 
     test_IAppxBlockMapReader( blockMap, reader );
+    test_IAppxManifestReader( manifest );
 
     IAppxPackageReader_Release( reader );
 }

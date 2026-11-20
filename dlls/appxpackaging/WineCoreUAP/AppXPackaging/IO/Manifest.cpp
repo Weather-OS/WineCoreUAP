@@ -22,9 +22,91 @@
 #include <new>
 
 #include "Manifest.hpp"
+#include "bcrypt.h"
+#include "corecrt_wstdio.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
+
+// dirty implementation of https://withinrafael.com/2018/01/28/whats-that-gobbledygook-in-my-package-family-name
+static BOOL PublisherIdFromPublisherString( LPCWSTR str, LPWSTR result, SIZE_T result_cch )
+{
+    static LPCWSTR alphabet = (LPCWSTR)L"0123456789abcdefghjkmnpqrstvwxyz";
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+    BCRYPT_HASH_HANDLE hHash = NULL;
+    BYTE hash[32];
+    BYTE group;
+    BYTE bit;
+    NTSTATUS status;
+    DWORD hashObjectSize = 0;
+    DWORD cbData = 0;
+    BYTE *hashObject = NULL;
+    SIZE_T inputBytes;
+    SIZE_T iterator;
+    SIZE_T bitPos;
+    INT iterator2;
+
+    if ( !str || !result || result_cch < 14 )
+        return FALSE;
+
+    inputBytes = lstrlenW(str) * sizeof(WCHAR);
+    status = BCryptOpenAlgorithmProvider( &hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0 );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
+
+    status = BCryptGetProperty( hAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&hashObjectSize, sizeof(hashObjectSize), &cbData, 0 );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
+
+    hashObject = (BYTE *)HeapAlloc( GetProcessHeap(), 0, hashObjectSize );
+    if (!hashObject)
+        goto _CLEANUP;
+        
+    status = BCryptCreateHash( hAlg, &hHash, hashObject, hashObjectSize, NULL, 0, 0 );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
+
+    status = BCryptHashData( hHash, (PUCHAR)str, (ULONG)inputBytes, 0 );
+    if ( FAILED( status ) )
+        goto _CLEANUP;
+
+    status = BCryptFinishHash( hHash, hash, sizeof(hash), 0 );
+
+    if (status < 0)
+        goto _CLEANUP;
+
+    //encode the first 64 hash bits into 13 base32 characters.
+    for ( iterator = 0; iterator < 13; iterator++ )
+    {
+        group = 0;
+        for ( iterator2 = 0; iterator2 < 5; iterator2++ )
+        {
+            bitPos = iterator * 5 + iterator2;
+            bit = 0;
+            if ( bitPos < 64 )
+            {
+                bit = (hash[bitPos / 8] >> (7 - (bitPos % 8))) & 1;
+            }
+            group = (BYTE)((group << 1) | bit);
+        }
+        result[iterator] = alphabet[group];
+    }
+
+    result[13] = L'\0';
+    HeapFree( GetProcessHeap(), 0, hashObject );
+    BCryptDestroyHash( hHash );
+    BCryptCloseAlgorithmProvider( hAlg, 0 );
+    return TRUE;
+
+_CLEANUP:
+    if (hashObject)
+        HeapFree( GetProcessHeap(), 0, hashObject );
+    if (hHash)
+        BCryptDestroyHash( hHash );
+    if (hAlg)
+        BCryptCloseAlgorithmProvider( hAlg, 0 );
+    return FALSE;
+}
 
 // ------------- IAppxManifestPackageId ------------- //
 AppxManifestPackageId::AppxManifestPackageId( IXMLDOMElement *element )
@@ -47,6 +129,12 @@ AppxManifestPackageId::QueryInterface( REFIID iid, void** out ) noexcept
     {
         AddRef();
         *out = static_cast<IAppxManifestPackageId *>(this);
+        return S_OK;
+    }
+    else if ( iid == __uuidof( IAppxManifestPackageId2 ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestPackageId2 *>(this);
         return S_OK;
     }
 
@@ -82,57 +170,412 @@ AppxManifestPackageId::Release() noexcept
 HRESULT WINAPI
 AppxManifestPackageId::GetName( LPWSTR *name ) noexcept
 {
-    FIXME( "iface %p, name %p stub!\n", this, name );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, name %p.\n", this, name );
+
+    if ( !name )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Name" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( *name )
+                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetArchitecture( APPX_PACKAGE_ARCHITECTURE *architecture ) noexcept
 {
-    FIXME( "iface %p, architecture %p stub!\n", this, architecture );
-    return E_NOTIMPL;
+    TRACE( "iface %p, architecture %p.\n", this, architecture );
+
+    return GetArchitecture2( reinterpret_cast<APPX_PACKAGE_ARCHITECTURE2 *>(architecture) );
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetPublisher( LPWSTR *publisher ) noexcept
 {
-    FIXME( "iface %p, publisher %p stub!\n", this, publisher );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, publisher %p.\n", this, publisher );
+
+    if ( !publisher )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Publisher" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *publisher = (LPWSTR)CoTaskMemAlloc( 14 * sizeof(WCHAR) );
+            if ( *publisher )
+                lstrcpynW( *publisher, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
 {
-    FIXME( "iface %p, packageVersion %p stub!\n", this, packageVersion );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    WCHAR extra;
+    LPWSTR version = nullptr;
+    USHORT versioning[4];
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, packageVersion %p.\n", this, packageVersion );
+
+    if ( !packageVersion )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Version" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            version = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( version )
+                lstrcpynW( version, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    if ( swscanf_s( reinterpret_cast<const wchar_t *>(version), L"%hu.%hu.%hu.%hu%c", &versioning[0], &versioning[1], &versioning[2], &versioning[3], &extra ) != 4 )
+        return E_INVALIDARG;
+
+    *packageVersion = ((UINT64)versioning[0] << 48) |
+        ((UINT64)versioning[1] << 32) |
+        ((UINT64)versioning[2] << 16) |
+        (UINT64)versioning[3];
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetResourceId( LPWSTR *resourceId ) noexcept
 {
-    FIXME( "iface %p, resourceId %p stub!\n", this, resourceId );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, resourceId %p.\n", this, resourceId );
+
+    if ( !resourceId )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"ResourceId" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        // element is optional
+        hr = S_FALSE;
+    }
+
+    if ( SUCCEEDED( hr ) && hr != S_FALSE )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *resourceId = (LPWSTR)CoTaskMemAlloc( 14 * sizeof(WCHAR) );
+            if ( *resourceId )
+                lstrcpynW( *resourceId, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::ComparePublisher( LPCWSTR other, BOOL *isSame ) noexcept
 {
-    FIXME( "iface %p, resourceId %s, isSame %p stub!\n", this, debugstr_w( other ), isSame );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    LPWSTR publisher;
+
+    TRACE( "iface %p, resourceId %s, isSame %p.\n", this, debugstr_w( other ), isSame );
+
+    if ( !other )
+        return E_INVALIDARG;
+
+    if ( !isSame )
+        return E_POINTER;
+
+    *isSame = FALSE;
+
+    if ( FAILED( hr = GetPublisher( &publisher ) ) )
+        return hr;
+
+    if ( lstrcmpW( publisher, other ) == 0 )
+        *isSame = TRUE;
+    
+    CoTaskMemFree( publisher );
+
+    return S_OK;;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetPackageFullName( LPWSTR *packageFullName ) noexcept
 {
-    FIXME( "iface %p, resourceId %p stub!\n", this, packageFullName );
-    return E_NOTIMPL;
+    APPX_PACKAGE_ARCHITECTURE2 architecture;
+    HRESULT hr = S_OK;
+    UINT64 packageVer; 
+    LPWSTR name;
+    LPWSTR resourceId = (LPWSTR)L"";
+    LPWSTR publisher;
+    WCHAR publisherId[14];
+    WCHAR version[26];
+    WCHAR architectureStr[8];
+
+    TRACE( "iface %p, packageFullName %p.\n", this, packageFullName );
+
+    if ( !packageFullName )
+        return E_POINTER;
+
+    if ( FAILED( hr = GetVersion( &packageVer ) ) )
+        return hr;
+
+    swprintf_s( reinterpret_cast<wchar_t *>(version), sizeof(version)/sizeof(WCHAR), L"%u.%u.%u.%u", 
+                (UINT64)((packageVer >> 48) & 0xFFFF), 
+                (UINT64)((packageVer >> 32) & 0xFFFF), 
+                (UINT64)((packageVer >> 16) & 0xFFFF), 
+                (UINT64)(packageVer & 0xFFFF) );
+
+    if ( FAILED( hr = GetArchitecture2( &architecture ) ) )
+        return hr;
+
+    switch ( architecture )
+    {
+        case APPX_PACKAGE_ARCHITECTURE2_X86:
+            lstrcpyW( architectureStr, (LPCWSTR)L"x86" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_ARM:
+            lstrcpyW( architectureStr, (LPCWSTR)L"arm" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_X64:
+            lstrcpyW( architectureStr, (LPCWSTR)L"x64" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_NEUTRAL:
+            lstrcpyW( architectureStr, (LPCWSTR)L"neutral" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_ARM64:
+            lstrcpyW( architectureStr, (LPCWSTR)L"arm64" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_X86_ON_ARM64:
+            lstrcpyW( architectureStr, (LPCWSTR)L"x86a64" );
+            break;
+
+        case APPX_PACKAGE_ARCHITECTURE2_UNKNOWN:
+            lstrcpyW( architectureStr, (LPCWSTR)L"unknown" );
+            break;
+    }
+
+    if ( SUCCEEDED( hr = GetName( &name ) ) )
+    {
+        if ( SUCCEEDED( hr = GetPublisher( &publisher ) ) )
+        {
+            PublisherIdFromPublisherString( publisher, publisherId, 14 );
+            CoTaskMemFree( publisher );
+            if ( SUCCEEDED( hr = GetResourceId( &resourceId ) ) )
+            {
+                *packageFullName = (LPWSTR)CoTaskMemAlloc( ((lstrlenW(name) + 1 + 1) * sizeof(WCHAR)) +
+                                                           ((lstrlenW(version) + 1 + 1) * sizeof(WCHAR)) +
+                                                           ((lstrlenW(architectureStr) + 1 + 1) * sizeof(WCHAR)) +
+                                                           ((lstrlenW(resourceId) + 1 + 1) * sizeof(WCHAR)) +
+                                                           ((lstrlenW(publisherId) + 1) * sizeof(WCHAR)) );
+                wsprintfW( *packageFullName, (LPCWSTR)L"%s_%s_%s_%s_%s", name, version, architectureStr, resourceId, publisherId );
+                if ( resourceId ) CoTaskMemFree( resourceId );
+            } 
+        }
+    }
+
+    if ( hr == S_FALSE )
+        hr = S_OK;
+
+    CoTaskMemFree( name );
+    
+    return hr;
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetPackageFamilyName( LPWSTR *packageFamilyName ) noexcept
 {
-    FIXME( "iface %p, packageFamilyName %p stub!\n", this, packageFamilyName );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    LPWSTR name;
+    LPWSTR publisher;
+    WCHAR publisherId[14];
+
+    TRACE( "iface %p, packageFamilyName %p.\n", this, packageFamilyName );
+
+    if ( !packageFamilyName )
+        return E_POINTER;
+
+    if ( SUCCEEDED( hr = GetName( &name ) ) )
+    {
+        if ( SUCCEEDED( hr = GetPublisher( &publisher ) ) )
+        {
+            PublisherIdFromPublisherString( publisher, publisherId, 14 );
+            CoTaskMemFree( publisher );
+            *packageFamilyName = (LPWSTR)CoTaskMemAlloc( ((lstrlenW(name) + 1 + 1) * sizeof(WCHAR)) +
+                                                         ((lstrlenW(publisherId) + 1) * sizeof(WCHAR)) );
+            wsprintfW( *packageFamilyName, (LPCWSTR)L"%s_%s", name, publisherId );
+        }
+    }
+
+    if ( hr == S_FALSE )
+        hr = S_OK;
+
+    CoTaskMemFree( name );
+    
+    return hr;
+}
+
+/* IAppxManifestPackageId2 Methods */
+HRESULT WINAPI
+AppxManifestPackageId::GetArchitecture2( APPX_PACKAGE_ARCHITECTURE2 *architecture ) noexcept
+{
+    BSTR attributeName;
+    LPWSTR architectureString = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, architecture %p.\n", this, architecture );
+
+    if ( !architecture )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"ProcessorArchitecture" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            architectureString = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( architectureString )
+                lstrcpynW( architectureString, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    if ( SUCCEEDED( hr ) )
+    {
+        TRACE("architectureString is %s\n", debugstr_w(architectureString));
+        if ( lstrcmpiW( architectureString, (LPWSTR)L"x86" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_X86;
+        else if ( lstrcmpiW( architectureString, (LPWSTR)L"arm" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_ARM;
+        else if ( lstrcmpiW( architectureString, (LPWSTR)L"x64" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_X64;
+        else if ( lstrcmpiW( architectureString, (LPWSTR)L"neutral" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_NEUTRAL;
+        else if ( lstrcmpiW( architectureString, (LPWSTR)L"arm64" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_ARM64;
+        else if ( lstrcmpiW( architectureString, (LPWSTR)L"x86a64" ) == 0 )
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_X86_ON_ARM64;
+        else
+            *architecture = APPX_PACKAGE_ARCHITECTURE2_UNKNOWN;
+    }
+
+    if ( architectureString ) CoTaskMemFree( architectureString );
+
+    return hr;
 }
 
 // ------------- IAppxManifestReader ------------- //
@@ -283,7 +726,7 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
                 }
             } else 
             {
-                ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+                ERR( "for manifest reader %p, got wrong xmlns %s!\n", this, debugstr_w( V_BSTR( &val ) ) );
                 hr = APPX_E_INVALID_BLOCKMAP;
             }
         }
