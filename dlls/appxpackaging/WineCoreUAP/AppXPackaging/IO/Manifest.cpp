@@ -796,6 +796,14 @@ AppxManifestReader::GetStream( IStream **manifestStream ) noexcept
     return appxFile->GetStream( manifestStream );
 }
 
+/* IAppxManifestReader2 Methods */
+HRESULT WINAPI
+AppxManifestReader::GetQualifiedResources( IAppxManifestQualifiedResourcesEnumerator **resources ) noexcept
+{
+    FIXME( "iface %p, resources %p stub!\n", this, resources );
+    return E_NOTIMPL;
+}
+
 /* Internal Methods */
 HRESULT WINAPI 
 AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept

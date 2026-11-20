@@ -83,7 +83,7 @@ private:
 
 /* IAppxFile backed AppxBlockMapReader */
 class AppxManifestReader
-    : public IAppxManifestReader
+    : public IAppxManifestReader2
 {
 public:
     AppxManifestReader() = default;
@@ -131,6 +131,10 @@ public:
 
     HRESULT WINAPI 
     GetStream( IStream **manifestStream ) noexcept override;
+
+    /* IAppxManifestReader2 Methods */
+    HRESULT WINAPI 
+    GetQualifiedResources( IAppxManifestQualifiedResourcesEnumerator **resources ) noexcept override;
 
 private:
     /* Internal Methods */
