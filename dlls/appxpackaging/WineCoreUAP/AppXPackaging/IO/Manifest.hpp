@@ -120,7 +120,7 @@ public:
     GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumerator **deviceCapabilities ) noexcept override;
 
     HRESULT WINAPI
-    GetPrerequisite( LPCWSTR name, UINT64 *value )noexcept override;
+    GetPrerequisite( LPCWSTR name, UINT64 *value ) noexcept override;
 
     HRESULT WINAPI
     GetApplications( IAppxManifestApplicationsEnumerator **applications ) noexcept override;

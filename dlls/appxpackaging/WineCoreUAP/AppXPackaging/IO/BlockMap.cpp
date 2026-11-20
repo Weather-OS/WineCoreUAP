@@ -439,11 +439,11 @@ HRESULT WINAPI
 AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
 {
     BSTR attributeName;
-    BSTR normalizedName = NULL;
+    BSTR normalizedName = nullptr;
     HRESULT hr = S_OK;
     VARIANT val;
-    IOpcFactory *opcFactory = NULL;
-    IOpcPartUri *partUri = NULL;
+    IOpcFactory *opcFactory = nullptr;
+    IOpcPartUri *partUri = nullptr;
 
     TRACE( "iface %p, name %p.\n", this, name );
 
@@ -1031,7 +1031,7 @@ AppxBlockMapReader::GetFiles( IAppxBlockMapFilesEnumerator **enumerator ) noexce
         if ( SUCCEEDED( hr ) )
         {
             // uri needs validation
-            if ( lstrcmpiW( V_BSTR( &val ), GetResourceW( IDS_XMLNS_URI ) ) == 0 )
+            if ( lstrcmpiW( V_BSTR( &val ), GetResourceW( IDS_XMLNS_BLOCKMAP_URI ) ) == 0 )
             {
                 VariantInit( &nsval );
                 nsval.vt = VT_BSTR;

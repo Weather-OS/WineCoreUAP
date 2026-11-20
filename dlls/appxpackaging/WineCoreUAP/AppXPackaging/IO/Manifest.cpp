@@ -191,8 +191,109 @@ AppxManifestReader::Release() noexcept
 HRESULT WINAPI
 AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 {
-    FIXME( "iface %p, packageId %p stub!\n", this, packageId );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNode *packageNode = nullptr;
+    IXMLDOMElement *packageElem = nullptr;
+    IXMLDOMElement *rootElem = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT val;
+    VARIANT nsval;
+    BSTR attributeName;
+
+    TRACE( "iface %p, packageId %p.\n", this, packageId );
+
+    if ( !packageId )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"xmlns" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( attributeName );
+        return hr;
+    }
+
+    hr = document->get_documentElement( &rootElem );
+    if ( FAILED( hr ) || !rootElem )
+    {
+        if ( rootElem )
+            rootElem->Release();
+
+        document->Release();
+        SysFreeString( attributeName );
+
+        return FAILED( hr ) ? hr : APPX_E_INVALID_BLOCKMAP;
+    }
+
+    VariantInit( &val );
+    
+    hr = rootElem->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_BLOCKMAP;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            // uri needs validation
+            if ( lstrcmpiW( V_BSTR( &val ), GetResourceW( IDS_XMLNS_MANIFEST_URI ) ) == 0 )
+            {
+                VariantInit( &nsval );
+                nsval.vt = VT_BSTR;
+                nsval.bstrVal = SysAllocStringLen( nullptr, lstrlenW( (LPWSTR)L"xmlns:ns='" ) + SysStringLen( V_BSTR( &val ) ) + lstrlenW( (LPWSTR)L"'" ) );
+                if ( !nsval.bstrVal )
+                {
+                    hr = E_OUTOFMEMORY;
+                }
+                else
+                {
+                    lstrcpyW( nsval.bstrVal, (LPWSTR)L"xmlns:ns='" );
+                    lstrcatW( nsval.bstrVal, V_BSTR( &val ) );
+                    lstrcatW( nsval.bstrVal, (LPWSTR)L"'" );
+                }
+
+                if ( SUCCEEDED( hr ) )
+                {
+                    document->setProperty( (BSTR)L"SelectionNamespaces", nsval );
+                    VariantClear( &nsval );
+
+                    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Identity", &packageNode );
+                    if ( SUCCEEDED( hr ) && packageNode )
+                    {
+                        hr = packageNode->QueryInterface( &packageElem );
+                        packageNode->Release();
+                        if ( SUCCEEDED( hr ) )
+                        {
+                            *packageId = new(std::nothrow) AppxManifestPackageId( packageElem );
+                            packageElem->Release();
+                            if ( !*packageId ) 
+                                hr = E_OUTOFMEMORY;
+                        }
+                    } else if ( !packageNode )
+                    {
+                        hr = APPX_E_INVALID_BLOCKMAP;
+                    }
+                }
+            } else 
+            {
+                ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+                hr = APPX_E_INVALID_BLOCKMAP;
+            }
+        }
+    }
+
+    document->Release();
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI
