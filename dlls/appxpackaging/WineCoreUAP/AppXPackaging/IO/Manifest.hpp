@@ -25,6 +25,58 @@
 
 #include "../../../private.h"
 
+class AppxManifestPackageId
+    : public IAppxManifestPackageId
+{
+public:
+    AppxManifestPackageId() = default;
+    AppxManifestPackageId(const AppxManifestPackageId&) = delete;
+    AppxManifestPackageId& operator=(const AppxManifestPackageId&) = delete;
+
+    AppxManifestPackageId( IXMLDOMElement *element );
+
+    virtual ~AppxManifestPackageId() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxBlockMapFile Methods */
+    HRESULT WINAPI
+    GetName( LPWSTR *name ) noexcept override;
+
+    HRESULT WINAPI
+    GetArchitecture( APPX_PACKAGE_ARCHITECTURE *architecture ) noexcept override;
+
+    HRESULT WINAPI
+    GetPublisher( LPWSTR *publisher ) noexcept override;
+
+    HRESULT WINAPI
+    GetVersion( UINT64 *packageVersion ) noexcept override;
+
+    HRESULT WINAPI
+    GetResourceId( LPWSTR *resourceId ) noexcept override;
+
+    HRESULT WINAPI
+    ComparePublisher( LPCWSTR other, BOOL *isSame ) noexcept override;
+
+    HRESULT WINAPI
+    GetPackageFullName( LPWSTR *packageFullName ) noexcept override;
+
+    HRESULT WINAPI
+    GetPackageFamilyName( LPWSTR *packageFamilyName ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMElement *xmlElement{ nullptr };
+};
+
 /* IAppxFile backed AppxBlockMapReader */
 class AppxManifestReader
     : public IAppxManifestReader
@@ -49,28 +101,28 @@ public:
     Release() noexcept override;
 
     /* IAppxManifestReader Methods */
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetPackageId( IAppxManifestPackageId **packageId ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetProperties( IAppxManifestProperties **packageProperties ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetPackageDependencies( IAppxManifestPackageDependenciesEnumerator **dependencies ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetResources( IAppxManifestResourcesEnumerator **resources ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumerator **deviceCapabilities ) noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetPrerequisite( LPCWSTR name, UINT64 *value )noexcept override;
 
-    HRESULT STDMETHODCALLTYPE 
+    HRESULT WINAPI
     GetApplications( IAppxManifestApplicationsEnumerator **applications ) noexcept override;
 
     HRESULT WINAPI 

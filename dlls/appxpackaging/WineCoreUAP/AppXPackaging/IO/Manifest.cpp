@@ -24,8 +24,116 @@
 #include "Manifest.hpp"
 #include "wine/debug.h"
 
-
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
+
+// ------------- IAppxManifestPackageId ------------- //
+AppxManifestPackageId::AppxManifestPackageId( IXMLDOMElement *element )
+    : xmlElement( element )
+{
+    element->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxManifestPackageId::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxManifestPackageId ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestPackageId *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxManifestPackageId::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxManifestPackageId::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if ( xmlElement ) xmlElement->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxManifestPackageId Methods */
+HRESULT WINAPI
+AppxManifestPackageId::GetName( LPWSTR *name ) noexcept
+{
+    FIXME( "iface %p, name %p stub!\n", this, name );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetArchitecture( APPX_PACKAGE_ARCHITECTURE *architecture ) noexcept
+{
+    FIXME( "iface %p, architecture %p stub!\n", this, architecture );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetPublisher( LPWSTR *publisher ) noexcept
+{
+    FIXME( "iface %p, publisher %p stub!\n", this, publisher );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
+{
+    FIXME( "iface %p, packageVersion %p stub!\n", this, packageVersion );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetResourceId( LPWSTR *resourceId ) noexcept
+{
+    FIXME( "iface %p, resourceId %p stub!\n", this, resourceId );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::ComparePublisher( LPCWSTR other, BOOL *isSame ) noexcept
+{
+    FIXME( "iface %p, resourceId %s, isSame %p stub!\n", this, debugstr_w( other ), isSame );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetPackageFullName( LPWSTR *packageFullName ) noexcept
+{
+    FIXME( "iface %p, resourceId %p stub!\n", this, packageFullName );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI
+AppxManifestPackageId::GetPackageFamilyName( LPWSTR *packageFamilyName ) noexcept
+{
+    FIXME( "iface %p, packageFamilyName %p stub!\n", this, packageFamilyName );
+    return E_NOTIMPL;
+}
 
 // ------------- IAppxManifestReader ------------- //
 AppxManifestReader::AppxManifestReader( IAppxFile *file )
@@ -79,7 +187,7 @@ AppxManifestReader::Release() noexcept
     return curr;
 }
 
-/* IAppxBlockMapReader Methods */
+/* IAppxManifestReader Methods */
 HRESULT WINAPI
 AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 {
