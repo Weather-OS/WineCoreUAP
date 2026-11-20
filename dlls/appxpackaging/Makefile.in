@@ -13,4 +13,6 @@ SOURCES = \
     WineCoreUAP/AppXPackaging/IO/PackageReader.cpp \
     WineCoreUAP/AppXPackaging/IO/PackageWriter.cpp \
     WineCoreUAP/AppXPackaging/IO/Readers.cpp \
-    WineCoreUAP/AppXPackaging/IO/BlockMap.cpp
+    WineCoreUAP/AppXPackaging/IO/BlockMap.cpp \
+    \
+    WineCoreUAP/AppXPackaging/IO/Manifest.cpp

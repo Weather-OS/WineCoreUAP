@@ -1,0 +1,90 @@
+/* 
+ * AppX Block Map classes
+ *
+ * Written by Weather.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+#ifndef __WINE_APPX_MANIFEST_H
+#define __WINE_APPX_MANIFEST_H
+
+#include <atomic>
+
+#include "../../../private.h"
+
+/* IAppxFile backed AppxBlockMapReader */
+class AppxManifestReader
+    : public IAppxManifestReader
+{
+public:
+    AppxManifestReader() = default;
+    AppxManifestReader(const AppxManifestReader&) = delete;
+    AppxManifestReader& operator=(const AppxManifestReader&) = delete;
+
+    AppxManifestReader( IAppxFile *file );
+
+    virtual ~AppxManifestReader() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxManifestReader Methods */
+    HRESULT STDMETHODCALLTYPE 
+    GetPackageId( IAppxManifestPackageId **packageId ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetProperties( IAppxManifestProperties **packageProperties ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetPackageDependencies( IAppxManifestPackageDependenciesEnumerator **dependencies ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetResources( IAppxManifestResourcesEnumerator **resources ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumerator **deviceCapabilities ) noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetPrerequisite( LPCWSTR name, UINT64 *value )noexcept override;
+
+    HRESULT STDMETHODCALLTYPE 
+    GetApplications( IAppxManifestApplicationsEnumerator **applications ) noexcept override;
+
+    HRESULT WINAPI 
+    GetStream( IStream **manifestStream ) noexcept override;
+
+private:
+    /* Internal Methods */
+    HRESULT WINAPI 
+    FetchDocument( IXMLDOMDocument3 **document ) noexcept;
+
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMDocument *xmlDocument{ nullptr };
+    // Do not use MSXML for the reader as it can't satisfy `GetStream`.
+    IAppxFile *appxFile{ nullptr };
+};
+
+#endif
