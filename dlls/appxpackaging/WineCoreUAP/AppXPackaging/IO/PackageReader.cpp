@@ -167,6 +167,8 @@ AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
     if ( !file )
         return E_POINTER;
 
+    *file = nullptr;
+
     if ( FAILED( hr = GetPayloadFiles( &enumerator ) ) )
         return hr;
 
@@ -211,6 +213,9 @@ AppxPackageReader::GetPayloadFile( LPCWSTR fileName, IAppxFile **file ) noexcept
     if ( current_name ) CoTaskMemFree( current_name );
 
     enumerator->Release();
+
+    if ( !*file )
+        hr = HRESULT_FROM_WIN32( ERROR_FILE_NOT_FOUND );
 
     return hr;
 }
