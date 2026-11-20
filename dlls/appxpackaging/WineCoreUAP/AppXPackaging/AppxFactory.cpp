@@ -109,9 +109,14 @@ public:
     CreatePackageReader( IStream *inputStream, IAppxPackageReader **packageReader ) noexcept override
     {
         AppxPackageReader *reader = nullptr;
+        IOpcRelationshipEnumerator *enumerator = nullptr;
+        IOpcRelationshipSet *relationshipSet = nullptr;
         IOpcPackage *package = nullptr;
         IOpcFactory *opc_factory = nullptr;
+        IAppxFile *current_file = nullptr;
+
         HRESULT hr = S_OK;
+        BOOL exists;
 
         TRACE( "iface %p, inputStream %p, packageReader %p.\n", this, inputStream, packageReader );
         
@@ -134,6 +139,43 @@ public:
         package->Release();
         if ( !reader ) 
             return E_OUTOFMEMORY;
+
+        /* Pass 1: AppX Packages should not contain relationships */
+        hr = package->GetRelationshipSet(&relationshipSet);
+        if ( SUCCEEDED( hr ) )
+        {
+            hr = relationshipSet->GetEnumerator( &enumerator );
+            relationshipSet->Release();
+
+            if ( SUCCEEDED( hr ) )
+            {
+                hr = enumerator->MoveNext( &exists );
+                enumerator->Release();
+
+                if ( SUCCEEDED(hr) && exists )
+                {
+                    reader->Release();
+                    return APPX_E_RELATIONSHIPS_NOT_ALLOWED;
+                }
+            }
+        }
+
+        /* Pass 2: AppX Packages should contain AppxManifest.xml and AppxBlockMap.xml */
+        hr = reader->GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE::APPX_FOOTPRINT_FILE_TYPE_BLOCKMAP, &current_file );
+        if ( FAILED( hr ) )
+        {
+            reader->Release();
+            return hr == OPC_E_NO_SUCH_PART ? APPX_E_MISSING_REQUIRED_FILE : hr;
+        }
+        current_file->Release();
+
+        hr = reader->GetFootprintFile( APPX_FOOTPRINT_FILE_TYPE::APPX_FOOTPRINT_FILE_TYPE_MANIFEST, &current_file );
+        if ( FAILED( hr ) )
+        {
+            reader->Release();
+            return hr == OPC_E_NO_SUCH_PART ? APPX_E_MISSING_REQUIRED_FILE : hr;
+        }
+        current_file->Release();
 
         *packageReader = reader;
 
