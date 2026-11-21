@@ -704,104 +704,33 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
     IXMLDOMDocument3 *document = nullptr;
     IXMLDOMNode *packageNode = nullptr;
     IXMLDOMElement *packageElem = nullptr;
-    IXMLDOMElement *rootElem = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
-    VARIANT nsval;
-    BSTR attributeName;
 
     TRACE( "iface %p, packageId %p.\n", this, packageId );
 
     if ( !packageId )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"xmlns" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-
     hr = FetchDocument( &document );
     if ( FAILED( hr ) )
-    {
-        SysFreeString( attributeName );
         return hr;
-    }
 
-    hr = document->get_documentElement( &rootElem );
-    if ( FAILED( hr ) || !rootElem )
+    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Identity", &packageNode );
+    if ( SUCCEEDED( hr ) && packageNode )
     {
-        if ( rootElem )
-            rootElem->Release();
-
-        document->Release();
-        SysFreeString( attributeName );
-
-        return FAILED( hr ) ? hr : APPX_E_INVALID_BLOCKMAP;
-    }
-
-    VariantInit( &val );
-    
-    hr = rootElem->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        hr = packageNode->QueryInterface( &packageElem );
+        packageNode->Release();
         if ( SUCCEEDED( hr ) )
         {
-            // uri needs validation
-            if ( lstrcmpiW( V_BSTR( &val ), GetResourceW( IDS_XMLNS_MANIFEST_URI ) ) == 0 )
-            {
-                VariantInit( &nsval );
-                nsval.vt = VT_BSTR;
-                nsval.bstrVal = SysAllocStringLen( nullptr, lstrlenW( (LPWSTR)L"xmlns:ns='" ) + SysStringLen( V_BSTR( &val ) ) + lstrlenW( (LPWSTR)L"'" ) );
-                if ( !nsval.bstrVal )
-                {
-                    hr = E_OUTOFMEMORY;
-                }
-                else
-                {
-                    lstrcpyW( nsval.bstrVal, (LPWSTR)L"xmlns:ns='" );
-                    lstrcatW( nsval.bstrVal, V_BSTR( &val ) );
-                    lstrcatW( nsval.bstrVal, (LPWSTR)L"'" );
-                }
-
-                if ( SUCCEEDED( hr ) )
-                {
-                    document->setProperty( (BSTR)L"SelectionNamespaces", nsval );
-                    VariantClear( &nsval );
-
-                    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Identity", &packageNode );
-                    if ( SUCCEEDED( hr ) && packageNode )
-                    {
-                        hr = packageNode->QueryInterface( &packageElem );
-                        packageNode->Release();
-                        if ( SUCCEEDED( hr ) )
-                        {
-                            *packageId = new(std::nothrow) AppxManifestPackageId( packageElem );
-                            packageElem->Release();
-                            if ( !*packageId ) 
-                                hr = E_OUTOFMEMORY;
-                        }
-                    } else if ( !packageNode )
-                    {
-                        hr = APPX_E_INVALID_BLOCKMAP;
-                    }
-                }
-            } else 
-            {
-                ERR( "for manifest reader %p, got wrong xmlns %s!\n", this, debugstr_w( V_BSTR( &val ) ) );
-                hr = APPX_E_INVALID_BLOCKMAP;
-            }
+            *packageId = new(std::nothrow) AppxManifestPackageId( packageElem );
+            packageElem->Release();
+            if ( !*packageId ) 
+                hr = E_OUTOFMEMORY;
         }
-    }
+    } else if ( !packageNode )
+        hr = APPX_E_INVALID_BLOCKMAP;
 
     document->Release();
-    SysFreeString( attributeName );
-    VariantClear( &val );
 
     return hr;
 }
@@ -809,8 +738,38 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 HRESULT WINAPI
 AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties ) noexcept
 {
-    FIXME( "iface %p, packageProperties %p stub!\n", this, packageProperties );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNode *packageNode = nullptr;
+    IXMLDOMElement *packageElem = nullptr;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, packageProperties %p.\n", this, packageProperties );
+
+    if ( !packageProperties )
+        return E_POINTER;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+        return hr;
+
+    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Properties", &packageNode );
+    if ( SUCCEEDED( hr ) && packageNode )
+    {
+        hr = packageNode->QueryInterface( &packageElem );
+        packageNode->Release();
+        if ( SUCCEEDED( hr ) )
+        {
+            *packageProperties = new(std::nothrow) AppxManifestProperties( packageElem );
+            packageElem->Release();
+            if ( !*packageProperties ) 
+                hr = E_OUTOFMEMORY;
+        }
+    } else if ( !packageNode )
+        hr = APPX_E_INVALID_BLOCKMAP;
+
+    document->Release();
+
+    return hr;
 }
 
 HRESULT WINAPI
@@ -876,9 +835,12 @@ HRESULT WINAPI
 AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
 {
     IStream *manifestStream = nullptr;
+    IXMLDOMElement *rootElem = nullptr;
     HRESULT hr = S_OK;
     VARIANT var;
+    VARIANT nsval;
     VARIANT_BOOL bLoaded = VARIANT_FALSE;
+    BSTR attributeName;
 
     TRACE( "iface %p, document %p.\n", this, document );
 
@@ -916,6 +878,68 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
         manifestStream->Release();
         VariantClear( &var );
         if ( FAILED( hr ) || bLoaded != VARIANT_TRUE ) 
+        {
+            xmlDocument->Release();
+            xmlDocument = nullptr;
+            return hr;
+        }
+
+        attributeName = SysAllocString( (OLECHAR *)L"xmlns" );
+        if ( !attributeName )
+        {
+            xmlDocument->Release();
+            xmlDocument = nullptr;
+            return E_OUTOFMEMORY;
+        }
+
+        hr = xmlDocument->get_documentElement( &rootElem );
+        if ( SUCCEEDED( hr ) && rootElem )
+        {
+            VariantInit( &var );
+            hr = rootElem->getAttribute( attributeName, &var );
+            if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &var ) == VT_EMPTY || V_VT( &var ) == VT_NULL )) )
+                hr = APPX_E_INVALID_BLOCKMAP;
+
+            if ( SUCCEEDED( hr ) )
+            {
+                hr = VariantChangeType( &var, &var, 0, VT_BSTR );
+                if ( SUCCEEDED( hr ) )
+                {
+                    if ( lstrcmpiW( V_BSTR( &var ), GetResourceW( IDS_XMLNS_MANIFEST_URI ) ) == 0 )
+                    {
+                        VariantInit( &nsval );
+                        nsval.vt = VT_BSTR;
+                        nsval.bstrVal = SysAllocStringLen( nullptr, lstrlenW( (LPWSTR)L"xmlns:ns='" ) + SysStringLen( V_BSTR( &var ) ) + lstrlenW( (LPWSTR)L"'" ) );
+                        if ( !nsval.bstrVal )
+                        {
+                            hr = E_OUTOFMEMORY;
+                        }
+                        else
+                        {
+                            lstrcpyW( nsval.bstrVal, (LPWSTR)L"xmlns:ns='" );
+                            lstrcatW( nsval.bstrVal, V_BSTR( &var ) );
+                            lstrcatW( nsval.bstrVal, (LPWSTR)L"'" );
+                        }
+
+                        if ( SUCCEEDED( hr ) )
+                            hr = xmlDocument->setProperty( (BSTR)L"SelectionNamespaces", nsval );
+
+                        VariantClear( &nsval );
+                    } else 
+                    {
+                        hr = APPX_E_INVALID_BLOCKMAP;
+                    }
+                }
+            }
+
+            VariantClear( &var );
+            rootElem->Release();
+        } else if ( SUCCEEDED( hr ) )
+            hr = APPX_E_INVALID_BLOCKMAP;
+
+        SysFreeString( attributeName );
+
+        if ( FAILED( hr ) )
         {
             xmlDocument->Release();
             xmlDocument = nullptr;
