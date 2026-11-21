@@ -108,6 +108,212 @@ _CLEANUP:
     return FALSE;
 }
 
+// ------------- IAppxManifestPackageDependency ------------- //
+AppxManifestPackageDependency::AppxManifestPackageDependency( IXMLDOMElement *element )
+    : xmlElement( element )
+{
+    element->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxManifestPackageDependency::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxManifestPackageDependency ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestPackageDependency *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxManifestPackageDependency::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxManifestPackageDependency::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if ( xmlElement ) xmlElement->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxManifestPackageDependency Methods */
+HRESULT WINAPI 
+AppxManifestPackageDependency::GetName( LPWSTR *name ) noexcept
+{
+    FIXME( "iface %p, name %p stub!\n", this, name );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxManifestPackageDependency::GetPublisher( LPWSTR *publisher ) noexcept
+{
+    FIXME( "iface %p, publisher %p stub!\n", this, publisher );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxManifestPackageDependency::GetMinVersion( UINT64 *minVersion ) noexcept
+{
+    FIXME( "iface %p, minVersion %p stub!\n", this, minVersion );
+    return E_NOTIMPL;
+}
+
+// ------------- IAppxManifestPackageDependenciesEnumerator ------------- //
+AppxManifestPackageDependenciesEnumerator::AppxManifestPackageDependenciesEnumerator( IXMLDOMNodeList *nodes )
+    : depNodes( nodes )
+{
+    nodes->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxManifestPackageDependenciesEnumerator::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxManifestPackageDependenciesEnumerator ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestPackageDependenciesEnumerator *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxManifestPackageDependenciesEnumerator::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxManifestPackageDependenciesEnumerator::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if( depNodes ) depNodes->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxManifestPackageDependenciesEnumerator Methods */
+HRESULT WINAPI 
+AppxManifestPackageDependenciesEnumerator::GetCurrent( IAppxManifestPackageDependency **dependency ) noexcept
+{
+    LONG len;
+    HRESULT hr = S_OK;
+    IXMLDOMNode *node;
+    IXMLDOMElement *elem;
+
+    TRACE( "iface %p, dependency %p.\n", this, dependency );
+
+    if ( !dependency )
+        return E_POINTER;
+
+    if ( FAILED( hr = depNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        return E_BOUNDS;
+
+    if ( FAILED( hr = depNodes->get_item( iterator, &node ) ) )
+        return hr;
+        
+    hr = node->QueryInterface( &elem );
+    node->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    *dependency = new(std::nothrow) AppxManifestPackageDependency( elem );
+    elem->Release();
+    if ( !*dependency ) 
+        hr = E_OUTOFMEMORY;
+
+    return hr;
+}
+
+HRESULT WINAPI 
+AppxManifestPackageDependenciesEnumerator::GetHasCurrent( BOOL *hasCurrent ) noexcept
+{
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasCurrent %p.\n", this, hasCurrent );
+
+    if ( !hasCurrent )
+        return E_POINTER;
+
+    if ( FAILED( hr = depNodes->get_length( &len ) ) )
+        return hr;
+    
+    if ( iterator >= len )
+        *hasCurrent = FALSE;
+    else
+        *hasCurrent = TRUE;
+
+    return hr;
+}
+
+HRESULT WINAPI
+AppxManifestPackageDependenciesEnumerator::MoveNext( BOOL *hasNext ) noexcept
+{
+    LONG len;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, hasNext %p.\n", this, hasNext );
+
+    if ( !hasNext )
+        return E_POINTER;
+
+    if ( FAILED( hr = depNodes->get_length( &len ) ) )
+        return hr;
+
+    if ( iterator < len )
+        iterator++;
+
+    *hasNext = ( iterator < len );
+
+    return S_OK;
+}
+
 // ------------- IAppxManifestPackageId ------------- //
 AppxManifestProperties::AppxManifestProperties( IXMLDOMElement *element )
     : xmlElement( element )

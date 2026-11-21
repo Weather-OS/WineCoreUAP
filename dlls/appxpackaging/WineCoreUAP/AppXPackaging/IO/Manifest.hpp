@@ -25,6 +25,81 @@
 
 #include "../../../private.h"
 
+class AppxManifestPackageDependency
+    : public IAppxManifestPackageDependency
+{
+public:
+    AppxManifestPackageDependency() = default;
+    AppxManifestPackageDependency(const AppxManifestPackageDependency&) = delete;
+    AppxManifestPackageDependency& operator=(const AppxManifestPackageDependency&) = delete;
+
+    AppxManifestPackageDependency( IXMLDOMElement *element );
+
+    virtual ~AppxManifestPackageDependency() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxManifestPackageDependency Methods */
+    HRESULT WINAPI 
+    GetName( LPWSTR *name ) noexcept override;
+
+    HRESULT WINAPI 
+    GetPublisher( LPWSTR *publisher ) noexcept override;
+
+    HRESULT WINAPI 
+    GetMinVersion( UINT64 *minVersion ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMElement *xmlElement{ nullptr };
+};
+
+class AppxManifestPackageDependenciesEnumerator
+    : public IAppxManifestPackageDependenciesEnumerator
+{
+public:
+    AppxManifestPackageDependenciesEnumerator() = default;
+    AppxManifestPackageDependenciesEnumerator(const AppxManifestPackageDependenciesEnumerator&) = delete;
+    AppxManifestPackageDependenciesEnumerator& operator=(const AppxManifestPackageDependenciesEnumerator&) = delete;
+
+    AppxManifestPackageDependenciesEnumerator( IXMLDOMNodeList *nodeList );
+
+    virtual ~AppxManifestPackageDependenciesEnumerator() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxManifestPackageDependenciesEnumerator Methods */
+    HRESULT WINAPI 
+    GetCurrent( IAppxManifestPackageDependency **dependency ) noexcept override;
+
+    HRESULT WINAPI 
+    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
+
+    HRESULT WINAPI 
+    MoveNext( BOOL *hasNext ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMNodeList *depNodes{ nullptr };
+    LONG iterator{ 0 };
+};
+
 class AppxManifestProperties
     : public IAppxManifestProperties
 {
