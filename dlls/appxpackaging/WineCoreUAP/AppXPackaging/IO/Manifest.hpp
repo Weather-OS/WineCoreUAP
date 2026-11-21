@@ -26,7 +26,8 @@
 #include "../../../private.h"
 
 class AppxManifestPackageDependency
-    : public IAppxManifestPackageDependency
+    : public IAppxManifestPackageDependency2
+    , public IAppxManifestPackageDependency3 // IAppxManifestPackageDependency3 does not statically inherit IAppxManifestPackageDependency2
 {
 public:
     AppxManifestPackageDependency() = default;
@@ -56,6 +57,14 @@ public:
 
     HRESULT WINAPI 
     GetMinVersion( UINT64 *minVersion ) noexcept override;
+
+    /* IAppxManifestPackageDependency2 Methods */
+    HRESULT WINAPI 
+    GetMaxMajorVersionTested( UINT16 *maxMajorVersionTested ) noexcept override;
+
+    /* IAppxManifestPackageDependency3 Methods */
+    HRESULT WINAPI 
+    GetIsOptional( BOOL *isOptional ) noexcept override;
 
 private:
     std::atomic<LONG> ref{ 1 };

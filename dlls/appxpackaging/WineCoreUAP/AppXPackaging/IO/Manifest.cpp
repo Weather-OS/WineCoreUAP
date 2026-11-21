@@ -22,7 +22,9 @@
 #include <new>
 
 #include "Manifest.hpp"
+#include "Helpers.hpp"
 #include "bcrypt.h"
+#include "shlwapi.h"
 #include "corecrt_wstdio.h"
 #include "wine/debug.h"
 
@@ -186,143 +188,84 @@ AppxManifestPackageDependency::Release() noexcept
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetName( LPWSTR *name ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, name %p.\n", this, name );
 
     if ( !name )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Name" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( *name )
-                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Name", name );
 }
 
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetPublisher( LPWSTR *publisher ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
-    TRACE( "iface %p, name %p.\n", this, publisher );
+    TRACE( "iface %p, publisher %p.\n", this, publisher );
 
     if ( !publisher )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Publisher" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            *publisher = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( *publisher )
-                lstrcpynW( *publisher, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Publisher", publisher );
 }
 
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetMinVersion( UINT64 *minVersion ) noexcept
 {
-    BSTR attributeName;
     LPWSTR version = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
 
     TRACE( "iface %p, minVersion %p.\n", this, minVersion );
 
     if ( !minVersion )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"MinVersion" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-
-    VariantInit( &val );
-
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            version = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( version )
-                lstrcpynW( version, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
+    hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"MinVersion", &version );
     if ( FAILED( hr ) )
-    {
-        CoTaskMemFree( version );
         return hr;
-    }
 
-    hr = ParseVersion( version, minVersion );
+    ParseVersion( version, minVersion );
     CoTaskMemFree( version );
 
     return hr;
+}
+
+/* IAppxManifestPackageDependency2 Methods */
+HRESULT WINAPI 
+AppxManifestPackageDependency::GetMaxMajorVersionTested( UINT16 *maxMajorVersionTested ) noexcept
+{
+    INT versionLong;
+    LPWSTR version = nullptr;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, maxMajorVersionTested %p.\n", this, maxMajorVersionTested );
+
+    if ( !maxMajorVersionTested )
+        return E_POINTER;
+
+    hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"MaxMajorVersionTested", &version );
+    if ( FAILED( hr ) )
+        return hr;
+
+    versionLong = StrToIntW( version );
+    CoTaskMemFree( version );
+
+    if ( versionLong > SHRT_MAX )
+        return E_BOUNDS;
+
+    *maxMajorVersionTested = static_cast<UINT16>(versionLong);
+
+    return hr;
+}
+
+/* IAppxManifestPackageDependency3 Methods */
+HRESULT WINAPI 
+AppxManifestPackageDependency::GetIsOptional( BOOL *isOptional ) noexcept
+{
+    TRACE( "iface %p, isOptional %p.\n", this, isOptional );
+
+    if ( !isOptional )
+        return E_POINTER;
+
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"uap6:Optional", isOptional );
 }
 
 // ------------- IAppxManifestPackageDependenciesEnumerator ------------- //
