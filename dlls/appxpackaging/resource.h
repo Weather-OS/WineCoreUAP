@@ -32,5 +32,6 @@
 #define IDS_HASH_URI_SHA512         3
 #define IDS_XMLNS_BLOCKMAP_URI      4
 #define IDS_XMLNS_MANIFEST_URI      5
+#define IDS_XMLNS_MANIFEST_UAP_URI  6
 
 #endif

@@ -22,9 +22,10 @@
 
 STRINGTABLE
 BEGIN
-    IDS_HASH_URI_SHA256     "http://www.w3.org/2001/04/xmlenc#sha256"
-    IDS_HASH_URI_SHA384     "http://www.w3.org/2001/04/xmldsig-more#sha384"
-    IDS_HASH_URI_SHA512     "http://www.w3.org/2001/04/xmlenc#sha512"
-    IDS_XMLNS_BLOCKMAP_URI  "http://schemas.microsoft.com/appx/2010/blockmap"
-    IDS_XMLNS_MANIFEST_URI  "http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    IDS_HASH_URI_SHA256         "http://www.w3.org/2001/04/xmlenc#sha256"
+    IDS_HASH_URI_SHA384         "http://www.w3.org/2001/04/xmldsig-more#sha384"
+    IDS_HASH_URI_SHA512         "http://www.w3.org/2001/04/xmlenc#sha512"
+    IDS_XMLNS_BLOCKMAP_URI      "http://schemas.microsoft.com/appx/2010/blockmap"
+    IDS_XMLNS_MANIFEST_URI      "http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    IDS_XMLNS_MANIFEST_UAP_URI  "http://schemas.microsoft.com/appx/manifest/uap/windows10"
 END

@@ -1,5 +1,5 @@
 MODULE    = appxpackaging.dll
-IMPORTS   = advapi32 combase oleaut32 crypt32 urlmon user32 bcrypt $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
+IMPORTS   = advapi32 combase crypt32 oleaut32 shlwapi urlmon user32 bcrypt $(CXXABI_PE_LIBS) $(CXX_PE_LIBS) vcruntime140
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
