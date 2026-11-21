@@ -164,15 +164,116 @@ AppxManifestProperties::Release() noexcept
 HRESULT WINAPI 
 AppxManifestProperties::GetBoolValue( LPCWSTR name, BOOL *value ) noexcept
 {
-    FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
-    return E_NOTIMPL;
+    BSTR nameStr;
+    BSTR val;
+    HRESULT hr = S_OK;
+    IXMLDOMNode *elemNode = nullptr;
+    IXMLDOMNode *childNode = nullptr;
+
+    TRACE( "iface %p, name %s, value %p.\n", this, debugstr_w( name ), value );
+
+    if ( !name )
+        return E_INVALIDARG;
+
+    if ( !value )
+        return E_POINTER;
+    
+    nameStr = SysAllocString( name );
+    if ( !nameStr )
+        return E_OUTOFMEMORY;
+
+    if ( FAILED( hr = xmlElement->QueryInterface( &elemNode ) ) )
+    {
+        SysFreeString( nameStr );
+        return hr;
+    }
+
+    hr = elemNode->selectSingleNode( nameStr, &childNode );
+    SysFreeString( nameStr );
+    elemNode->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    if ( !childNode )
+        return E_INVALIDARG;
+
+    hr = childNode->get_text( &val );
+    childNode->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    *value = lstrcmpW( val, (LPCWSTR)L"true" ) == 0;
+    SysFreeString( val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxManifestProperties::GetStringValue( LPCWSTR name, LPWSTR *value ) noexcept
 {
-    FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
-    return E_NOTIMPL;
+    BSTR xpathStr;
+    BSTR nameStr;
+    BSTR val;
+    WCHAR xpath[512];
+    HRESULT hr = S_OK;
+    IXMLDOMNode *elemNode = nullptr;
+    IXMLDOMNode *childNode = nullptr;
+
+    TRACE( "iface %p, name %s, value %p.\n", this, debugstr_w( name ), value );
+
+    if ( !name )
+        return E_INVALIDARG;
+
+    if ( !value )
+        return E_POINTER;
+    
+    nameStr = SysAllocString( name );
+    if ( !nameStr )
+        return E_OUTOFMEMORY;
+
+    if ( FAILED( hr = xmlElement->QueryInterface( &elemNode ) ) )
+    {
+        SysFreeString( nameStr );
+        return hr;
+    }
+
+    // node path is defined per namespace
+    swprintf_s( reinterpret_cast<wchar_t *>(xpath), ARRAYSIZE( xpath ),
+                L"*[local-name()='%s' and namespace-uri()='%s']",
+                name, GetResourceW( IDS_XMLNS_MANIFEST_URI ) );
+
+    xpathStr = SysAllocString( xpath );
+    if ( !xpathStr )
+    {
+        elemNode->Release();
+        return E_OUTOFMEMORY;
+    }
+
+    hr = elemNode->selectSingleNode( xpathStr, &childNode );
+    SysFreeString( xpathStr );
+    elemNode->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    if ( !childNode )
+        return E_INVALIDARG;
+
+    hr = childNode->get_text( &val );
+    childNode->Release();
+    if ( FAILED( hr ) ) 
+        return hr;
+
+    // API calls for CoTaskMemAlloc
+    *value = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( val ) + sizeof(WCHAR) );
+    if ( !*value )
+    {
+        SysFreeString( val );
+        return E_OUTOFMEMORY;
+    }
+    lstrcpynW( *value, val, SysStringLen( val ) + 1 );
+    SysFreeString( val );
+
+    return hr;
 }
 
 // ------------- IAppxManifestPackageId ------------- //
@@ -691,6 +792,7 @@ AppxManifestReader::Release() noexcept
     if ( !curr )
     {
         if ( appxFile ) appxFile->Release();
+        if ( xmlDocument ) xmlDocument->Release();
         delete this;
     }
     

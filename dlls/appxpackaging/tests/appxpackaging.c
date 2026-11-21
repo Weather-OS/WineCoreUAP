@@ -79,12 +79,17 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     APPX_PACKAGE_ARCHITECTURE2 architecture;
     IAppxManifestPackageId *packageId = NULL;
     IAppxManifestPackageId2 *packageId2 = NULL;
+    IAppxManifestProperties *properties = NULL;
     LPWSTR publisher;
     LPWSTR packageFullName;
     LPWSTR packageFamilyName;
+    LPWSTR strVal;
 
     hr = IAppxManifestReader_GetPackageId( manifest, &packageId );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageId failed with %#lx\n", hr );
+
+    hr = IAppxManifestReader_GetProperties( manifest, &properties );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetProperties failed with %#lx\n", hr );
 
     hr = IAppxManifestPackageId_QueryInterface( packageId, &IID_IAppxManifestPackageId2, (void **)&packageId2 );
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
@@ -113,6 +118,11 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId2::GetPackageFamilyName failed with %#lx\n", hr );
 
     trace("packageFamilyName is %s\n", wine_dbgstr_w( packageFamilyName ));
+
+    hr = IAppxManifestProperties_GetStringValue( properties, (LPCWSTR)L"DisplayName", &strVal );
+    ok( SUCCEEDED( hr ), "IAppxManifestProperties::GetStringValue failed with %#lx\n", hr );
+
+    trace("DisplayName is %s\n", wine_dbgstr_w( strVal ));
 }
 
 static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackageReader *reader )

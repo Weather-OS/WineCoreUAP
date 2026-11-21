@@ -905,6 +905,7 @@ AppxBlockMapReader::Release() noexcept
     if ( !curr )
     {
         if ( appxFile ) appxFile->Release();
+        if ( xmlDocument ) xmlDocument->Release();
         delete this;
     }
     
