@@ -76,14 +76,18 @@ static void load_resource( const WCHAR *name, const WCHAR *type, const WCHAR *fi
 static void test_IAppxManifestReader( IAppxManifestReader *manifest )
 {
     HRESULT hr;
+    BOOL has_current;
     APPX_PACKAGE_ARCHITECTURE2 architecture;
     IAppxManifestPackageId *packageId = NULL;
     IAppxManifestPackageId2 *packageId2 = NULL;
     IAppxManifestProperties *properties = NULL;
+    IAppxManifestPackageDependency *dep = NULL;
+    IAppxManifestPackageDependenciesEnumerator *deps = NULL;
     LPWSTR publisher;
     LPWSTR packageFullName;
     LPWSTR packageFamilyName;
     LPWSTR strVal;
+    LPWSTR name;
 
     hr = IAppxManifestReader_GetPackageId( manifest, &packageId );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageId failed with %#lx\n", hr );
@@ -91,11 +95,15 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     hr = IAppxManifestReader_GetProperties( manifest, &properties );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetProperties failed with %#lx\n", hr );
 
+    hr = IAppxManifestReader_GetPackageDependencies( manifest, &deps );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageDependencies failed with %#lx\n", hr );
+
     hr = IAppxManifestPackageId_QueryInterface( packageId, &IID_IAppxManifestPackageId2, (void **)&packageId2 );
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
 
     hr = IAppxManifestPackageId2_GetArchitecture2( packageId2, &architecture );
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
+
 #if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
     ok( architecture == APPX_PACKAGE_ARCHITECTURE2_ARM64, "got wrong architecture %d for current package!\n", architecture );
 #elif defined(__x86_64__) || defined(_M_X64)
@@ -123,6 +131,25 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     ok( SUCCEEDED( hr ), "IAppxManifestProperties::GetStringValue failed with %#lx\n", hr );
 
     trace("DisplayName is %s\n", wine_dbgstr_w( strVal ));
+
+    hr = IAppxManifestPackageDependenciesEnumerator_GetHasCurrent( deps, &has_current );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageDependenciesEnumerator::GetHasCurrent failed with %#lx\n", hr );
+
+    while ( has_current )
+    {
+        hr = IAppxManifestPackageDependenciesEnumerator_GetCurrent( deps, &dep );
+        ok( SUCCEEDED( hr ), "IAppxManifestPackageDependenciesEnumerator::GetCurrent failed with %#lx\n", hr );
+
+        hr = IAppxManifestPackageDependency_GetName( dep, &name );
+        ok( SUCCEEDED( hr ), "IAppxManifestPackageDependency::GetName failed with %#lx\n", hr );
+        trace( "Dependency name: %s\n", wine_dbgstr_w( name ) );
+
+        CoTaskMemFree( name );
+        IAppxManifestPackageDependency_Release( dep );
+
+        hr = IAppxManifestPackageDependenciesEnumerator_MoveNext( deps, &has_current );
+        ok( SUCCEEDED( hr ), "IAppxManifestPackageDependenciesEnumerator::MoveNext failed with %#lx\n", hr );
+    }
 }
 
 static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackageReader *reader )

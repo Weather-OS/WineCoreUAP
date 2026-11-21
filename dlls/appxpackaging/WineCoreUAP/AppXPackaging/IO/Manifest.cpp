@@ -108,6 +108,28 @@ _CLEANUP:
     return FALSE;
 }
 
+
+static HRESULT ParseVersion( LPCWSTR version, UINT64 *packageVersion ) noexcept
+{
+    WCHAR extra;
+    USHORT versioning[4];
+
+    if ( !version || !packageVersion )
+        return E_INVALIDARG;
+
+    if ( swscanf_s( reinterpret_cast<const wchar_t *>(version), L"%hu.%hu.%hu.%hu%c",
+                    &versioning[0], &versioning[1],
+                    &versioning[2], &versioning[3], &extra ) != 4 )
+        return E_INVALIDARG;
+
+    *packageVersion = ((UINT64)versioning[0] << 48) |
+                      ((UINT64)versioning[1] << 32) |
+                      ((UINT64)versioning[2] << 16) |
+                      (UINT64)versioning[3];
+
+    return S_OK;
+}
+
 // ------------- IAppxManifestPackageDependency ------------- //
 AppxManifestPackageDependency::AppxManifestPackageDependency( IXMLDOMElement *element )
     : xmlElement( element )
@@ -164,22 +186,143 @@ AppxManifestPackageDependency::Release() noexcept
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetName( LPWSTR *name ) noexcept
 {
-    FIXME( "iface %p, name %p stub!\n", this, name );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, name %p.\n", this, name );
+
+    if ( !name )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Name" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_MANIFEST;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( *name )
+                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetPublisher( LPWSTR *publisher ) noexcept
 {
-    FIXME( "iface %p, publisher %p stub!\n", this, publisher );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, name %p.\n", this, publisher );
+
+    if ( !publisher )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"Publisher" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+    
+    VariantInit( &val );
+    
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_MANIFEST;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            *publisher = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( *publisher )
+                lstrcpynW( *publisher, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    return hr;
 }
 
 HRESULT WINAPI 
 AppxManifestPackageDependency::GetMinVersion( UINT64 *minVersion ) noexcept
 {
-    FIXME( "iface %p, minVersion %p stub!\n", this, minVersion );
-    return E_NOTIMPL;
+    BSTR attributeName;
+    LPWSTR version = nullptr;
+    HRESULT hr = S_OK;
+    VARIANT val;
+
+    TRACE( "iface %p, minVersion %p.\n", this, minVersion );
+
+    if ( !minVersion )
+        return E_POINTER;
+
+    attributeName = SysAllocString( (OLECHAR *)L"MinVersion" );
+    if ( !attributeName )
+        return E_OUTOFMEMORY;
+
+    VariantInit( &val );
+
+    hr = xmlElement->getAttribute( attributeName, &val );
+    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
+    {
+        ERR( "for manifest package dependency %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_MANIFEST;
+    }
+
+    if ( SUCCEEDED( hr ) )
+    {
+        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+        if ( SUCCEEDED( hr ) )
+        {
+            version = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+            if ( version )
+                lstrcpynW( version, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+            else
+                hr = E_OUTOFMEMORY;
+        }
+    }
+
+    SysFreeString( attributeName );
+    VariantClear( &val );
+
+    if ( FAILED( hr ) )
+    {
+        CoTaskMemFree( version );
+        return hr;
+    }
+
+    hr = ParseVersion( version, minVersion );
+    CoTaskMemFree( version );
+
+    return hr;
 }
 
 // ------------- IAppxManifestPackageDependenciesEnumerator ------------- //
@@ -563,7 +706,7 @@ AppxManifestPackageId::GetName( LPWSTR *name ) noexcept
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
         ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
+        hr = APPX_E_INVALID_MANIFEST;
     }
 
     if ( SUCCEEDED( hr ) )
@@ -615,7 +758,7 @@ AppxManifestPackageId::GetPublisher( LPWSTR *publisher ) noexcept
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
         ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
+        hr = APPX_E_INVALID_MANIFEST;
     }
 
     if ( SUCCEEDED( hr ) )
@@ -641,9 +784,7 @@ HRESULT WINAPI
 AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
 {
     BSTR attributeName;
-    WCHAR extra;
     LPWSTR version = nullptr;
-    USHORT versioning[4];
     HRESULT hr = S_OK;
     VARIANT val;
 
@@ -655,14 +796,14 @@ AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
     attributeName = SysAllocString( (OLECHAR *)L"Version" );
     if ( !attributeName )
         return E_OUTOFMEMORY;
-    
+
     VariantInit( &val );
-    
+
     hr = xmlElement->getAttribute( attributeName, &val );
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
         ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
+        hr = APPX_E_INVALID_MANIFEST;
     }
 
     if ( SUCCEEDED( hr ) )
@@ -681,13 +822,14 @@ AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
     SysFreeString( attributeName );
     VariantClear( &val );
 
-    if ( swscanf_s( reinterpret_cast<const wchar_t *>(version), L"%hu.%hu.%hu.%hu%c", &versioning[0], &versioning[1], &versioning[2], &versioning[3], &extra ) != 4 )
-        return E_INVALIDARG;
+    if ( FAILED( hr ) )
+    {
+        CoTaskMemFree( version );
+        return hr;
+    }
 
-    *packageVersion = ((UINT64)versioning[0] << 48) |
-        ((UINT64)versioning[1] << 32) |
-        ((UINT64)versioning[2] << 16) |
-        (UINT64)versioning[3];
+    hr = ParseVersion( version, packageVersion );
+    CoTaskMemFree( version );
 
     return hr;
 }
@@ -713,7 +855,7 @@ AppxManifestPackageId::GetResourceId( LPWSTR *resourceId ) noexcept
     hr = xmlElement->getAttribute( attributeName, &val );
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
-        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        WARN( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
         // element is optional
         hr = S_FALSE;
     }
@@ -908,8 +1050,8 @@ AppxManifestPackageId::GetArchitecture2( APPX_PACKAGE_ARCHITECTURE2 *architectur
     hr = xmlElement->getAttribute( attributeName, &val );
     if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
     {
-        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
+        ERR( "for manifest package id file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
+        hr = APPX_E_INVALID_MANIFEST;
     }
 
     if ( SUCCEEDED( hr ) )
@@ -1036,7 +1178,7 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
                 hr = E_OUTOFMEMORY;
         }
     } else if ( !packageNode )
-        hr = APPX_E_INVALID_BLOCKMAP;
+        hr = APPX_E_INVALID_MANIFEST;
 
     document->Release();
 
@@ -1047,8 +1189,8 @@ HRESULT WINAPI
 AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties ) noexcept
 {
     IXMLDOMDocument3 *document = nullptr;
-    IXMLDOMNode *packageNode = nullptr;
-    IXMLDOMElement *packageElem = nullptr;
+    IXMLDOMNode *propertiesNode = nullptr;
+    IXMLDOMElement *propertiesElem = nullptr;
     HRESULT hr = S_OK;
 
     TRACE( "iface %p, packageProperties %p.\n", this, packageProperties );
@@ -1060,20 +1202,20 @@ AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties )
     if ( FAILED( hr ) )
         return hr;
 
-    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Properties", &packageNode );
-    if ( SUCCEEDED( hr ) && packageNode )
+    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Properties", &propertiesNode );
+    if ( SUCCEEDED( hr ) && propertiesNode )
     {
-        hr = packageNode->QueryInterface( &packageElem );
-        packageNode->Release();
+        hr = propertiesNode->QueryInterface( &propertiesElem );
+        propertiesNode->Release();
         if ( SUCCEEDED( hr ) )
         {
-            *packageProperties = new(std::nothrow) AppxManifestProperties( packageElem );
-            packageElem->Release();
+            *packageProperties = new(std::nothrow) AppxManifestProperties( propertiesElem );
+            propertiesElem->Release();
             if ( !*packageProperties ) 
                 hr = E_OUTOFMEMORY;
         }
-    } else if ( !packageNode )
-        hr = APPX_E_INVALID_BLOCKMAP;
+    } else if ( !propertiesNode )
+        hr = APPX_E_INVALID_MANIFEST;
 
     document->Release();
 
@@ -1083,8 +1225,42 @@ AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties )
 HRESULT WINAPI
 AppxManifestReader::GetPackageDependencies( IAppxManifestPackageDependenciesEnumerator **dependencies ) noexcept
 {
-    FIXME( "iface %p, dependencies %p stub!\n", this, dependencies );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNode *dependenciesNode = nullptr;
+    IXMLDOMNodeList *dependenciesNodeList = nullptr;
+    HRESULT hr = S_OK;
+
+    TRACE( "iface %p, dependencies %p.\n", this, dependencies );
+
+    if ( !dependencies )
+        return E_POINTER;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+        return hr;
+
+    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Dependencies", &dependenciesNode );
+    if ( SUCCEEDED( hr ) && dependenciesNode )
+    {
+        hr = dependenciesNode->QueryInterface( &dependenciesNode );
+        dependenciesNode->Release();
+        if ( SUCCEEDED( hr ) )
+        {
+            hr = dependenciesNode->selectNodes( (BSTR)L"ns:PackageDependency", &dependenciesNodeList );
+            if ( SUCCEEDED( hr ) )
+            {
+                *dependencies = new(std::nothrow) AppxManifestPackageDependenciesEnumerator( dependenciesNodeList );
+                dependenciesNodeList->Release();
+                if ( !*dependencies ) 
+                    hr = E_OUTOFMEMORY;
+            }
+        }
+    } else if ( !dependenciesNode )
+        hr = APPX_E_INVALID_MANIFEST;
+
+    document->Release();
+
+    return hr;
 }
 
 HRESULT WINAPI
@@ -1206,7 +1382,7 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
             VariantInit( &var );
             hr = rootElem->getAttribute( attributeName, &var );
             if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &var ) == VT_EMPTY || V_VT( &var ) == VT_NULL )) )
-                hr = APPX_E_INVALID_BLOCKMAP;
+                hr = APPX_E_INVALID_MANIFEST;
 
             if ( SUCCEEDED( hr ) )
             {
@@ -1235,7 +1411,7 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
                         VariantClear( &nsval );
                     } else 
                     {
-                        hr = APPX_E_INVALID_BLOCKMAP;
+                        hr = APPX_E_INVALID_MANIFEST;
                     }
                 }
             }
@@ -1243,7 +1419,7 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
             VariantClear( &var );
             rootElem->Release();
         } else if ( SUCCEEDED( hr ) )
-            hr = APPX_E_INVALID_BLOCKMAP;
+            hr = APPX_E_INVALID_MANIFEST;
 
         SysFreeString( attributeName );
 
