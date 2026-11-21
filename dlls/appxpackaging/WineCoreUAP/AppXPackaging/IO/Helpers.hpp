@@ -26,11 +26,21 @@
 
 #include "../../../private.h"
 
+#include "wincrypt.h"
+
+struct AppxBlockMapHash
+{
+public:
+    UINT32 bufferSize;
+    BYTE *buffer;
+};
+
 template<typename T>
 HRESULT
 ObtainAttributeFromXMLElement( IXMLDOMElement *elem, OLECHAR* attribName, T *value )
 {
     BSTR attributeName;
+    DWORD hashSize = 0;
     LPWSTR tmpVal;
     HRESULT hr = S_OK;
     VARIANT val;
@@ -58,6 +68,12 @@ ObtainAttributeFromXMLElement( IXMLDOMElement *elem, OLECHAR* attribName, T *val
                 else
                     hr = E_OUTOFMEMORY;
             }
+        } else if constexpr ( std::is_same_v<T, UINT32> )
+        {
+            // UINT64 should not be used for versioning. Use LPWSTR instead.
+            hr = VariantChangeType( &val, &val, 0, VT_UI4 );
+            if ( SUCCEEDED( hr ) )
+                *value = V_UI4( &val );
         } else if constexpr ( std::is_same_v<T, UINT64> )
         {
             // UINT64 should not be used for versioning. Use LPWSTR instead.
@@ -79,6 +95,35 @@ ObtainAttributeFromXMLElement( IXMLDOMElement *elem, OLECHAR* attribName, T *val
                     *value = TRUE;
                 else
                     *value = FALSE;
+            }
+        } else if constexpr ( std::is_same_v<T, AppxBlockMapHash> )
+        {
+            hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+            if ( SUCCEEDED( hr ) )
+            {
+                if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, NULL, &hashSize, NULL, NULL ) )
+                    hr = HRESULT_FROM_WIN32( GetLastError() );
+
+                if ( SUCCEEDED( hr ) )
+                {
+                    value->buffer = static_cast<BYTE *>( CoTaskMemAlloc( hashSize ) );
+                    if ( !value->buffer )
+                    {
+                        hr = E_OUTOFMEMORY;
+                    } else if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, value->buffer, &hashSize, NULL, NULL ) )
+                    {
+                        CoTaskMemFree( value->buffer );
+                        hr = HRESULT_FROM_WIN32( GetLastError() );
+                    }
+                    value->bufferSize = hashSize;
+                }
+            }
+        } else if constexpr ( std::is_same_v<T, IUri*> )
+        {
+            hr = VariantChangeType( &val, &val, 0, VT_BSTR );
+            if ( SUCCEEDED( hr ) )
+            {
+                hr = CreateUri( V_BSTR( &val ), Uri_CREATE_CANONICALIZE, 0, value );
             }
         }
     }

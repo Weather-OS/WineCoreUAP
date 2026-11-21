@@ -22,9 +22,7 @@
 #include <new>
 
 #include "BlockMap.hpp"
-
-#include "wincrypt.h"
-
+#include "Helpers.hpp"
 #include "wine/debug.h"
 
 #define CHUNK_SIZE 64 * 1024
@@ -88,59 +86,19 @@ AppxBlockMapBlock::Release() noexcept
 HRESULT WINAPI 
 AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
 {
-    BSTR attributeName;
-    DWORD hashSize = 0;
     HRESULT hr = S_OK;
-    VARIANT val;
+    AppxBlockMapHash hash;
 
     TRACE( "iface %p, bufferSize %p, buffer %p.\n", this, bufferSize, buffer );
 
     if ( !bufferSize || !buffer )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Hash" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap block %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
+    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Hash", &hash ) ) )
+        return hr;
 
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, NULL, &hashSize, NULL, NULL ) )
-            {
-                ERR( "for blockmap block %p, failed to calculate hash size! return value was %ld\n", this, GetLastError() );
-                hr = HRESULT_FROM_WIN32( GetLastError() );
-            }
-
-            if ( SUCCEEDED( hr ) )
-            {
-                *buffer = static_cast<BYTE *>( CoTaskMemAlloc( hashSize ) );
-                if ( !*buffer )
-                {
-                    hr = E_OUTOFMEMORY;
-                } else if ( !CryptStringToBinaryW( V_BSTR( &val ), 0, CRYPT_STRING_BASE64, *buffer, &hashSize, NULL, NULL ) )
-                {
-                    ERR( "for blockmap block %p, failed to calculate hash! return value was %ld\n", this, GetLastError() );
-                    CoTaskMemFree( *buffer );
-                    hr = HRESULT_FROM_WIN32( GetLastError() );
-                }
-                *bufferSize = hashSize;
-            }
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
+    *bufferSize = hash.bufferSize;
+    *buffer = hash.buffer;
 
     return hr;
 }
@@ -148,39 +106,12 @@ AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
 HRESULT WINAPI 
 AppxBlockMapBlock::GetCompressedSize( UINT32 *size ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, lfhSize %p.\n", this, size );
 
     if ( !size )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Size" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap block %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_I4 );
-        if ( SUCCEEDED( hr ) )
-            *size = V_I4( &val );
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Size", size );
 }
 
 // ------------- IAppxBlockMapBlocksEnumerator ------------- //
@@ -400,48 +331,20 @@ AppxBlockMapFile::GetBlocks( IAppxBlockMapBlocksEnumerator **blocks ) noexcept
 HRESULT WINAPI 
 AppxBlockMapFile::GetLocalFileHeaderSize( UINT32 *lfhSize ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, lfhSize %p.\n", this, lfhSize );
 
     if ( !lfhSize )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"LfhSize" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_UI4 );
-        if ( SUCCEEDED( hr ) )
-            *lfhSize = V_UI4( &val );
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"LfhSize", lfhSize );
 }
 
 HRESULT WINAPI
 AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
 {
-    BSTR attributeName;
     BSTR normalizedName = nullptr;
+    LPWSTR nameStr = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
     IOpcFactory *opcFactory = nullptr;
     IOpcPartUri *partUri = nullptr;
 
@@ -450,42 +353,27 @@ AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
     if ( !name )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Name" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
+    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Name", &nameStr ) ) )
+        return hr;
 
-    VariantInit( &val );
+    hr = CoCreateInstance( CLSID_OpcFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opcFactory ) );
+    if ( SUCCEEDED( hr ) )
+        hr = opcFactory->CreatePartUri( nameStr, &partUri );
 
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
+    if ( SUCCEEDED( hr ) )
+        hr = partUri->GetPath( &normalizedName );
 
     if ( SUCCEEDED( hr ) )
     {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            hr = CoCreateInstance( CLSID_OpcFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opcFactory ) );
-            if ( SUCCEEDED( hr ) )
-                hr = opcFactory->CreatePartUri( V_BSTR( &val ), &partUri );
-
-            if ( SUCCEEDED( hr ) )
-                hr = partUri->GetPath( &normalizedName );
-
-            if ( SUCCEEDED( hr ) )
-            {
-                *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( normalizedName ) + sizeof(WCHAR) );
-                if ( *name )
-                    lstrcpynW( *name, normalizedName, SysStringLen( normalizedName ) + 1 );
-                else
-                    hr = E_OUTOFMEMORY;
-            }
-        }
+        *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( normalizedName ) + sizeof(WCHAR) );
+        if ( *name )
+            lstrcpynW( *name, normalizedName, SysStringLen( normalizedName ) + 1 );
+        else
+            hr = E_OUTOFMEMORY;
     }
 
+    if ( nameStr )
+        CoTaskMemFree( nameStr );
     if ( normalizedName )
         SysFreeString( normalizedName );
     if ( partUri )
@@ -493,48 +381,18 @@ AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
     if ( opcFactory )
         opcFactory->Release();
 
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
     return hr;
 }
 
 HRESULT WINAPI 
 AppxBlockMapFile::GetUncompressedSize( UINT64 *size ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, size %p.\n", this, size );
 
     if ( !size )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Size" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_UI8 );
-        if ( SUCCEEDED( hr ) )
-            *size = V_UI8( &val );
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Size", size );
 }
 
 HRESULT WINAPI 
@@ -1086,53 +944,22 @@ AppxBlockMapReader::GetHashMethod( IUri **hashMethod ) noexcept
     IXMLDOMDocument3 *document = nullptr;
     IXMLDOMElement *rootElem = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
-    BSTR attributeName;
 
     TRACE( "iface %p, hashMethod %p.\n", this, hashMethod );
 
     if ( !hashMethod )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"HashMethod" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-
     hr = FetchDocument( &document );
     if ( FAILED( hr ) )
-    {
-        SysFreeString( attributeName );
         return hr;
-    }
 
     hr = document->get_documentElement( &rootElem );
     document->Release();
     if ( FAILED( hr ) )
-    {
-        SysFreeString( attributeName );
         return hr;
-    }
 
-    VariantInit( &val );
-    
-    hr = rootElem->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for blockmap reader %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_BLOCKMAP;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-            hr = CreateUri( V_BSTR( &val ), Uri_CREATE_CANONICALIZE, 0, hashMethod );
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( rootElem, (OLECHAR *)L"HashMethod", hashMethod );
 }
 
 HRESULT WINAPI

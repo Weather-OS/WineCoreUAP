@@ -157,11 +157,23 @@ static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackag
     HRESULT hr;
     BOOL has_current;
     BOOL isValid;
+    BSTR hashPath;
     LPWSTR name;
+    IUri *hash = NULL;
     IStream *appxFileStream = NULL;
     IAppxFile *appxFile = NULL;
     IAppxBlockMapFile *file = NULL;
     IAppxBlockMapFilesEnumerator *files = NULL;
+
+    hr = IAppxBlockMapReader_GetHashMethod( blockMap, &hash );
+    ok( SUCCEEDED( hr ), "IAppxBlockMapReader::GetHashMethod failed with %#lx\n", hr );
+
+    hr = IUri_GetAbsoluteUri( hash, &hashPath );
+    ok( SUCCEEDED( hr ), "IUri::GetAbsoluteUri failed with %#lx\n", hr );
+
+    trace( "Hash method uri: %s\n", wine_dbgstr_w( hashPath ) );
+
+    SysFreeString( hashPath );
 
     hr = IAppxBlockMapReader_GetFiles( blockMap, &files );
     ok( SUCCEEDED( hr ), "IAppxBlockMapReader::GetFiles failed with %#lx\n", hr );
