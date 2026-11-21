@@ -109,6 +109,73 @@ _CLEANUP:
 }
 
 // ------------- IAppxManifestPackageId ------------- //
+AppxManifestProperties::AppxManifestProperties( IXMLDOMElement *element )
+    : xmlElement( element )
+{
+    element->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxManifestProperties::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxManifestProperties ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestProperties *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxManifestProperties::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxManifestProperties::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if ( xmlElement ) xmlElement->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+/* IAppxManifestProperties Methods */
+HRESULT WINAPI 
+AppxManifestProperties::GetBoolValue( LPCWSTR name, BOOL *value ) noexcept
+{
+    FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI 
+AppxManifestProperties::GetStringValue( LPCWSTR name, LPWSTR *value ) noexcept
+{
+    FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
+    return E_NOTIMPL;
+}
+
+// ------------- IAppxManifestPackageId ------------- //
 AppxManifestPackageId::AppxManifestPackageId( IXMLDOMElement *element )
     : xmlElement( element )
 {

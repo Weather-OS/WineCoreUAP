@@ -25,6 +25,40 @@
 
 #include "../../../private.h"
 
+class AppxManifestProperties
+    : public IAppxManifestProperties
+{
+public:
+    AppxManifestProperties() = default;
+    AppxManifestProperties(const AppxManifestProperties&) = delete;
+    AppxManifestProperties& operator=(const AppxManifestProperties&) = delete;
+
+    AppxManifestProperties( IXMLDOMElement *element );
+
+    virtual ~AppxManifestProperties() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* IAppxManifestProperties Methods */
+    HRESULT WINAPI 
+    GetBoolValue( LPCWSTR name, BOOL *value ) noexcept override;
+
+    HRESULT WINAPI 
+    GetStringValue( LPCWSTR name, LPWSTR *value ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMElement *xmlElement{ nullptr };
+};
+
 class AppxManifestPackageId
     : public IAppxManifestPackageId2
 {
