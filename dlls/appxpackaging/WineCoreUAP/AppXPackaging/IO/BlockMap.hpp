@@ -23,6 +23,8 @@
 
 #include <atomic>
 
+#include "Helpers.hpp"
+
 #include "../../../private.h"
 
 class AppxBlockMapBlock
@@ -57,44 +59,6 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMElement *xmlElement{ nullptr };
-};
-
-class AppxBlockMapBlocksEnumerator
-    : public IAppxBlockMapBlocksEnumerator
-{
-public:
-    AppxBlockMapBlocksEnumerator() = default;
-    AppxBlockMapBlocksEnumerator(const AppxBlockMapBlocksEnumerator&) = delete;
-    AppxBlockMapBlocksEnumerator& operator=(const AppxBlockMapBlocksEnumerator&) = delete;
-
-    AppxBlockMapBlocksEnumerator( IXMLDOMNodeList *nodes );
-
-    virtual ~AppxBlockMapBlocksEnumerator() = default;
-
-    /* IUnknown Methods (Shared) */
-    HRESULT WINAPI
-    QueryInterface( REFIID iid, void** out ) noexcept override;
-
-    ULONG WINAPI 
-    AddRef() noexcept override;
-
-    ULONG WINAPI 
-    Release() noexcept override;
-
-    /* IAppxBlockMapBlocksEnumerator Methods */
-    HRESULT WINAPI 
-    GetCurrent( IAppxBlockMapBlock **block ) noexcept override;
-
-    HRESULT WINAPI 
-    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
-
-    HRESULT WINAPI 
-    MoveNext( BOOL *hasNext ) noexcept override;
-
-private:
-    std::atomic<LONG> ref{ 1 };
-    IXMLDOMNodeList *blockNodes{ nullptr };
-    LONG iterator{ 0 };
 };
 
 class AppxBlockMapFile
@@ -138,44 +102,6 @@ public:
 private:
     std::atomic<LONG> ref{ 1 };
     IXMLDOMElement *xmlElement{ nullptr };
-};
-
-class AppxBlockMapFilesEnumerator
-    : public IAppxBlockMapFilesEnumerator
-{
-public:
-    AppxBlockMapFilesEnumerator() = default;
-    AppxBlockMapFilesEnumerator(const AppxBlockMapFilesEnumerator&) = delete;
-    AppxBlockMapFilesEnumerator& operator=(const AppxBlockMapFilesEnumerator&) = delete;
-
-    AppxBlockMapFilesEnumerator( IXMLDOMNodeList *nodes );
-
-    virtual ~AppxBlockMapFilesEnumerator() = default;
-
-    /* IUnknown Methods (Shared) */
-    HRESULT WINAPI
-    QueryInterface( REFIID iid, void** out ) noexcept override;
-
-    ULONG WINAPI 
-    AddRef() noexcept override;
-
-    ULONG WINAPI 
-    Release() noexcept override;
-
-    /* IAppxBlockMapFilesEnumerator Methods */
-    HRESULT WINAPI 
-    GetCurrent( IAppxBlockMapFile **file ) noexcept override;
-
-    HRESULT WINAPI 
-    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
-
-    HRESULT WINAPI 
-    MoveNext( BOOL *hasNext ) noexcept override;
-
-private:
-    std::atomic<LONG> ref{ 1 };
-    IXMLDOMNodeList *fileNodes{ nullptr };
-    LONG iterator{ 0 };
 };
 
 /* IAppxFile backed AppxBlockMapReader */

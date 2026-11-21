@@ -134,4 +134,132 @@ ObtainAttributeFromXMLElement( IXMLDOMElement *elem, OLECHAR* attribName, T *val
     return hr;
 }
 
+template <typename Interface, typename CurrentInterface, typename Object>
+class AppxEnumerator 
+    : public Interface
+{
+public:
+    AppxEnumerator(const AppxEnumerator&) = delete;
+    AppxEnumerator& operator=(const AppxEnumerator&) = delete;
+
+    explicit AppxEnumerator( IXMLDOMNodeList *nodes )
+        : nodes(nodes)
+    {
+        nodes->AddRef();
+    }
+
+    virtual ~AppxEnumerator() = default;
+
+    HRESULT WINAPI 
+    QueryInterface( REFIID iid, void **out ) noexcept override
+    {
+        if ( !out )
+            return E_POINTER;
+
+        *out = nullptr;
+
+        if ( iid == __uuidof( IUnknown ) ||
+             iid == __uuidof( Interface ) )
+        {
+            AddRef();
+            *out = static_cast<Interface *>(this);
+            return S_OK;
+        }
+
+        return E_NOINTERFACE;
+    }
+
+    ULONG WINAPI 
+    AddRef() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(++ref);
+        return curr;
+    }
+
+    ULONG WINAPI 
+    Release() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(--ref);
+        if ( !curr )
+        {
+            nodes->Release();
+            delete this;
+        }
+        return curr;
+    }
+
+    HRESULT WINAPI
+    GetCurrent( CurrentInterface **object ) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+        IXMLDOMNode *node;
+        IXMLDOMElement *elem;
+
+        if ( !object )
+            return E_POINTER;
+
+        *object = nullptr;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        if ( iterator >= len )
+            return E_BOUNDS;
+
+        if ( FAILED( hr = nodes->get_item( iterator, &node ) ) )
+            return hr;
+
+        hr = node->QueryInterface( &elem );
+        node->Release();
+
+        if ( FAILED( hr ) )
+            return hr;
+
+        *object = new(std::nothrow) Object( elem );
+        elem->Release();
+
+        return *object ? S_OK : E_OUTOFMEMORY;
+    }
+
+    HRESULT WINAPI 
+    GetHasCurrent( BOOL *hasCurrent ) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+
+        if ( !hasCurrent )
+            return E_POINTER;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        *hasCurrent = iterator < len;
+        return S_OK;
+    }
+
+    HRESULT WINAPI MoveNext(BOOL *hasNext) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+
+        if ( !hasNext )
+            return E_POINTER;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        if ( iterator < len )
+            iterator++;
+
+        *hasNext = iterator < len;
+        return S_OK;
+    }
+
+protected:
+    IXMLDOMNodeList *nodes;
+    std::atomic<LONG> ref = 1;
+    LONG iterator = 0;
+};
+
 #endif

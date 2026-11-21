@@ -71,44 +71,6 @@ private:
     IXMLDOMElement *xmlElement{ nullptr };
 };
 
-class AppxManifestPackageDependenciesEnumerator
-    : public IAppxManifestPackageDependenciesEnumerator
-{
-public:
-    AppxManifestPackageDependenciesEnumerator() = default;
-    AppxManifestPackageDependenciesEnumerator(const AppxManifestPackageDependenciesEnumerator&) = delete;
-    AppxManifestPackageDependenciesEnumerator& operator=(const AppxManifestPackageDependenciesEnumerator&) = delete;
-
-    AppxManifestPackageDependenciesEnumerator( IXMLDOMNodeList *nodeList );
-
-    virtual ~AppxManifestPackageDependenciesEnumerator() = default;
-
-    /* IUnknown Methods (Shared) */
-    HRESULT WINAPI
-    QueryInterface( REFIID iid, void** out ) noexcept override;
-
-    ULONG WINAPI 
-    AddRef() noexcept override;
-
-    ULONG WINAPI 
-    Release() noexcept override;
-
-    /* IAppxManifestPackageDependenciesEnumerator Methods */
-    HRESULT WINAPI 
-    GetCurrent( IAppxManifestPackageDependency **dependency ) noexcept override;
-
-    HRESULT WINAPI 
-    GetHasCurrent( BOOL *hasCurrent ) noexcept override;
-
-    HRESULT WINAPI 
-    MoveNext( BOOL *hasNext ) noexcept override;
-
-private:
-    std::atomic<LONG> ref{ 1 };
-    IXMLDOMNodeList *depNodes{ nullptr };
-    LONG iterator{ 0 };
-};
-
 class AppxManifestProperties
     : public IAppxManifestProperties
 {
