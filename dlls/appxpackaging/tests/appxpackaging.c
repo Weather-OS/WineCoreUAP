@@ -78,6 +78,7 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     HRESULT hr;
     BOOL has_current;
     APPX_PACKAGE_ARCHITECTURE2 architecture;
+    APPX_CAPABILITIES capabilities;
     IAppxManifestPackageId *packageId = NULL;
     IAppxManifestPackageId2 *packageId2 = NULL;
     IAppxManifestProperties *properties = NULL;
@@ -89,11 +90,17 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     LPWSTR strVal;
     LPWSTR name;
 
+    check_interface( manifest, &IID_IAppxManifestReader2, TRUE, FALSE );
+
     hr = IAppxManifestReader_GetPackageId( manifest, &packageId );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageId failed with %#lx\n", hr );
 
     hr = IAppxManifestReader_GetProperties( manifest, &properties );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetProperties failed with %#lx\n", hr );
+
+    hr = IAppxManifestReader_GetCapabilities( manifest, &capabilities );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetCapabilities failed with %#lx\n", hr );
+    ok ( capabilities & APPX_CAPABILITY_INTERNET_CLIENT, "Unexpected Appx Package Capability %#x\n", capabilities );
 
     hr = IAppxManifestReader_GetPackageDependencies( manifest, &deps );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageDependencies failed with %#lx\n", hr );

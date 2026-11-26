@@ -931,6 +931,13 @@ AppxManifestReader::QueryInterface( REFIID iid, void** out ) noexcept
         return S_OK;
     }
 
+    if ( iid == __uuidof( IAppxManifestReader2 ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestReader2 *>(this);
+        return S_OK;
+    }
+
     FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
     *out = nullptr;
     return E_NOINTERFACE;
@@ -1061,7 +1068,7 @@ AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
     if ( !capabilities )
         return E_POINTER;
 
-    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Capabilities" );
+    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Capabilities" );
     if ( !nodePath )
         return E_OUTOFMEMORY;
 
@@ -1087,11 +1094,11 @@ AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
     document->Release();
     SysFreeString( nodes );
     SysFreeString( nodePath );
-    node->Release();
+    if ( node ) node->Release();
 
     if ( FAILED( hr ) )
     {
-        nodeList->Release();
+        if ( nodeList ) nodeList->Release();
         return hr;
     }
 
@@ -1100,6 +1107,7 @@ AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
         nodeList->Release();
         return hr;
     }
+
 
     for ( iterator = 0; iterator < listLength; iterator++ )
     {
@@ -1116,30 +1124,30 @@ AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
 
         if ( SUCCEEDED( hr ) )
         {
-            if ( lstrcmpW( capability, (LPCWSTR)L"internetClient" ) )
-                *capabilities &= APPX_CAPABILITY_INTERNET_CLIENT;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"contacts" ) )
-                *capabilities &= APPX_CAPABILITY_CONTACTS;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"enterpriseAuthentication" ) )
-                *capabilities &= APPX_CAPABILITY_ENTERPRISE_AUTHENTICATION;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"internetClientServer" ) )
-                *capabilities &= APPX_CAPABILITY_INTERNET_CLIENT_SERVER;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"musicLibrary" ) )
-                *capabilities &= APPX_CAPABILITY_MUSIC_LIBRARY;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"picturesLibrary" ) )
-                *capabilities &= APPX_CAPABILITY_PICTURES_LIBRARY;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"removableStorage" ) )
-                *capabilities &= APPX_CAPABILITY_REMOVABLE_STORAGE;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"sharedUserCertificates" ) )
-                *capabilities &= APPX_CAPABILITY_SHARED_USER_CERTIFICATES;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"videosLibrary" ) )
-                *capabilities &= APPX_CAPABILITY_VIDEOS_LIBRARY;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"documentsLibrary" ) )
-                *capabilities &= APPX_CAPABILITY_DOCUMENTS_LIBRARY;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"privateNetworkClientServer" ) )
-                *capabilities &= APPX_CAPABILITY_PRIVATE_NETWORK_CLIENT_SERVER;
-            else if ( lstrcmpW( capability, (LPCWSTR)L"appointments" ) )
-                *capabilities &= APPX_CAPABILITY_APPOINTMENTS;
+            if ( lstrcmpW( capability, (LPCWSTR)L"internetClient" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_INTERNET_CLIENT;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"contacts" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_CONTACTS;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"enterpriseAuthentication" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_ENTERPRISE_AUTHENTICATION;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"internetClientServer" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_INTERNET_CLIENT_SERVER;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"musicLibrary" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_MUSIC_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"picturesLibrary" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_PICTURES_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"removableStorage" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_REMOVABLE_STORAGE;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"sharedUserCertificates" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_SHARED_USER_CERTIFICATES;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"videosLibrary" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_VIDEOS_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"documentsLibrary" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_DOCUMENTS_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"privateNetworkClientServer" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_PRIVATE_NETWORK_CLIENT_SERVER;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"appointments" ) == 0 )
+                *capabilities |= APPX_CAPABILITY_APPOINTMENTS;
         } else
             break;
     }
