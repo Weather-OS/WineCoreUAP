@@ -195,7 +195,7 @@ AppxManifestPackageDependency::GetName( LPWSTR *name ) noexcept
     if ( !name )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Name", name );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Name", name );
 }
 
 HRESULT WINAPI 
@@ -206,7 +206,7 @@ AppxManifestPackageDependency::GetPublisher( LPWSTR *publisher ) noexcept
     if ( !publisher )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Publisher", publisher );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Publisher", publisher );
 }
 
 HRESULT WINAPI 
@@ -220,7 +220,7 @@ AppxManifestPackageDependency::GetMinVersion( UINT64 *minVersion ) noexcept
     if ( !minVersion )
         return E_POINTER;
 
-    hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"MinVersion", &version );
+    hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"MinVersion", &version );
     if ( FAILED( hr ) )
         return hr;
 
@@ -243,7 +243,7 @@ AppxManifestPackageDependency::GetMaxMajorVersionTested( UINT16 *maxMajorVersion
     if ( !maxMajorVersionTested )
         return E_POINTER;
 
-    hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"MaxMajorVersionTested", &version );
+    hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"MaxMajorVersionTested", &version );
     if ( FAILED( hr ) )
         return hr;
 
@@ -267,7 +267,7 @@ AppxManifestPackageDependency::GetIsOptional( BOOL *isOptional ) noexcept
     if ( !isOptional )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"uap6:Optional", isOptional );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"uap6:Optional", isOptional );
 }
 
 // ------------- IAppxManifestPackageId ------------- //
@@ -964,36 +964,23 @@ AppxManifestReader::Release() noexcept
 HRESULT WINAPI
 AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 {
-    IXMLDOMDocument3 *document = nullptr;
-    IXMLDOMNode *packageNode = nullptr;
-    IXMLDOMElement *packageElem = nullptr;
-    HRESULT hr = S_OK;
+    BSTR nodePath;
+    HRESULT hr;
+    AppxManifestPackageId *package = nullptr;
 
     TRACE( "iface %p, packageId %p.\n", this, packageId );
-
+    
     if ( !packageId )
         return E_POINTER;
 
-    hr = FetchDocument( &document );
-    if ( FAILED( hr ) )
-        return hr;
+    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Identity" );
+    if ( !nodePath )
+        return E_OUTOFMEMORY;
 
-    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Identity", &packageNode );
-    if ( SUCCEEDED( hr ) && packageNode )
-    {
-        hr = packageNode->QueryInterface( &packageElem );
-        packageNode->Release();
-        if ( SUCCEEDED( hr ) )
-        {
-            *packageId = new(std::nothrow) AppxManifestPackageId( packageElem );
-            packageElem->Release();
-            if ( !*packageId ) 
-                hr = E_OUTOFMEMORY;
-        }
-    } else if ( !packageNode )
-        hr = APPX_E_INVALID_MANIFEST;
-
-    document->Release();
+    hr = FetchSingleNode<AppxManifestPackageId>( nodePath, &package );
+    SysFreeString( nodePath );
+    if ( SUCCEEDED( hr ) )
+        *packageId = package;
 
     return hr;
 }
@@ -1001,36 +988,23 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 HRESULT WINAPI
 AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties ) noexcept
 {
-    IXMLDOMDocument3 *document = nullptr;
-    IXMLDOMNode *propertiesNode = nullptr;
-    IXMLDOMElement *propertiesElem = nullptr;
-    HRESULT hr = S_OK;
+    BSTR nodePath;
+    HRESULT hr;
+    AppxManifestProperties *package = nullptr;
 
     TRACE( "iface %p, packageProperties %p.\n", this, packageProperties );
-
+    
     if ( !packageProperties )
         return E_POINTER;
 
-    hr = FetchDocument( &document );
-    if ( FAILED( hr ) )
-        return hr;
+    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Properties" );
+    if ( !nodePath )
+        return E_OUTOFMEMORY;
 
-    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Properties", &propertiesNode );
-    if ( SUCCEEDED( hr ) && propertiesNode )
-    {
-        hr = propertiesNode->QueryInterface( &propertiesElem );
-        propertiesNode->Release();
-        if ( SUCCEEDED( hr ) )
-        {
-            *packageProperties = new(std::nothrow) AppxManifestProperties( propertiesElem );
-            propertiesElem->Release();
-            if ( !*packageProperties ) 
-                hr = E_OUTOFMEMORY;
-        }
-    } else if ( !propertiesNode )
-        hr = APPX_E_INVALID_MANIFEST;
-
-    document->Release();
+    hr = FetchSingleNode<AppxManifestProperties>( nodePath, &package );
+    SysFreeString( nodePath );
+    if ( SUCCEEDED( hr ) )
+        *packageProperties = package;
 
     return hr;
 }
@@ -1038,40 +1012,32 @@ AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties )
 HRESULT WINAPI
 AppxManifestReader::GetPackageDependencies( IAppxManifestPackageDependenciesEnumerator **dependencies ) noexcept
 {
-    IXMLDOMDocument3 *document = nullptr;
-    IXMLDOMNode *dependenciesNode = nullptr;
-    IXMLDOMNodeList *dependenciesNodeList = nullptr;
-    HRESULT hr = S_OK;
+    BSTR nodePath;
+    BSTR nodes;
+    HRESULT hr;
+    AppxManifestPackageDependenciesEnumerator *enumerator = nullptr;
 
     TRACE( "iface %p, dependencies %p.\n", this, dependencies );
-
+    
     if ( !dependencies )
         return E_POINTER;
 
-    hr = FetchDocument( &document );
-    if ( FAILED( hr ) )
-        return hr;
+    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Dependencies" );
+    if ( !nodePath )
+        return E_OUTOFMEMORY;
 
-    hr = document->selectSingleNode( (BSTR)L"/ns:Package/ns:Dependencies", &dependenciesNode );
-    if ( SUCCEEDED( hr ) && dependenciesNode )
+    nodes = SysAllocString( (const OLECHAR *)L"ns:PackageDependency" );
+    if ( !nodes )
     {
-        hr = dependenciesNode->QueryInterface( &dependenciesNode );
-        dependenciesNode->Release();
-        if ( SUCCEEDED( hr ) )
-        {
-            hr = dependenciesNode->selectNodes( (BSTR)L"ns:PackageDependency", &dependenciesNodeList );
-            if ( SUCCEEDED( hr ) )
-            {
-                *dependencies = new(std::nothrow) AppxManifestPackageDependenciesEnumerator( dependenciesNodeList );
-                dependenciesNodeList->Release();
-                if ( !*dependencies ) 
-                    hr = E_OUTOFMEMORY;
-            }
-        }
-    } else if ( !dependenciesNode )
-        hr = APPX_E_INVALID_MANIFEST;
+        SysFreeString( nodePath );
+        return E_OUTOFMEMORY;
+    }
 
-    document->Release();
+    hr = FetchNodeList<AppxManifestPackageDependenciesEnumerator>( nodePath, nodes, &enumerator );
+    SysFreeString( nodePath );
+    SysFreeString( nodes );
+    if ( SUCCEEDED( hr ) )
+        *dependencies = enumerator;
 
     return hr;
 }
@@ -1079,8 +1045,108 @@ AppxManifestReader::GetPackageDependencies( IAppxManifestPackageDependenciesEnum
 HRESULT WINAPI
 AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
 {
-    FIXME( "iface %p, capabilities %p stub!\n", this, capabilities );
-    return E_NOTIMPL;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNodeList *nodeList = nullptr;
+    IXMLDOMElement *elem = nullptr;
+    IXMLDOMNode *node = nullptr;
+    HRESULT hr = S_OK;
+    LPWSTR capability;
+    LONG listLength;
+    LONG iterator;
+    BSTR nodePath;
+    BSTR nodes;
+
+    TRACE( "iface %p, capabilities %p.\n", this, capabilities );
+
+    if ( !capabilities )
+        return E_POINTER;
+
+    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Capabilities" );
+    if ( !nodePath )
+        return E_OUTOFMEMORY;
+
+    nodes = SysAllocString( (const OLECHAR *)L"*[local-name()='Capability']" );
+    if ( !nodes )
+        return E_OUTOFMEMORY;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( nodePath );
+        SysFreeString( nodes );
+        return hr;
+    }
+
+    hr = document->selectSingleNode( nodePath, &node );
+    if ( SUCCEEDED( hr ) && node )
+    {
+        hr = node->selectNodes( nodes, &nodeList ); 
+    } else if ( !node )
+        hr = APPX_E_INVALID_MANIFEST;
+
+    document->Release();
+    SysFreeString( nodes );
+    SysFreeString( nodePath );
+    node->Release();
+
+    if ( FAILED( hr ) )
+    {
+        nodeList->Release();
+        return hr;
+    }
+
+    if ( FAILED( hr = nodeList->get_length( &listLength ) ) )
+    {
+        nodeList->Release();
+        return hr;
+    }
+
+    for ( iterator = 0; iterator < listLength; iterator++ )
+    {
+        if ( SUCCEEDED( hr = nodeList->get_item( iterator, &node ) ) )
+        {
+            hr = node->QueryInterface( &elem );
+            node->Release();
+            if ( SUCCEEDED( hr ) )
+            {
+                hr = ObtainAttributeFromXMLElement( elem, (const OLECHAR *)L"Name", &capability );
+                elem->Release();
+            }
+        }
+
+        if ( SUCCEEDED( hr ) )
+        {
+            if ( lstrcmpW( capability, (LPCWSTR)L"internetClient" ) )
+                *capabilities &= APPX_CAPABILITY_INTERNET_CLIENT;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"contacts" ) )
+                *capabilities &= APPX_CAPABILITY_CONTACTS;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"enterpriseAuthentication" ) )
+                *capabilities &= APPX_CAPABILITY_ENTERPRISE_AUTHENTICATION;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"internetClientServer" ) )
+                *capabilities &= APPX_CAPABILITY_INTERNET_CLIENT_SERVER;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"musicLibrary" ) )
+                *capabilities &= APPX_CAPABILITY_MUSIC_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"picturesLibrary" ) )
+                *capabilities &= APPX_CAPABILITY_PICTURES_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"removableStorage" ) )
+                *capabilities &= APPX_CAPABILITY_REMOVABLE_STORAGE;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"sharedUserCertificates" ) )
+                *capabilities &= APPX_CAPABILITY_SHARED_USER_CERTIFICATES;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"videosLibrary" ) )
+                *capabilities &= APPX_CAPABILITY_VIDEOS_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"documentsLibrary" ) )
+                *capabilities &= APPX_CAPABILITY_DOCUMENTS_LIBRARY;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"privateNetworkClientServer" ) )
+                *capabilities &= APPX_CAPABILITY_PRIVATE_NETWORK_CLIENT_SERVER;
+            else if ( lstrcmpW( capability, (LPCWSTR)L"appointments" ) )
+                *capabilities &= APPX_CAPABILITY_APPOINTMENTS;
+        } else
+            break;
+    }
+
+    nodeList->Release();
+
+    return hr;
 }
 
 HRESULT WINAPI
@@ -1098,7 +1164,7 @@ AppxManifestReader::GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumer
 }
 
 HRESULT WINAPI
-AppxManifestReader::GetPrerequisite( LPCWSTR name, UINT64 *value )noexcept
+AppxManifestReader::GetPrerequisite( LPCWSTR name, UINT64 *value ) noexcept
 {
     FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
     return E_NOTIMPL;
@@ -1245,6 +1311,72 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
     }
        
     hr = xmlDocument->QueryInterface( document );
+
+    return hr;
+}
+
+template <typename Object>
+HRESULT WINAPI
+AppxManifestReader::FetchSingleNode( BSTR nodePath, Object **out ) noexcept
+{
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMElement *nodeElem = nullptr;
+    IXMLDOMNode *node = nullptr;
+    HRESULT hr = S_OK;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+        return hr;
+
+    hr = document->selectSingleNode( nodePath, &node );
+    if ( SUCCEEDED( hr ) && node )
+    {
+        hr = node->QueryInterface( &nodeElem );
+        node->Release();
+        if ( SUCCEEDED( hr ) )
+        {
+            *out = new(std::nothrow) Object( nodeElem );
+            nodeElem->Release();
+            if ( !*out ) 
+                hr = E_OUTOFMEMORY;
+        }
+    } else if ( !node )
+        hr = APPX_E_INVALID_MANIFEST;
+
+    document->Release();
+
+    return hr;
+}
+
+template <typename Object>
+HRESULT WINAPI
+AppxManifestReader::FetchNodeList( BSTR nodePath, BSTR nodes, Object **out ) noexcept
+{
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMNodeList *nodeList = nullptr;
+    IXMLDOMNode *node = nullptr;
+    HRESULT hr = S_OK;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+        return hr;
+
+    hr = document->selectSingleNode( nodePath, &node );
+    if ( SUCCEEDED( hr ) && node )
+    {
+        hr = node->selectNodes( nodes, &nodeList );
+        if ( SUCCEEDED( hr ) )
+        {
+            *out = new(std::nothrow) Object( nodeList );
+            nodeList->Release();
+            if ( !*out ) 
+                hr = E_OUTOFMEMORY;
+        }
+    } else if ( !node )
+        hr = APPX_E_INVALID_MANIFEST;
+
+    document->Release();
+    if ( node ) node->Release();
 
     return hr;
 }

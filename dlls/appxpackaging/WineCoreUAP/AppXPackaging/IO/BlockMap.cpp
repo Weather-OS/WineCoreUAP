@@ -97,7 +97,7 @@ AppxBlockMapBlock::GetHash( UINT32 *bufferSize, BYTE **buffer ) noexcept
     if ( !bufferSize || !buffer )
         return E_POINTER;
 
-    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Hash", &hash ) ) )
+    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Hash", &hash ) ) )
         return hr;
 
     *bufferSize = hash.bufferSize;
@@ -114,7 +114,7 @@ AppxBlockMapBlock::GetCompressedSize( UINT32 *size ) noexcept
     if ( !size )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Size", size );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Size", size );
 }
 
 // ------------- IAppxBlockMapFile ------------- //
@@ -207,7 +207,7 @@ AppxBlockMapFile::GetLocalFileHeaderSize( UINT32 *lfhSize ) noexcept
     if ( !lfhSize )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"LfhSize", lfhSize );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"LfhSize", lfhSize );
 }
 
 HRESULT WINAPI
@@ -224,7 +224,7 @@ AppxBlockMapFile::GetName( LPWSTR *name ) noexcept
     if ( !name )
         return E_POINTER;
 
-    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Name", &nameStr ) ) )
+    if ( FAILED( hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Name", &nameStr ) ) )
         return hr;
 
     hr = CoCreateInstance( CLSID_OpcFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( &opcFactory ) );
@@ -263,7 +263,7 @@ AppxBlockMapFile::GetUncompressedSize( UINT64 *size ) noexcept
     if ( !size )
         return E_POINTER;
 
-    return ObtainAttributeFromXMLElement( xmlElement, (OLECHAR *)L"Size", size );
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Size", size );
 }
 
 HRESULT WINAPI 
@@ -698,7 +698,7 @@ AppxBlockMapReader::GetHashMethod( IUri **hashMethod ) noexcept
     if ( FAILED( hr ) )
         return hr;
 
-    return ObtainAttributeFromXMLElement( rootElem, (OLECHAR *)L"HashMethod", hashMethod );
+    return ObtainAttributeFromXMLElement( rootElem, (const  OLECHAR *)L"HashMethod", hashMethod );
 }
 
 HRESULT WINAPI

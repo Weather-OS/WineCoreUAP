@@ -221,6 +221,14 @@ private:
     HRESULT WINAPI 
     FetchDocument( IXMLDOMDocument3 **document ) noexcept;
 
+    template <typename Object>
+    HRESULT WINAPI
+    FetchNodeList( BSTR nodePath, BSTR nodes, Object **out ) noexcept;
+
+    template <typename Object>
+    HRESULT WINAPI
+    FetchSingleNode( BSTR nodePath, Object **out ) noexcept;
+
     std::atomic<LONG> ref{ 1 };
     IXMLDOMDocument3 *xmlDocument{ nullptr };
     // Do not use MSXML for the reader as it can't satisfy `GetStream`.

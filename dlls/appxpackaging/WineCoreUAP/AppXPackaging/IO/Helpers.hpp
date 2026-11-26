@@ -37,7 +37,7 @@ public:
 
 template<typename T>
 HRESULT
-ObtainAttributeFromXMLElement( IXMLDOMElement *elem, OLECHAR* attribName, T *value )
+ObtainAttributeFromXMLElement( IXMLDOMElement *elem, const OLECHAR *attribName, T *value )
 {
     BSTR attributeName;
     DWORD hashSize = 0;
