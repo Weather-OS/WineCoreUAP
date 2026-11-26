@@ -23,6 +23,7 @@
 
 #include "IO/PackageIO.hpp"
 #include "IO/BlockMap.hpp"
+#include "IO/Manifest.hpp"
 
 #include "../../private.h"
 #include "wine/debug.h"
@@ -185,8 +186,27 @@ public:
     HRESULT WINAPI 
     CreateManifestReader( IStream *inputStream, IAppxManifestReader **manifestReader ) noexcept override
     {
-        FIXME( "iface %p, inputStream %p, manifestReader %p stub!\n", this, inputStream, manifestReader );
-        return E_NOTIMPL;
+        HRESULT hr = S_OK;
+        IAppxFile *manifestFile = nullptr;
+
+        TRACE( "iface %p, inputStream %p, manifestReader %p.\n", this, inputStream, manifestReader );
+
+        if ( !inputStream )
+            return E_INVALIDARG;
+
+        if ( !manifestFile )
+            return E_POINTER;
+
+        manifestFile = new(std::nothrow) AppxFile( inputStream );
+        if ( !manifestFile )
+            return E_OUTOFMEMORY;
+
+        *manifestReader = new(std::nothrow) AppxManifestReader( manifestFile );
+        manifestFile->Release();
+        if ( !*manifestReader )
+            return E_OUTOFMEMORY;
+
+        return hr;
     }
     
     HRESULT WINAPI 
@@ -195,7 +215,7 @@ public:
         HRESULT hr = S_OK;
         IAppxFile *blockMapFile = nullptr;
 
-        TRACE( "iface %p, inputStream %p, manifestReader %p.\n", this, inputStream, blockMapReader );
+        TRACE( "iface %p, inputStream %p, blockMapReader %p.\n", this, inputStream, blockMapReader );
 
         if ( !inputStream )
             return E_INVALIDARG;
