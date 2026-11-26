@@ -82,13 +82,16 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     IAppxManifestPackageId *packageId = NULL;
     IAppxManifestPackageId2 *packageId2 = NULL;
     IAppxManifestProperties *properties = NULL;
+    IAppxManifestApplication *application = NULL;
     IAppxManifestPackageDependency *dep = NULL;
     IAppxManifestPackageDependenciesEnumerator *deps = NULL;
     IAppxManifestResourcesEnumerator *resources = NULL;
+    IAppxManifestApplicationsEnumerator *apps = NULL;
     LPWSTR resource;
     LPWSTR publisher;
     LPWSTR packageFullName;
     LPWSTR packageFamilyName;
+    LPWSTR applicationExecutable;
     LPWSTR strVal;
     LPWSTR name;
 
@@ -110,11 +113,14 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     hr = IAppxManifestReader_GetResources( manifest, &resources );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetResources failed with %#lx\n", hr );
 
+    hr = IAppxManifestReader_GetApplications( manifest, &apps );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetApplications failed with %#lx\n", hr );
+
     hr = IAppxManifestPackageId_QueryInterface( packageId, &IID_IAppxManifestPackageId2, (void **)&packageId2 );
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
 
     hr = IAppxManifestPackageId2_GetArchitecture2( packageId2, &architecture );
-    ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
+    ok( SUCCEEDED( hr ), "IAppxManifestPackageId2::QueryInterface failed with %#lx\n", hr );
 
 #if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
     ok( architecture == APPX_PACKAGE_ARCHITECTURE2_ARM64, "got wrong architecture %d for current package!\n", architecture );
@@ -166,6 +172,13 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     hr = IAppxManifestResourcesEnumerator_GetCurrent( resources, &resource );
     ok( SUCCEEDED( hr ), "IAppxManifestResourcesEnumerator::GetCurrent failed with %#lx\n", hr );
     ok( !lstrcmpW( resource, L"EN-US"), "Got unexpected first resource %s\n", wine_dbgstr_w( resource ) );
+
+    hr = IAppxManifestApplicationsEnumerator_GetCurrent( apps, &application );
+    ok( SUCCEEDED( hr ), "IAppxManifestApplicationsEnumerator::GetCurrent failed with %#lx\n", hr );
+
+    hr = IAppxManifestApplication_GetStringValue( application, L"Executable", &applicationExecutable );
+    ok( SUCCEEDED( hr ), "IAppxManifestApplication::GetStringValue failed with %#lx\n", hr );
+    ok( !lstrcmpW( applicationExecutable, L"TestApplication.exe"), "Got unexpected first application executable %s\n", wine_dbgstr_w( applicationExecutable ) );
 
     CoTaskMemFree( resource );
 }

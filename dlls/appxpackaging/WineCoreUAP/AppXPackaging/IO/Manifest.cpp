@@ -31,6 +31,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
 using AppxManifestPackageDependenciesEnumerator = AppxEnumerator<IAppxManifestPackageDependenciesEnumerator, IAppxManifestPackageDependency, AppxManifestPackageDependency>;
+using AppxManifestApplicationsEnumerator = AppxEnumerator<IAppxManifestApplicationsEnumerator, IAppxManifestApplication, AppxManifestApplication>;
 using AppxManifestResourcesEnumerator = AppxWstrEnumerator<IAppxManifestResourcesEnumerator>;
 using AppxManifestDeviceCapabilitiesEnumerator = AppxWstrEnumerator<IAppxManifestDeviceCapabilitiesEnumerator>;
 
@@ -272,7 +273,83 @@ AppxManifestPackageDependency::GetIsOptional( BOOL *isOptional ) noexcept
     return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"uap6:Optional", isOptional );
 }
 
-// ------------- IAppxManifestPackageId ------------- //
+// ------------- IAppxManifestApplication ------------- //
+AppxManifestApplication::AppxManifestApplication( IXMLDOMElement *element )
+    : xmlElement( element )
+{
+    element->AddRef();
+}
+
+/* IUnknown Methods (Shared) */
+HRESULT WINAPI
+AppxManifestApplication::QueryInterface( REFIID iid, void** out ) noexcept
+{
+    TRACE( "iface %p, iid %s, out %p.\n", this, debugstr_guid( &iid ), out );
+
+    if (!out) return E_POINTER;
+    *out = nullptr;
+
+    if ( iid == __uuidof( IUnknown ) ||
+         iid == __uuidof( IAppxManifestApplication ) )
+    {
+        AddRef();
+        *out = static_cast<IAppxManifestApplication *>(this);
+        return S_OK;
+    }
+
+    FIXME( "%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid( &iid ) );
+    *out = nullptr;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI 
+AppxManifestApplication::AddRef() noexcept
+{
+    ULONG curr = static_cast<ULONG>(++ref);
+    TRACE( "iface %p increasing refcount to %lu.\n", this, curr );
+    return curr;
+}
+
+ULONG WINAPI 
+AppxManifestApplication::Release() noexcept
+{
+    ULONG curr = static_cast<ULONG>(--ref);
+    TRACE( "iface %p decreasing refcount to %lu.\n", this, curr );
+
+    if ( !curr )
+    {
+        if ( xmlElement ) xmlElement->Release();
+        delete this;
+    }
+    
+    return curr;
+}
+
+HRESULT WINAPI 
+AppxManifestApplication::GetStringValue( LPCWSTR name, LPWSTR *value ) noexcept
+{
+    TRACE( "iface %p, name %s, value %p.\n", this, debugstr_w( name ), value );
+
+    if ( !name )
+        return E_INVALIDARG;
+
+    if ( !value )
+        return E_POINTER;
+
+    return ObtainAttributeFromXMLElement( xmlElement, name, value );
+}
+
+HRESULT WINAPI
+AppxManifestApplication::GetAppUserModelId( LPWSTR *appUserModelId ) noexcept
+{
+    // App User mode IDs follow this structure:
+    // PACKAGEIDENTITYNAME_PRODUCTID!APPLICATIONID
+    // TODO: Figure out a way to obtain PACKAGEIDENTITYNAME and PRODUCTID from this context.
+    FIXME( "iface %p, appUserModelId %p stub!\n", this, appUserModelId );
+    return E_NOTIMPL;
+}
+
+// ------------- IAppxManifestProperties ------------- //
 AppxManifestProperties::AppxManifestProperties( IXMLDOMElement *element )
     : xmlElement( element )
 {
@@ -1106,8 +1183,20 @@ AppxManifestReader::GetPrerequisite( LPCWSTR name, UINT64 *value ) noexcept
 HRESULT WINAPI
 AppxManifestReader::GetApplications( IAppxManifestApplicationsEnumerator **applications ) noexcept
 {
-    FIXME( "iface %p, applications %p stub!\n", this, applications );
-    return E_NOTIMPL;
+    HRESULT hr;
+    AppxManifestApplicationsEnumerator *enumerator = nullptr;
+
+    TRACE( "iface %p, applications %p.\n", this, applications );
+    
+    if ( !applications )
+        return E_POINTER;
+
+    hr = FetchNodeList( (const OLECHAR *)L"/ns:Package/ns:Applications", (const OLECHAR *)L"ns:Application", &enumerator );
+
+    if ( SUCCEEDED( hr ) )
+        *applications = enumerator;
+
+    return hr;
 }
 
 HRESULT WINAPI

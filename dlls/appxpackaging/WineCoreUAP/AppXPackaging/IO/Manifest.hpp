@@ -71,6 +71,40 @@ private:
     IXMLDOMElement *xmlElement{ nullptr };
 };
 
+class AppxManifestApplication
+    : public IAppxManifestApplication
+{
+public:
+    AppxManifestApplication() = default;
+    AppxManifestApplication(const AppxManifestApplication&) = delete;
+    AppxManifestApplication& operator=(const AppxManifestApplication&) = delete;
+
+    AppxManifestApplication( IXMLDOMElement *element );
+
+    virtual ~AppxManifestApplication() = default;
+
+    /* IUnknown Methods (Shared) */
+    HRESULT WINAPI
+    QueryInterface( REFIID iid, void** out ) noexcept override;
+
+    ULONG WINAPI 
+    AddRef() noexcept override;
+
+    ULONG WINAPI 
+    Release() noexcept override;
+
+    /* AppxManifestApplication Methods */
+    HRESULT WINAPI 
+    GetStringValue( LPCWSTR name, LPWSTR *value ) noexcept override;
+
+    HRESULT WINAPI 
+    GetAppUserModelId( LPWSTR *appUserModelId ) noexcept override;
+
+private:
+    std::atomic<LONG> ref{ 1 };
+    IXMLDOMElement *xmlElement{ nullptr };
+};
+
 class AppxManifestProperties
     : public IAppxManifestProperties
 {
