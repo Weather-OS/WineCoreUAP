@@ -32,6 +32,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
 using AppxManifestPackageDependenciesEnumerator = AppxEnumerator<IAppxManifestPackageDependenciesEnumerator, IAppxManifestPackageDependency, AppxManifestPackageDependency>;
 using AppxManifestResourcesEnumerator = AppxWstrEnumerator<IAppxManifestResourcesEnumerator>;
+using AppxManifestDeviceCapabilitiesEnumerator = AppxWstrEnumerator<IAppxManifestDeviceCapabilitiesEnumerator>;
 
 // dirty implementation of https://withinrafael.com/2018/01/28/whats-that-gobbledygook-in-my-package-family-name
 static BOOL PublisherIdFromPublisherString( LPCWSTR str, LPWSTR result, SIZE_T result_cch )
@@ -1001,8 +1002,20 @@ AppxManifestReader::GetResources( IAppxManifestResourcesEnumerator **resources )
 HRESULT WINAPI
 AppxManifestReader::GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumerator **deviceCapabilities ) noexcept
 {
-    FIXME( "iface %p, deviceCapabilities %p stub!\n", this, deviceCapabilities );
-    return E_NOTIMPL;
+    HRESULT hr;
+    AppxManifestDeviceCapabilitiesEnumerator *enumerator = nullptr;
+
+    TRACE( "iface %p, deviceCapabilities %p.\n", this, deviceCapabilities );
+    
+    if ( !deviceCapabilities )
+        return E_POINTER;
+
+    hr = FetchNodeList( (const OLECHAR *)L"/ns:Package/ns:Capabilities", (const OLECHAR *)L"ns:DeviceCapability", &enumerator );
+
+    if ( SUCCEEDED( hr ) )
+        *deviceCapabilities = enumerator;
+
+    return hr;
 }
 
 HRESULT WINAPI
