@@ -501,45 +501,12 @@ AppxManifestPackageId::Release() noexcept
 HRESULT WINAPI
 AppxManifestPackageId::GetName( LPWSTR *name ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, name %p.\n", this, name );
 
     if ( !name )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Name" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            *name = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( *name )
-                lstrcpynW( *name, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Name", name );
 }
 
 HRESULT WINAPI
@@ -553,96 +520,30 @@ AppxManifestPackageId::GetArchitecture( APPX_PACKAGE_ARCHITECTURE *architecture 
 HRESULT WINAPI
 AppxManifestPackageId::GetPublisher( LPWSTR *publisher ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
     TRACE( "iface %p, publisher %p.\n", this, publisher );
 
     if ( !publisher )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Publisher" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            *publisher = (LPWSTR)CoTaskMemAlloc( 14 * sizeof(WCHAR) );
-            if ( *publisher )
-                lstrcpynW( *publisher, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    return hr;
+    return ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Publisher", publisher );
 }
 
 HRESULT WINAPI
 AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
 {
-    BSTR attributeName;
     LPWSTR version = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
 
     TRACE( "iface %p, packageVersion %p.\n", this, packageVersion );
 
     if ( !packageVersion )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"Version" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-
-    VariantInit( &val );
-
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
-
-    if ( SUCCEEDED( hr ) )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            version = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( version )
-                lstrcpynW( version, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
+    hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"Version", &version );
     if ( FAILED( hr ) )
-    {
-        CoTaskMemFree( version );
         return hr;
-    }
 
-    hr = ParseVersion( version, packageVersion );
+    ParseVersion( version, packageVersion );
     CoTaskMemFree( version );
 
     return hr;
@@ -651,44 +552,16 @@ AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
 HRESULT WINAPI
 AppxManifestPackageId::GetResourceId( LPWSTR *resourceId ) noexcept
 {
-    BSTR attributeName;
-    HRESULT hr = S_OK;
-    VARIANT val;
-
+    HRESULT hr;
     TRACE( "iface %p, resourceId %p.\n", this, resourceId );
 
     if ( !resourceId )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"ResourceId" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        WARN( "for manifest package id %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        // element is optional
-        hr = S_FALSE;
-    }
-
-    if ( SUCCEEDED( hr ) && hr != S_FALSE )
-    {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            *resourceId = (LPWSTR)CoTaskMemAlloc( 14 * sizeof(WCHAR) );
-            if ( *resourceId )
-                lstrcpynW( *resourceId, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
+    hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"ResourceId", resourceId );
+    // resource is optional
+    if ( hr == E_INVALIDARG )
+        return S_FALSE;
 
     return hr;
 }
@@ -783,8 +656,10 @@ AppxManifestPackageId::GetPackageFullName( LPWSTR *packageFullName ) noexcept
 
     if ( SUCCEEDED( hr = GetName( &name ) ) )
     {
+        TRACE("hr was %#lx\n", hr);
         if ( SUCCEEDED( hr = GetPublisher( &publisher ) ) )
         {
+            TRACE("hr was %#lx\n", hr);
             PublisherIdFromPublisherString( publisher, publisherId, 14 );
             CoTaskMemFree( publisher );
             if ( SUCCEEDED( hr = GetResourceId( &resourceId ) ) )
@@ -796,7 +671,7 @@ AppxManifestPackageId::GetPackageFullName( LPWSTR *packageFullName ) noexcept
                                                            ((lstrlenW(publisherId) + 1) * sizeof(WCHAR)) );
                 wsprintfW( *packageFullName, (LPCWSTR)L"%s_%s_%s_%s_%s", name, version, architectureStr, resourceId, publisherId );
                 if ( resourceId ) CoTaskMemFree( resourceId );
-            } 
+            }
         }
     }
 
@@ -845,48 +720,18 @@ AppxManifestPackageId::GetPackageFamilyName( LPWSTR *packageFamilyName ) noexcep
 HRESULT WINAPI
 AppxManifestPackageId::GetArchitecture2( APPX_PACKAGE_ARCHITECTURE2 *architecture ) noexcept
 {
-    BSTR attributeName;
-    LPWSTR architectureString = nullptr;
     HRESULT hr = S_OK;
-    VARIANT val;
+    LPWSTR architectureString = nullptr;
 
     TRACE( "iface %p, architecture %p.\n", this, architecture );
 
     if ( !architecture )
         return E_POINTER;
 
-    attributeName = SysAllocString( (OLECHAR *)L"ProcessorArchitecture" );
-    if ( !attributeName )
-        return E_OUTOFMEMORY;
-    
-    VariantInit( &val );
-    
-    hr = xmlElement->getAttribute( attributeName, &val );
-    if ( hr == S_FALSE || (SUCCEEDED( hr ) && ( V_VT( &val ) == VT_EMPTY || V_VT( &val ) == VT_NULL )) )
-    {
-        ERR( "for manifest package id file %p, its XML element does not include %s!\n", this, debugstr_w( attributeName ) );
-        hr = APPX_E_INVALID_MANIFEST;
-    }
+    hr = ObtainAttributeFromXMLElement( xmlElement, (const OLECHAR *)L"ProcessorArchitecture", &architectureString );
 
     if ( SUCCEEDED( hr ) )
     {
-        hr = VariantChangeType( &val, &val, 0, VT_BSTR );
-        if ( SUCCEEDED( hr ) )
-        {
-            architectureString = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
-            if ( architectureString )
-                lstrcpynW( architectureString, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
-            else
-                hr = E_OUTOFMEMORY;
-        }
-    }
-
-    SysFreeString( attributeName );
-    VariantClear( &val );
-
-    if ( SUCCEEDED( hr ) )
-    {
-        TRACE("architectureString is %s\n", debugstr_w(architectureString));
         if ( lstrcmpiW( architectureString, (LPWSTR)L"x86" ) == 0 )
             *architecture = APPX_PACKAGE_ARCHITECTURE2_X86;
         else if ( lstrcmpiW( architectureString, (LPWSTR)L"arm" ) == 0 )
