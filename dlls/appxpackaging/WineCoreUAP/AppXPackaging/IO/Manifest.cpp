@@ -31,6 +31,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
 
 using AppxManifestPackageDependenciesEnumerator = AppxEnumerator<IAppxManifestPackageDependenciesEnumerator, IAppxManifestPackageDependency, AppxManifestPackageDependency>;
+using AppxManifestResourcesEnumerator = AppxWstrEnumerator<IAppxManifestResourcesEnumerator>;
 
 // dirty implementation of https://withinrafael.com/2018/01/28/whats-that-gobbledygook-in-my-package-family-name
 static BOOL PublisherIdFromPublisherString( LPCWSTR str, LPWSTR result, SIZE_T result_cch )
@@ -971,7 +972,6 @@ AppxManifestReader::Release() noexcept
 HRESULT WINAPI
 AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 {
-    BSTR nodePath;
     HRESULT hr;
     AppxManifestPackageId *package = nullptr;
 
@@ -980,12 +980,8 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
     if ( !packageId )
         return E_POINTER;
 
-    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Identity" );
-    if ( !nodePath )
-        return E_OUTOFMEMORY;
+    hr = FetchSingleNode( (const OLECHAR *)L"/ns:Package/ns:Identity", &package );
 
-    hr = FetchSingleNode<AppxManifestPackageId>( nodePath, &package );
-    SysFreeString( nodePath );
     if ( SUCCEEDED( hr ) )
         *packageId = package;
 
@@ -995,7 +991,6 @@ AppxManifestReader::GetPackageId( IAppxManifestPackageId **packageId ) noexcept
 HRESULT WINAPI
 AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties ) noexcept
 {
-    BSTR nodePath;
     HRESULT hr;
     AppxManifestProperties *package = nullptr;
 
@@ -1004,12 +999,8 @@ AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties )
     if ( !packageProperties )
         return E_POINTER;
 
-    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Properties" );
-    if ( !nodePath )
-        return E_OUTOFMEMORY;
+    hr = FetchSingleNode( (const OLECHAR *)L"/ns:Package/ns:Properties", &package );
 
-    hr = FetchSingleNode<AppxManifestProperties>( nodePath, &package );
-    SysFreeString( nodePath );
     if ( SUCCEEDED( hr ) )
         *packageProperties = package;
 
@@ -1019,8 +1010,6 @@ AppxManifestReader::GetProperties( IAppxManifestProperties **packageProperties )
 HRESULT WINAPI
 AppxManifestReader::GetPackageDependencies( IAppxManifestPackageDependenciesEnumerator **dependencies ) noexcept
 {
-    BSTR nodePath;
-    BSTR nodes;
     HRESULT hr;
     AppxManifestPackageDependenciesEnumerator *enumerator = nullptr;
 
@@ -1029,20 +1018,8 @@ AppxManifestReader::GetPackageDependencies( IAppxManifestPackageDependenciesEnum
     if ( !dependencies )
         return E_POINTER;
 
-    nodePath = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Dependencies" );
-    if ( !nodePath )
-        return E_OUTOFMEMORY;
+    hr = FetchNodeList( (const OLECHAR *)L"/ns:Package/ns:Dependencies", (const OLECHAR *)L"ns:PackageDependency", &enumerator );
 
-    nodes = SysAllocString( (const OLECHAR *)L"ns:PackageDependency" );
-    if ( !nodes )
-    {
-        SysFreeString( nodePath );
-        return E_OUTOFMEMORY;
-    }
-
-    hr = FetchNodeList<AppxManifestPackageDependenciesEnumerator>( nodePath, nodes, &enumerator );
-    SysFreeString( nodePath );
-    SysFreeString( nodes );
     if ( SUCCEEDED( hr ) )
         *dependencies = enumerator;
 
@@ -1160,8 +1137,20 @@ AppxManifestReader::GetCapabilities( APPX_CAPABILITIES *capabilities ) noexcept
 HRESULT WINAPI
 AppxManifestReader::GetResources( IAppxManifestResourcesEnumerator **resources ) noexcept
 {
-    FIXME( "iface %p, resources %p stub!\n", this, resources );
-    return E_NOTIMPL;
+    HRESULT hr;
+    AppxManifestResourcesEnumerator *enumerator = nullptr;
+
+    TRACE( "iface %p, resources %p.\n", this, resources );
+    
+    if ( !resources )
+        return E_POINTER;
+
+    hr = FetchNodeList( (const OLECHAR *)L"/ns:Package/ns:Resources", (const OLECHAR *)L"ns:Resource", &enumerator );
+
+    if ( SUCCEEDED( hr ) )
+        *resources = enumerator;
+
+    return hr;
 }
 
 HRESULT WINAPI
@@ -1325,18 +1314,26 @@ AppxManifestReader::FetchDocument( IXMLDOMDocument3 **document ) noexcept
 
 template <typename Object>
 HRESULT WINAPI
-AppxManifestReader::FetchSingleNode( BSTR nodePath, Object **out ) noexcept
+AppxManifestReader::FetchSingleNode( const OLECHAR* nodePath, Object **out ) noexcept
 {
     IXMLDOMDocument3 *document = nullptr;
     IXMLDOMElement *nodeElem = nullptr;
     IXMLDOMNode *node = nullptr;
     HRESULT hr = S_OK;
+    BSTR nodePathStr;
+
+    nodePathStr = SysAllocString( nodePath );
+    if ( !nodePathStr )
+        return E_OUTOFMEMORY;
 
     hr = FetchDocument( &document );
     if ( FAILED( hr ) )
+    {
+        SysFreeString( nodePathStr );
         return hr;
+    }
 
-    hr = document->selectSingleNode( nodePath, &node );
+    hr = document->selectSingleNode( nodePathStr, &node );
     if ( SUCCEEDED( hr ) && node )
     {
         hr = node->QueryInterface( &nodeElem );
@@ -1351,6 +1348,7 @@ AppxManifestReader::FetchSingleNode( BSTR nodePath, Object **out ) noexcept
     } else if ( !node )
         hr = APPX_E_INVALID_MANIFEST;
 
+    SysFreeString( nodePathStr );
     document->Release();
 
     return hr;
@@ -1358,21 +1356,38 @@ AppxManifestReader::FetchSingleNode( BSTR nodePath, Object **out ) noexcept
 
 template <typename Object>
 HRESULT WINAPI
-AppxManifestReader::FetchNodeList( BSTR nodePath, BSTR nodes, Object **out ) noexcept
+AppxManifestReader::FetchNodeList( const OLECHAR* nodePath, const OLECHAR* nodes, Object **out ) noexcept
 {
     IXMLDOMDocument3 *document = nullptr;
     IXMLDOMNodeList *nodeList = nullptr;
     IXMLDOMNode *node = nullptr;
     HRESULT hr = S_OK;
+    BSTR nodePathStr;
+    BSTR nodesStr;
+
+    nodePathStr = SysAllocString( nodePath );
+    if ( !nodePathStr )
+        return E_OUTOFMEMORY;
+
+    nodesStr = SysAllocString( nodes );
+    if ( !nodesStr )
+    {
+        SysFreeString( nodePathStr );
+        return E_OUTOFMEMORY;
+    }
 
     hr = FetchDocument( &document );
     if ( FAILED( hr ) )
+    {
+        SysFreeString( nodePathStr );
+        SysFreeString( nodesStr );
         return hr;
+    }
 
-    hr = document->selectSingleNode( nodePath, &node );
+    hr = document->selectSingleNode( nodePathStr, &node );
     if ( SUCCEEDED( hr ) && node )
     {
-        hr = node->selectNodes( nodes, &nodeList );
+        hr = node->selectNodes( nodesStr, &nodeList );
         if ( SUCCEEDED( hr ) )
         {
             *out = new(std::nothrow) Object( nodeList );
@@ -1383,6 +1398,8 @@ AppxManifestReader::FetchNodeList( BSTR nodePath, BSTR nodes, Object **out ) noe
     } else if ( !node )
         hr = APPX_E_INVALID_MANIFEST;
 
+    SysFreeString( nodesStr );
+    SysFreeString( nodePathStr );
     document->Release();
     if ( node ) node->Release();
 

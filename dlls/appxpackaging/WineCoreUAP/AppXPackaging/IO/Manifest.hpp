@@ -223,11 +223,11 @@ private:
 
     template <typename Object>
     HRESULT WINAPI
-    FetchNodeList( BSTR nodePath, BSTR nodes, Object **out ) noexcept;
+    FetchNodeList( const OLECHAR* nodePath, const OLECHAR* nodes, Object **out ) noexcept;
 
     template <typename Object>
     HRESULT WINAPI
-    FetchSingleNode( BSTR nodePath, Object **out ) noexcept;
+    FetchSingleNode( const OLECHAR* nodePath, Object **out ) noexcept;
 
     std::atomic<LONG> ref{ 1 };
     IXMLDOMDocument3 *xmlDocument{ nullptr };

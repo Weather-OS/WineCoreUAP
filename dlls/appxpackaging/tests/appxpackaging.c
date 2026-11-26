@@ -84,6 +84,8 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
     IAppxManifestProperties *properties = NULL;
     IAppxManifestPackageDependency *dep = NULL;
     IAppxManifestPackageDependenciesEnumerator *deps = NULL;
+    IAppxManifestResourcesEnumerator *resources = NULL;
+    LPWSTR resource;
     LPWSTR publisher;
     LPWSTR packageFullName;
     LPWSTR packageFamilyName;
@@ -104,6 +106,9 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
 
     hr = IAppxManifestReader_GetPackageDependencies( manifest, &deps );
     ok( SUCCEEDED( hr ), "IAppxManifestReader::GetPackageDependencies failed with %#lx\n", hr );
+
+    hr = IAppxManifestReader_GetResources( manifest, &resources );
+    ok( SUCCEEDED( hr ), "IAppxManifestReader::GetResources failed with %#lx\n", hr );
 
     hr = IAppxManifestPackageId_QueryInterface( packageId, &IID_IAppxManifestPackageId2, (void **)&packageId2 );
     ok( SUCCEEDED( hr ), "IAppxManifestPackageId::QueryInterface failed with %#lx\n", hr );
@@ -157,6 +162,12 @@ static void test_IAppxManifestReader( IAppxManifestReader *manifest )
         hr = IAppxManifestPackageDependenciesEnumerator_MoveNext( deps, &has_current );
         ok( SUCCEEDED( hr ), "IAppxManifestPackageDependenciesEnumerator::MoveNext failed with %#lx\n", hr );
     }
+
+    hr = IAppxManifestResourcesEnumerator_GetCurrent( resources, &resource );
+    ok( SUCCEEDED( hr ), "IAppxManifestResourcesEnumerator::GetCurrent failed with %#lx\n", hr );
+    ok( !lstrcmpW( resource, L"EN-US"), "Got unexpected first resource %s\n", wine_dbgstr_w( resource ) );
+
+    CoTaskMemFree( resource );
 }
 
 static void test_IAppxBlockMapReader( IAppxBlockMapReader *blockMap, IAppxPackageReader *reader )

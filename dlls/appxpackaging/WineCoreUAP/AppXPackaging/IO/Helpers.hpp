@@ -134,6 +134,157 @@ ObtainAttributeFromXMLElement( IXMLDOMElement *elem, const OLECHAR *attribName, 
     return hr;
 }
 
+template <typename Interface>
+class AppxWstrEnumerator 
+    : public Interface
+{
+public:
+    AppxWstrEnumerator(const AppxWstrEnumerator&) = delete;
+    AppxWstrEnumerator& operator=(const AppxWstrEnumerator&) = delete;
+
+    explicit AppxWstrEnumerator( IXMLDOMNodeList *nodes )
+        : nodes(nodes)
+    {
+        nodes->AddRef();
+    }
+
+    virtual ~AppxWstrEnumerator() = default;
+
+    HRESULT WINAPI 
+    QueryInterface( REFIID iid, void **out ) noexcept override
+    {
+        if ( !out )
+            return E_POINTER;
+
+        *out = nullptr;
+
+        if ( iid == __uuidof( IUnknown ) ||
+             iid == __uuidof( Interface ) )
+        {
+            AddRef();
+            *out = static_cast<Interface *>(this);
+            return S_OK;
+        }
+
+        return E_NOINTERFACE;
+    }
+
+    ULONG WINAPI 
+    AddRef() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(++ref);
+        return curr;
+    }
+
+    ULONG WINAPI 
+    Release() noexcept override
+    {
+        ULONG curr = static_cast<ULONG>(--ref);
+        if ( !curr )
+        {
+            nodes->Release();
+            delete this;
+        }
+        return curr;
+    }
+
+    HRESULT WINAPI
+    GetCurrent( LPWSTR *str ) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+        VARIANT val;
+        IXMLDOMNode *node;
+        IXMLDOMElement *elem;
+        IXMLDOMNamedNodeMap *attributes;
+
+        if ( !str )
+            return E_POINTER;
+
+        *str = nullptr;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        if ( iterator >= len )
+            return E_BOUNDS;
+
+        if ( FAILED( hr = nodes->get_item( iterator, &node ) ) )
+            return hr;
+
+        hr = node->QueryInterface( &elem );
+        node->Release();
+
+        if ( FAILED( hr ) )
+            return hr;
+
+        hr = elem->get_attributes( &attributes );
+        elem->Release();
+        if ( SUCCEEDED(hr) && attributes )
+        {
+            hr = attributes->get_item( 0, &node );
+
+            if ( SUCCEEDED(hr) && node )
+            {
+                VariantInit( &val );
+                hr = node->get_nodeValue( &val );
+                node->Release();
+                if ( SUCCEEDED(hr) && val.vt == VT_BSTR )
+                {
+                    *str = (LPWSTR)CoTaskMemAlloc( SysStringByteLen( V_BSTR( &val ) ) + sizeof(WCHAR) );
+                    if ( !*str )
+                        hr = E_OUTOFMEMORY;
+                    else 
+                        lstrcpynW( *str, V_BSTR( &val ), SysStringLen( V_BSTR( &val ) ) + 1 );
+                }
+            }
+        }
+
+        VariantClear( &val );
+
+        return hr;
+    }
+
+    HRESULT WINAPI 
+    GetHasCurrent( BOOL *hasCurrent ) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+
+        if ( !hasCurrent )
+            return E_POINTER;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        *hasCurrent = iterator < len;
+        return S_OK;
+    }
+
+    HRESULT WINAPI MoveNext(BOOL *hasNext) noexcept override
+    {
+        LONG len;
+        HRESULT hr;
+
+        if ( !hasNext )
+            return E_POINTER;
+
+        if ( FAILED( hr = nodes->get_length( &len ) ) )
+            return hr;
+
+        if ( iterator < len )
+            iterator++;
+
+        *hasNext = iterator < len;
+        return S_OK;
+    }
+
+protected:
+    IXMLDOMNodeList *nodes;
+    std::atomic<LONG> ref = 1;
+    LONG iterator = 0;
+};
+
 template <typename Interface, typename CurrentInterface, typename Object>
 class AppxEnumerator 
     : public Interface
