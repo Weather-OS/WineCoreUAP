@@ -226,7 +226,7 @@ AppxManifestPackageDependency::GetMinVersion( UINT64 *minVersion ) noexcept
     if ( FAILED( hr ) )
         return hr;
 
-    ParseVersion( version, minVersion );
+    hr = ParseVersion( version, minVersion );
     CoTaskMemFree( version );
 
     return hr;
@@ -544,7 +544,7 @@ AppxManifestPackageId::GetVersion( UINT64 *packageVersion ) noexcept
     if ( FAILED( hr ) )
         return hr;
 
-    ParseVersion( version, packageVersion );
+    hr = ParseVersion( version, packageVersion );
     CoTaskMemFree( version );
 
     return hr;
@@ -1021,8 +1021,86 @@ AppxManifestReader::GetDeviceCapabilities( IAppxManifestDeviceCapabilitiesEnumer
 HRESULT WINAPI
 AppxManifestReader::GetPrerequisite( LPCWSTR name, UINT64 *value ) noexcept
 {
-    FIXME( "iface %p, name %s, value %p stub!\n", this, debugstr_w( name ), value );
-    return E_NOTIMPL;
+    HRESULT hr = S_OK;
+    IXMLDOMDocument3 *document = nullptr;
+    IXMLDOMElement *nodeElem = nullptr;
+    IXMLDOMNode *node = nullptr;
+    BSTR versionStr;
+    BSTR nodePathStr;
+    BSTR nodeName;
+
+    TRACE( "iface %p, name %s, value %p.\n", this, debugstr_w( name ), value );
+
+    if ( !name )
+        return E_INVALIDARG;
+
+    if ( !value )
+        return E_POINTER;
+    
+    /**
+     * This is a legacy method that may not be present in modern manifests.
+     * It uses the following node structure:
+     * 
+     * <Prerequisites>
+     *   <OSMinVersion>VERSION</OSMinVersion>
+     *   <OSMaxVersionTested>VERSION</OSMaxVersionTested>
+     * </Prerequisites>
+     * 
+     * This is still present in old .appx OPC packages.
+     */
+
+    nodePathStr = SysAllocString( (const OLECHAR *)L"/ns:Package/ns:Prerequisites" );
+    if ( !nodePathStr )
+        return E_OUTOFMEMORY;
+
+    hr = FetchDocument( &document );
+    if ( FAILED( hr ) )
+    {
+        SysFreeString( nodePathStr );
+        return hr;
+    }
+
+    hr = document->selectSingleNode( nodePathStr, &node );
+    if ( SUCCEEDED( hr ) && node )
+    {
+        hr = node->QueryInterface( &nodeElem );
+        node->Release();
+    } else if ( !node )
+        hr = APPX_E_INVALID_MANIFEST;
+
+    SysFreeString( nodePathStr );
+    document->Release();
+
+    if ( FAILED( hr ) )
+    {
+        if ( nodeElem ) nodeElem->Release();
+        return hr;
+    }
+
+    if ( lstrcmpW( name, (LPCWSTR)"OSMinVersion") == 0 )
+    {
+        nodeName = SysAllocString( (const OLECHAR *)L"ns:OSMinVersion" );
+    } else if ( lstrcmpW( name, (LPCWSTR)"OSMaxVersionTested") == 0 )
+    {
+        nodeName = SysAllocString( (const OLECHAR *)L"ns:OSMaxVersionTested" );
+    } else 
+        return E_INVALIDARG;
+
+    if ( !nodeName )
+        return E_OUTOFMEMORY;
+
+    hr = nodeElem->selectSingleNode( nodeName, &node );
+    SysFreeString( nodeName );
+
+    hr = node->get_text( &versionStr );
+    node->Release();
+    if ( FAILED( hr ) )
+        return hr;
+
+    hr = ParseVersion( versionStr, value );
+    SysFreeString( versionStr );
+    
+    return hr;
 }
 
 HRESULT WINAPI
