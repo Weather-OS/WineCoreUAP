@@ -25,10 +25,22 @@
 #include "IO/BlockMap.hpp"
 #include "IO/Manifest.hpp"
 
+#include "wintrust.h"
+#include "shlwapi.h"
+#include "softpub.h"
+
 #include "../../private.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(appxp);
+
+static const GUID AppxP7xSignatureSIP =
+{
+    0x5598CFF1, 0x68DB, 0x4340,
+    { 0xB5, 0x7F, 0x1C, 0xAC, 0xF8, 0x8C, 0x9A, 0x51 }
+};
+
+static GUID ActionGenericVerifyV2 = WINTRUST_ACTION_GENERIC_VERIFY_V2;
 
 class AppxFactoryImpl
     : public IAppxFactory
@@ -239,9 +251,40 @@ public:
     CreateValidatedBlockMapReader( IStream *blockMapStream, LPCWSTR signatureFileName, 
                                    IAppxBlockMapReader **blockMapReader ) noexcept override
     {
-        FIXME( "iface %p, blockMapStream %p, signatureFileName %s, manifestReader %p stub!\n", 
+        LONG trustStatus = 0;
+        WINTRUST_FILE_INFO fileInfo{ .cbStruct = sizeof(WINTRUST_FILE_INFO),
+                                     .pcwszFilePath = signatureFileName,
+                                     .pgKnownSubject = const_cast<GUID*>(&AppxP7xSignatureSIP) };
+        WINTRUST_DATA trustData{ .cbStruct = sizeof(WINTRUST_DATA),
+                                 .dwUIChoice = WTD_UI_NONE,
+                                 .fdwRevocationChecks = WTD_REVOKE_NONE,
+                                 .dwUnionChoice = WTD_CHOICE_FILE,
+                                 .pFile = &fileInfo,
+                                 .dwStateAction = WTD_STATEACTION_VERIFY,
+                                 .dwProvFlags = WTD_CACHE_ONLY_URL_RETRIEVAL };
+
+        TRACE( "iface %p, blockMapStream %p, signatureFileName %s, manifestReader %p.\n", 
             this, blockMapStream, debugstr_w(signatureFileName), blockMapReader );
-        return E_NOTIMPL;
+
+        if ( !blockMapStream || !signatureFileName )
+            return E_INVALIDARG;
+
+        if ( !blockMapReader )
+            return E_POINTER;
+
+        // For now, just verify the p7x content data.
+        // TODO: Check the contents of blockMapStream against the p7x content data.
+
+        trustStatus = WinVerifyTrust( nullptr, &ActionGenericVerifyV2, &trustData );
+
+        trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+
+        WinVerifyTrust( nullptr, &ActionGenericVerifyV2, &trustData );
+
+        if ( trustStatus != ERROR_SUCCESS )
+            return HRESULT_FROM_WIN32( trustStatus );
+
+        return CreateBlockMapReader( blockMapStream, blockMapReader );
     }
 private:
     std::atomic<LONG> ref{ 1 };

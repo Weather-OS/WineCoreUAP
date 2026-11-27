@@ -302,10 +302,19 @@ static void test_IAppxPackageReader( IAppxPackageReader *reader )
 
 static void test_AppxFactory( void )
 {
+    IAppxBlockMapReader *blockMapReader = NULL;
     IAppxPackageReader *reader = NULL;
     IAppxFactory *factory = NULL;
+    IAppxFile *signature = NULL;
+    IAppxFile *blockMap = NULL;
     IStream *stream = NULL;
+    IStream *signatureStream = NULL;
+    IStream *outputStream = NULL;
+    IStream *blockMapStream = NULL;
+    LARGE_INTEGER zero = { .QuadPart = 0 };
     HRESULT hr = S_OK;
+    ULONG bytesRead, bytesWritten;
+    BYTE buffer[4096];
 
 #if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
     LPCWSTR appxPackage = L"ARM64.appx";
@@ -315,7 +324,15 @@ static void test_AppxFactory( void )
     LPCWSTR appxPackage = L"Win32.appx";
 #endif
 
-    WCHAR temp[MAX_PATH], path[MAX_PATH + 7];
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
+    LPCWSTR appxPackageDep = L"ARM64dep.appx";
+#elif defined(__x86_64__) || defined(_M_X64)
+    LPCWSTR appxPackageDep = L"x64dep.appx";
+#elif defined(__i386__) || defined(_M_IX86)
+    LPCWSTR appxPackageDep = L"Win32dep.appx";
+#endif
+
+    WCHAR temp[MAX_PATH], path[MAX_PATH + 32];
 
     GetTempPathW( ARRAY_SIZE(temp), temp );
     GetTempFileNameW( temp, L"winetest-appxpackaging", 0, temp );
@@ -335,6 +352,65 @@ static void test_AppxFactory( void )
     ok( SUCCEEDED( hr ), "IAppxFactory::CreatePackageReader failed with %#lx\n", hr );
 
     test_IAppxPackageReader( reader );
+
+    swprintf( path, MAX_PATH, L"%s\\%s", temp, appxPackageDep );
+    load_resource( appxPackageDep, (const WCHAR *)RT_RCDATA, path );
+
+    IStream_Release( stream );
+
+    /*
+     * once AppxPackageReader tests pass here, extract AppxSignature.p7x right here,
+     * and test CreateValidatedBlockMapReader
+     */
+
+    hr = SHCreateStreamOnFileEx( path, STGM_READ | STGM_SHARE_EXCLUSIVE, 0, FALSE, NULL, &stream );
+    ok( SUCCEEDED( hr ), "SHCreateStreamOnFileEx failed with %#lx\n", hr );
+
+    hr = IAppxFactory_CreatePackageReader( factory, stream, &reader );
+    ok( SUCCEEDED( hr ), "IAppxFactory::CreatePackageReader failed with %#lx\n", hr );
+
+    hr = IAppxPackageReader_GetFootprintFile( reader, APPX_FOOTPRINT_FILE_TYPE_SIGNATURE, &signature );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetFootprintFile failed with %#lx\n", hr );
+
+    hr = IAppxFile_GetStream( signature, &signatureStream );
+    ok( SUCCEEDED( hr ), "IAppxFile::GetStream failed with %#lx\n", hr );
+
+    hr = IAppxPackageReader_GetFootprintFile( reader, APPX_FOOTPRINT_FILE_TYPE_BLOCKMAP, &blockMap );
+    ok( SUCCEEDED( hr ), "IAppxPackageReader::GetFootprintFile failed with %#lx\n", hr );
+
+    hr = IAppxFile_GetStream( blockMap, &blockMapStream );
+    ok( SUCCEEDED( hr ), "IAppxFile::GetStream failed with %#lx\n", hr );
+
+    swprintf( path, ARRAY_SIZE(path), L"%s\\AppxSignature.p7x", temp );
+
+    hr = IStream_Seek( signatureStream, zero, STREAM_SEEK_SET, NULL );
+    ok( SUCCEEDED( hr ), "IStream::Seek failed with %#lx\n", hr );
+
+    hr = SHCreateStreamOnFileEx( path, STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, FILE_ATTRIBUTE_NORMAL, TRUE, NULL, &outputStream );
+    ok( SUCCEEDED( hr ), "SHCreateStreamOnFileEx failed with %#lx\n", hr );
+
+    while ( TRUE )
+    {
+        hr = IStream_Read( signatureStream, buffer, sizeof(buffer), &bytesRead );
+        ok( SUCCEEDED( hr ), "IStream::Read failed with %#lx\n", hr );
+
+        if ( FAILED( hr ) || !bytesRead ) break;
+
+        hr = IStream_Write( outputStream, buffer, bytesRead, &bytesWritten );
+        ok( SUCCEEDED( hr ), "IStream::Write failed with %#lx\n", hr );
+
+        if ( FAILED( hr ) ) break;
+
+        ok( bytesWritten == bytesRead, "Expected to write %lu bytes, wrote %lu\n", bytesRead, bytesWritten );
+
+        if ( bytesWritten != bytesRead ) break;
+    }
+
+    IStream_Release( outputStream );
+    IStream_Release( signatureStream );
+
+    hr = IAppxFactory_CreateValidatedBlockMapReader( factory, blockMapStream, path, &blockMapReader );
+    ok( SUCCEEDED( hr ), "IAppxFactory::CreateValidatedBlockMapReader failed with %#lx\n", hr );
 }
 
 START_TEST(appxpackaging)
