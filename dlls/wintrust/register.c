@@ -1011,6 +1011,7 @@ HRESULT WINAPI DllRegisterServer(void)
     static GUID Unknown4 = { 0xC689AAB9, 0x8E78, 0x11D0, { 0x8C,0x47,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
     static GUID Unknown5 = { 0xDE351A43, 0x8E59, 0x11D0, { 0x8C,0x47,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
     static GUID Unknown6 = { 0x9BA61D3F, 0xE73A, 0x11D0, { 0x8C,0xD2,0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
+    static GUID Unknown7 = { 0x5598CFF1, 0x68DB, 0x4340, { 0xB5,0x7F,0x1C,0xAC,0xF8,0x8C,0x9A,0x51 }};
     static WCHAR MagicNumber2[] = {'M','S','C','F', 0};
     static WCHAR MagicNumber3[] = {'0','x','0','0','0','0','4','5','5','0', 0};
     static WCHAR CafeBabe[] = {'0','x','c','a','f','e','b','a','b','e', 0};
@@ -1125,6 +1126,8 @@ add_trust_providers:
     if (!WINTRUST_SIPPAddProvider(&Unknown5, CafeBabe))
         SIPAddProviderRes = S_FALSE;
     if (!WINTRUST_SIPPAddProvider(&Unknown6, CafeBabe))
+        SIPAddProviderRes = S_FALSE;
+    if (!WINTRUST_SIPPAddProvider(&Unknown7, CafeBabe))
         SIPAddProviderRes = S_FALSE;
 
     /* Native does a CryptSIPRemoveProvider here for {941C2937-1292-11D1-85BE-00C04FC295EE}.

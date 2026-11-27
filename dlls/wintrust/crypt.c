@@ -1611,6 +1611,103 @@ static BOOL WINTRUST_GetSignedMsgFromCatFile(SIP_SUBJECTINFO *pSubjectInfo,
     return ret;
 }
 
+static BOOL WINTRUST_GetSignedMsgFromP7xFile(
+    SIP_SUBJECTINFO *pSubjectInfo,
+    DWORD *pdwEncodingType,
+    DWORD dwIndex,
+    DWORD *pcbSignedDataMsg,
+    BYTE *pbSignedDataMsg)
+{
+    LARGE_INTEGER offset;
+    LARGE_INTEGER base_offset, zero, file_size;
+    DWORD dwRead, signature_size;
+    BYTE header[4];
+    BOOL ret = FALSE;
+
+    TRACE( "(%p %p %ld %p %p)\n", pSubjectInfo, pdwEncodingType, dwIndex, pcbSignedDataMsg, pbSignedDataMsg );
+
+    zero.QuadPart = 0;
+
+    if ( !pSubjectInfo || !pdwEncodingType || !pcbSignedDataMsg || pSubjectInfo->hFile == INVALID_HANDLE_VALUE )
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+
+    // P7x files represent only a single file signature.
+    if ( dwIndex != 0 )
+    {
+        SetLastError( CRYPT_E_NO_MATCH );
+        return FALSE;
+    }
+
+    if ( !SetFilePointerEx( pSubjectInfo->hFile, zero, &base_offset, FILE_CURRENT ) )
+    {
+        TRACE("hFile %p\n", pSubjectInfo->hFile);
+        return FALSE;
+    }
+    if ( !GetFileSizeEx( pSubjectInfo->hFile, &file_size ) )
+        return FALSE;
+
+    if ( file_size.QuadPart < sizeof(header) || file_size.QuadPart - sizeof(header) > MAXDWORD )
+    {
+        SetLastError( ERROR_BAD_FORMAT );
+        return FALSE;
+    }
+
+    signature_size = (DWORD)(file_size.QuadPart - sizeof(header));
+
+    if ( !SetFilePointerEx( pSubjectInfo->hFile, zero, NULL, FILE_BEGIN ) )
+        goto _CLEANUP;
+
+    if ( !ReadFile( pSubjectInfo->hFile, header, sizeof(header), &dwRead, NULL ) || dwRead != sizeof(header) )
+    {
+        SetLastError( ERROR_BAD_FORMAT );
+        goto _CLEANUP;
+    }
+
+    if ( strncmp( (LPCSTR)header, "PKCX", 4 ) != 0 ) 
+    {
+        SetLastError( ERROR_BAD_FORMAT );
+        goto _CLEANUP;
+    }
+
+    if ( !pbSignedDataMsg )
+    {
+        *pcbSignedDataMsg = signature_size;
+        ret = TRUE;
+        goto _CLEANUP;
+    }
+
+    if ( *pcbSignedDataMsg < signature_size )
+    {
+        *pcbSignedDataMsg = signature_size;
+        SetLastError( ERROR_INSUFFICIENT_BUFFER );
+        goto _CLEANUP;
+    }
+
+    offset.QuadPart = sizeof(header);
+
+    if ( !SetFilePointerEx( pSubjectInfo->hFile, offset, NULL, FILE_BEGIN ) )
+        goto _CLEANUP;
+
+    if ( !ReadFile( pSubjectInfo->hFile, pbSignedDataMsg, signature_size, &dwRead, NULL ) || dwRead != signature_size )
+    {
+        SetLastError( ERROR_BAD_FORMAT );
+        goto _CLEANUP;
+    }
+
+    *pcbSignedDataMsg = signature_size;
+    *pdwEncodingType = X509_ASN_ENCODING | PKCS_7_ASN_ENCODING;
+    ret = TRUE;
+
+_CLEANUP:
+    if ( !SetFilePointerEx( pSubjectInfo->hFile, base_offset, NULL, FILE_BEGIN ) )
+        return FALSE;
+
+    return ret;
+}
+
 /* GUIDs used by CryptSIPGetSignedDataMsg and CryptSIPPutSignedDataMsg */
 static const GUID unknown = { 0xC689AAB8, 0x8E78, 0x11D0, { 0x8C,0x47,
     0x00,0xC0,0x4F,0xC2,0x95,0xEE } };
@@ -1618,6 +1715,8 @@ static const GUID cabGUID = { 0xC689AABA, 0x8E78, 0x11D0, { 0x8C,0x47,
     0x00,0xC0,0x4F,0xC2,0x95,0xEE } };
 static const GUID catGUID = { 0xDE351A43, 0x8E59, 0x11D0, { 0x8C,0x47,
      0x00,0xC0,0x4F,0xC2,0x95,0xEE }};
+static const GUID appxP7xGUID = { 0x5598CFF1, 0x68DB, 0x4340, { 0xB5, 0x7F, 
+    0x1C, 0xAC, 0xF8, 0x8C, 0x9A, 0x51 }};
 
 /***********************************************************************
  *      CryptSIPGetSignedDataMsg  (WINTRUST.@)
@@ -1644,6 +1743,9 @@ BOOL WINAPI CryptSIPGetSignedDataMsg(SIP_SUBJECTINFO* pSubjectInfo, DWORD* pdwEn
          dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
     else if (!memcmp(pSubjectInfo->pgSubjectType, &catGUID, sizeof(catGUID)))
         ret = WINTRUST_GetSignedMsgFromCatFile(pSubjectInfo, pdwEncodingType,
+         dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
+    else if (!memcmp(pSubjectInfo->pgSubjectType, &appxP7xGUID, sizeof(appxP7xGUID)))
+        ret = WINTRUST_GetSignedMsgFromP7xFile(pSubjectInfo, pdwEncodingType,
          dwIndex, pcbSignedDataMsg, pbSignedDataMsg);
     else
     {
